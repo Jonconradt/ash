@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -9,9 +10,12 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
+	"syscall"
 	"time"
 
 	"github.com/charmbracelet/glamour"
@@ -20,6 +24,7 @@ import (
 const (
 	defaultOllamaPort = "11434"
 	defaultHistoryMax = 40
+	defaultAITimeout  = 3 * time.Minute
 	historyFileName   = ".ash_history.json"
 	systemFileName    = ".ash_system"
 )
@@ -51,6 +56,10 @@ var (
 	osReadFile       = os.ReadFile
 	osWriteFile      = os.WriteFile
 	newTermRenderer  = glamour.NewTermRenderer
+	signalNotifyContext = signal.NotifyContext
+	newHTTPClient       = func(timeout time.Duration) *http.Client {
+		return &http.Client{Timeout: timeout}
+	}
 )
 
 func main() {
@@ -107,8 +116,24 @@ func run(args []string, stdout, stderr io.Writer) int {
 	messages = append(messages, conversation...)
 	messages = append(messages, message{Role: "user", Content: userInput})
 
-	assistantReply, err := chat(baseURL, model, messages)
+	timeout := aiTimeout()
+	ctx, stop := signalNotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	stopSpinner := startThinkingIndicator(stderr)
+	assistantReply, err := chat(ctx, baseURL, model, messages)
+	stopSpinner()
 	if err != nil {
+		if errors.Is(err, context.Canceled) {
+			fmt.Fprintln(stderr, "ollama request aborted")
+			return 130
+		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			fmt.Fprintf(stderr, "ollama request timed out after %s\n", timeout)
+			return 1
+		}
 		fmt.Fprintf(stderr, "ollama request failed: %v\n", err)
 		return 1
 	}
@@ -236,6 +261,16 @@ func historyLimit() int {
 	return defaultHistoryMax
 }
 
+func aiTimeout() time.Duration {
+	if raw := strings.TrimSpace(os.Getenv("AI_TIMEOUT")); raw != "" {
+		if parsed, err := time.ParseDuration(raw); err == nil && parsed > 0 {
+			return parsed
+		}
+	}
+
+	return defaultAITimeout
+}
+
 func keepRecentMessages(messages []message, max int) []message {
 	if len(messages) <= max {
 		return messages
@@ -244,7 +279,7 @@ func keepRecentMessages(messages []message, max int) []message {
 	return append([]message(nil), messages[len(messages)-max:]...)
 }
 
-func chat(baseURL, model string, messages []message) (string, error) {
+func chat(ctx context.Context, baseURL, model string, messages []message) (string, error) {
 	requestBody := chatRequest{
 		Model:    model,
 		Messages: messages,
@@ -256,8 +291,14 @@ func chat(baseURL, model string, messages []message) (string, error) {
 		return "", err
 	}
 
-	client := &http.Client{Timeout: 60 * time.Second}
-	resp, err := client.Post(baseURL+"/api/chat", "application/json", bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/api/chat", bytes.NewReader(payload))
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	client := newHTTPClient(aiTimeout())
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
 	}
@@ -282,6 +323,39 @@ func chat(baseURL, model string, messages []message) (string, error) {
 	}
 
 	return parsed.Message.Content, nil
+}
+
+func startThinkingIndicator(w io.Writer) func() {
+	frames := []string{"|", "/", "-", "\\"}
+	done := make(chan struct{})
+	stopped := make(chan struct{})
+	var once sync.Once
+
+	go func() {
+		defer close(stopped)
+		ticker := time.NewTicker(100 * time.Millisecond)
+		defer ticker.Stop()
+
+		frame := 0
+		for {
+			fmt.Fprintf(w, "\rThinking... %s", frames[frame])
+			frame = (frame + 1) % len(frames)
+
+			select {
+			case <-done:
+				fmt.Fprint(w, "\r                \r")
+				return
+			case <-ticker.C:
+			}
+		}
+	}()
+
+	return func() {
+		once.Do(func() {
+			close(done)
+			<-stopped
+		})
+	}
 }
 
 func renderMarkdownWithGlamour(markdown string) (string, error) {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,7 +15,9 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/charmbracelet/glamour"
 )
@@ -230,6 +233,22 @@ func TestGetHistoryPathError(t *testing.T) {
 	}
 }
 
+func TestAITimeout(t *testing.T) {
+	t.Run("configured duration", func(t *testing.T) {
+		t.Setenv("AI_TIMEOUT", "45s")
+		if got := aiTimeout(); got != 45*time.Second {
+			t.Fatalf("aiTimeout mismatch: got %s want %s", got, 45*time.Second)
+		}
+	})
+
+	t.Run("invalid falls back", func(t *testing.T) {
+		t.Setenv("AI_TIMEOUT", "not-a-duration")
+		if got := aiTimeout(); got != defaultAITimeout {
+			t.Fatalf("aiTimeout fallback mismatch: got %s want %s", got, defaultAITimeout)
+		}
+	})
+}
+
 func TestLoadHistoryNotFound(t *testing.T) {
 	origReadFile := osReadFile
 	t.Cleanup(func() { osReadFile = origReadFile })
@@ -428,6 +447,9 @@ func TestFormatAssistantOutputFallbackOnRendererError(t *testing.T) {
 }
 
 func TestChat(t *testing.T) {
+	origClientFactory := newHTTPClient
+	t.Cleanup(func() { newHTTPClient = origClientFactory })
+
 	t.Run("success", func(t *testing.T) {
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if r.URL.Path != "/api/chat" {
@@ -438,7 +460,7 @@ func TestChat(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		got, err := chat(srv.URL, "model", []message{{Role: "user", Content: "hi"}})
+		got, err := chat(context.Background(), srv.URL, "model", []message{{Role: "user", Content: "hi"}})
 		if err != nil {
 			t.Fatalf("chat returned error: %v", err)
 		}
@@ -453,7 +475,7 @@ func TestChat(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		_, err := chat(srv.URL, "model", []message{{Role: "user", Content: "hi"}})
+		_, err := chat(context.Background(), srv.URL, "model", []message{{Role: "user", Content: "hi"}})
 		if err == nil {
 			t.Fatalf("expected error, got nil")
 		}
@@ -469,7 +491,7 @@ func TestChat(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		_, err := chat(srv.URL, "model", []message{{Role: "user", Content: "hi"}})
+		_, err := chat(context.Background(), srv.URL, "model", []message{{Role: "user", Content: "hi"}})
 		if err == nil {
 			t.Fatalf("expected error, got nil")
 		}
@@ -484,11 +506,77 @@ func TestChat(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		_, err := chat(srv.URL, "model", []message{{Role: "user", Content: "hi"}})
+		_, err := chat(context.Background(), srv.URL, "model", []message{{Role: "user", Content: "hi"}})
 		if err == nil {
 			t.Fatalf("expected error, got nil")
 		}
 	})
+
+	t.Run("context canceled", func(t *testing.T) {
+		started := make(chan struct{})
+		release := make(chan struct{})
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			close(started)
+			<-release
+		}))
+		defer srv.Close()
+
+		ctx, cancel := context.WithCancel(context.Background())
+		result := make(chan error, 1)
+		go func() {
+			_, err := chat(ctx, srv.URL, "model", []message{{Role: "user", Content: "hi"}})
+			result <- err
+		}()
+
+		<-started
+		cancel()
+		close(release)
+
+		err := <-result
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("expected context.Canceled, got %v", err)
+		}
+	})
+
+	t.Run("client timeout", func(t *testing.T) {
+		var timeoutSeen atomic.Int64
+		newHTTPClient = func(timeout time.Duration) *http.Client {
+			timeoutSeen.Store(int64(timeout))
+			return &http.Client{Timeout: timeout}
+		}
+		t.Setenv("AI_TIMEOUT", "20ms")
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			time.Sleep(100 * time.Millisecond)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"message":{"role":"assistant","content":"slow"}}`))
+		}))
+		defer srv.Close()
+
+		_, err := chat(context.Background(), srv.URL, "model", []message{{Role: "user", Content: "hi"}})
+		if err == nil {
+			t.Fatalf("expected timeout error, got nil")
+		}
+		if timeoutSeen.Load() != int64(20*time.Millisecond) {
+			t.Fatalf("expected client timeout %s, got %s", 20*time.Millisecond, time.Duration(timeoutSeen.Load()))
+		}
+		newHTTPClient = origClientFactory
+	})
+}
+
+func TestStartThinkingIndicator(t *testing.T) {
+	var output bytes.Buffer
+	stop := startThinkingIndicator(&output)
+	time.Sleep(150 * time.Millisecond)
+	stop()
+
+	got := output.String()
+	if !strings.Contains(got, "Thinking...") {
+		t.Fatalf("expected thinking indicator output, got %q", got)
+	}
+	if !strings.Contains(got, "\r") {
+		t.Fatalf("expected carriage return output, got %q", got)
+	}
 }
 
 func TestRenderMarkdownWithGlamourEmojiPassthrough(t *testing.T) {

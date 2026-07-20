@@ -9,6 +9,8 @@ the assistant response.
 - Uses environment variable `AI` with format `ollama://host[:port]/model`
 - Defaults Ollama port to `11434` when omitted
 - Uses Ollama Chat API (`/api/chat`)
+- Shows an ANSI-friendly thinking indicator while waiting for Ollama
+- Supports `Ctrl-C` to abort an in-flight Ollama request
 - Keeps chat history across calls
 - Uses `.ash_system` as system prompt when present
 - Supports emoji input/output (UTF-8)
@@ -73,6 +75,13 @@ Optional max history messages (default: `40`):
 
 ```bash
 export ASH_HISTORY_MAX=80
+```
+
+Optional AI request timeout (default: `3m`):
+
+```bash
+export AI_TIMEOUT=90s
+export AI_TIMEOUT=3m
 ```
 
 ## Use with `command_not_found_handle`
