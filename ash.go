@@ -50,12 +50,12 @@ type historyData struct {
 }
 
 var (
-	markdownRenderer = renderMarkdownWithGlamour
-	osGetwd          = os.Getwd
-	osUserHomeDir    = os.UserHomeDir
-	osReadFile       = os.ReadFile
-	osWriteFile      = os.WriteFile
-	newTermRenderer  = glamour.NewTermRenderer
+	markdownRenderer    = renderMarkdownWithGlamour
+	osGetwd             = os.Getwd
+	osUserHomeDir       = os.UserHomeDir
+	osReadFile          = os.ReadFile
+	osWriteFile         = os.WriteFile
+	newTermRenderer     = glamour.NewTermRenderer
 	signalNotifyContext = signal.NotifyContext
 	newHTTPClient       = func(timeout time.Duration) *http.Client {
 		return &http.Client{Timeout: timeout}
