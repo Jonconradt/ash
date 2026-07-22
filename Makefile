@@ -1,4 +1,4 @@
-.PHONY: all verify lint test test-race test-cover test-fuzz vet staticcheck install release release-check release-build release-pkg release-validate
+.PHONY: all verify lint test test-race test-cover test-fuzz vet staticcheck install release release-check release-build release-pkg release-validate release-publish
 
 COVERAGE_MIN ?= 95
 FUZZ_TIME ?= 10s
@@ -49,7 +49,7 @@ staticcheck:
 install: test lint
 	go install ./...
 
-release: release-check release-build release-pkg release-validate
+release: release-check release-build release-pkg release-validate release-publish
 
 release-check: lint test
 	@if [[ -n "$$(git status --porcelain)" ]]; then \
@@ -87,3 +87,31 @@ release-validate:
 		--install-path "$(RELEASE_INSTALL_PATH)" \
 		--app-name "$(APP_NAME)"
 	@shasum -a 256 "$(RELEASE_PKG_PATH)" > "$(RELEASE_PKG_PATH).sha256"
+
+release-publish:
+	@head_sha="$$(git rev-parse HEAD)"; \
+	local_sha="$$(git rev-parse -q --verify "refs/tags/$(RELEASE_VERSION)^{}" 2>/dev/null || true)"; \
+	if [[ -n "$$local_sha" && "$$local_sha" != "$$head_sha" ]]; then \
+		echo "local tag $(RELEASE_VERSION) already exists and points to $$local_sha, not HEAD ($$head_sha)"; \
+		exit 1; \
+	fi; \
+	if [[ -z "$$local_sha" ]]; then \
+		git tag -a "$(RELEASE_VERSION)" -m "release $(RELEASE_VERSION)"; \
+		echo "created local tag $(RELEASE_VERSION)"; \
+	else \
+		echo "local tag $(RELEASE_VERSION) already exists at HEAD"; \
+	fi
+	@remote_sha="$$(git ls-remote --tags origin "refs/tags/$(RELEASE_VERSION)^{}" | awk '{print $$1}')"; \
+	head_sha="$$(git rev-parse HEAD)"; \
+	if [[ -n "$$remote_sha" ]]; then \
+		if [[ "$$remote_sha" == "$$head_sha" ]]; then \
+			echo "remote tag $(RELEASE_VERSION) already exists at HEAD; nothing to push"; \
+		else \
+			echo "remote tag $(RELEASE_VERSION) already exists and points to $$remote_sha, not HEAD ($$head_sha)"; \
+			echo "choose a new RELEASE_VERSION or move the tag manually"; \
+			exit 1; \
+		fi; \
+	else \
+		git push origin "refs/tags/$(RELEASE_VERSION):refs/tags/$(RELEASE_VERSION)"; \
+		echo "pushed tag $(RELEASE_VERSION) to origin"; \
+	fi

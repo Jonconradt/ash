@@ -40,7 +40,8 @@ make release RELEASE_VERSION=v1.2.3
 - `make install` runs `go install ./...`
 - `make verify` runs strict checks (tests, race, coverage gate, vet, staticcheck)
 - `make release` runs quality checks, builds an arm64 macOS `.pkg`, validates it,
-  and writes a SHA-256 checksum to `dist/release/`
+  writes a SHA-256 checksum to `dist/release/`, creates the release tag, and pushes
+  it to `origin`
 - If `RELEASE_VERSION` is omitted, the latest stable tag (`v<major>.<minor>.<patch>`)
   is used as the source and the next version is derived as `v<major>.<minor+1>.0`
 
@@ -50,17 +51,18 @@ Contributor note: run `make lint test` before submitting changes.
 
 Canonical publishing is tag-driven in GitHub Actions.
 
-1. Create and push a semantic tag like `v1.2.3`.
-2. The `release` workflow builds and validates the macOS installer package.
-3. GitHub Release assets are published automatically:
+1. Run `make release RELEASE_VERSION=v1.2.3` (or omit `RELEASE_VERSION` to auto-derive).
+2. `make release` creates and pushes the release tag to `origin`.
+3. The `release` workflow builds and validates the macOS installer package.
+4. GitHub Release assets are published automatically:
    - `ash-v1.2.3-darwin-arm64.pkg`
    - `ash-v1.2.3-darwin-arm64.pkg.sha256`
 
-For local maintainer checks, you can build release artifacts without publishing:
+For local maintainer checks without publishing, run the release build steps directly:
 
 ```bash
-make release
-make release RELEASE_VERSION=v1.2.3
+make release-check
+make release-build release-pkg release-validate RELEASE_VERSION=v1.2.3
 ```
 
 Requirements for local packaging:
