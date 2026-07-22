@@ -140,6 +140,97 @@ func TestReadSystemPrompt(t *testing.T) {
 	}
 }
 
+func TestReadSystemPromptExpandsEnvironmentVariables(t *testing.T) {
+	originalCwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd failed: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(originalCwd)
+	})
+
+	cwd := t.TempDir()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("ASH_TEST_ONE", "first")
+	t.Setenv("ASH_TEST_TWO", "second")
+
+	if err := os.Chdir(cwd); err != nil {
+		t.Fatalf("Chdir failed: %v", err)
+	}
+
+	content := "one=$ASH_TEST_ONE two=${ASH_TEST_TWO} missing=$ASH_TEST_MISSING"
+	if err := os.WriteFile(filepath.Join(cwd, systemFileName), []byte(content), 0o600); err != nil {
+		t.Fatalf("write cwd prompt: %v", err)
+	}
+
+	prompt, err := readSystemPrompt()
+	if err != nil {
+		t.Fatalf("readSystemPrompt error: %v", err)
+	}
+
+	want := "one=first two=second missing="
+	if prompt != want {
+		t.Fatalf("expanded prompt mismatch: got %q want %q", prompt, want)
+	}
+}
+
+func TestReadSystemPromptExpandsUname(t *testing.T) {
+	originalCwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd failed: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(originalCwd)
+	})
+
+	origLookPath := execLookPath
+	origCommandOutput := execCommandOutput
+	t.Cleanup(func() {
+		execLookPath = origLookPath
+		execCommandOutput = origCommandOutput
+	})
+
+	cwd := t.TempDir()
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("UNAME", "env-uname")
+
+	if err := os.Chdir(cwd); err != nil {
+		t.Fatalf("Chdir failed: %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(cwd, systemFileName), []byte("host=$UNAME"), 0o600); err != nil {
+		t.Fatalf("write cwd prompt: %v", err)
+	}
+
+	execLookPath = func(file string) (string, error) {
+		if file != "uname" {
+			t.Fatalf("unexpected lookpath query: %q", file)
+		}
+		return "/usr/bin/uname", nil
+	}
+	execCommandOutput = func(name string, args ...string) ([]byte, error) {
+		if name != "uname" {
+			t.Fatalf("unexpected command name: %q", name)
+		}
+		if len(args) != 1 || args[0] != "-a" {
+			t.Fatalf("unexpected command args: %#v", args)
+		}
+		return []byte("Test Kernel 1.0\n"), nil
+	}
+
+	prompt, err := readSystemPrompt()
+	if err != nil {
+		t.Fatalf("readSystemPrompt error: %v", err)
+	}
+
+	want := "host=Test Kernel 1.0"
+	if prompt != want {
+		t.Fatalf("expanded prompt mismatch: got %q want %q", prompt, want)
+	}
+}
+
 func TestReadSystemPromptErrors(t *testing.T) {
 	origGetwd := osGetwd
 	origHome := osUserHomeDir

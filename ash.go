@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strconv"
@@ -55,6 +56,8 @@ var (
 	osUserHomeDir       = os.UserHomeDir
 	osReadFile          = os.ReadFile
 	osWriteFile         = os.WriteFile
+	execLookPath        = exec.LookPath
+	execCommandOutput   = func(name string, args ...string) ([]byte, error) { return exec.Command(name, args...).Output() }
 	newTermRenderer     = glamour.NewTermRenderer
 	signalNotifyContext = signal.NotifyContext
 	newHTTPClient       = func(timeout time.Duration) *http.Client {
@@ -127,11 +130,11 @@ func run(args []string, stdout, stderr io.Writer) int {
 	stopSpinner()
 	if err != nil {
 		if errors.Is(err, context.Canceled) {
-			fmt.Fprintln(stderr, "ollama request aborted")
+			fmt.Fprintln(stderr, "AI doesn't feel like talking right now. Try again later.")
 			return 130
 		}
 		if errors.Is(err, context.DeadlineExceeded) {
-			fmt.Fprintf(stderr, "ollama request timed out after %s\n", timeout)
+			fmt.Fprintf(stderr, "AI took longer than %s, so we should probably try again later\n", timeout)
 			return 1
 		}
 		fmt.Fprintf(stderr, "ollama request failed: %v\n", err)
@@ -193,7 +196,7 @@ func readSystemPrompt() (string, error) {
 
 	cwdPath := filepath.Join(cwd, systemFileName)
 	if content, err := osReadFile(cwdPath); err == nil {
-		return string(content), nil
+		return expandSystemPrompt(string(content)), nil
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return "", err
 	}
@@ -205,12 +208,28 @@ func readSystemPrompt() (string, error) {
 
 	homePath := filepath.Join(home, systemFileName)
 	if content, err := osReadFile(homePath); err == nil {
-		return string(content), nil
+		return expandSystemPrompt(string(content)), nil
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return "", err
 	}
 
 	return "", nil
+}
+
+func expandSystemPrompt(prompt string) string {
+	unameValue := ""
+	if _, err := execLookPath("uname"); err == nil {
+		if output, err := execCommandOutput("uname", "-a"); err == nil {
+			unameValue = strings.TrimSpace(string(output))
+		}
+	}
+
+	return os.Expand(prompt, func(key string) string {
+		if key == "UNAME" && unameValue != "" {
+			return unameValue
+		}
+		return os.Getenv(key)
+	})
 }
 
 func getHistoryPath() (string, error) {
