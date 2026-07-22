@@ -14,6 +14,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -1036,6 +1037,304 @@ func TestRenderMarkdownWithGlamourFactoryError(t *testing.T) {
 	_, err := renderMarkdownWithGlamour("x")
 	if err == nil || !strings.Contains(err.Error(), "factory failed") {
 		t.Fatalf("expected factory failed error, got %v", err)
+	}
+}
+
+func TestParseInstallArgs(t *testing.T) {
+	t.Run("empty args", func(t *testing.T) {
+		shellName, dryRun, err := parseInstallArgs(nil)
+		if err != nil {
+			t.Fatalf("parseInstallArgs returned error: %v", err)
+		}
+		if shellName != "" || dryRun {
+			t.Fatalf("unexpected parse result: shell=%q dryRun=%v", shellName, dryRun)
+		}
+	})
+
+	t.Run("shell and dry run", func(t *testing.T) {
+		shellName, dryRun, err := parseInstallArgs([]string{"--shell", "zsh", "--dry-run"})
+		if err != nil {
+			t.Fatalf("parseInstallArgs returned error: %v", err)
+		}
+		if shellName != "zsh" || !dryRun {
+			t.Fatalf("unexpected parse result: shell=%q dryRun=%v", shellName, dryRun)
+		}
+	})
+
+	t.Run("missing shell value", func(t *testing.T) {
+		_, _, err := parseInstallArgs([]string{"--shell"})
+		if err == nil || !strings.Contains(err.Error(), "--shell requires a value") {
+			t.Fatalf("expected missing value error, got %v", err)
+		}
+	})
+
+	t.Run("unknown arg", func(t *testing.T) {
+		_, _, err := parseInstallArgs([]string{"--wat"})
+		if err == nil || !strings.Contains(err.Error(), "unknown install argument") {
+			t.Fatalf("expected unknown argument error, got %v", err)
+		}
+	})
+}
+
+func TestInstallRecommendation(t *testing.T) {
+	originalCwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd failed: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(originalCwd)
+	})
+
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SHELL", "/bin/bash")
+
+	reco, err := installRecommendation()
+	if err != nil {
+		t.Fatalf("installRecommendation returned error: %v", err)
+	}
+	if !strings.Contains(reco, "ash install --shell bash") {
+		t.Fatalf("expected recommendation for bash install, got %q", reco)
+	}
+
+	rcPath := filepath.Join(home, ".bashrc")
+	if err := os.WriteFile(rcPath, []byte(installBlockForShell("bash")), 0o600); err != nil {
+		t.Fatalf("write rc file: %v", err)
+	}
+
+	reco, err = installRecommendation()
+	if err != nil {
+		t.Fatalf("installRecommendation returned error: %v", err)
+	}
+	if reco != "" {
+		t.Fatalf("expected no recommendation when installed, got %q", reco)
+	}
+}
+
+func TestRunInstall(t *testing.T) {
+	originalCwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd failed: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(originalCwd)
+	})
+
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SHELL", "/bin/bash")
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{"install", "--shell", "bash"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
+	}
+
+	rcPath := filepath.Join(home, ".bashrc")
+	rcContent, err := os.ReadFile(rcPath)
+	if err != nil {
+		t.Fatalf("read rc file: %v", err)
+	}
+
+	content := string(rcContent)
+	if !strings.Contains(content, installStartMarker) || !strings.Contains(content, installEndMarker) {
+		t.Fatalf("expected install block markers in rc file, got %q", content)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{"install", "--shell", "bash"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected second install to succeed, got %d stderr=%q", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "already present") {
+		t.Fatalf("expected idempotent install message, got %q", stdout.String())
+	}
+
+	rcContentAfter, err := os.ReadFile(rcPath)
+	if err != nil {
+		t.Fatalf("read rc file after second install: %v", err)
+	}
+	if strings.Count(string(rcContentAfter), installStartMarker) != 1 {
+		t.Fatalf("expected single install block, got %d", strings.Count(string(rcContentAfter), installStartMarker))
+	}
+}
+
+func TestRunInstallDryRun(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SHELL", "/bin/zsh")
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{"install", "--shell", "zsh", "--dry-run"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected dry-run exit code 0, got %d stderr=%q", code, stderr.String())
+	}
+
+	if !strings.Contains(stdout.String(), "[dry-run]") {
+		t.Fatalf("expected dry-run output, got %q", stdout.String())
+	}
+
+	rcPath := filepath.Join(home, ".zshrc")
+	if _, err := os.Stat(rcPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected no rc file write in dry-run, stat err=%v", err)
+	}
+}
+
+var conservativeOperandPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
+
+func shouldRouteToAshConservative(command string, args []string) bool {
+	// Rule A: no args => delegate.
+	if len(args) == 0 {
+		return false
+	}
+
+	// Rule B: flag-style args => delegate.
+	for _, arg := range args {
+		if strings.HasPrefix(arg, "-") {
+			return false
+		}
+	}
+
+	// Rule C: path-like args => delegate.
+	for _, arg := range args {
+		if strings.Contains(arg, "/") || strings.HasPrefix(arg, "./") || strings.HasPrefix(arg, "../") {
+			return false
+		}
+	}
+
+	// Rule D: builtin/keyword single-operand forms => delegate.
+	switch strings.ToLower(command) {
+	case "time", "test", "type":
+		if len(args) == 1 && conservativeOperandPattern.MatchString(args[0]) {
+			return false
+		}
+	}
+
+	full := command
+	if len(args) > 0 {
+		full += " " + strings.Join(args, " ")
+	}
+
+	// Rule E: trailing question mark with enough tokens => ash.
+	if strings.HasSuffix(full, "?") && len(args) >= 2 {
+		return true
+	}
+
+	// Rule F: interrogative/auxiliary first arg with enough tokens => ash.
+	first := strings.ToLower(args[0])
+	switch first {
+	case "is", "are", "am", "do", "does", "did", "can", "could", "should", "would", "will", "why", "how", "when", "where", "who":
+		return len(args) >= 2
+	}
+
+	// Rule G: default => delegate.
+	return false
+}
+
+func TestShouldRouteToAshConservative(t *testing.T) {
+	tests := []struct {
+		name    string
+		command string
+		args    []string
+		want    bool
+	}{
+		{name: "rule A no args", command: "what", args: nil, want: false},
+		{name: "rule B flag arg", command: "what", args: []string{"-s", "file"}, want: false},
+		{name: "rule C path arg", command: "what", args: []string{"/usr/bin/what"}, want: false},
+		{name: "rule D builtin single operand", command: "test", args: []string{"foo"}, want: false},
+		{name: "rule E trailing question", command: "What", args: []string{"time", "is", "it?"}, want: true},
+		{name: "rule F interrogative first arg", command: "what", args: []string{"is", "awk"}, want: true},
+		{name: "rule G default delegate", command: "which", args: []string{"ls"}, want: false},
+		{name: "precedence B over E", command: "what", args: []string{"-n", "what?"}, want: false},
+		{name: "precedence C over F", command: "what", args: []string{"who", "./path"}, want: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := shouldRouteToAshConservative(tt.command, tt.args); got != tt.want {
+				t.Fatalf("route decision mismatch: got %v want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func runShellCollisionFixture(t *testing.T, shell, fixture, invocation string) string {
+	t.Helper()
+
+	shellPath, err := exec.LookPath(shell)
+	if err != nil {
+		t.Skipf("%s not available: %v", shell, err)
+	}
+
+	fixturePath := filepath.Join("testdata", fixture)
+	command := fmt.Sprintf("source %q; %s", fixturePath, invocation)
+	execCmd := exec.Command(shellPath, "-c", command)
+	output, err := execCmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("%s fixture invocation failed: %v\noutput=%s", shell, err, output)
+	}
+
+	return strings.TrimSpace(string(output))
+}
+
+func TestBashCollisionWrappers(t *testing.T) {
+	tests := []struct {
+		name       string
+		invocation string
+		want       string
+	}{
+		{name: "title case what routed", invocation: "What time is it?", want: "ASH:What time is it?"},
+		{name: "lower case what routed", invocation: "what time is it?", want: "ASH:what time is it?"},
+		{name: "what interrogative routed", invocation: "what is awk", want: "ASH:what is awk"},
+		{name: "what path delegates", invocation: "what /usr/bin/what", want: "DELEGATE:what:/usr/bin/what"},
+		{name: "what flag delegates", invocation: "what -s file", want: "DELEGATE:what:-s file"},
+		{name: "title case time routed", invocation: "Time is it late?", want: "ASH:Time is it late?"},
+		{name: "test question routed", invocation: "test should I use jq", want: "ASH:test should I use jq"},
+		{name: "test flag delegates", invocation: "test -f /etc/hosts", want: "DELEGATE:test:-f /etc/hosts"},
+		{name: "type question routed", invocation: "type why is grep slow?", want: "ASH:type why is grep slow?"},
+		{name: "type command form delegates", invocation: "type ls", want: "DELEGATE:type:ls"},
+		{name: "which question routed", invocation: "which should I use ripgrep or grep", want: "ASH:which should I use ripgrep or grep"},
+		{name: "which command form delegates", invocation: "which ls", want: "DELEGATE:which:ls"},
+		{name: "who question routed", invocation: "who am I?", want: "ASH:who am I?"},
+		{name: "who no args delegates", invocation: "who", want: "DELEGATE:who:"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := runShellCollisionFixture(t, "bash", "collision_wrappers.bash", tt.invocation)
+			if got != tt.want {
+				t.Fatalf("bash fixture output mismatch: got %q want %q", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestZshCollisionWrappers(t *testing.T) {
+	tests := []struct {
+		name       string
+		invocation string
+		want       string
+	}{
+		{name: "title case what routed", invocation: "What time is it?", want: "ASH:What time is it?"},
+		{name: "lower case what routed", invocation: "what time is it?", want: "ASH:what time is it?"},
+		{name: "what path delegates", invocation: "what /usr/bin/what", want: "DELEGATE:what:/usr/bin/what"},
+		{name: "title case time routed", invocation: "Time is it late?", want: "ASH:Time is it late?"},
+		{name: "where question routed", invocation: "where should logs go", want: "ASH:where should logs go"},
+		{name: "where command form delegates", invocation: "where ls", want: "DELEGATE:where:ls"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := runShellCollisionFixture(t, "zsh", "collision_wrappers.zsh", tt.invocation)
+			if got != tt.want {
+				t.Fatalf("zsh fixture output mismatch: got %q want %q", got, tt.want)
+			}
+		})
 	}
 }
 

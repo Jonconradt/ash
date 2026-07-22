@@ -1,6 +1,15 @@
-command_not_found_handle() {
-  ash "$@"
-  return $?
+#!/usr/bin/env bash
+
+set -f
+
+ash() {
+  printf 'ASH:%s\n' "$*"
+}
+
+_ash_delegate() {
+  local cmd="$1"
+  shift
+  printf 'DELEGATE:%s:%s\n' "$cmd" "$*"
 }
 
 _ash_should_route() {
@@ -9,21 +18,17 @@ _ash_should_route() {
   local args=("$@")
   local argc=${#args[@]}
 
-  # Rule A: no args => delegate.
   [[ $argc -eq 0 ]] && return 1
 
-  # Rule B: flag-style args => delegate.
   local a
   for a in "${args[@]}"; do
     [[ "$a" == -* ]] && return 1
   done
 
-  # Rule C: path-like args => delegate.
   for a in "${args[@]}"; do
     [[ "$a" == */* || "$a" == ./* || "$a" == ../* ]] && return 1
   done
 
-  # Rule D: builtin/keyword single-operand patterns => delegate.
   if [[ "$cmd" == "Time" || "$cmd" == "test" || "$cmd" == "Test" || "$cmd" == "type" || "$cmd" == "Type" ]]; then
     if [[ $argc -eq 1 && "${args[0]}" =~ ^[A-Za-z0-9_.-]+$ ]]; then
       return 1
@@ -35,10 +40,8 @@ _ash_should_route() {
     full+=" $a"
   done
 
-  # Rule E: trailing question mark with enough tokens => ash.
   [[ "$full" == *\? && $argc -ge 2 ]] && return 0
 
-  # Rule F: interrogative/auxiliary first arg => ash.
   local first
   first="$(printf '%s' "${args[0]}" | tr '[:upper:]' '[:lower:]')"
   case "$first" in
@@ -47,7 +50,6 @@ _ash_should_route() {
       ;;
   esac
 
-  # Rule G: default delegate.
   return 1
 }
 
@@ -58,7 +60,7 @@ _ash_route_or_delegate() {
     ash "$cmd" "$@"
     return $?
   fi
-  command "$cmd" "$@"
+  _ash_delegate "$cmd" "$@"
 }
 
 _ash_route_or_delegate_builtin() {
@@ -68,10 +70,9 @@ _ash_route_or_delegate_builtin() {
     ash "$builtin_name" "$@"
     return $?
   fi
-  builtin "$builtin_name" "$@"
+  _ash_delegate "$builtin_name" "$@"
 }
 
-# External command collisions.
 what()  { _ash_route_or_delegate what  "$@"; }
 What()  { _ash_route_or_delegate What  "$@"; }
 which() { _ash_route_or_delegate which "$@"; }
@@ -79,10 +80,8 @@ Which() { _ash_route_or_delegate Which "$@"; }
 who()   { _ash_route_or_delegate who   "$@"; }
 Who()   { _ash_route_or_delegate Who   "$@"; }
 
-# Builtin collisions.
 test()  { _ash_route_or_delegate_builtin test "$@"; }
 Test()  { _ash_route_or_delegate_builtin test "$@"; }
 type()  { _ash_route_or_delegate_builtin type "$@"; }
 Type()  { _ash_route_or_delegate_builtin type "$@"; }
-# `time` is a reserved shell keyword, so only title-case can be wrapped.
 Time()  { _ash_route_or_delegate Time "$@"; }

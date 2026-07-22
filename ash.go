@@ -34,6 +34,8 @@ const (
 	historyFileName      = ".ash_history.json"
 	systemFileName       = ".ash_system"
 	toolsFileName        = ".ash_tools"
+	installStartMarker   = "# >>> ash install >>>"
+	installEndMarker     = "# <<< ash install <<<"
 )
 
 type message struct {
@@ -122,8 +124,16 @@ func main() {
 
 func run(args []string, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
-		fmt.Fprintln(stderr, "usage: ash <text>")
+		printUsage(stderr)
 		return 1
+	}
+
+	if args[0] == "install" {
+		return runInstall(args[1:], stdout, stderr)
+	}
+
+	if recommendation, err := installRecommendation(); err == nil && recommendation != "" {
+		fmt.Fprintln(stderr, recommendation)
 	}
 
 	aiURI := strings.TrimSpace(os.Getenv("AI"))
@@ -212,6 +222,334 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 
 	return 0
+}
+
+func printUsage(w io.Writer) {
+	fmt.Fprintln(w, "usage: ash <text>")
+	fmt.Fprintln(w, "       ash install [--shell bash|zsh] [--dry-run]")
+}
+
+func runInstall(args []string, stdout, stderr io.Writer) int {
+	shellName, dryRun, err := parseInstallArgs(args)
+	if err != nil {
+		fmt.Fprintf(stderr, "install error: %v\n", err)
+		printUsage(stderr)
+		return 1
+	}
+
+	if shellName == "" {
+		shellName = detectShellName(os.Getenv("SHELL"))
+		if shellName == "" {
+			shellName = "bash"
+		}
+	}
+
+	rcPath, err := rcPathForShell(shellName)
+	if err != nil {
+		fmt.Fprintf(stderr, "install error: %v\n", err)
+		return 1
+	}
+
+	block := installBlockForShell(shellName)
+	if block == "" {
+		fmt.Fprintf(stderr, "install error: unsupported shell %q\n", shellName)
+		return 1
+	}
+
+	existing, err := readFileIfExists(rcPath)
+	if err != nil {
+		fmt.Fprintf(stderr, "install error: failed to read %s: %v\n", rcPath, err)
+		return 1
+	}
+
+	if strings.Contains(existing, installStartMarker) && strings.Contains(existing, installEndMarker) {
+		fmt.Fprintf(stdout, "ash install already present in %s\n", rcPath)
+		return 0
+	}
+
+	updated := appendInstallBlock(existing, block)
+	if dryRun {
+		fmt.Fprintf(stdout, "[dry-run] would append install block to %s\n", rcPath)
+		fmt.Fprint(stdout, block)
+		if !strings.HasSuffix(block, "\n") {
+			fmt.Fprintln(stdout)
+		}
+		return 0
+	}
+
+	if err := osWriteFile(rcPath, []byte(updated), 0o600); err != nil {
+		fmt.Fprintf(stderr, "install error: failed to write %s: %v\n", rcPath, err)
+		return 1
+	}
+
+	fmt.Fprintf(stdout, "ash install appended wrappers to %s\n", rcPath)
+	fmt.Fprintln(stdout, "restart your shell or source your rc file to activate wrappers")
+	return 0
+}
+
+func parseInstallArgs(args []string) (shellName string, dryRun bool, err error) {
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
+		case "--dry-run":
+			dryRun = true
+		case "--shell":
+			i++
+			if i >= len(args) {
+				return "", false, errors.New("--shell requires a value")
+			}
+			shellName = strings.TrimSpace(strings.ToLower(args[i]))
+		default:
+			return "", false, fmt.Errorf("unknown install argument: %s", args[i])
+		}
+	}
+	return shellName, dryRun, nil
+}
+
+func detectShellName(shellPath string) string {
+	base := strings.TrimSpace(filepath.Base(shellPath))
+	switch base {
+	case "bash", "zsh":
+		return base
+	default:
+		return ""
+	}
+}
+
+func rcPathForShell(shellName string) (string, error) {
+	home, err := osUserHomeDir()
+	if err != nil {
+		return "", err
+	}
+
+	switch shellName {
+	case "bash":
+		return filepath.Join(home, ".bashrc"), nil
+	case "zsh":
+		return filepath.Join(home, ".zshrc"), nil
+	default:
+		return "", fmt.Errorf("unsupported shell %q (supported: bash, zsh)", shellName)
+	}
+}
+
+func readFileIfExists(path string) (string, error) {
+	content, err := osReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return string(content), nil
+}
+
+func appendInstallBlock(existing, block string) string {
+	if existing == "" {
+		return block + "\n"
+	}
+
+	updated := existing
+	if !strings.HasSuffix(updated, "\n") {
+		updated += "\n"
+	}
+	updated += "\n" + block + "\n"
+	return updated
+}
+
+func installRecommendation() (string, error) {
+	shellName := detectShellName(os.Getenv("SHELL"))
+	if shellName == "" {
+		return "", nil
+	}
+
+	rcPath, err := rcPathForShell(shellName)
+	if err != nil {
+		return "", err
+	}
+
+	content, err := readFileIfExists(rcPath)
+	if err != nil {
+		return "", err
+	}
+
+	if strings.Contains(content, installStartMarker) && strings.Contains(content, installEndMarker) {
+		return "", nil
+	}
+
+	return fmt.Sprintf("ash is not installed for %s. Run: ash install --shell %s", shellName, shellName), nil
+}
+
+func installBlockForShell(shellName string) string {
+	switch shellName {
+	case "bash":
+		return strings.TrimSpace(`
+` + installStartMarker + `
+command_not_found_handle() {
+  ash "$@"
+  return $?
+}
+
+_ash_should_route() {
+  local cmd="$1"
+  shift
+  local args=("$@")
+  local argc=${#args[@]}
+
+  [[ $argc -eq 0 ]] && return 1
+
+  local a
+  for a in "${args[@]}"; do
+    [[ "$a" == -* ]] && return 1
+  done
+
+  for a in "${args[@]}"; do
+    [[ "$a" == */* || "$a" == ./* || "$a" == ../* ]] && return 1
+  done
+
+  if [[ "$cmd" == "Time" || "$cmd" == "test" || "$cmd" == "Test" || "$cmd" == "type" || "$cmd" == "Type" ]]; then
+    if [[ $argc -eq 1 && "${args[0]}" =~ ^[A-Za-z0-9_.-]+$ ]]; then
+      return 1
+    fi
+  fi
+
+  local full="$cmd"
+  for a in "${args[@]}"; do
+    full+=" $a"
+  done
+
+  [[ "$full" == *\? && $argc -ge 2 ]] && return 0
+
+  local first
+  first="$(printf '%s' "${args[0]}" | tr '[:upper:]' '[:lower:]')"
+  case "$first" in
+    is|are|am|do|does|did|can|could|should|would|will|why|how|when|where|who)
+      [[ $argc -ge 2 ]] && return 0
+      ;;
+  esac
+
+  return 1
+}
+
+_ash_route_or_delegate() {
+  local cmd="$1"
+  shift
+  if _ash_should_route "$cmd" "$@"; then
+    ash "$cmd" "$@"
+    return $?
+  fi
+  command "$cmd" "$@"
+}
+
+_ash_route_or_delegate_builtin() {
+  local builtin_name="$1"
+  shift
+  if _ash_should_route "$builtin_name" "$@"; then
+    ash "$builtin_name" "$@"
+    return $?
+  fi
+  builtin "$builtin_name" "$@"
+}
+
+what()  { _ash_route_or_delegate what  "$@"; }
+What()  { _ash_route_or_delegate What  "$@"; }
+which() { _ash_route_or_delegate which "$@"; }
+Which() { _ash_route_or_delegate Which "$@"; }
+who()   { _ash_route_or_delegate who   "$@"; }
+Who()   { _ash_route_or_delegate Who   "$@"; }
+
+test()  { _ash_route_or_delegate_builtin test "$@"; }
+Test()  { _ash_route_or_delegate_builtin test "$@"; }
+type()  { _ash_route_or_delegate_builtin type "$@"; }
+Type()  { _ash_route_or_delegate_builtin type "$@"; }
+Time()  { _ash_route_or_delegate Time "$@"; }
+` + installEndMarker)
+	case "zsh":
+		return strings.TrimSpace(`
+` + installStartMarker + `
+command_not_found_handler() {
+  ash "$@"
+  return $?
+}
+
+_ash_should_route() {
+  local cmd="$1"
+  shift
+  local -a args
+  args=("$@")
+  local argc=${#args}
+
+  [[ $argc -eq 0 ]] && return 1
+
+  local a
+  for a in "${args[@]}"; do
+    [[ "$a" == -* ]] && return 1
+  done
+
+  for a in "${args[@]}"; do
+    [[ "$a" == */* || "$a" == ./* || "$a" == ../* ]] && return 1
+  done
+
+  if [[ "$cmd" == "Time" || "$cmd" == "test" || "$cmd" == "Test" || "$cmd" == "type" || "$cmd" == "Type" ]]; then
+    if [[ $argc -eq 1 && "${args[1]}" =~ '^[A-Za-z0-9_.-]+$' ]]; then
+      return 1
+    fi
+  fi
+
+  local full="$cmd"
+  for a in "${args[@]}"; do
+    full+=" $a"
+  done
+
+  [[ "$full" == *\? && $argc -ge 2 ]] && return 0
+
+  local first
+  first="$(printf '%s' "${args[1]}" | tr '[:upper:]' '[:lower:]')"
+  case "$first" in
+    is|are|am|do|does|did|can|could|should|would|will|why|how|when|where|who)
+      [[ $argc -ge 2 ]] && return 0
+      ;;
+  esac
+
+  return 1
+}
+
+_ash_route_or_delegate() {
+  local cmd="$1"
+  shift
+  if _ash_should_route "$cmd" "$@"; then
+    ash "$cmd" "$@"
+    return $?
+  fi
+  command "$cmd" "$@"
+}
+
+_ash_route_or_delegate_builtin() {
+  local builtin_name="$1"
+  shift
+  if _ash_should_route "$builtin_name" "$@"; then
+    ash "$builtin_name" "$@"
+    return $?
+  fi
+  builtin "$builtin_name" "$@"
+}
+
+what()  { _ash_route_or_delegate what  "$@"; }
+What()  { _ash_route_or_delegate What  "$@"; }
+which() { _ash_route_or_delegate which "$@"; }
+Which() { _ash_route_or_delegate Which "$@"; }
+who()   { _ash_route_or_delegate who   "$@"; }
+Who()   { _ash_route_or_delegate Who   "$@"; }
+where() { _ash_route_or_delegate_builtin where "$@"; }
+Where() { _ash_route_or_delegate_builtin where "$@"; }
+
+test()  { _ash_route_or_delegate_builtin test "$@"; }
+Test()  { _ash_route_or_delegate_builtin test "$@"; }
+type()  { _ash_route_or_delegate_builtin type "$@"; }
+Type()  { _ash_route_or_delegate_builtin type "$@"; }
+Time()  { _ash_route_or_delegate Time "$@"; }
+` + installEndMarker)
+	default:
+		return ""
+	}
 }
 
 func runToolLoop(ctx context.Context, baseURL, model, userInput string, messages []message, shim mcpToolShim) (string, []message, error) {
