@@ -1,0 +1,119 @@
+# ash tool allowlist
+#
+# This file is read by ash to allow Unix command execution through the
+# run_unix_command tool.
+#
+# Format rules:
+# - One command per line (preferred), or comma-separated on one line.
+# - Lines starting with # are comments.
+# - Use bare executable names only (no paths, no arguments).
+#
+# Safety model:
+# - Keep this list conservative by default.
+# - Prefer read/inspect commands over mutating commands.
+# - Avoid destructive tools (rm, mv, dd, chmod, chown, kill, sudo, etc).
+#
+# Notes:
+# - ASH_TOOL_ALLOWLIST environment variable overrides this file.
+# - python3 is also available through ash's dedicated run_python3 tool.
+#
+# -----------------------------------------------------------------------------
+# Core shell information
+# -----------------------------------------------------------------------------
+pwd
+ls
+whoami
+id
+uname
+hostname
+date
+cal
+printenv
+env
+
+# -----------------------------------------------------------------------------
+# File and directory inspection
+# -----------------------------------------------------------------------------
+stat
+file
+du
+df
+find
+readlink
+realpath
+
+# -----------------------------------------------------------------------------
+# Text and content inspection
+# -----------------------------------------------------------------------------
+cat
+head
+tail
+less
+wc
+nl
+cut
+paste
+tr
+sort
+uniq
+awk
+sed
+grep
+egrep
+fgrep
+strings
+column
+
+# -----------------------------------------------------------------------------
+# Process and system observability
+# -----------------------------------------------------------------------------
+ps
+pgrep
+top
+uptime
+sysctl
+vm_stat
+iostat
+
+# -----------------------------------------------------------------------------
+# Networking and connectivity diagnostics
+# -----------------------------------------------------------------------------
+ping
+ifconfig
+netstat
+lsof
+host
+nslookup
+dig
+scutil
+
+# -----------------------------------------------------------------------------
+# Documentation and help
+# -----------------------------------------------------------------------------
+man
+which
+
+# -----------------------------------------------------------------------------
+# Structured data helpers
+# -----------------------------------------------------------------------------
+jq
+python3
+
+# -----------------------------------------------------------------------------
+# macOS-specific utilities
+# -----------------------------------------------------------------------------
+osascript
+open
+say
+mdfind
+mdls
+sw_vers
+
+# -----------------------------------------------------------------------------
+# Optional additions (uncomment only if desired)
+# -----------------------------------------------------------------------------
+# git
+# make
+# go
+# curl
+# wget

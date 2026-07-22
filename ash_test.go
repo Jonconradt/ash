@@ -551,12 +551,12 @@ func TestChat(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		got, err := chat(context.Background(), srv.URL, "model", []message{{Role: "user", Content: "hi"}})
+		got, err := chat(context.Background(), srv.URL, "model", []message{{Role: "user", Content: "hi"}}, nil)
 		if err != nil {
 			t.Fatalf("chat returned error: %v", err)
 		}
-		if got != "ok" {
-			t.Fatalf("chat content mismatch: got %q want %q", got, "ok")
+		if got.Message.Content != "ok" {
+			t.Fatalf("chat content mismatch: got %q want %q", got.Message.Content, "ok")
 		}
 	})
 
@@ -566,7 +566,7 @@ func TestChat(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		_, err := chat(context.Background(), srv.URL, "model", []message{{Role: "user", Content: "hi"}})
+		_, err := chat(context.Background(), srv.URL, "model", []message{{Role: "user", Content: "hi"}}, nil)
 		if err == nil {
 			t.Fatalf("expected error, got nil")
 		}
@@ -582,7 +582,7 @@ func TestChat(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		_, err := chat(context.Background(), srv.URL, "model", []message{{Role: "user", Content: "hi"}})
+		_, err := chat(context.Background(), srv.URL, "model", []message{{Role: "user", Content: "hi"}}, nil)
 		if err == nil {
 			t.Fatalf("expected error, got nil")
 		}
@@ -597,7 +597,7 @@ func TestChat(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		_, err := chat(context.Background(), srv.URL, "model", []message{{Role: "user", Content: "hi"}})
+		_, err := chat(context.Background(), srv.URL, "model", []message{{Role: "user", Content: "hi"}}, nil)
 		if err == nil {
 			t.Fatalf("expected error, got nil")
 		}
@@ -615,7 +615,7 @@ func TestChat(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		result := make(chan error, 1)
 		go func() {
-			_, err := chat(ctx, srv.URL, "model", []message{{Role: "user", Content: "hi"}})
+			_, err := chat(ctx, srv.URL, "model", []message{{Role: "user", Content: "hi"}}, nil)
 			result <- err
 		}()
 
@@ -644,7 +644,7 @@ func TestChat(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		_, err := chat(context.Background(), srv.URL, "model", []message{{Role: "user", Content: "hi"}})
+		_, err := chat(context.Background(), srv.URL, "model", []message{{Role: "user", Content: "hi"}}, nil)
 		if err == nil {
 			t.Fatalf("expected timeout error, got nil")
 		}
@@ -653,6 +653,348 @@ func TestChat(t *testing.T) {
 		}
 		newHTTPClient = origClientFactory
 	})
+}
+
+func TestChatIncludesToolsAndParsesToolCalls(t *testing.T) {
+	var gotReq chatRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &gotReq)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"run_unix_command","arguments":{"command":"ls"}}}]}}`))
+	}))
+	defer srv.Close()
+
+	tools := []toolDefinition{{
+		Type: "function",
+		Function: toolFunctionDefinition{
+			Name:        "run_unix_command",
+			Description: "run command",
+			Parameters:  map[string]any{"type": "object"},
+		},
+	}}
+
+	resp, err := chat(context.Background(), srv.URL, "model", []message{{Role: "user", Content: "hi"}}, tools)
+	if err != nil {
+		t.Fatalf("chat returned error: %v", err)
+	}
+
+	if len(gotReq.Tools) != 1 || gotReq.Tools[0].Function.Name != "run_unix_command" {
+		t.Fatalf("expected tools in request, got %#v", gotReq.Tools)
+	}
+
+	if len(resp.Message.ToolCalls) != 1 {
+		t.Fatalf("expected one tool call, got %#v", resp.Message.ToolCalls)
+	}
+
+	if resp.Message.ToolCalls[0].Function.Name != "run_unix_command" {
+		t.Fatalf("unexpected tool call name: %#v", resp.Message.ToolCalls)
+	}
+}
+
+func TestLoadAllowlistedCommands(t *testing.T) {
+	originalCwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd failed: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(originalCwd)
+	})
+
+	t.Run("env override", func(t *testing.T) {
+		t.Setenv("ASH_TOOL_ALLOWLIST", "ls, ps,python3")
+		allowed, err := loadAllowlistedCommands()
+		if err != nil {
+			t.Fatalf("loadAllowlistedCommands error: %v", err)
+		}
+		if _, ok := allowed["ls"]; !ok {
+			t.Fatalf("expected ls in allowlist: %#v", allowed)
+		}
+		if _, ok := allowed["ps"]; !ok {
+			t.Fatalf("expected ps in allowlist: %#v", allowed)
+		}
+		if _, ok := allowed["python3"]; !ok {
+			t.Fatalf("expected python3 in allowlist: %#v", allowed)
+		}
+	})
+
+	t.Run("cwd file wins over home", func(t *testing.T) {
+		t.Setenv("ASH_TOOL_ALLOWLIST", "")
+		home := t.TempDir()
+		cwd := t.TempDir()
+		t.Setenv("HOME", home)
+
+		if err := os.WriteFile(filepath.Join(home, toolsFileName), []byte("ls\n"), 0o600); err != nil {
+			t.Fatalf("write home tools file: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(cwd, toolsFileName), []byte("ps\n"), 0o600); err != nil {
+			t.Fatalf("write cwd tools file: %v", err)
+		}
+		if err := os.Chdir(cwd); err != nil {
+			t.Fatalf("Chdir failed: %v", err)
+		}
+
+		allowed, err := loadAllowlistedCommands()
+		if err != nil {
+			t.Fatalf("loadAllowlistedCommands error: %v", err)
+		}
+		if len(allowed) != 1 {
+			t.Fatalf("expected one allowlisted command, got %#v", allowed)
+		}
+		if _, ok := allowed["ps"]; !ok {
+			t.Fatalf("expected cwd allowlist to win, got %#v", allowed)
+		}
+	})
+}
+
+func TestLocalToolShimRunUnixCommandPolicy(t *testing.T) {
+	originalRunner := toolCommandRunner
+	t.Cleanup(func() { toolCommandRunner = originalRunner })
+
+	shim := localToolShim{allowlist: map[string]struct{}{"ls": {}}}
+
+	t.Run("reject not allowlisted", func(t *testing.T) {
+		resultJSON := shim.CallTool(context.Background(), "run_unix_command", map[string]any{"command": "cat"})
+		if !strings.Contains(resultJSON, "not allowlisted") {
+			t.Fatalf("expected allowlist failure, got %s", resultJSON)
+		}
+	})
+
+	t.Run("reject blocked arg", func(t *testing.T) {
+		resultJSON := shim.CallTool(context.Background(), "run_unix_command", map[string]any{
+			"command": "ls",
+			"args":    []any{"foo;bar"},
+		})
+		if !strings.Contains(resultJSON, "blocked shell control pattern") {
+			t.Fatalf("expected blocked arg failure, got %s", resultJSON)
+		}
+	})
+
+	t.Run("success", func(t *testing.T) {
+		toolCommandRunner = func(ctx context.Context, name string, args []string, timeout time.Duration, outputMax int) toolCommandResult {
+			if name != "ls" {
+				t.Fatalf("unexpected command %q", name)
+			}
+			if len(args) != 1 || args[0] != "-l" {
+				t.Fatalf("unexpected args %#v", args)
+			}
+			return toolCommandResult{OK: true, Command: "ls -l", ExitCode: 0, Stdout: "file\n"}
+		}
+
+		resultJSON := shim.CallTool(context.Background(), "run_unix_command", map[string]any{
+			"command": "ls",
+			"args":    []any{"-l"},
+		})
+		if !strings.Contains(resultJSON, `"ok":true`) {
+			t.Fatalf("expected success, got %s", resultJSON)
+		}
+	})
+}
+
+func TestRunToolLoop(t *testing.T) {
+	originalRunner := toolCommandRunner
+	t.Cleanup(func() { toolCommandRunner = originalRunner })
+
+	toolCommandRunner = func(ctx context.Context, name string, args []string, timeout time.Duration, outputMax int) toolCommandResult {
+		return toolCommandResult{OK: true, Command: "ls -1", ExitCode: 0, Stdout: "a\nb\n"}
+	}
+
+	requestCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		var req chatRequest
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &req)
+
+		w.Header().Set("Content-Type", "application/json")
+		if requestCount == 1 {
+			if len(req.Tools) == 0 {
+				t.Fatalf("expected tools list in first request")
+			}
+			_, _ = w.Write([]byte(`{"message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"run_unix_command","arguments":{"command":"ls","args":["-1"]}}}]}}`))
+			return
+		}
+
+		if len(req.Messages) == 0 || req.Messages[len(req.Messages)-1].Role != "tool" {
+			t.Fatalf("expected tool message in follow-up request, got %#v", req.Messages)
+		}
+		if req.Messages[len(req.Messages)-1].ToolName != "run_unix_command" {
+			t.Fatalf("expected tool_name in follow-up request, got %#v", req.Messages[len(req.Messages)-1])
+		}
+
+		_, _ = w.Write([]byte(`{"message":{"role":"assistant","content":"done"}}`))
+	}))
+	defer srv.Close()
+
+	shim := localToolShim{allowlist: map[string]struct{}{"ls": {}}}
+	final, updated, err := runToolLoop(context.Background(), srv.URL, "model", "list files", []message{{Role: "user", Content: "list files"}}, shim)
+	if err != nil {
+		t.Fatalf("runToolLoop returned error: %v", err)
+	}
+
+	if final != "done" {
+		t.Fatalf("expected final assistant reply, got %q", final)
+	}
+
+	if len(updated) < 3 {
+		t.Fatalf("expected tool loop messages, got %#v", updated)
+	}
+}
+
+func TestRunToolLoopRetriesExecutionPrompt(t *testing.T) {
+	originalRunner := toolCommandRunner
+	t.Cleanup(func() { toolCommandRunner = originalRunner })
+
+	toolCommandRunner = func(ctx context.Context, name string, args []string, timeout time.Duration, outputMax int) toolCommandResult {
+		if name != "python3" {
+			t.Fatalf("unexpected command: %q", name)
+		}
+		return toolCommandResult{OK: true, Command: "python3 -c ...", ExitCode: 0, Stdout: "Hello World\n"}
+	}
+
+	requestCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		w.Header().Set("Content-Type", "application/json")
+
+		switch requestCount {
+		case 1:
+			_, _ = w.Write([]byte(`{"message":{"role":"assistant","content":"Here is python code: print(\"Hello World\")"}}`))
+		case 2:
+			_, _ = w.Write([]byte(`{"message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"python3","arguments":{"code":"print(\"Hello World\")"}}}]}}`))
+		default:
+			_, _ = w.Write([]byte(`{"message":{"role":"assistant","content":"Executed successfully"}}`))
+		}
+	}))
+	defer srv.Close()
+
+	shim := localToolShim{allowlist: map[string]struct{}{}}
+	final, updated, err := runToolLoop(
+		context.Background(),
+		srv.URL,
+		"model",
+		"Use python to print hello world.",
+		[]message{{Role: "user", Content: "Use python to print hello world."}},
+		shim,
+	)
+	if err != nil {
+		t.Fatalf("runToolLoop returned error: %v", err)
+	}
+
+	if final != "Executed successfully" {
+		t.Fatalf("unexpected final reply: %q", final)
+	}
+
+	hasToolResult := false
+	for _, m := range updated {
+		if m.Role == "tool" && m.ToolName == "python3" && strings.Contains(m.Content, "Hello World") {
+			hasToolResult = true
+			break
+		}
+	}
+	if !hasToolResult {
+		t.Fatalf("expected python3 tool result in message history, got %#v", updated)
+	}
+}
+
+func TestVerboseLoggingEnabled(t *testing.T) {
+	t.Setenv("ASH_VERBOSE", "")
+	if verboseLoggingEnabled() {
+		t.Fatalf("expected verbose logging disabled by default")
+	}
+
+	t.Setenv("ASH_VERBOSE", "1")
+	if !verboseLoggingEnabled() {
+		t.Fatalf("expected verbose logging enabled for ASH_VERBOSE=1")
+	}
+
+	t.Setenv("ASH_VERBOSE", "true")
+	if !verboseLoggingEnabled() {
+		t.Fatalf("expected verbose logging enabled for ASH_VERBOSE=true")
+	}
+}
+
+func TestChatVerboseLogsPayload(t *testing.T) {
+	origDebugWriter := debugWriter
+	t.Cleanup(func() { debugWriter = origDebugWriter })
+
+	t.Setenv("ASH_VERBOSE", "1")
+	var logOutput bytes.Buffer
+	debugWriter = &logOutput
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"message":{"role":"assistant","content":"ok"}}`))
+	}))
+	defer srv.Close()
+
+	tools := []toolDefinition{{
+		Type: "function",
+		Function: toolFunctionDefinition{
+			Name:        "run_unix_command",
+			Description: "run command",
+			Parameters:  map[string]any{"type": "object"},
+		},
+	}}
+
+	_, err := chat(context.Background(), srv.URL, "model", []message{{Role: "user", Content: "hi"}}, tools)
+	if err != nil {
+		t.Fatalf("chat returned error: %v", err)
+	}
+
+	logs := logOutput.String()
+	if !strings.Contains(logs, "AI request payload") {
+		t.Fatalf("expected payload debug log, got %q", logs)
+	}
+	if !strings.Contains(logs, `"tools":[`) {
+		t.Fatalf("expected tool schema in payload logs, got %q", logs)
+	}
+	if !strings.Contains(logs, "AI response: status=200") {
+		t.Fatalf("expected response debug log, got %q", logs)
+	}
+}
+
+func TestRunToolLoopVerboseLogsToolInvocation(t *testing.T) {
+	originalRunner := toolCommandRunner
+	origDebugWriter := debugWriter
+	t.Cleanup(func() {
+		toolCommandRunner = originalRunner
+		debugWriter = origDebugWriter
+	})
+
+	t.Setenv("ASH_VERBOSE", "1")
+	var logOutput bytes.Buffer
+	debugWriter = &logOutput
+
+	toolCommandRunner = func(ctx context.Context, name string, args []string, timeout time.Duration, outputMax int) toolCommandResult {
+		return toolCommandResult{OK: true, Command: "ls", ExitCode: 0, Stdout: "a\n"}
+	}
+
+	requestCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		w.Header().Set("Content-Type", "application/json")
+		if requestCount == 1 {
+			_, _ = w.Write([]byte(`{"message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"run_unix_command","arguments":{"command":"ls"}}}]}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"message":{"role":"assistant","content":"done"}}`))
+	}))
+	defer srv.Close()
+
+	shim := localToolShim{allowlist: map[string]struct{}{"ls": {}}}
+	_, _, err := runToolLoop(context.Background(), srv.URL, "model", "list files", []message{{Role: "user", Content: "list files"}}, shim)
+	if err != nil {
+		t.Fatalf("runToolLoop returned error: %v", err)
+	}
+
+	logs := logOutput.String()
+	if !strings.Contains(logs, "Tool invocation requested: name=run_unix_command") {
+		t.Fatalf("expected tool invocation debug log, got %q", logs)
+	}
+	if !strings.Contains(logs, "Tool invocation result: name=run_unix_command") {
+		t.Fatalf("expected tool result debug log, got %q", logs)
+	}
 }
 
 func TestStartThinkingIndicator(t *testing.T) {
