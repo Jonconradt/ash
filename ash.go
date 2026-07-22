@@ -25,15 +25,15 @@ import (
 )
 
 const (
-	defaultOllamaPort = "11434"
-	defaultHistoryMax = 40
-	defaultAITimeout  = 3 * time.Minute
-	defaultToolTimeout = 15 * time.Second
+	defaultOllamaPort    = "11434"
+	defaultHistoryMax    = 40
+	defaultAITimeout     = 3 * time.Minute
+	defaultToolTimeout   = 15 * time.Second
 	defaultToolOutputMax = 8192
-	defaultMaxToolIters = 4
-	historyFileName   = ".ash_history.json"
-	systemFileName    = ".ash_system"
-	toolsFileName     = ".ash_tools"
+	defaultMaxToolIters  = 4
+	historyFileName      = ".ash_history.json"
+	systemFileName       = ".ash_system"
+	toolsFileName        = ".ash_tools"
 )
 
 type message struct {
@@ -111,8 +111,8 @@ var (
 	newHTTPClient       = func(timeout time.Duration) *http.Client {
 		return &http.Client{Timeout: timeout}
 	}
-	argumentBlockPattern = regexp.MustCompile(`(;|\|\||&&|\||` + "`" + `|\$\(|>|<|\x00|\n|\r)`)
-	toolCommandRunner    = runToolCommand
+	argumentBlockPattern           = regexp.MustCompile(`(;|\|\||&&|\||` + "`" + `|\$\(|>|<|\x00|\n|\r)`)
+	toolCommandRunner              = runToolCommand
 	debugWriter          io.Writer = os.Stderr
 )
 
@@ -239,7 +239,7 @@ func runToolLoop(ctx context.Context, baseURL, model, userInput string, messages
 				forcedToolRetryUsed = true
 				debugLogf("Execution-style prompt detected, forcing one retry with tool-use instruction")
 				messages = append(messages, message{
-					Role: "system",
+					Role:    "system",
 					Content: "When a user asks to run or execute code/commands and tools are available, call an appropriate tool instead of only explaining.",
 				})
 				continue
