@@ -1183,6 +1183,9 @@ func toStringSliceArg(value any) ([]string, error) {
 		if !ok {
 			return nil, errors.New("args must be an array of strings")
 		}
+		if v == "" {
+			continue
+		}
 		out = append(out, v)
 	}
 

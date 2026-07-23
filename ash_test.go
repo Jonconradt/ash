@@ -790,6 +790,26 @@ func TestLocalToolShimRunUnixCommandPolicy(t *testing.T) {
 			t.Fatalf("expected success, got %s", resultJSON)
 		}
 	})
+
+	t.Run("drops empty args", func(t *testing.T) {
+		toolCommandRunner = func(ctx context.Context, name string, args []string, timeout time.Duration, outputMax int) toolCommandResult {
+			if name != "ls" {
+				t.Fatalf("unexpected command %q", name)
+			}
+			if len(args) != 1 || args[0] != "-l" {
+				t.Fatalf("unexpected args %#v", args)
+			}
+			return toolCommandResult{OK: true, Command: "ls -l", ExitCode: 0, Stdout: "file\n"}
+		}
+
+		resultJSON := shim.CallTool(context.Background(), "run_unix_command", map[string]any{
+			"command": "ls",
+			"args":    []any{"", "-l", ""},
+		})
+		if !strings.Contains(resultJSON, `"ok":true`) {
+			t.Fatalf("expected success, got %s", resultJSON)
+		}
+	})
 }
 
 func TestRunToolLoop(t *testing.T) {
