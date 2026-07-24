@@ -810,6 +810,27 @@ func TestLocalToolShimRunUnixCommandPolicy(t *testing.T) {
 			t.Fatalf("expected success, got %s", resultJSON)
 		}
 	})
+
+	t.Run("supports inline command args", func(t *testing.T) {
+		inlineShim := localToolShim{allowlist: map[string]struct{}{"find": {}}}
+		toolCommandRunner = func(ctx context.Context, name string, args []string, timeout time.Duration, outputMax int) toolCommandResult {
+			if name != "find" {
+				t.Fatalf("unexpected command %q", name)
+			}
+			if len(args) != 3 || args[0] != "-maxdepth" || args[1] != "2" || args[2] != "-type" {
+				t.Fatalf("unexpected args %#v", args)
+			}
+			return toolCommandResult{OK: true, Command: "find -maxdepth 2 -type", ExitCode: 0}
+		}
+
+		resultJSON := inlineShim.CallTool(context.Background(), "run_unix_command", map[string]any{
+			"command": "find -maxdepth 2",
+			"args":    []any{"-type"},
+		})
+		if !strings.Contains(resultJSON, `"ok":true`) {
+			t.Fatalf("expected success, got %s", resultJSON)
+		}
+	})
 }
 
 func TestRunToolLoop(t *testing.T) {
@@ -915,6 +936,105 @@ func TestRunToolLoopRetriesExecutionPrompt(t *testing.T) {
 	}
 	if !hasToolResult {
 		t.Fatalf("expected python3 tool result in message history, got %#v", updated)
+	}
+}
+
+func TestBuildExecutionTasks(t *testing.T) {
+	tasks := buildExecutionTasks("What directory am I in and are there any executable files?", 6)
+	if len(tasks) != 2 {
+		t.Fatalf("expected 2 tasks, got %d: %#v", len(tasks), tasks)
+	}
+
+	if tasks[0].ID != 1 || tasks[0].Status != taskStatusPending {
+		t.Fatalf("unexpected first task: %#v", tasks[0])
+	}
+
+	if !strings.Contains(strings.ToLower(tasks[0].Goal), "what directory am i in") {
+		t.Fatalf("unexpected first task goal: %q", tasks[0].Goal)
+	}
+
+	if !strings.Contains(strings.ToLower(tasks[1].Goal), "executable") {
+		t.Fatalf("unexpected second task goal: %q", tasks[1].Goal)
+	}
+}
+
+func TestBuildExecutionStateMessageUsesRelevanceWindow(t *testing.T) {
+	tasks := []executionTask{
+		{ID: 1, Goal: "Get current directory", Status: taskStatusDone},
+		{ID: 2, Goal: "Find executable files", Status: taskStatusPending},
+	}
+	observations := []toolObservation{
+		{Command: "pwd", OK: true, Summary: "/tmp/demo"},
+		{Command: "ls", OK: true, Summary: "a\nb"},
+		{Command: "find", OK: false, Summary: "command is not allowlisted"},
+	}
+
+	msg := buildExecutionStateMessage("directory and executables", tasks, observations, 2)
+	if msg.Role != "system" {
+		t.Fatalf("expected system role, got %q", msg.Role)
+	}
+
+	if !strings.Contains(msg.Content, "Execution task list") {
+		t.Fatalf("expected task list marker in state message: %q", msg.Content)
+	}
+
+	if strings.Contains(msg.Content, "pwd") {
+		t.Fatalf("expected oldest observation to be trimmed by relevance window: %q", msg.Content)
+	}
+
+	if !strings.Contains(msg.Content, "ls") || !strings.Contains(msg.Content, "find") {
+		t.Fatalf("expected newest observations to be included: %q", msg.Content)
+	}
+}
+
+func TestRunToolLoopInjectsExecutionStateMessage(t *testing.T) {
+	originalRunner := toolCommandRunner
+	t.Cleanup(func() { toolCommandRunner = originalRunner })
+
+	toolCommandRunner = func(ctx context.Context, name string, args []string, timeout time.Duration, outputMax int) toolCommandResult {
+		if name != "pwd" {
+			t.Fatalf("unexpected command: %q", name)
+		}
+		return toolCommandResult{OK: true, Command: "pwd", ExitCode: 0, Stdout: "/tmp/demo\n"}
+	}
+
+	requestCount := 0
+	sawStateMessage := false
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		var req chatRequest
+		body, _ := io.ReadAll(r.Body)
+		_ = json.Unmarshal(body, &req)
+
+		for _, m := range req.Messages {
+			if m.Role == "system" && strings.Contains(m.Content, "Execution task list") {
+				sawStateMessage = true
+				break
+			}
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		switch requestCount {
+		case 1:
+			_, _ = w.Write([]byte(`{"message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"run_unix_command","arguments":{"command":"pwd"}}}]}}`))
+		default:
+			_, _ = w.Write([]byte(`{"message":{"role":"assistant","content":"done"}}`))
+		}
+	}))
+	defer srv.Close()
+
+	shim := localToolShim{allowlist: map[string]struct{}{"pwd": {}}}
+	final, _, err := runToolLoop(context.Background(), srv.URL, "model", "what directory am i in and list executables", []message{{Role: "user", Content: "what directory am i in and list executables"}}, shim)
+	if err != nil {
+		t.Fatalf("runToolLoop returned error: %v", err)
+	}
+
+	if final != "done" {
+		t.Fatalf("expected final reply, got %q", final)
+	}
+
+	if !sawStateMessage {
+		t.Fatalf("expected execution state system message to be injected")
 	}
 }
 
@@ -1252,6 +1372,25 @@ func shouldRouteToAshConservative(command string, args []string) bool {
 		return len(args) >= 2
 	}
 
+	// Rule F2: for natural-language wrappers, allow early auxiliary/interrogative
+	// tokens beyond the first word (for example "What directory am I in ...").
+	switch strings.ToLower(command) {
+	case "what", "which", "who", "where":
+		if len(args) >= 3 {
+			limit := 4
+			if len(args) < limit {
+				limit = len(args)
+			}
+			for i := 1; i < limit; i++ {
+				token := strings.ToLower(strings.Trim(args[i], "?!.:,;"))
+				switch token {
+				case "is", "are", "am", "do", "does", "did", "can", "could", "should", "would", "will", "why", "how", "when", "where", "who", "if":
+					return true
+				}
+			}
+		}
+	}
+
 	// Rule G: default => delegate.
 	return false
 }
@@ -1269,6 +1408,7 @@ func TestShouldRouteToAshConservative(t *testing.T) {
 		{name: "rule D builtin single operand", command: "test", args: []string{"foo"}, want: false},
 		{name: "rule E trailing question", command: "What", args: []string{"time", "is", "it?"}, want: true},
 		{name: "rule F interrogative first arg", command: "what", args: []string{"is", "awk"}, want: true},
+		{name: "rule F2 natural language mid auxiliary", command: "What", args: []string{"directory", "am", "I", "in", "and", "are", "there", "any", "executeable", "files", "Run", "multiple", "tools", "if", "necessary"}, want: true},
 		{name: "rule G default delegate", command: "which", args: []string{"ls"}, want: false},
 		{name: "precedence B over E", command: "what", args: []string{"-n", "what?"}, want: false},
 		{name: "precedence C over F", command: "what", args: []string{"who", "./path"}, want: false},
@@ -1311,6 +1451,7 @@ func TestBashCollisionWrappers(t *testing.T) {
 		{name: "title case what routed", invocation: "What time is it?", want: "ASH:What time is it?"},
 		{name: "lower case what routed", invocation: "what time is it?", want: "ASH:what time is it?"},
 		{name: "what interrogative routed", invocation: "what is awk", want: "ASH:what is awk"},
+		{name: "what mid auxiliary routed", invocation: "What directory am I in and are there any executeable files Run multiple tools if necessary", want: "ASH:What directory am I in and are there any executeable files Run multiple tools if necessary"},
 		{name: "what path delegates", invocation: "what /usr/bin/what", want: "DELEGATE:what:/usr/bin/what"},
 		{name: "what flag delegates", invocation: "what -s file", want: "DELEGATE:what:-s file"},
 		{name: "title case time routed", invocation: "Time is it late?", want: "ASH:Time is it late?"},
@@ -1342,6 +1483,7 @@ func TestZshCollisionWrappers(t *testing.T) {
 	}{
 		{name: "title case what routed", invocation: "What time is it?", want: "ASH:What time is it?"},
 		{name: "lower case what routed", invocation: "what time is it?", want: "ASH:what time is it?"},
+		{name: "what mid auxiliary routed", invocation: "What directory am I in and are there any executeable files Run multiple tools if necessary", want: "ASH:What directory am I in and are there any executeable files Run multiple tools if necessary"},
 		{name: "what path delegates", invocation: "what /usr/bin/what", want: "DELEGATE:what:/usr/bin/what"},
 		{name: "title case time routed", invocation: "Time is it late?", want: "ASH:Time is it late?"},
 		{name: "where question routed", invocation: "where should logs go", want: "ASH:where should logs go"},

@@ -51,6 +51,26 @@ _ash_should_route() {
       ;;
   esac
 
+  case "$(printf '%s' "$cmd" | tr '[:upper:]' '[:lower:]')" in
+    what|which|who|where)
+      if [[ $argc -ge 3 ]]; then
+        local limit=4
+        (( argc < limit )) && limit=$argc
+        local i token raw
+        for (( i=2; i<=limit; i++ )); do
+          raw="${args[$i]}"
+          token="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
+          token="${token%%[?!.,:;]}"
+          case "$token" in
+            is|are|am|do|does|did|can|could|should|would|will|why|how|when|where|who|if)
+              return 0
+              ;;
+          esac
+        done
+      fi
+      ;;
+  esac
+
   return 1
 }
 

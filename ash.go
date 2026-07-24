@@ -31,6 +31,9 @@ const (
 	defaultToolTimeout   = 15 * time.Second
 	defaultToolOutputMax = 8192
 	defaultMaxToolIters  = 4
+	defaultTaskMax       = 6
+	defaultRelevanceWin  = 4
+	defaultStallRounds   = 2
 	historyFileName      = ".ash_history.json"
 	systemFileName       = ".ash_system"
 	toolsFileName        = ".ash_tools"
@@ -89,6 +92,26 @@ type toolCommandResult struct {
 	Stderr   string `json:"stderr,omitempty"`
 	Error    string `json:"error,omitempty"`
 }
+
+type executionTask struct {
+	ID     int
+	Goal   string
+	Status string
+	Detail string
+}
+
+type toolObservation struct {
+	Command string
+	OK      bool
+	Summary string
+}
+
+const (
+	taskStatusPending = "pending"
+	taskStatusRunning = "running"
+	taskStatusDone    = "done"
+	taskStatusBlocked = "blocked"
+)
 
 type mcpToolShim interface {
 	ListTools() []toolDefinition
@@ -383,6 +406,11 @@ func installBlockForShell(shellName string) string {
 	case "bash":
 		return strings.TrimSpace(`
 ` + installStartMarker + `
+case "$-" in
+	*i*) ;;
+	*) return ;;
+esac
+
 command_not_found_handle() {
   ash "$@"
   return $?
@@ -425,6 +453,26 @@ _ash_should_route() {
       [[ $argc -ge 2 ]] && return 0
       ;;
   esac
+
+	case "$(printf '%s' "$cmd" | tr '[:upper:]' '[:lower:]')" in
+		what|which|who|where)
+			if [[ $argc -ge 3 ]]; then
+				local limit=4
+				(( argc < limit )) && limit=$argc
+				local i token raw
+				for (( i=1; i<limit; i++ )); do
+					raw="${args[$i]}"
+					token="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
+					token="${token%%[?!.,:;]}"
+					case "$token" in
+						is|are|am|do|does|did|can|could|should|would|will|why|how|when|where|who|if)
+							return 0
+							;;
+					esac
+				done
+			fi
+			;;
+	esac
 
   return 1
 }
@@ -509,6 +557,26 @@ _ash_should_route() {
       ;;
   esac
 
+	case "$(printf '%s' "$cmd" | tr '[:upper:]' '[:lower:]')" in
+		what|which|who|where)
+			if [[ $argc -ge 3 ]]; then
+				local limit=4
+				(( argc < limit )) && limit=$argc
+				local i token raw
+				for (( i=2; i<=limit; i++ )); do
+					raw="${args[$i]}"
+					token="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
+					token="${token%%[?!.,:;]}"
+					case "$token" in
+						is|are|am|do|does|did|can|could|should|would|will|why|how|when|where|who|if)
+							return 0
+							;;
+					esac
+				done
+			fi
+			;;
+	esac
+
   return 1
 }
 
@@ -555,12 +623,24 @@ Time()  { _ash_route_or_delegate Time "$@"; }
 func runToolLoop(ctx context.Context, baseURL, model, userInput string, messages []message, shim mcpToolShim) (string, []message, error) {
 	maxIters := maxToolIterations()
 	tools := shim.ListTools()
+	tasks := buildExecutionTasks(userInput, taskListMax())
+	observations := make([]toolObservation, 0, 8)
+	stallRounds := 0
 	forcedToolRetryUsed := false
 	debugLogf("Tool loop started: max_iters=%d tools=%d", maxIters, len(tools))
 
 	for i := 0; i <= maxIters; i++ {
 		debugLogf("Tool loop iteration=%d message_count=%d", i+1, len(messages))
-		response, err := chat(ctx, baseURL, model, messages, tools)
+		roundMessages := append([]message{}, messages...)
+		stateMessage := buildExecutionStateMessage(userInput, tasks, observations, relevanceWindow())
+		if len(roundMessages) == 0 {
+			roundMessages = append(roundMessages, stateMessage)
+		} else {
+			insertAt := len(roundMessages) - 1
+			roundMessages = append(roundMessages[:insertAt], append([]message{stateMessage}, roundMessages[insertAt:]...)...)
+		}
+
+		response, err := chat(ctx, baseURL, model, roundMessages, tools)
 		if err != nil {
 			return "", nil, err
 		}
@@ -573,6 +653,12 @@ func runToolLoop(ctx context.Context, baseURL, model, userInput string, messages
 
 		if len(assistant.ToolCalls) == 0 {
 			debugLogf("Assistant returned no tool calls")
+			if hasPendingExecutionTasks(tasks) {
+				stallRounds++
+			} else {
+				stallRounds = 0
+			}
+
 			if !forcedToolRetryUsed && shouldForceToolRetry(userInput, assistant.Content, tools) {
 				forcedToolRetryUsed = true
 				debugLogf("Execution-style prompt detected, forcing one retry with tool-use instruction")
@@ -582,18 +668,35 @@ func runToolLoop(ctx context.Context, baseURL, model, userInput string, messages
 				})
 				continue
 			}
+
+			if hasPendingExecutionTasks(tasks) && len(observations) > 0 && stallRounds < maxTaskStallRounds() {
+				messages = append(messages, message{
+					Role:    "system",
+					Content: "Continue executing the pending tasks by calling available tools when possible.",
+				})
+				continue
+			}
 			return assistant.Content, messages, nil
 		}
+
+		stallRounds = 0
 
 		if i == maxIters {
 			return "", nil, fmt.Errorf("tool iteration limit reached (%d)", maxIters)
 		}
 
+		promoteNextPendingTask(tasks)
 		for _, call := range assistant.ToolCalls {
 			toolName := strings.TrimSpace(call.Function.Name)
 			debugLogf("Tool invocation requested: name=%s args=%s", toolName, marshalForDebug(call.Function.Arguments))
 			toolResult := shim.CallTool(ctx, toolName, call.Function.Arguments)
 			debugLogf("Tool invocation result: name=%s result=%s", toolName, toolResult)
+			observation := parseToolObservation(toolResult)
+			if observation.Command == "" {
+				observation.Command = toolName
+			}
+			observations = append(observations, observation)
+			applyToolObservationToTasks(tasks, observation)
 			messages = append(messages, message{
 				Role:     "tool",
 				Content:  toolResult,
@@ -914,6 +1017,178 @@ func keepRecentMessages(messages []message, max int) []message {
 	return append([]message(nil), messages[len(messages)-max:]...)
 }
 
+func taskListMax() int {
+	if raw := strings.TrimSpace(os.Getenv("ASH_TASK_MAX")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			return parsed
+		}
+	}
+	return defaultTaskMax
+}
+
+func relevanceWindow() int {
+	if raw := strings.TrimSpace(os.Getenv("ASH_RELEVANCE_WINDOW")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			return parsed
+		}
+	}
+	return defaultRelevanceWin
+}
+
+func maxTaskStallRounds() int {
+	if raw := strings.TrimSpace(os.Getenv("ASH_TASK_STALL_ROUNDS")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			return parsed
+		}
+	}
+	return defaultStallRounds
+}
+
+func buildExecutionTasks(userInput string, max int) []executionTask {
+	normalized := strings.TrimSpace(userInput)
+	if normalized == "" {
+		return nil
+	}
+
+	parts := strings.Split(normalized, " and ")
+	if len(parts) == 1 {
+		parts = []string{normalized}
+	}
+
+	if max <= 0 {
+		max = defaultTaskMax
+	}
+
+	tasks := make([]executionTask, 0, len(parts))
+	for _, part := range parts {
+		goal := strings.TrimSpace(strings.Trim(part, "?!. "))
+		if goal == "" {
+			continue
+		}
+		tasks = append(tasks, executionTask{
+			ID:     len(tasks) + 1,
+			Goal:   goal,
+			Status: taskStatusPending,
+		})
+		if len(tasks) >= max {
+			break
+		}
+	}
+
+	if len(tasks) == 0 {
+		return []executionTask{{ID: 1, Goal: normalized, Status: taskStatusPending}}
+	}
+
+	return tasks
+}
+
+func buildExecutionStateMessage(userInput string, tasks []executionTask, observations []toolObservation, window int) message {
+	if window <= 0 {
+		window = defaultRelevanceWin
+	}
+
+	var b strings.Builder
+	b.WriteString("Execution task list (invocation-scoped):\n")
+	b.WriteString("User request: ")
+	b.WriteString(strings.TrimSpace(userInput))
+	b.WriteString("\n")
+
+	if len(tasks) == 0 {
+		b.WriteString("- (no explicit tasks)\n")
+	} else {
+		for _, task := range tasks {
+			b.WriteString(fmt.Sprintf("- [%s] #%d %s", task.Status, task.ID, task.Goal))
+			if strings.TrimSpace(task.Detail) != "" {
+				b.WriteString(": ")
+				b.WriteString(strings.TrimSpace(task.Detail))
+			}
+			b.WriteString("\n")
+		}
+	}
+
+	recent := observations
+	if len(recent) > window {
+		recent = recent[len(recent)-window:]
+	}
+	b.WriteString("Recent tool observations:\n")
+	if len(recent) == 0 {
+		b.WriteString("- (none yet)\n")
+	} else {
+		for _, obs := range recent {
+			status := "ok"
+			if !obs.OK {
+				status = "error"
+			}
+			b.WriteString(fmt.Sprintf("- [%s] %s: %s\n", status, strings.TrimSpace(obs.Command), strings.TrimSpace(obs.Summary)))
+		}
+	}
+
+	b.WriteString("When tasks are pending, prefer tool calls over explanation-only replies.")
+
+	return message{Role: "system", Content: b.String()}
+}
+
+func parseToolObservation(toolResult string) toolObservation {
+	var parsed toolCommandResult
+	if err := json.Unmarshal([]byte(toolResult), &parsed); err != nil {
+		return toolObservation{Summary: strings.TrimSpace(toolResult)}
+	}
+
+	summary := strings.TrimSpace(parsed.Stdout)
+	if summary == "" {
+		summary = strings.TrimSpace(parsed.Stderr)
+	}
+	if summary == "" {
+		summary = strings.TrimSpace(parsed.Error)
+	}
+	if summary == "" {
+		summary = "(no output)"
+	}
+
+	if idx := strings.Index(summary, "\n"); idx >= 0 {
+		summary = summary[:idx]
+	}
+
+	return toolObservation{
+		Command: strings.TrimSpace(parsed.Command),
+		OK:      parsed.OK,
+		Summary: summary,
+	}
+}
+
+func promoteNextPendingTask(tasks []executionTask) {
+	for i := range tasks {
+		if tasks[i].Status == taskStatusPending {
+			tasks[i].Status = taskStatusRunning
+			return
+		}
+	}
+}
+
+func applyToolObservationToTasks(tasks []executionTask, observation toolObservation) {
+	for i := range tasks {
+		if tasks[i].Status != taskStatusPending && tasks[i].Status != taskStatusRunning {
+			continue
+		}
+		tasks[i].Detail = strings.TrimSpace(observation.Summary)
+		if observation.OK {
+			tasks[i].Status = taskStatusDone
+		} else {
+			tasks[i].Status = taskStatusBlocked
+		}
+		return
+	}
+}
+
+func hasPendingExecutionTasks(tasks []executionTask) bool {
+	for _, task := range tasks {
+		if task.Status == taskStatusPending || task.Status == taskStatusRunning {
+			return true
+		}
+	}
+	return false
+}
+
 func chat(ctx context.Context, baseURL, model string, messages []message, tools []toolDefinition) (chatResponse, error) {
 	requestBody := chatRequest{
 		Model:    model,
@@ -1062,10 +1337,18 @@ func (s localToolShim) CallTool(ctx context.Context, name string, args map[strin
 }
 
 func (s localToolShim) callUnixCommand(ctx context.Context, args map[string]any) toolCommandResult {
-	commandName, ok := toStringArg(args["command"])
+	commandInput, ok := toStringArg(args["command"])
 	if !ok {
 		return toolCommandResult{OK: false, Error: "command must be a string"}
 	}
+
+	fields := strings.Fields(commandInput)
+	if len(fields) == 0 {
+		return toolCommandResult{OK: false, Error: "command must be a bare executable name"}
+	}
+
+	commandName := fields[0]
+	inlineArgs := fields[1:]
 
 	commandName = normalizeToolName(commandName)
 	if commandName == "" {
@@ -1080,6 +1363,7 @@ func (s localToolShim) callUnixCommand(ctx context.Context, args map[string]any)
 	if err != nil {
 		return toolCommandResult{OK: false, Command: commandName, Error: err.Error()}
 	}
+	argv = append(inlineArgs, argv...)
 
 	for _, arg := range argv {
 		if isBlockedArgument(arg) {
