@@ -317,12 +317,16 @@ func TestReadSystemPromptErrors(t *testing.T) {
 	})
 
 	t.Run("getwd error", func(t *testing.T) {
+		osUserHomeDir = func() (string, error) { return "/tmp/home", nil }
+		osReadFile = func(string) ([]byte, error) { return nil, os.ErrNotExist }
 		osGetwd = func() (string, error) { return "", errors.New("cwd fail") }
 		_, err := readSystemPrompt()
 		if err == nil || !strings.Contains(err.Error(), "cwd fail") {
 			t.Fatalf("expected cwd fail error, got %v", err)
 		}
 		osGetwd = origGetwd
+		osReadFile = origReadFile
+		osUserHomeDir = origHome
 	})
 
 	t.Run("cwd read unexpected error", func(t *testing.T) {
@@ -1014,6 +1018,7 @@ func TestBuildScheduledInvocationScript(t *testing.T) {
 	osGetwd = func() (string, error) { return "/tmp/project", nil }
 	t.Setenv("AI_ENDPOINT", "http://localhost:11434")
 	t.Setenv("AI_MODEL", "llama3.1")
+	t.Setenv("SESSION_ID", "session_ABC123")
 	t.Setenv("HOME", "/Users/tester")
 	t.Setenv("PATH", "/usr/bin:/bin")
 
@@ -1033,7 +1038,7 @@ func TestBuildScheduledInvocationScript(t *testing.T) {
 	if !strings.Contains(got, "ASH_VERBOSE='1'") {
 		t.Fatalf("expected verbose logging to be enabled, got %q", got)
 	}
-	if !strings.Contains(got, "ASH_LOG_FILE='") || !strings.Contains(got, "/.ash/logs/scheduler.log'") {
+	if !strings.Contains(got, "ASH_LOG_FILE='") || !strings.Contains(got, "/.ash/logs/task_sessionABC123.log'") {
 		t.Fatalf("expected scheduler log file assignment, got %q", got)
 	}
 	if !strings.Contains(got, "ASH_LOG_FORMAT='json'") {
@@ -1142,6 +1147,39 @@ func TestSchedulerDebugLoggingRotatesJSON(t *testing.T) {
 	}
 	if !strings.Contains(string(rotatedData), `"first `) {
 		t.Fatalf("expected first entry in rotated log, got %q", string(rotatedData))
+	}
+}
+
+func TestSchedulerLogFilePathUsesSanitizedSessionID(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SESSION_ID", "abC-12_3.!@Z")
+
+	scheduledPath, err := schedulerLogFilePath(true)
+	if err != nil {
+		t.Fatalf("schedulerLogFilePath scheduled error: %v", err)
+	}
+	wantScheduled := filepath.Join(home, ".ash", "logs", "task_abC123Z.log")
+	if scheduledPath != wantScheduled {
+		t.Fatalf("scheduled log path = %q, want %q", scheduledPath, wantScheduled)
+	}
+
+	interactivePath, err := schedulerLogFilePath(false)
+	if err != nil {
+		t.Fatalf("schedulerLogFilePath interactive error: %v", err)
+	}
+	wantInteractive := filepath.Join(home, ".ash", "logs", "abC123Z.log")
+	if interactivePath != wantInteractive {
+		t.Fatalf("interactive log path = %q, want %q", interactivePath, wantInteractive)
+	}
+}
+
+func TestSchedulerLogFilePathRequiresSessionID(t *testing.T) {
+	t.Setenv("SESSION_ID", "")
+	if _, err := schedulerLogFilePath(true); err == nil {
+		t.Fatalf("expected error when SESSION_ID is missing")
+	} else if !strings.Contains(err.Error(), "Add this line to ~/.env") {
+		t.Fatalf("expected .env instruction in error, got %q", err.Error())
 	}
 }
 
@@ -1920,9 +1958,29 @@ func shouldRouteToAshConservative(command string, args []string) bool {
 		}
 	}
 
-	// Rule C: path-like args => delegate.
+	cmdLower := strings.ToLower(command)
+	naturalWrapper := cmdLower == "what" || cmdLower == "which" || cmdLower == "who" || cmdLower == "where"
+	hasPathLike := false
+
+	// Rule C: path-like args generally delegate, except natural-language wrapper
+	// prompts with multiple tokens may still route via Rule F2.
 	for _, arg := range args {
 		if strings.Contains(arg, "/") || strings.HasPrefix(arg, "./") || strings.HasPrefix(arg, "../") {
+			hasPathLike = true
+			break
+		}
+	}
+	if hasPathLike && (!naturalWrapper || len(args) == 1) {
+		return false
+	}
+
+	if cmdLower == "at" {
+		firstAt := strings.ToLower(strings.Trim(args[0], "?!.:,;"))
+		if strings.ContainsAny(firstAt, "0123456789:") {
+			return false
+		}
+		switch firstAt {
+		case "now", "today", "tomorrow", "teatime", "midnight", "noon", "am", "pm":
 			return false
 		}
 	}
@@ -1949,12 +2007,14 @@ func shouldRouteToAshConservative(command string, args []string) bool {
 	first := strings.ToLower(args[0])
 	switch first {
 	case "is", "are", "am", "do", "does", "did", "can", "could", "should", "would", "will", "why", "how", "when", "where", "who":
-		return len(args) >= 2
+		if !hasPathLike || (naturalWrapper && len(args) >= 3) {
+			return len(args) >= 2
+		}
 	}
 
 	// Rule F2: for natural-language wrappers, allow early auxiliary/interrogative
 	// tokens beyond the first word (for example "What directory am I in ...").
-	switch strings.ToLower(command) {
+	switch cmdLower {
 	case "what", "which", "who", "where":
 		if len(args) >= 3 {
 			limit := 4
@@ -1967,6 +2027,14 @@ func shouldRouteToAshConservative(command string, args []string) bool {
 				case "is", "are", "am", "do", "does", "did", "can", "could", "should", "would", "will", "why", "how", "when", "where", "who", "if":
 					return true
 				}
+			}
+		}
+	case "at":
+		if len(args) >= 2 {
+			firstToken := strings.ToLower(strings.Trim(args[0], "?!.:,;"))
+			switch firstToken {
+			case "remind", "tell", "ask", "message", "note", "please", "what", "when", "how", "why", "who", "where":
+				return true
 			}
 		}
 	}
@@ -1989,6 +2057,11 @@ func TestShouldRouteToAshConservative(t *testing.T) {
 		{name: "rule E trailing question", command: "What", args: []string{"time", "is", "it?"}, want: true},
 		{name: "rule F interrogative first arg", command: "what", args: []string{"is", "awk"}, want: true},
 		{name: "rule F2 natural language mid auxiliary", command: "What", args: []string{"directory", "am", "I", "in", "and", "are", "there", "any", "executeable", "files", "Run", "multiple", "tools", "if", "necessary"}, want: true},
+		{name: "rule F2 natural language with path token", command: "what", args: []string{"time", "is", "it", "and", "list", "all", "files", "in", "~/.ash/logs"}, want: true},
+		{name: "rule F interrogative with path token for who", command: "who", args: []string{"am", "I", "and", "list", "files", "in", "~/.ash/logs"}, want: true},
+		{name: "rule at natural prompt routed", command: "at", args: []string{"remind", "me", "tomorrow"}, want: true},
+		{name: "rule at scheduler time delegates", command: "at", args: []string{"5pm"}, want: false},
+		{name: "rule at now delegates", command: "at", args: []string{"now", "+", "1", "minute"}, want: false},
 		{name: "rule G default delegate", command: "which", args: []string{"ls"}, want: false},
 		{name: "precedence B over E", command: "what", args: []string{"-n", "what?"}, want: false},
 		{name: "precedence C over F", command: "what", args: []string{"who", "./path"}, want: false},
@@ -2032,6 +2105,7 @@ func TestBashCollisionWrappers(t *testing.T) {
 		{name: "lower case what routed", invocation: "what time is it?", want: "ASH:what time is it?"},
 		{name: "what interrogative routed", invocation: "what is awk", want: "ASH:what is awk"},
 		{name: "what mid auxiliary routed", invocation: "What directory am I in and are there any executeable files Run multiple tools if necessary", want: "ASH:What directory am I in and are there any executeable files Run multiple tools if necessary"},
+		{name: "what sentence with path routed", invocation: "what time is it and list all of the files in the ~/.ash/logs", want: "ASH:what time is it and list all of the files in the /Users/jon/.ash/logs"},
 		{name: "what path delegates", invocation: "what /usr/bin/what", want: "DELEGATE:what:/usr/bin/what"},
 		{name: "what flag delegates", invocation: "what -s file", want: "DELEGATE:what:-s file"},
 		{name: "title case time routed", invocation: "Time is it late?", want: "ASH:Time is it late?"},
@@ -2042,7 +2116,10 @@ func TestBashCollisionWrappers(t *testing.T) {
 		{name: "which question routed", invocation: "which should I use ripgrep or grep", want: "ASH:which should I use ripgrep or grep"},
 		{name: "which command form delegates", invocation: "which ls", want: "DELEGATE:which:ls"},
 		{name: "who question routed", invocation: "who am I?", want: "ASH:who am I?"},
+		{name: "who with path routed", invocation: "who am I and list files in ~/.ash/logs", want: "ASH:who am I and list files in /Users/jon/.ash/logs"},
 		{name: "who no args delegates", invocation: "who", want: "DELEGATE:who:"},
+		{name: "at natural routed", invocation: "at remind me tomorrow", want: "ASH:at remind me tomorrow"},
+		{name: "at scheduler delegates", invocation: "at 5pm", want: "DELEGATE:at:5pm"},
 	}
 
 	for _, tt := range tests {
@@ -2064,10 +2141,14 @@ func TestZshCollisionWrappers(t *testing.T) {
 		{name: "title case what routed", invocation: "What time is it?", want: "ASH:What time is it?"},
 		{name: "lower case what routed", invocation: "what time is it?", want: "ASH:what time is it?"},
 		{name: "what mid auxiliary routed", invocation: "What directory am I in and are there any executeable files Run multiple tools if necessary", want: "ASH:What directory am I in and are there any executeable files Run multiple tools if necessary"},
+		{name: "what sentence with path routed", invocation: "what time is it and list all of the files in the ~/.ash/logs", want: "ASH:what time is it and list all of the files in the /Users/jon/.ash/logs"},
 		{name: "what path delegates", invocation: "what /usr/bin/what", want: "DELEGATE:what:/usr/bin/what"},
 		{name: "title case time routed", invocation: "Time is it late?", want: "ASH:Time is it late?"},
 		{name: "where question routed", invocation: "where should logs go", want: "ASH:where should logs go"},
 		{name: "where command form delegates", invocation: "where ls", want: "DELEGATE:where:ls"},
+		{name: "who with path routed", invocation: "who am I and list files in ~/.ash/logs", want: "ASH:who am I and list files in /Users/jon/.ash/logs"},
+		{name: "at natural routed", invocation: "at remind me tomorrow", want: "ASH:at remind me tomorrow"},
+		{name: "at scheduler delegates", invocation: "at 5pm", want: "DELEGATE:at:5pm"},
 	}
 
 	for _, tt := range tests {

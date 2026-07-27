@@ -217,7 +217,8 @@ The Unix tool rejects risky shell-control argument patterns and always executes 
 - Recurring scheduling uses user `crontab` entries with ash metadata markers.
 - Recurring-job management (`list`, `cancel`, `modify`, `explain`) operates only on ash-owned crontab entries.
 - Scheduled runs capture prompt + working directory and replay a minimal environment allowlist (`AI`, `HOME`, `PATH`, and selected ash config vars).
-- One-off scheduled runs also enable verbose logging and write JSON debug logs to `~/.ash/logs/scheduler.log`, rotating the file at 1 MB.
+- One-off scheduled runs also enable verbose logging and write JSON debug logs to `~/.ash/logs/task_$SESSION_ID.log`, rotating the file at 1 MB.
+- SESSION_ID is required for default log naming and is sanitized to alphanumeric characters for filename safety.
 
 ### Persistent workspace files
 

@@ -40,19 +40,21 @@ const (
 	defaultLaunchdTimeout             = 15 * time.Second
 	defaultCronTimeout                = 15 * time.Second
 	defaultSchedulerLogMaxBytes int64 = 1 << 20
+	sessionIDEnvName                  = "SESSION_ID"
 	historyFileName                   = ".ash_history.json"
 	systemFileName                    = ".ash_system"
 	toolsFileName                     = ".ash_tools"
 	ashWorkspaceDirName               = ".ash"
 	inventoryFileName                 = "inventory.md"
 	schedulerLogDirName               = "logs"
-	schedulerLogFileName              = "scheduler.log"
 	launchAgentsDirName               = "launchagents"
 	futurePromptAgentPrefix           = "com.user.gonetwork"
 	jobMarkerPrefix                   = "# ash:job "
 	installStartMarker                = "# >>> ash install >>>"
 	installEndMarker                  = "# <<< ash install <<<"
 )
+
+var sessionIDSanitizer = regexp.MustCompile(`[^A-Za-z0-9]+`)
 
 const (
 	aiEnvEndpoint  = "AI_ENDPOINT"
@@ -721,6 +723,12 @@ _ash_should_route() {
   shift
   local args=("$@")
   local argc=${#args[@]}
+	local cmd_lower
+	cmd_lower="$(printf '%s' "$cmd" | tr '[:upper:]' '[:lower:]')"
+	local natural_wrapper=0
+	case "$cmd_lower" in
+		what|which|who|where|at) natural_wrapper=1 ;;
+	esac
 
   [[ $argc -eq 0 ]] && return 1
 
@@ -729,9 +737,33 @@ _ash_should_route() {
     [[ "$a" == -* ]] && return 1
   done
 
-  for a in "${args[@]}"; do
-    [[ "$a" == */* || "$a" == ./* || "$a" == ../* ]] && return 1
-  done
+	local has_path_like=0
+	for a in "${args[@]}"; do
+		if [[ "$a" == */* || "$a" == ./* || "$a" == ../* ]]; then
+			has_path_like=1
+			break
+		fi
+	done
+	if [[ $has_path_like -eq 1 && ( $natural_wrapper -eq 0 || $argc -eq 1 ) ]]; then
+		return 1
+	fi
+
+	if [[ "$cmd_lower" == "at" ]]; then
+		local first_at
+		first_at="$(printf '%s' "${args[0]}" | tr '[:upper:]' '[:lower:]')"
+		first_at="${first_at%%[?!.,:;]}"
+		if [[ "$first_at" =~ [0-9:] ]]; then
+			return 1
+		fi
+		case "$first_at" in
+			now|today|tomorrow|teatime|midnight|noon)
+				return 1
+				;;
+			am|pm)
+				return 1
+				;;
+		esac
+	fi
 
   if [[ "$cmd" == "Time" || "$cmd" == "test" || "$cmd" == "Test" || "$cmd" == "type" || "$cmd" == "Type" ]]; then
     if [[ $argc -eq 1 && "${args[0]}" =~ ^[A-Za-z0-9_.-]+$ ]]; then
@@ -750,11 +782,15 @@ _ash_should_route() {
   first="$(printf '%s' "${args[0]}" | tr '[:upper:]' '[:lower:]')"
   case "$first" in
     is|are|am|do|does|did|can|could|should|would|will|why|how|when|where|who)
-      [[ $argc -ge 2 ]] && return 0
+			if [[ $argc -ge 2 ]]; then
+				if [[ $has_path_like -eq 0 || ( $natural_wrapper -eq 1 && $argc -ge 3 ) ]]; then
+					return 0
+				fi
+			fi
       ;;
   esac
 
-	case "$(printf '%s' "$cmd" | tr '[:upper:]' '[:lower:]')" in
+	case "$cmd_lower" in
 		what|which|who|where)
 			if [[ $argc -ge 3 ]]; then
 				local limit=4
@@ -779,6 +815,18 @@ _ash_should_route() {
 				first_token="${first_token%%[?!.,:;]}"
 				case "$first_token" in
 					out|something|a|an|the|please|why|how|when|where|who|what|can|could|should|would)
+						return 0
+						;;
+				esac
+			fi
+			;;
+		at)
+			if [[ $argc -ge 2 ]]; then
+				local first_token
+				first_token="$(printf '%s' "${args[0]}" | tr '[:upper:]' '[:lower:]')"
+				first_token="${first_token%%[?!.,:;]}"
+				case "$first_token" in
+					remind|tell|ask|message|note|please|what|when|how|why|who|where)
 						return 0
 						;;
 				esac
@@ -817,6 +865,8 @@ who()   { _ash_route_or_delegate who   "$@"; }
 Who()   { _ash_route_or_delegate Who   "$@"; }
 say()   { _ash_route_or_delegate say   "$@"; }
 Say()   { _ash_route_or_delegate Say   "$@"; }
+at()    { _ash_route_or_delegate at    "$@"; }
+At()    { _ash_route_or_delegate At    "$@"; }
 
 test()  { _ash_route_or_delegate_builtin test "$@"; }
 Test()  { _ash_route_or_delegate_builtin test "$@"; }
@@ -838,6 +888,12 @@ _ash_should_route() {
   local -a args
   args=("$@")
   local argc=${#args}
+	local cmd_lower
+	cmd_lower="$(printf '%s' "$cmd" | tr '[:upper:]' '[:lower:]')"
+	local natural_wrapper=0
+	case "$cmd_lower" in
+		what|which|who|where|at) natural_wrapper=1 ;;
+	esac
 
   [[ $argc -eq 0 ]] && return 1
 
@@ -846,9 +902,33 @@ _ash_should_route() {
     [[ "$a" == -* ]] && return 1
   done
 
-  for a in "${args[@]}"; do
-    [[ "$a" == */* || "$a" == ./* || "$a" == ../* ]] && return 1
-  done
+	local has_path_like=0
+	for a in "${args[@]}"; do
+		if [[ "$a" == */* || "$a" == ./* || "$a" == ../* ]]; then
+			has_path_like=1
+			break
+		fi
+	done
+	if [[ $has_path_like -eq 1 && ( $natural_wrapper -eq 0 || $argc -eq 1 ) ]]; then
+		return 1
+	fi
+
+	if [[ "$cmd_lower" == "at" ]]; then
+		local first_at
+		first_at="$(printf '%s' "${args[1]}" | tr '[:upper:]' '[:lower:]')"
+		first_at="${first_at%%[?!.,:;]}"
+		if [[ "$first_at" =~ [0-9:] ]]; then
+			return 1
+		fi
+		case "$first_at" in
+			now|today|tomorrow|teatime|midnight|noon)
+				return 1
+				;;
+			am|pm)
+				return 1
+				;;
+		esac
+	fi
 
   if [[ "$cmd" == "Time" || "$cmd" == "test" || "$cmd" == "Test" || "$cmd" == "type" || "$cmd" == "Type" ]]; then
     if [[ $argc -eq 1 && "${args[1]}" =~ '^[A-Za-z0-9_.-]+$' ]]; then
@@ -867,11 +947,15 @@ _ash_should_route() {
   first="$(printf '%s' "${args[1]}" | tr '[:upper:]' '[:lower:]')"
   case "$first" in
     is|are|am|do|does|did|can|could|should|would|will|why|how|when|where|who)
-      [[ $argc -ge 2 ]] && return 0
+			if [[ $argc -ge 2 ]]; then
+				if [[ $has_path_like -eq 0 || ( $natural_wrapper -eq 1 && $argc -ge 3 ) ]]; then
+					return 0
+				fi
+			fi
       ;;
   esac
 
-	case "$(printf '%s' "$cmd" | tr '[:upper:]' '[:lower:]')" in
+	case "$cmd_lower" in
 		what|which|who|where)
 			if [[ $argc -ge 3 ]]; then
 				local limit=4
@@ -887,6 +971,18 @@ _ash_should_route() {
 							;;
 					esac
 				done
+			fi
+			;;
+		at)
+			if [[ $argc -ge 2 ]]; then
+				local first_token
+				first_token="$(printf '%s' "${args[1]}" | tr '[:upper:]' '[:lower:]')"
+				first_token="${first_token%%[?!.,:;]}"
+				case "$first_token" in
+					remind|tell|ask|message|note|please|what|when|how|why|who|where)
+						return 0
+						;;
+				esac
 			fi
 			;;
 	esac
@@ -922,6 +1018,8 @@ who()   { _ash_route_or_delegate who   "$@"; }
 Who()   { _ash_route_or_delegate Who   "$@"; }
 where() { _ash_route_or_delegate_builtin where "$@"; }
 Where() { _ash_route_or_delegate_builtin where "$@"; }
+at()    { _ash_route_or_delegate at    "$@"; }
+At()    { _ash_route_or_delegate At    "$@"; }
 
 test()  { _ash_route_or_delegate_builtin test "$@"; }
 Test()  { _ash_route_or_delegate_builtin test "$@"; }
@@ -1075,7 +1173,12 @@ func configureDebugLogging() {
 
 	logFile := strings.TrimSpace(os.Getenv("ASH_LOG_FILE"))
 	if logFile == "" {
-		return
+		computedPath, err := schedulerLogFilePath(false)
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			return
+		}
+		logFile = computedPath
 	}
 
 	maxBytes := defaultSchedulerLogMaxBytes
@@ -2385,8 +2488,10 @@ func schedulerInvocationEnv() map[string]string {
 		env["ASH_VERBOSE"] = "1"
 	}
 	if strings.TrimSpace(env["ASH_LOG_FILE"]) == "" {
-		if logFile, err := schedulerLogFilePath(); err == nil {
+		if logFile, err := schedulerLogFilePath(true); err == nil {
 			env["ASH_LOG_FILE"] = logFile
+		} else {
+			fmt.Fprintln(os.Stderr, err)
 		}
 	}
 	if strings.TrimSpace(env["ASH_LOG_FORMAT"]) == "" {
@@ -2444,12 +2549,31 @@ func shellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
 }
 
-func schedulerLogFilePath() (string, error) {
+func schedulerLogFilePath(isScheduledTask bool) (string, error) {
 	home, err := osUserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ashWorkspaceDirName, schedulerLogDirName, schedulerLogFileName), nil
+	sessionID, err := sanitizedSessionIDForLogFile()
+	if err != nil {
+		return "", err
+	}
+	if isScheduledTask {
+		sessionID = "task_" + sessionID
+	}
+	return filepath.Join(home, ashWorkspaceDirName, schedulerLogDirName, sessionID+".log"), nil
+}
+
+func sanitizedSessionIDForLogFile() (string, error) {
+	raw := strings.TrimSpace(os.Getenv(sessionIDEnvName))
+	if raw == "" {
+		return "", errors.New("SESSION_ID is required for log file naming. Add this line to ~/.env: export SESSION_ID=\"$(cat /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)\"")
+	}
+	sanitized := sessionIDSanitizer.ReplaceAllString(raw, "")
+	if sanitized == "" {
+		return "", errors.New("SESSION_ID must contain at least one ASCII letter or digit")
+	}
+	return sanitized, nil
 }
 
 func buildFuturePromptLaunchAgent(prompt, cwd string, scheduledAt time.Time) (string, string, string, error) {

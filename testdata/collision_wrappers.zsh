@@ -18,6 +18,12 @@ _ash_should_route() {
   local -a args
   args=("$@")
   local argc=${#args}
+  local cmd_lower
+  cmd_lower="$(printf '%s' "$cmd" | tr '[:upper:]' '[:lower:]')"
+  local natural_wrapper=0
+  case "$cmd_lower" in
+    what|which|who|where|at) natural_wrapper=1 ;;
+  esac
 
   [[ $argc -eq 0 ]] && return 1
 
@@ -26,9 +32,33 @@ _ash_should_route() {
     [[ "$a" == -* ]] && return 1
   done
 
+  local has_path_like=0
   for a in "${args[@]}"; do
-    [[ "$a" == */* || "$a" == ./* || "$a" == ../* ]] && return 1
+    if [[ "$a" == */* || "$a" == ./* || "$a" == ../* ]]; then
+      has_path_like=1
+      break
+    fi
   done
+  if [[ $has_path_like -eq 1 && ( $natural_wrapper -eq 0 || $argc -eq 1 ) ]]; then
+    return 1
+  fi
+
+  if [[ "$cmd_lower" == "at" ]]; then
+    local first_at
+    first_at="$(printf '%s' "${args[1]}" | tr '[:upper:]' '[:lower:]')"
+    first_at="${first_at%%[?!.,:;]}"
+    if [[ "$first_at" =~ [0-9:] ]]; then
+      return 1
+    fi
+    case "$first_at" in
+      now|today|tomorrow|teatime|midnight|noon)
+        return 1
+        ;;
+      am|pm)
+        return 1
+        ;;
+    esac
+  fi
 
   if [[ "$cmd" == "Time" || "$cmd" == "test" || "$cmd" == "Test" || "$cmd" == "type" || "$cmd" == "Type" ]]; then
     if [[ $argc -eq 1 && "${args[1]}" =~ '^[A-Za-z0-9_.-]+$' ]]; then
@@ -47,11 +77,15 @@ _ash_should_route() {
   first="$(printf '%s' "${args[1]}" | tr '[:upper:]' '[:lower:]')"
   case "$first" in
     is|are|am|do|does|did|can|could|should|would|will|why|how|when|where|who)
-      [[ $argc -ge 2 ]] && return 0
+      if [[ $argc -ge 2 ]]; then
+        if [[ $has_path_like -eq 0 || ( $natural_wrapper -eq 1 && $argc -ge 3 ) ]]; then
+          return 0
+        fi
+      fi
       ;;
   esac
 
-  case "$(printf '%s' "$cmd" | tr '[:upper:]' '[:lower:]')" in
+  case "$cmd_lower" in
     what|which|who|where)
       if [[ $argc -ge 3 ]]; then
         local limit=4
@@ -67,6 +101,18 @@ _ash_should_route() {
               ;;
           esac
         done
+      fi
+      ;;
+    at)
+      if [[ $argc -ge 2 ]]; then
+        local first_token
+        first_token="$(printf '%s' "${args[1]}" | tr '[:upper:]' '[:lower:]')"
+        first_token="${first_token%%[?!.,:;]}"
+        case "$first_token" in
+          remind|tell|ask|message|note|please|what|when|how|why|who|where)
+            return 0
+            ;;
+        esac
       fi
       ;;
   esac
@@ -102,6 +148,8 @@ who()   { _ash_route_or_delegate who   "$@"; }
 Who()   { _ash_route_or_delegate Who   "$@"; }
 where() { _ash_route_or_delegate_builtin where "$@"; }
 Where() { _ash_route_or_delegate_builtin where "$@"; }
+at()    { _ash_route_or_delegate at    "$@"; }
+At()    { _ash_route_or_delegate At    "$@"; }
 
 test()  { _ash_route_or_delegate_builtin test "$@"; }
 Test()  { _ash_route_or_delegate_builtin test "$@"; }
