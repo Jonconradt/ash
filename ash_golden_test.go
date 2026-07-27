@@ -5,7 +5,6 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -91,11 +90,9 @@ func TestRunGoldenFailurePromptDirectoryAndExecutables(t *testing.T) {
 		t.Fatalf("write system file: %v", err)
 	}
 
-	u, err := url.Parse(srv.URL)
-	if err != nil {
-		t.Fatalf("parse server url: %v", err)
-	}
-	t.Setenv("AI", "ollama://"+u.Host+"/llama3.1")
+	t.Setenv("AI", "")
+	t.Setenv("AI_ENDPOINT", srv.URL)
+	t.Setenv("AI_MODEL", "llama3.1")
 	t.Setenv("ASH_TOOL_ALLOWLIST", "pwd,find")
 
 	var stdout bytes.Buffer

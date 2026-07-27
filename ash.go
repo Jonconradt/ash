@@ -1,12 +1,15 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -25,20 +28,36 @@ import (
 )
 
 const (
-	defaultOllamaPort    = "11434"
-	defaultHistoryMax    = 40
-	defaultAITimeout     = 3 * time.Minute
-	defaultToolTimeout   = 15 * time.Second
-	defaultToolOutputMax = 8192
-	defaultMaxToolIters  = 4
-	defaultTaskMax       = 6
-	defaultRelevanceWin  = 4
-	defaultStallRounds   = 2
-	historyFileName      = ".ash_history.json"
-	systemFileName       = ".ash_system"
-	toolsFileName        = ".ash_tools"
-	installStartMarker   = "# >>> ash install >>>"
-	installEndMarker     = "# <<< ash install <<<"
+	defaultHistoryMax                 = 40
+	defaultAITimeout                  = 3 * time.Minute
+	defaultToolTimeout                = 15 * time.Second
+	defaultToolOutputMax              = 8192
+	defaultMaxToolIters               = 4
+	defaultTaskMax                    = 6
+	defaultRelevanceWin               = 4
+	defaultStallRounds                = 2
+	defaultLaunchdTimeout             = 15 * time.Second
+	defaultCronTimeout                = 15 * time.Second
+	defaultSchedulerLogMaxBytes int64 = 1 << 20
+	historyFileName                   = ".ash_history.json"
+	systemFileName                    = ".ash_system"
+	toolsFileName                     = ".ash_tools"
+	ashWorkspaceDirName               = ".ash"
+	inventoryFileName                 = "inventory.md"
+	schedulerLogDirName               = "logs"
+	schedulerLogFileName              = "scheduler.log"
+	launchAgentsDirName               = "launchagents"
+	futurePromptAgentPrefix           = "com.user.gonetwork"
+	jobMarkerPrefix                   = "# ash:job "
+	installStartMarker                = "# >>> ash install >>>"
+	installEndMarker                  = "# <<< ash install <<<"
+)
+
+const (
+	aiEnvEndpoint  = "AI_ENDPOINT"
+	aiEnvModel     = "AI_MODEL"
+	aiEnvAuthType  = "AI_AUTH_TYPE"
+	aiEnvAuthToken = "AI_AUTH_TOKEN"
 )
 
 type message struct {
@@ -49,10 +68,11 @@ type message struct {
 }
 
 type chatRequest struct {
-	Model    string           `json:"model"`
-	Messages []message        `json:"messages"`
-	Tools    []toolDefinition `json:"tools,omitempty"`
-	Stream   bool             `json:"stream"`
+	Model      string           `json:"model"`
+	Messages   []message        `json:"messages"`
+	Tools      []toolDefinition `json:"tools,omitempty"`
+	ToolChoice string           `json:"tool_choice,omitempty"`
+	Stream     bool             `json:"stream"`
 }
 
 type chatResponse struct {
@@ -72,10 +92,19 @@ type toolFunctionDefinition struct {
 }
 
 type toolCall struct {
+	Type     string           `json:"type,omitempty"`
 	Function toolFunctionCall `json:"function"`
 }
 
+type aiConfig struct {
+	BaseURL       string
+	Model         string
+	HistoryKey    string
+	Authorization string
+}
+
 type toolFunctionCall struct {
+	Index     *int           `json:"index,omitempty"`
 	Name      string         `json:"name"`
 	Arguments map[string]any `json:"arguments"`
 }
@@ -106,6 +135,22 @@ type toolObservation struct {
 	Summary string
 }
 
+type recurringJobMetadata struct {
+	ID        string            `json:"id"`
+	Cron      string            `json:"cron"`
+	Prompt    string            `json:"prompt"`
+	Cwd       string            `json:"cwd"`
+	Env       map[string]string `json:"env"`
+	Purpose   string            `json:"purpose,omitempty"`
+	CreatedAt string            `json:"created_at"`
+}
+
+type recurringJobRecord struct {
+	Meta    recurringJobMetadata `json:"meta"`
+	Line    string               `json:"line"`
+	Command string               `json:"command"`
+}
+
 const (
 	taskStatusPending = "pending"
 	taskStatusRunning = "running"
@@ -131,6 +176,9 @@ var (
 	execLookPath        = exec.LookPath
 	execCommandOutput   = func(name string, args ...string) ([]byte, error) { return exec.Command(name, args...).Output() }
 	execCommandContext  = exec.CommandContext
+	osMkdirAll          = os.MkdirAll
+	osExecutable        = os.Executable
+	timeNow             = time.Now
 	newTermRenderer     = glamour.NewTermRenderer
 	signalNotifyContext = signal.NotifyContext
 	newHTTPClient       = func(timeout time.Duration) *http.Client {
@@ -139,6 +187,7 @@ var (
 	argumentBlockPattern           = regexp.MustCompile(`(;|\|\||&&|\||` + "`" + `|\$\(|>|<|\x00|\n|\r)`)
 	toolCommandRunner              = runToolCommand
 	debugWriter          io.Writer = os.Stderr
+	debugJSONLogging     bool
 )
 
 func main() {
@@ -155,19 +204,15 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runInstall(args[1:], stdout, stderr)
 	}
 
+	configureDebugLogging()
+
 	if recommendation, err := installRecommendation(); err == nil && recommendation != "" {
 		fmt.Fprintln(stderr, recommendation)
 	}
 
-	aiURI := strings.TrimSpace(os.Getenv("AI"))
-	if aiURI == "" {
-		fmt.Fprintln(stderr, "AI environment variable is required (example: ollama://localhost/llama3.1)")
-		return 1
-	}
-
-	baseURL, model, historyKey, err := parseAI(aiURI)
+	aiCfg, err := parseAIConfigFromEnv()
 	if err != nil {
-		fmt.Fprintf(stderr, "invalid AI value: %v\n", err)
+		fmt.Fprintf(stderr, "invalid AI configuration: %v\n", err)
 		return 1
 	}
 
@@ -182,6 +227,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "failed to read %s: %v\n", systemFileName, err)
 		return 1
 	}
+	systemPrompt = buildSystemPrompt(systemPrompt, timeNow())
 
 	historyPath, err := getHistoryPath()
 	if err != nil {
@@ -204,11 +250,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 	toolShim := localToolShim{allowlist: allowlist}
 
-	conversation := history.Conversations[historyKey]
+	conversation := history.Conversations[aiCfg.HistoryKey]
 	messages := make([]message, 0, len(conversation)+2)
-	if strings.TrimSpace(systemPrompt) != "" {
-		messages = append(messages, message{Role: "system", Content: systemPrompt})
-	}
+	messages = append(messages, message{Role: "system", Content: systemPrompt})
 	messages = append(messages, conversation...)
 	messages = append(messages, message{Role: "user", Content: userInput})
 
@@ -219,9 +263,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 	defer cancel()
 
 	stopSpinner := startThinkingIndicator(stderr)
-	assistantReply, updatedMessages, err := runToolLoop(ctx, baseURL, model, userInput, messages, toolShim)
+	assistantReply, updatedMessages, err := runToolLoop(ctx, aiCfg, userInput, messages, toolShim)
 	stopSpinner()
 	if err != nil {
+		debugLogf("run failed: %v", err)
 		if errors.Is(err, context.Canceled) {
 			fmt.Fprintln(stderr, "AI doesn't feel like talking right now. Try again later.")
 			return 130
@@ -234,11 +279,12 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
+	debugLogf("assistant final reply: %q", assistantReply)
 	fmt.Fprint(stdout, formatAssistantOutput(assistantReply))
 
 	conversation = stripSystemMessage(updatedMessages)
 	conversation = keepRecentMessages(conversation, historyLimit())
-	history.Conversations[historyKey] = conversation
+	history.Conversations[aiCfg.HistoryKey] = conversation
 
 	if err := saveHistory(historyPath, history); err != nil {
 		fmt.Fprintf(stderr, "warning: failed to save history: %v\n", err)
@@ -620,7 +666,7 @@ Time()  { _ash_route_or_delegate Time "$@"; }
 	}
 }
 
-func runToolLoop(ctx context.Context, baseURL, model, userInput string, messages []message, shim mcpToolShim) (string, []message, error) {
+func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages []message, shim mcpToolShim) (string, []message, error) {
 	maxIters := maxToolIterations()
 	tools := shim.ListTools()
 	tasks := buildExecutionTasks(userInput, taskListMax())
@@ -640,7 +686,7 @@ func runToolLoop(ctx context.Context, baseURL, model, userInput string, messages
 			roundMessages = append(roundMessages[:insertAt], append([]message{stateMessage}, roundMessages[insertAt:]...)...)
 		}
 
-		response, err := chat(ctx, baseURL, model, roundMessages, tools)
+		response, err := chat(ctx, aiCfg, roundMessages, tools)
 		if err != nil {
 			return "", nil, err
 		}
@@ -648,6 +694,15 @@ func runToolLoop(ctx context.Context, baseURL, model, userInput string, messages
 		assistant := response.Message
 		if strings.TrimSpace(assistant.Role) == "" {
 			assistant.Role = "assistant"
+		}
+		for j := range assistant.ToolCalls {
+			if strings.TrimSpace(assistant.ToolCalls[j].Type) == "" {
+				assistant.ToolCalls[j].Type = "function"
+			}
+			if assistant.ToolCalls[j].Function.Index == nil {
+				idx := j
+				assistant.ToolCalls[j].Function.Index = &idx
+			}
 		}
 		messages = append(messages, assistant)
 
@@ -742,6 +797,35 @@ func verboseLoggingEnabled() bool {
 	}
 }
 
+func configureDebugLogging() {
+	debugWriter = os.Stderr
+	debugJSONLogging = false
+
+	if !verboseLoggingEnabled() {
+		return
+	}
+
+	logFile := strings.TrimSpace(os.Getenv("ASH_LOG_FILE"))
+	if logFile == "" {
+		return
+	}
+
+	maxBytes := defaultSchedulerLogMaxBytes
+	if raw := strings.TrimSpace(os.Getenv("ASH_LOG_MAX_BYTES")); raw != "" {
+		if parsed, err := strconv.ParseInt(raw, 10, 64); err == nil && parsed > 0 {
+			maxBytes = parsed
+		}
+	}
+
+	writer, err := newRotatingSchedulerLogWriter(logFile, maxBytes)
+	if err != nil {
+		return
+	}
+
+	debugWriter = writer
+	debugJSONLogging = strings.EqualFold(strings.TrimSpace(os.Getenv("ASH_LOG_FORMAT")), "json")
+}
+
 func debugLogf(format string, args ...any) {
 	if !verboseLoggingEnabled() {
 		return
@@ -749,7 +833,106 @@ func debugLogf(format string, args ...any) {
 	if debugWriter == nil {
 		return
 	}
+	if debugJSONLogging {
+		record := map[string]any{
+			"time":    timeNow().UTC().Format(time.RFC3339Nano),
+			"level":   "debug",
+			"message": fmt.Sprintf(format, args...),
+		}
+		encoded, err := json.Marshal(record)
+		if err != nil {
+			_, _ = fmt.Fprintf(debugWriter, "[ash-debug] %s\n", sanitizeJSONError(err.Error()))
+			return
+		}
+		_, _ = debugWriter.Write(append(encoded, '\n'))
+		return
+	}
 	_, _ = fmt.Fprintf(debugWriter, "[ash-debug] "+format+"\n", args...)
+}
+
+type rotatingSchedulerLogWriter struct {
+	mu       sync.Mutex
+	path     string
+	maxBytes int64
+	file     *os.File
+	size     int64
+}
+
+func newRotatingSchedulerLogWriter(path string, maxBytes int64) (*rotatingSchedulerLogWriter, error) {
+	if strings.TrimSpace(path) == "" {
+		return nil, errors.New("log file path must be a non-empty string")
+	}
+	if maxBytes <= 0 {
+		maxBytes = defaultSchedulerLogMaxBytes
+	}
+	if err := osMkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return nil, err
+	}
+	writer := &rotatingSchedulerLogWriter{path: path, maxBytes: maxBytes}
+	if err := writer.openCurrent(); err != nil {
+		return nil, err
+	}
+	return writer, nil
+}
+
+func (w *rotatingSchedulerLogWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	if w.file == nil {
+		if err := w.openCurrent(); err != nil {
+			return 0, err
+		}
+	}
+
+	if w.maxBytes > 0 && w.size > 0 && w.size+int64(len(p)) > w.maxBytes {
+		if err := w.rotateCurrent(); err != nil {
+			return 0, err
+		}
+	}
+
+	n, err := w.file.Write(p)
+	w.size += int64(n)
+	return n, err
+}
+
+func (w *rotatingSchedulerLogWriter) openCurrent() error {
+	file, err := os.OpenFile(w.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
+	if err != nil {
+		return err
+	}
+	info, err := file.Stat()
+	if err != nil {
+		_ = file.Close()
+		return err
+	}
+	w.file = file
+	w.size = info.Size()
+	if w.maxBytes > 0 && w.size >= w.maxBytes {
+		return w.rotateCurrent()
+	}
+	return nil
+}
+
+func (w *rotatingSchedulerLogWriter) rotateCurrent() error {
+	if w.file != nil {
+		_ = w.file.Close()
+		w.file = nil
+	}
+	backupPath := w.path + ".1"
+	_ = os.Remove(backupPath)
+	if _, err := os.Stat(w.path); err == nil {
+		if err := os.Rename(w.path, backupPath); err != nil {
+			return err
+		}
+	}
+	file, err := os.OpenFile(w.path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	if err != nil {
+		return err
+	}
+	w.file = file
+	w.size = 0
+	return nil
 }
 
 func marshalForDebug(value any) string {
@@ -779,35 +962,92 @@ func stripSystemMessage(messages []message) []message {
 	return append([]message(nil), messages...)
 }
 
-func parseAI(value string) (baseURL string, model string, historyKey string, err error) {
+func parseAIConfigFromEnv() (aiConfig, error) {
+	if legacy := strings.TrimSpace(os.Getenv("AI")); legacy != "" {
+		return aiConfig{}, errors.New("AI is no longer supported; use AI_ENDPOINT and AI_MODEL")
+	}
+
+	rawEndpoint := strings.TrimSpace(os.Getenv(aiEnvEndpoint))
+	if rawEndpoint == "" {
+		return aiConfig{}, fmt.Errorf("%s is required", aiEnvEndpoint)
+	}
+
+	model := strings.TrimSpace(os.Getenv(aiEnvModel))
+	if model == "" {
+		return aiConfig{}, fmt.Errorf("%s is required", aiEnvModel)
+	}
+
+	baseURL, host, scheme, err := parseAIEndpoint(rawEndpoint)
+	if err != nil {
+		return aiConfig{}, err
+	}
+
+	authType := strings.ToLower(strings.TrimSpace(os.Getenv(aiEnvAuthType)))
+	authToken := strings.TrimSpace(os.Getenv(aiEnvAuthToken))
+	if authToken != "" && authType == "" {
+		return aiConfig{}, fmt.Errorf("%s is required when %s is set", aiEnvAuthType, aiEnvAuthToken)
+	}
+	if authType != "" && authType != "bearer" {
+		return aiConfig{}, fmt.Errorf("%s must be bearer when set", aiEnvAuthType)
+	}
+	if authType == "bearer" && authToken == "" {
+		return aiConfig{}, fmt.Errorf("%s is required when %s=bearer", aiEnvAuthToken, aiEnvAuthType)
+	}
+
+	if isCloudAIHost(host) {
+		if scheme != "https" {
+			return aiConfig{}, errors.New("AI_ENDPOINT must use https for cloud endpoints")
+		}
+		if authType != "bearer" || authToken == "" {
+			return aiConfig{}, errors.New("cloud endpoints require AI_AUTH_TYPE=bearer and AI_AUTH_TOKEN")
+		}
+	}
+
+	cfg := aiConfig{
+		BaseURL:    baseURL,
+		Model:      model,
+		HistoryKey: fmt.Sprintf("%s/%s", baseURL, model),
+	}
+	if authType == "bearer" {
+		cfg.Authorization = "Bearer " + authToken
+	}
+
+	return cfg, nil
+}
+
+func parseAIEndpoint(value string) (baseURL string, host string, scheme string, err error) {
 	u, err := url.Parse(value)
 	if err != nil {
 		return "", "", "", err
 	}
 
-	if u.Scheme != "ollama" {
-		return "", "", "", errors.New("scheme must be ollama")
+	scheme = strings.ToLower(strings.TrimSpace(u.Scheme))
+	if scheme != "http" && scheme != "https" {
+		return "", "", "", errors.New("AI_ENDPOINT scheme must be http or https")
 	}
-
-	host := strings.TrimSpace(u.Hostname())
+	host = strings.TrimSpace(u.Hostname())
 	if host == "" {
-		return "", "", "", errors.New("host is required")
+		return "", "", "", errors.New("AI_ENDPOINT host is required")
+	}
+	if strings.TrimSpace(u.RawQuery) != "" || strings.TrimSpace(u.Fragment) != "" {
+		return "", "", "", errors.New("AI_ENDPOINT must not include query or fragment")
 	}
 
-	port := strings.TrimSpace(u.Port())
-	if port == "" {
-		port = defaultOllamaPort
+	cleanPath := strings.TrimRight(strings.TrimSpace(u.Path), "/")
+	baseURL = fmt.Sprintf("%s://%s%s", scheme, u.Host, cleanPath)
+	return baseURL, host, scheme, nil
+}
+
+func isCloudAIHost(host string) bool {
+	h := strings.TrimSpace(strings.ToLower(host))
+	if h == "localhost" {
+		return false
 	}
-
-	model = strings.Trim(u.Path, "/")
-	if model == "" {
-		return "", "", "", errors.New("model is required in path")
+	ip := net.ParseIP(h)
+	if ip == nil {
+		return true
 	}
-
-	baseURL = fmt.Sprintf("http://%s:%s", host, port)
-	historyKey = fmt.Sprintf("%s/%s", baseURL, model)
-
-	return baseURL, model, historyKey, nil
+	return !ip.IsLoopback()
 }
 
 func readSystemPrompt() (string, error) {
@@ -1189,9 +1429,9 @@ func hasPendingExecutionTasks(tasks []executionTask) bool {
 	return false
 }
 
-func chat(ctx context.Context, baseURL, model string, messages []message, tools []toolDefinition) (chatResponse, error) {
+func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolDefinition) (chatResponse, error) {
 	requestBody := chatRequest{
-		Model:    model,
+		Model:    aiCfg.Model,
 		Messages: messages,
 		Tools:    tools,
 		Stream:   false,
@@ -1201,14 +1441,17 @@ func chat(ctx context.Context, baseURL, model string, messages []message, tools 
 	if err != nil {
 		return chatResponse{}, err
 	}
-	debugLogf("AI request: url=%s/api/chat", baseURL)
+	debugLogf("AI request: url=%s/api/chat", aiCfg.BaseURL)
 	debugLogf("AI request payload: %s", string(payload))
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/api/chat", bytes.NewReader(payload))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, aiCfg.BaseURL+"/api/chat", bytes.NewReader(payload))
 	if err != nil {
 		return chatResponse{}, err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	if aiCfg.Authorization != "" {
+		req.Header.Set("Authorization", aiCfg.Authorization)
+	}
 
 	client := newHTTPClient(aiTimeout())
 	resp, err := client.Do(req)
@@ -1292,6 +1535,139 @@ func (s localToolShim) ListTools() []toolDefinition {
 		{
 			Type: "function",
 			Function: toolFunctionDefinition{
+				Name:        "schedule_future_prompt",
+				Description: "Schedule one future ash invocation with a prompt using a user launchd LaunchAgent; accepts common offsets like '2 minutes from now'",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"prompt": map[string]any{
+							"type":        "string",
+							"description": "Prompt text to run later",
+						},
+						"when": map[string]any{
+							"type":        "string",
+							"description": "Future schedule string such as 'now + 5 minutes', 'in 10 minutes', or RFC3339 datetime",
+						},
+						"cwd": map[string]any{
+							"type":        "string",
+							"description": "Optional working directory for the scheduled invocation",
+						},
+					},
+					"required": []string{"prompt", "when"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: toolFunctionDefinition{
+				Name:        "schedule_recurring_prompt",
+				Description: "Schedule a recurring ash invocation with a cron expression",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"prompt": map[string]any{
+							"type":        "string",
+							"description": "Prompt text to run on schedule",
+						},
+						"cron": map[string]any{
+							"type":        "string",
+							"description": "Cron expression (5 fields) or @weekly/@daily style macro",
+						},
+						"cwd": map[string]any{
+							"type":        "string",
+							"description": "Optional working directory for the scheduled invocation",
+						},
+						"purpose": map[string]any{
+							"type":        "string",
+							"description": "Optional purpose text for job explain output",
+						},
+					},
+					"required": []string{"prompt", "cron"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: toolFunctionDefinition{
+				Name:        "manage_recurring_jobs",
+				Description: "List, cancel, modify, or explain recurring ash cron jobs",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"action": map[string]any{
+							"type":        "string",
+							"description": "One of list|cancel|modify|explain",
+						},
+						"id": map[string]any{
+							"type":        "string",
+							"description": "Recurring job id (required for cancel/modify/explain single job)",
+						},
+						"cron": map[string]any{
+							"type":        "string",
+							"description": "Replacement cron expression for modify",
+						},
+						"prompt": map[string]any{
+							"type":        "string",
+							"description": "Replacement prompt text for modify",
+						},
+						"cwd": map[string]any{
+							"type":        "string",
+							"description": "Replacement working directory for modify",
+						},
+						"purpose": map[string]any{
+							"type":        "string",
+							"description": "Replacement purpose text for modify",
+						},
+					},
+					"required": []string{"action"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: toolFunctionDefinition{
+				Name:        "ash_read_workspace_file",
+				Description: "Read a file inside ~/.ash workspace",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"path": map[string]any{
+							"type":        "string",
+							"description": "Path relative to ~/.ash",
+						},
+					},
+					"required": []string{"path"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: toolFunctionDefinition{
+				Name:        "ash_write_workspace_file",
+				Description: "Write a file inside ~/.ash workspace and update inventory.md",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"path": map[string]any{
+							"type":        "string",
+							"description": "Path relative to ~/.ash",
+						},
+						"content": map[string]any{
+							"type":        "string",
+							"description": "File contents to write",
+						},
+						"purpose": map[string]any{
+							"type":        "string",
+							"description": "Purpose text stored in ~/.ash/inventory.md",
+						},
+					},
+					"required": []string{"path", "content", "purpose"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: toolFunctionDefinition{
 				Name:        "python3",
 				Description: "Execute Python 3 code via python3 -c and return stdout/stderr",
 				Parameters: map[string]any{
@@ -1324,6 +1700,16 @@ func (s localToolShim) CallTool(ctx context.Context, name string, args map[strin
 		result = s.callUnixCommand(ctx, args)
 	case "run_python3", "python3":
 		result = s.callPython3(ctx, args)
+	case "schedule_future_prompt":
+		result = s.callScheduleFuturePrompt(ctx, args)
+	case "schedule_recurring_prompt":
+		result = s.callScheduleRecurringPrompt(ctx, args)
+	case "manage_recurring_jobs":
+		result = s.callManageRecurringJobs(ctx, args)
+	case "ash_read_workspace_file":
+		result = s.callReadWorkspaceFile(args)
+	case "ash_write_workspace_file":
+		result = s.callWriteWorkspaceFile(args)
 	default:
 		result = toolCommandResult{OK: false, Error: fmt.Sprintf("unknown tool: %s", name)}
 	}
@@ -1393,6 +1779,848 @@ func (s localToolShim) callPython3(ctx context.Context, args map[string]any) too
 
 	pythonArgs := append([]string{"-c", code}, argv...)
 	return toolCommandRunner(ctx, "python3", pythonArgs, toolTimeout(), toolOutputLimit())
+}
+
+func (s localToolShim) callScheduleFuturePrompt(ctx context.Context, args map[string]any) toolCommandResult {
+	prompt, ok := toStringArg(args["prompt"])
+	if !ok || strings.TrimSpace(prompt) == "" {
+		return toolCommandResult{OK: false, Command: "launchctl", Error: "prompt must be a non-empty string"}
+	}
+	when, ok := toStringArg(args["when"])
+	if !ok || strings.TrimSpace(when) == "" {
+		return toolCommandResult{OK: false, Command: "launchctl", Error: "when must be a non-empty string"}
+	}
+	scheduledAt, err := parseFutureScheduleTime(when, timeNow())
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "launchctl", Error: err.Error()}
+	}
+
+	cwd, err := optionalStringArg(args, "cwd")
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "launchctl", Error: err.Error()}
+	}
+
+	label, plistPath, plistContent, err := buildFuturePromptLaunchAgent(prompt, cwd, scheduledAt)
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "launchctl", Error: err.Error()}
+	}
+	if err := osMkdirAll(filepath.Dir(plistPath), 0o700); err != nil {
+		return toolCommandResult{OK: false, Command: "launchctl", Error: err.Error()}
+	}
+	if err := osWriteFile(plistPath, []byte(plistContent), 0o600); err != nil {
+		return toolCommandResult{OK: false, Command: "launchctl", Error: err.Error()}
+	}
+
+	serviceDomain := fmt.Sprintf("gui/%d", os.Getuid())
+	result := toolCommandRunner(ctx, "launchctl", []string{"bootstrap", serviceDomain, plistPath}, defaultLaunchdTimeout, toolOutputLimit())
+	if !result.OK {
+		return result
+	}
+
+	result.Stdout = fmt.Sprintf("scheduled future job label=%s at=%s plist=%s", label, scheduledAt.Format(time.RFC3339), plistPath)
+	return result
+}
+
+func (s localToolShim) callScheduleRecurringPrompt(ctx context.Context, args map[string]any) toolCommandResult {
+	prompt, ok := toStringArg(args["prompt"])
+	if !ok || strings.TrimSpace(prompt) == "" {
+		return toolCommandResult{OK: false, Command: "crontab", Error: "prompt must be a non-empty string"}
+	}
+
+	cronExpr, ok := toStringArg(args["cron"])
+	if !ok {
+		return toolCommandResult{OK: false, Command: "crontab", Error: "cron must be a string"}
+	}
+	cronExpr = strings.TrimSpace(cronExpr)
+	if err := validateCronExpr(cronExpr); err != nil {
+		return toolCommandResult{OK: false, Command: "crontab", Error: err.Error()}
+	}
+
+	cwd, err := optionalStringArg(args, "cwd")
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "crontab", Error: err.Error()}
+	}
+	purpose, err := optionalStringArg(args, "purpose")
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "crontab", Error: err.Error()}
+	}
+
+	meta, line, err := buildRecurringJobLine(prompt, cronExpr, cwd, purpose, "")
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "crontab", Error: err.Error()}
+	}
+
+	content, err := loadCurrentCrontab(ctx)
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "crontab -l", Error: err.Error()}
+	}
+	updated := appendCrontabLine(content, line)
+	writeResult := writeCrontab(ctx, updated)
+	if !writeResult.OK {
+		return writeResult
+	}
+	writeResult.Stdout = strings.TrimSpace(fmt.Sprintf("scheduled recurring job id=%s cron=%s", meta.ID, meta.Cron))
+	return writeResult
+}
+
+func (s localToolShim) callManageRecurringJobs(ctx context.Context, args map[string]any) toolCommandResult {
+	actionRaw, ok := toStringArg(args["action"])
+	if !ok {
+		return toolCommandResult{OK: false, Command: "crontab", Error: "action must be a string"}
+	}
+	action := strings.ToLower(strings.TrimSpace(actionRaw))
+
+	content, err := loadCurrentCrontab(ctx)
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "crontab -l", Error: err.Error()}
+	}
+	records, err := parseRecurringJobs(content)
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "crontab -l", Error: err.Error()}
+	}
+
+	switch action {
+	case "list":
+		body, _ := json.Marshal(records)
+		return toolCommandResult{OK: true, Command: "crontab -l", ExitCode: 0, Stdout: string(body)}
+	case "explain":
+		id, _ := toStringArg(args["id"])
+		id = strings.TrimSpace(id)
+		if id == "" {
+			var b strings.Builder
+			if len(records) == 0 {
+				b.WriteString("no recurring ash jobs found")
+			} else {
+				for _, rec := range records {
+					b.WriteString(fmt.Sprintf("id=%s cron=%s cwd=%s purpose=%s\n", rec.Meta.ID, rec.Meta.Cron, rec.Meta.Cwd, strings.TrimSpace(rec.Meta.Purpose)))
+				}
+			}
+			return toolCommandResult{OK: true, Command: "crontab -l", ExitCode: 0, Stdout: strings.TrimSpace(b.String())}
+		}
+		rec, found := findRecurringJob(records, id)
+		if !found {
+			return toolCommandResult{OK: false, Command: "crontab -l", Error: "recurring job id not found"}
+		}
+		return toolCommandResult{
+			OK:       true,
+			Command:  "crontab -l",
+			ExitCode: 0,
+			Stdout:   fmt.Sprintf("id=%s cron=%s cwd=%s purpose=%s prompt=%s", rec.Meta.ID, rec.Meta.Cron, rec.Meta.Cwd, strings.TrimSpace(rec.Meta.Purpose), rec.Meta.Prompt),
+		}
+	case "cancel":
+		id, _ := toStringArg(args["id"])
+		id = strings.TrimSpace(id)
+		if id == "" {
+			return toolCommandResult{OK: false, Command: "crontab", Error: "id is required for cancel"}
+		}
+		updated, removed := removeRecurringJobFromCrontab(content, id)
+		if !removed {
+			return toolCommandResult{OK: false, Command: "crontab", Error: "recurring job id not found"}
+		}
+		result := writeCrontab(ctx, updated)
+		if !result.OK {
+			return result
+		}
+		result.Stdout = fmt.Sprintf("canceled recurring job id=%s", id)
+		return result
+	case "modify":
+		id, _ := toStringArg(args["id"])
+		id = strings.TrimSpace(id)
+		if id == "" {
+			return toolCommandResult{OK: false, Command: "crontab", Error: "id is required for modify"}
+		}
+		rec, found := findRecurringJob(records, id)
+		if !found {
+			return toolCommandResult{OK: false, Command: "crontab", Error: "recurring job id not found"}
+		}
+
+		if cronExpr, ok := args["cron"]; ok {
+			value, ok := cronExpr.(string)
+			if !ok {
+				return toolCommandResult{OK: false, Command: "crontab", Error: "cron must be a string"}
+			}
+			value = strings.TrimSpace(value)
+			if err := validateCronExpr(value); err != nil {
+				return toolCommandResult{OK: false, Command: "crontab", Error: err.Error()}
+			}
+			rec.Meta.Cron = value
+		}
+		if prompt, ok := args["prompt"]; ok {
+			value, ok := prompt.(string)
+			if !ok || strings.TrimSpace(value) == "" {
+				return toolCommandResult{OK: false, Command: "crontab", Error: "prompt must be a non-empty string"}
+			}
+			rec.Meta.Prompt = strings.TrimSpace(value)
+		}
+		if cwd, ok := args["cwd"]; ok {
+			value, ok := cwd.(string)
+			if !ok {
+				return toolCommandResult{OK: false, Command: "crontab", Error: "cwd must be a string"}
+			}
+			rec.Meta.Cwd = strings.TrimSpace(value)
+		}
+		if purpose, ok := args["purpose"]; ok {
+			value, ok := purpose.(string)
+			if !ok {
+				return toolCommandResult{OK: false, Command: "crontab", Error: "purpose must be a string"}
+			}
+			rec.Meta.Purpose = strings.TrimSpace(value)
+		}
+
+		script, err := buildScheduledInvocationScriptWithEnv(rec.Meta.Prompt, rec.Meta.Cwd, rec.Meta.Env)
+		if err != nil {
+			return toolCommandResult{OK: false, Command: "crontab", Error: err.Error()}
+		}
+		line, err := buildRecurringCrontabLine(rec.Meta, script)
+		if err != nil {
+			return toolCommandResult{OK: false, Command: "crontab", Error: err.Error()}
+		}
+		updated := replaceRecurringJobLine(content, id, line)
+		result := writeCrontab(ctx, updated)
+		if !result.OK {
+			return result
+		}
+		result.Stdout = fmt.Sprintf("modified recurring job id=%s", id)
+		return result
+	default:
+		return toolCommandResult{OK: false, Command: "crontab", Error: "action must be one of list, cancel, modify, explain"}
+	}
+}
+
+func (s localToolShim) callReadWorkspaceFile(args map[string]any) toolCommandResult {
+	rel, ok := toStringArg(args["path"])
+	if !ok || strings.TrimSpace(rel) == "" {
+		return toolCommandResult{OK: false, Command: "ash_read_workspace_file", Error: "path must be a non-empty string"}
+	}
+	root, err := ashWorkspaceDir()
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "ash_read_workspace_file", Error: err.Error()}
+	}
+	absolutePath, relPath, err := resolveWorkspacePath(root, rel)
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "ash_read_workspace_file", Error: err.Error()}
+	}
+
+	content, err := osReadFile(absolutePath)
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "ash_read_workspace_file", Error: err.Error()}
+	}
+
+	return toolCommandResult{OK: true, Command: "ash_read_workspace_file", ExitCode: 0, Stdout: fmt.Sprintf("path=%s\n%s", relPath, string(content))}
+}
+
+func (s localToolShim) callWriteWorkspaceFile(args map[string]any) toolCommandResult {
+	rel, ok := toStringArg(args["path"])
+	if !ok || strings.TrimSpace(rel) == "" {
+		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: "path must be a non-empty string"}
+	}
+	content, ok := toStringArg(args["content"])
+	if !ok {
+		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: "content must be a string"}
+	}
+	purpose, ok := toStringArg(args["purpose"])
+	if !ok || strings.TrimSpace(purpose) == "" {
+		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: "purpose must be a non-empty string"}
+	}
+
+	root, err := ashWorkspaceDir()
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: err.Error()}
+	}
+	if err := osMkdirAll(root, 0o700); err != nil {
+		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: err.Error()}
+	}
+	absolutePath, relPath, err := resolveWorkspacePath(root, rel)
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: err.Error()}
+	}
+
+	if err := osMkdirAll(filepath.Dir(absolutePath), 0o700); err != nil {
+		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: err.Error()}
+	}
+	if err := osWriteFile(absolutePath, []byte(content), 0o600); err != nil {
+		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: err.Error()}
+	}
+	if err := updateWorkspaceInventory(root, relPath, strings.TrimSpace(purpose)); err != nil {
+		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: err.Error()}
+	}
+
+	return toolCommandResult{OK: true, Command: "ash_write_workspace_file", ExitCode: 0, Stdout: fmt.Sprintf("wrote %s", relPath)}
+}
+
+func buildSystemPrompt(userPrompt string, now time.Time) string {
+	header := fmt.Sprintf("Current local datetime: %s", now.Format(time.RFC3339))
+	trimmed := strings.TrimSpace(userPrompt)
+	if trimmed == "" {
+		return header
+	}
+	return header + "\n\n" + trimmed
+}
+
+func schedulerEnvAllowlist() map[string]string {
+	keys := []string{
+		aiEnvEndpoint,
+		aiEnvModel,
+		aiEnvAuthType,
+		aiEnvAuthToken,
+		"HOME",
+		"PATH",
+		"AI_TIMEOUT",
+		"ASH_HISTORY_MAX",
+		"ASH_VERBOSE",
+		"ASH_LOG_FILE",
+		"ASH_LOG_FORMAT",
+		"ASH_LOG_MAX_BYTES",
+		"ASH_TOOL_ALLOWLIST",
+		"ASH_TOOL_TIMEOUT",
+		"ASH_TOOL_OUTPUT_MAX",
+		"ASH_MAX_TOOL_ITERS",
+	}
+	out := map[string]string{}
+	for _, key := range keys {
+		value := strings.TrimSpace(os.Getenv(key))
+		if value == "" {
+			continue
+		}
+		out[key] = value
+	}
+	return out
+}
+
+func schedulerInvocationEnv() map[string]string {
+	env := schedulerEnvAllowlist()
+	if strings.TrimSpace(env["ASH_VERBOSE"]) == "" {
+		env["ASH_VERBOSE"] = "1"
+	}
+	if strings.TrimSpace(env["ASH_LOG_FILE"]) == "" {
+		if logFile, err := schedulerLogFilePath(); err == nil {
+			env["ASH_LOG_FILE"] = logFile
+		}
+	}
+	if strings.TrimSpace(env["ASH_LOG_FORMAT"]) == "" {
+		env["ASH_LOG_FORMAT"] = "json"
+	}
+	if strings.TrimSpace(env["ASH_LOG_MAX_BYTES"]) == "" {
+		env["ASH_LOG_MAX_BYTES"] = strconv.FormatInt(defaultSchedulerLogMaxBytes, 10)
+	}
+	return env
+}
+
+func buildScheduledInvocationScript(prompt, cwd string) (string, error) {
+	return buildScheduledInvocationScriptWithEnv(prompt, cwd, schedulerInvocationEnv())
+}
+
+func buildScheduledInvocationScriptWithEnv(prompt, cwd string, env map[string]string) (string, error) {
+	trimmedPrompt := strings.TrimSpace(prompt)
+	if trimmedPrompt == "" {
+		return "", errors.New("prompt must be a non-empty string")
+	}
+	if strings.TrimSpace(cwd) == "" {
+		current, err := osGetwd()
+		if err != nil {
+			return "", err
+		}
+		cwd = current
+	}
+	ashPath, err := osExecutable()
+	if err != nil {
+		return "", err
+	}
+
+	parts := []string{fmt.Sprintf("cd %s", shellQuote(cwd))}
+	envKeys := make([]string, 0, len(env))
+	for key := range env {
+		envKeys = append(envKeys, key)
+	}
+	sort.Strings(envKeys)
+	assignments := make([]string, 0, len(envKeys))
+	for _, key := range envKeys {
+		assignments = append(assignments, fmt.Sprintf("%s=%s", key, shellQuote(env[key])))
+	}
+	command := fmt.Sprintf("%s %s", shellQuote(ashPath), shellQuote(trimmedPrompt))
+	if len(assignments) > 0 {
+		command = strings.Join(assignments, " ") + " " + command
+	}
+	parts = append(parts, command)
+	return strings.Join(parts, " && "), nil
+}
+
+func shellQuote(value string) string {
+	if value == "" {
+		return "''"
+	}
+	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
+}
+
+func schedulerLogFilePath() (string, error) {
+	home, err := osUserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ashWorkspaceDirName, schedulerLogDirName, schedulerLogFileName), nil
+}
+
+func buildFuturePromptLaunchAgent(prompt, cwd string, scheduledAt time.Time) (string, string, string, error) {
+	trimmedPrompt := strings.TrimSpace(prompt)
+	if trimmedPrompt == "" {
+		return "", "", "", errors.New("prompt must be a non-empty string")
+	}
+	if strings.TrimSpace(cwd) == "" {
+		current, err := osGetwd()
+		if err != nil {
+			return "", "", "", err
+		}
+		cwd = current
+	}
+	ashPath, err := osExecutable()
+	if err != nil {
+		return "", "", "", err
+	}
+	root, err := ashWorkspaceDir()
+	if err != nil {
+		return "", "", "", err
+	}
+	agentID := timeNow().UnixNano()
+	label := fmt.Sprintf("%s.%d", futurePromptAgentPrefix, agentID)
+	plistFile := fmt.Sprintf("%s.%d.plist", futurePromptAgentPrefix, agentID)
+	plistPath := filepath.Join(root, launchAgentsDirName, plistFile)
+	plist := buildLaunchAgentPlist(label, []string{ashPath, trimmedPrompt}, schedulerInvocationEnv(), cwd, scheduledAt)
+	return label, plistPath, plist, nil
+}
+
+func buildLaunchAgentPlist(label string, programArgs []string, env map[string]string, cwd string, scheduledAt time.Time) string {
+	envKeys := make([]string, 0, len(env))
+	for key := range env {
+		envKeys = append(envKeys, key)
+	}
+	sort.Strings(envKeys)
+
+	var b strings.Builder
+	b.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
+	b.WriteString("<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://apple.com\">\n")
+	b.WriteString("<plist version=\"1.0\">\n")
+	b.WriteString("<dict>\n")
+	b.WriteString("    <key>Label</key>\n")
+	b.WriteString(fmt.Sprintf("    <string>%s</string>\n", xmlEscape(label)))
+	b.WriteString("    <key>ProgramArguments</key>\n")
+	b.WriteString("    <array>\n")
+	for _, arg := range programArgs {
+		b.WriteString(fmt.Sprintf("        <string>%s</string>\n", xmlEscape(arg)))
+	}
+	b.WriteString("    </array>\n")
+	b.WriteString("    <key>EnvironmentVariables</key>\n")
+	b.WriteString("    <dict>\n")
+	for _, key := range envKeys {
+		b.WriteString(fmt.Sprintf("        <key>%s</key>\n", xmlEscape(key)))
+		b.WriteString(fmt.Sprintf("        <string>%s</string>\n", xmlEscape(env[key])))
+	}
+	b.WriteString("    </dict>\n")
+	b.WriteString("    <key>WorkingDirectory</key>\n")
+	b.WriteString(fmt.Sprintf("    <string>%s</string>\n", xmlEscape(cwd)))
+	b.WriteString("    <key>RunAtLoad</key>\n")
+	b.WriteString("    <false/>\n")
+	b.WriteString("    <key>StartCalendarInterval</key>\n")
+	b.WriteString("    <dict>\n")
+	b.WriteString(fmt.Sprintf("        <key>Year</key>\n        <integer>%d</integer>\n", scheduledAt.Year()))
+	b.WriteString(fmt.Sprintf("        <key>Month</key>\n        <integer>%d</integer>\n", int(scheduledAt.Month())))
+	b.WriteString(fmt.Sprintf("        <key>Day</key>\n        <integer>%d</integer>\n", scheduledAt.Day()))
+	b.WriteString(fmt.Sprintf("        <key>Hour</key>\n        <integer>%d</integer>\n", scheduledAt.Hour()))
+	b.WriteString(fmt.Sprintf("        <key>Minute</key>\n        <integer>%d</integer>\n", scheduledAt.Minute()))
+	b.WriteString("    </dict>\n")
+	b.WriteString("</dict>\n")
+	b.WriteString("</plist>\n")
+	return b.String()
+}
+
+func parseFutureScheduleTime(value string, now time.Time) (time.Time, error) {
+	trimmed := normalizeFutureScheduleTime(value)
+	if trimmed == "" {
+		return time.Time{}, errors.New("when must be a non-empty string")
+	}
+
+	lower := strings.ToLower(trimmed)
+	nowPlusPattern := regexp.MustCompile(`^now\s*\+\s*(\d+)\s+(second|seconds|minute|minutes|hour|hours|day|days|week|weeks)$`)
+	if matches := nowPlusPattern.FindStringSubmatch(lower); len(matches) == 3 {
+		amount, _ := strconv.Atoi(matches[1])
+		scheduled, err := addScheduleOffset(now, amount, matches[2])
+		if err != nil {
+			return time.Time{}, err
+		}
+		if !scheduled.After(now) {
+			return time.Time{}, errors.New("when must resolve to a future time")
+		}
+		return scheduled, nil
+	}
+
+	if parsed, err := time.Parse(time.RFC3339, trimmed); err == nil {
+		if !parsed.After(now) {
+			return time.Time{}, errors.New("when must resolve to a future time")
+		}
+		return parsed.In(now.Location()), nil
+	}
+
+	formats := []string{"2006-01-02 15:04", "2006-01-02 15:04:05", "2006-01-02T15:04"}
+	for _, format := range formats {
+		if parsed, err := time.ParseInLocation(format, trimmed, now.Location()); err == nil {
+			if !parsed.After(now) {
+				return time.Time{}, errors.New("when must resolve to a future time")
+			}
+			return parsed, nil
+		}
+	}
+
+	return time.Time{}, errors.New("unsupported when format; use 'now + 5 minutes', 'in 10 minutes', or an RFC3339 timestamp")
+}
+
+func addScheduleOffset(now time.Time, amount int, unit string) (time.Time, error) {
+	if amount <= 0 {
+		return time.Time{}, errors.New("time offset must be greater than zero")
+	}
+
+	switch unit {
+	case "second", "seconds":
+		return now.Add(time.Duration(amount) * time.Second), nil
+	case "minute", "minutes":
+		return now.Add(time.Duration(amount) * time.Minute), nil
+	case "hour", "hours":
+		return now.Add(time.Duration(amount) * time.Hour), nil
+	case "day", "days":
+		return now.AddDate(0, 0, amount), nil
+	case "week", "weeks":
+		return now.AddDate(0, 0, amount*7), nil
+	default:
+		return time.Time{}, errors.New("unsupported time unit")
+	}
+}
+
+func xmlEscape(value string) string {
+	replacer := strings.NewReplacer(
+		"&", "&amp;",
+		"<", "&lt;",
+		">", "&gt;",
+		`"`, "&quot;",
+		"'", "&apos;",
+	)
+	return replacer.Replace(value)
+}
+
+func normalizeFutureScheduleTime(value string) string {
+	trimmed := strings.TrimSpace(value)
+	if trimmed == "" {
+		return trimmed
+	}
+
+	lower := strings.ToLower(trimmed)
+	if strings.HasPrefix(lower, "now + ") {
+		return trimmed
+	}
+
+	fromNowPattern := regexp.MustCompile(`^(\d+)\s+(second|seconds|minute|minutes|hour|hours|day|days|week|weeks)\s+from\s+now$`)
+	if matches := fromNowPattern.FindStringSubmatch(lower); len(matches) == 3 {
+		return fmt.Sprintf("now + %s %s", matches[1], matches[2])
+	}
+
+	inPattern := regexp.MustCompile(`^in\s+(\d+)\s+(second|seconds|minute|minutes|hour|hours|day|days|week|weeks)$`)
+	if matches := inPattern.FindStringSubmatch(lower); len(matches) == 3 {
+		return fmt.Sprintf("now + %s %s", matches[1], matches[2])
+	}
+
+	return trimmed
+}
+
+func optionalStringArg(args map[string]any, key string) (string, error) {
+	if _, ok := args[key]; !ok {
+		return "", nil
+	}
+	raw, ok := args[key].(string)
+	if !ok {
+		return "", fmt.Errorf("%s must be a string", key)
+	}
+	return strings.TrimSpace(raw), nil
+}
+
+func validateCronExpr(expr string) error {
+	if strings.TrimSpace(expr) == "" {
+		return errors.New("cron must be a non-empty string")
+	}
+	if strings.HasPrefix(expr, "@") {
+		allowed := map[string]struct{}{"@yearly": {}, "@annually": {}, "@monthly": {}, "@weekly": {}, "@daily": {}, "@hourly": {}}
+		if _, ok := allowed[strings.ToLower(strings.TrimSpace(expr))]; ok {
+			return nil
+		}
+		return errors.New("unsupported cron macro")
+	}
+	parts := strings.Fields(expr)
+	if len(parts) != 5 {
+		return errors.New("cron must contain 5 fields")
+	}
+	return nil
+}
+
+func buildRecurringJobLine(prompt, cronExpr, cwd, purpose, id string) (recurringJobMetadata, string, error) {
+	env := schedulerEnvAllowlist()
+	if strings.TrimSpace(id) == "" {
+		id = fmt.Sprintf("job-%d", timeNow().UnixNano())
+	}
+	meta := recurringJobMetadata{
+		ID:        strings.TrimSpace(id),
+		Cron:      strings.TrimSpace(cronExpr),
+		Prompt:    strings.TrimSpace(prompt),
+		Cwd:       strings.TrimSpace(cwd),
+		Env:       env,
+		Purpose:   strings.TrimSpace(purpose),
+		CreatedAt: timeNow().Format(time.RFC3339),
+	}
+	script, err := buildScheduledInvocationScriptWithEnv(meta.Prompt, meta.Cwd, meta.Env)
+	if err != nil {
+		return recurringJobMetadata{}, "", err
+	}
+	line, err := buildRecurringCrontabLine(meta, script)
+	if err != nil {
+		return recurringJobMetadata{}, "", err
+	}
+	return meta, line, nil
+}
+
+func buildRecurringCrontabLine(meta recurringJobMetadata, script string) (string, error) {
+	payload, err := json.Marshal(meta)
+	if err != nil {
+		return "", err
+	}
+	encoded := base64.RawStdEncoding.EncodeToString(payload)
+	return fmt.Sprintf("%s %s %s%s %s", meta.Cron, script, jobMarkerPrefix, meta.ID, encoded), nil
+}
+
+func appendCrontabLine(content, line string) string {
+	trimmed := strings.TrimRight(content, "\n")
+	if trimmed == "" {
+		return line + "\n"
+	}
+	return trimmed + "\n" + line + "\n"
+}
+
+func parseRecurringJobs(content string) ([]recurringJobRecord, error) {
+	lines := strings.Split(content, "\n")
+	records := make([]recurringJobRecord, 0)
+	for _, line := range lines {
+		idx := strings.Index(line, jobMarkerPrefix)
+		if idx < 0 {
+			continue
+		}
+		suffix := strings.TrimSpace(line[idx+len(jobMarkerPrefix):])
+		parts := strings.Fields(suffix)
+		if len(parts) < 2 {
+			continue
+		}
+		id := strings.TrimSpace(parts[0])
+		encoded := strings.TrimSpace(parts[1])
+		decoded, err := base64.RawStdEncoding.DecodeString(encoded)
+		if err != nil {
+			return nil, err
+		}
+		var meta recurringJobMetadata
+		if err := json.Unmarshal(decoded, &meta); err != nil {
+			return nil, err
+		}
+		if meta.ID == "" {
+			meta.ID = id
+		}
+		commandText := strings.TrimSpace(line)
+		if idx > 0 {
+			commandText = strings.TrimSpace(line[:idx])
+		}
+		records = append(records, recurringJobRecord{Meta: meta, Line: line, Command: commandText})
+	}
+	return records, nil
+}
+
+func findRecurringJob(records []recurringJobRecord, id string) (recurringJobRecord, bool) {
+	for _, rec := range records {
+		if rec.Meta.ID == id {
+			return rec, true
+		}
+	}
+	return recurringJobRecord{}, false
+}
+
+func removeRecurringJobFromCrontab(content, id string) (string, bool) {
+	lines := strings.Split(content, "\n")
+	kept := make([]string, 0, len(lines))
+	removed := false
+	needle := jobMarkerPrefix + id + " "
+	for _, line := range lines {
+		if strings.Contains(line, needle) {
+			removed = true
+			continue
+		}
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	if len(kept) == 0 {
+		return "", removed
+	}
+	return strings.Join(kept, "\n") + "\n", removed
+}
+
+func replaceRecurringJobLine(content, id, replacement string) string {
+	lines := strings.Split(content, "\n")
+	updated := make([]string, 0, len(lines))
+	needle := jobMarkerPrefix + id + " "
+	for _, line := range lines {
+		if strings.Contains(line, needle) {
+			updated = append(updated, replacement)
+			continue
+		}
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		updated = append(updated, line)
+	}
+	if len(updated) == 0 {
+		return ""
+	}
+	return strings.Join(updated, "\n") + "\n"
+}
+
+func loadCurrentCrontab(ctx context.Context) (string, error) {
+	result := runToolCommandWithInput(ctx, "crontab", []string{"-l"}, "", defaultCronTimeout, toolOutputLimit())
+	if result.OK {
+		return result.Stdout, nil
+	}
+	combined := strings.ToLower(strings.TrimSpace(result.Stderr + " " + result.Error))
+	if strings.Contains(combined, "no crontab") {
+		return "", nil
+	}
+	return "", errors.New(strings.TrimSpace(result.Stderr + " " + result.Error))
+}
+
+func writeCrontab(ctx context.Context, content string) toolCommandResult {
+	return runToolCommandWithInput(ctx, "crontab", []string{"-"}, content, defaultCronTimeout, toolOutputLimit())
+}
+
+func runToolCommandWithInput(ctx context.Context, name string, args []string, stdin string, timeout time.Duration, outputMax int) toolCommandResult {
+	commandCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	cmd := execCommandContext(commandCtx, name, args...)
+	if stdin != "" {
+		cmd.Stdin = strings.NewReader(stdin)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	err := cmd.Run()
+	result := toolCommandResult{
+		OK:      err == nil,
+		Command: strings.TrimSpace(strings.Join(append([]string{name}, args...), " ")),
+		Stdout:  truncateForToolOutput(stdout.String(), outputMax),
+		Stderr:  truncateForToolOutput(stderr.String(), outputMax),
+	}
+	if err == nil {
+		result.ExitCode = 0
+		return result
+	}
+
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		result.ExitCode = exitErr.ExitCode()
+		result.Error = fmt.Sprintf("command exited with status %d", result.ExitCode)
+		return result
+	}
+	if errors.Is(commandCtx.Err(), context.DeadlineExceeded) {
+		result.ExitCode = -1
+		result.Error = fmt.Sprintf("command timed out after %s", timeout)
+		return result
+	}
+	result.ExitCode = -1
+	result.Error = err.Error()
+	return result
+}
+
+func ashWorkspaceDir() (string, error) {
+	home, err := osUserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(home, ashWorkspaceDirName), nil
+}
+
+func resolveWorkspacePath(root, userPath string) (absolute string, rel string, err error) {
+	cleanInput := strings.TrimSpace(userPath)
+	if cleanInput == "" {
+		return "", "", errors.New("path must be a non-empty string")
+	}
+
+	if filepath.IsAbs(cleanInput) {
+		relPath, relErr := filepath.Rel(root, cleanInput)
+		if relErr != nil {
+			return "", "", relErr
+		}
+		if relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) {
+			return "", "", errors.New("path must be inside ~/.ash")
+		}
+		return cleanInput, filepath.ToSlash(relPath), nil
+	}
+
+	joined := filepath.Join(root, cleanInput)
+	clean := filepath.Clean(joined)
+	relPath, relErr := filepath.Rel(root, clean)
+	if relErr != nil {
+		return "", "", relErr
+	}
+	if relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) {
+		return "", "", errors.New("path must be inside ~/.ash")
+	}
+	return clean, filepath.ToSlash(relPath), nil
+}
+
+func updateWorkspaceInventory(root, relPath, purpose string) error {
+	if filepath.ToSlash(relPath) == inventoryFileName {
+		return nil
+	}
+
+	inventoryPath := filepath.Join(root, inventoryFileName)
+	entries := map[string]string{}
+	if content, err := osReadFile(inventoryPath); err == nil {
+		scanner := bufio.NewScanner(strings.NewReader(string(content)))
+		for scanner.Scan() {
+			line := strings.TrimSpace(scanner.Text())
+			if line == "" || strings.HasPrefix(line, "#") {
+				continue
+			}
+			parts := strings.SplitN(line, "|", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			entries[strings.TrimSpace(parts[0])] = strings.TrimSpace(parts[1])
+		}
+		if err := scanner.Err(); err != nil {
+			return err
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return err
+	}
+
+	entries[filepath.ToSlash(relPath)] = strings.TrimSpace(purpose)
+	keys := make([]string, 0, len(entries))
+	for key := range entries {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	var b strings.Builder
+	for _, key := range keys {
+		b.WriteString(key)
+		b.WriteString(" | ")
+		b.WriteString(entries[key])
+		b.WriteString("\n")
+	}
+	return osWriteFile(inventoryPath, []byte(b.String()), 0o600)
 }
 
 func runToolCommand(ctx context.Context, name string, args []string, timeout time.Duration, outputMax int) toolCommandResult {

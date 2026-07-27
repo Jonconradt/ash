@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -23,54 +22,110 @@ import (
 	"github.com/charmbracelet/glamour"
 )
 
-func TestParseAI(t *testing.T) {
+func testAIConfig(baseURL, model string) aiConfig {
+	return aiConfig{BaseURL: baseURL, Model: model, HistoryKey: baseURL + "/" + model}
+}
+
+func TestParseAIConfigFromEnv(t *testing.T) {
 	tests := []struct {
 		name           string
-		input          string
+		env            map[string]string
 		wantBaseURL    string
 		wantModel      string
 		wantHistoryKey string
+		wantAuth       string
 		wantErr        string
 	}{
 		{
-			name:           "valid with default port",
-			input:          "ollama://localhost/llama3.1",
+			name: "local endpoint without auth",
+			env: map[string]string{
+				"AI_ENDPOINT": "http://localhost:11434",
+				"AI_MODEL":    "llama3.1",
+			},
 			wantBaseURL:    "http://localhost:11434",
 			wantModel:      "llama3.1",
 			wantHistoryKey: "http://localhost:11434/llama3.1",
 		},
 		{
-			name:           "valid with explicit port",
-			input:          "ollama://example.com:1234/mistral",
-			wantBaseURL:    "http://example.com:1234",
+			name: "cloud endpoint with bearer auth",
+			env: map[string]string{
+				"AI_ENDPOINT":   "https://api.example.com/ollama",
+				"AI_MODEL":      "mistral",
+				"AI_AUTH_TYPE":  "bearer",
+				"AI_AUTH_TOKEN": "abc123",
+			},
+			wantBaseURL:    "https://api.example.com/ollama",
 			wantModel:      "mistral",
-			wantHistoryKey: "http://example.com:1234/mistral",
+			wantHistoryKey: "https://api.example.com/ollama/mistral",
+			wantAuth:       "Bearer abc123",
 		},
 		{
-			name:    "invalid scheme",
-			input:   "http://localhost/llama3.1",
-			wantErr: "scheme must be ollama",
+			name: "legacy AI env rejected",
+			env: map[string]string{
+				"AI": "ollama://localhost/llama3.1",
+			},
+			wantErr: "AI is no longer supported",
 		},
 		{
-			name:    "missing host",
-			input:   "ollama:///llama3.1",
-			wantErr: "host is required",
+			name:    "missing endpoint",
+			env:     map[string]string{"AI_MODEL": "llama3.1"},
+			wantErr: "AI_ENDPOINT is required",
 		},
 		{
 			name:    "missing model",
-			input:   "ollama://localhost",
-			wantErr: "model is required in path",
+			env:     map[string]string{"AI_ENDPOINT": "http://localhost:11434"},
+			wantErr: "AI_MODEL is required",
 		},
 		{
-			name:    "invalid URI parse",
-			input:   "://bad",
-			wantErr: "missing protocol scheme",
+			name: "token without auth type",
+			env: map[string]string{
+				"AI_ENDPOINT":   "http://localhost:11434",
+				"AI_MODEL":      "llama3.1",
+				"AI_AUTH_TOKEN": "abc",
+			},
+			wantErr: "AI_AUTH_TYPE is required when AI_AUTH_TOKEN is set",
+		},
+		{
+			name: "invalid auth type",
+			env: map[string]string{
+				"AI_ENDPOINT":  "http://localhost:11434",
+				"AI_MODEL":     "llama3.1",
+				"AI_AUTH_TYPE": "basic",
+			},
+			wantErr: "AI_AUTH_TYPE must be bearer",
+		},
+		{
+			name: "cloud endpoint requires https",
+			env: map[string]string{
+				"AI_ENDPOINT":   "http://api.example.com",
+				"AI_MODEL":      "llama3.1",
+				"AI_AUTH_TYPE":  "bearer",
+				"AI_AUTH_TOKEN": "abc",
+			},
+			wantErr: "AI_ENDPOINT must use https for cloud endpoints",
+		},
+		{
+			name: "cloud endpoint requires auth",
+			env: map[string]string{
+				"AI_ENDPOINT": "https://api.example.com",
+				"AI_MODEL":    "llama3.1",
+			},
+			wantErr: "cloud endpoints require AI_AUTH_TYPE=bearer and AI_AUTH_TOKEN",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			baseURL, model, historyKey, err := parseAI(tt.input)
+			t.Setenv("AI", "")
+			t.Setenv("AI_ENDPOINT", "")
+			t.Setenv("AI_MODEL", "")
+			t.Setenv("AI_AUTH_TYPE", "")
+			t.Setenv("AI_AUTH_TOKEN", "")
+			for k, v := range tt.env {
+				t.Setenv(k, v)
+			}
+
+			cfg, err := parseAIConfigFromEnv()
 			if tt.wantErr != "" {
 				if err == nil {
 					t.Fatalf("expected error %q, got nil", tt.wantErr)
@@ -82,16 +137,19 @@ func TestParseAI(t *testing.T) {
 			}
 
 			if err != nil {
-				t.Fatalf("parseAI returned unexpected error: %v", err)
+				t.Fatalf("parseAIConfigFromEnv returned unexpected error: %v", err)
 			}
-			if baseURL != tt.wantBaseURL {
-				t.Fatalf("baseURL mismatch: got %q want %q", baseURL, tt.wantBaseURL)
+			if cfg.BaseURL != tt.wantBaseURL {
+				t.Fatalf("baseURL mismatch: got %q want %q", cfg.BaseURL, tt.wantBaseURL)
 			}
-			if model != tt.wantModel {
-				t.Fatalf("model mismatch: got %q want %q", model, tt.wantModel)
+			if cfg.Model != tt.wantModel {
+				t.Fatalf("model mismatch: got %q want %q", cfg.Model, tt.wantModel)
 			}
-			if historyKey != tt.wantHistoryKey {
-				t.Fatalf("historyKey mismatch: got %q want %q", historyKey, tt.wantHistoryKey)
+			if cfg.HistoryKey != tt.wantHistoryKey {
+				t.Fatalf("historyKey mismatch: got %q want %q", cfg.HistoryKey, tt.wantHistoryKey)
+			}
+			if cfg.Authorization != tt.wantAuth {
+				t.Fatalf("authorization mismatch: got %q want %q", cfg.Authorization, tt.wantAuth)
 			}
 		})
 	}
@@ -293,6 +351,28 @@ func TestReadSystemPromptErrors(t *testing.T) {
 		osGetwd = origGetwd
 		osReadFile = origReadFile
 		osUserHomeDir = origHome
+	})
+}
+
+func TestBuildSystemPrompt(t *testing.T) {
+	now := time.Date(2026, time.July, 24, 9, 15, 30, 0, time.FixedZone("PDT", -7*3600))
+
+	t.Run("header only when empty prompt", func(t *testing.T) {
+		got := buildSystemPrompt("", now)
+		want := "Current local datetime: 2026-07-24T09:15:30-07:00"
+		if got != want {
+			t.Fatalf("unexpected prompt: got %q want %q", got, want)
+		}
+	})
+
+	t.Run("header plus prompt body", func(t *testing.T) {
+		got := buildSystemPrompt("sys-msg", now)
+		if !strings.HasPrefix(got, "Current local datetime: 2026-07-24T09:15:30-07:00\n\n") {
+			t.Fatalf("expected datetime prefix, got %q", got)
+		}
+		if !strings.HasSuffix(got, "sys-msg") {
+			t.Fatalf("expected user prompt suffix, got %q", got)
+		}
 	})
 }
 
@@ -552,7 +632,7 @@ func TestChat(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		got, err := chat(context.Background(), srv.URL, "model", []message{{Role: "user", Content: "hi"}}, nil)
+		got, err := chat(context.Background(), testAIConfig(srv.URL, "model"), []message{{Role: "user", Content: "hi"}}, nil)
 		if err != nil {
 			t.Fatalf("chat returned error: %v", err)
 		}
@@ -567,7 +647,7 @@ func TestChat(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		_, err := chat(context.Background(), srv.URL, "model", []message{{Role: "user", Content: "hi"}}, nil)
+		_, err := chat(context.Background(), testAIConfig(srv.URL, "model"), []message{{Role: "user", Content: "hi"}}, nil)
 		if err == nil {
 			t.Fatalf("expected error, got nil")
 		}
@@ -583,7 +663,7 @@ func TestChat(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		_, err := chat(context.Background(), srv.URL, "model", []message{{Role: "user", Content: "hi"}}, nil)
+		_, err := chat(context.Background(), testAIConfig(srv.URL, "model"), []message{{Role: "user", Content: "hi"}}, nil)
 		if err == nil {
 			t.Fatalf("expected error, got nil")
 		}
@@ -598,7 +678,7 @@ func TestChat(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		_, err := chat(context.Background(), srv.URL, "model", []message{{Role: "user", Content: "hi"}}, nil)
+		_, err := chat(context.Background(), testAIConfig(srv.URL, "model"), []message{{Role: "user", Content: "hi"}}, nil)
 		if err == nil {
 			t.Fatalf("expected error, got nil")
 		}
@@ -616,7 +696,7 @@ func TestChat(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())
 		result := make(chan error, 1)
 		go func() {
-			_, err := chat(ctx, srv.URL, "model", []message{{Role: "user", Content: "hi"}}, nil)
+			_, err := chat(ctx, testAIConfig(srv.URL, "model"), []message{{Role: "user", Content: "hi"}}, nil)
 			result <- err
 		}()
 
@@ -645,7 +725,7 @@ func TestChat(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		_, err := chat(context.Background(), srv.URL, "model", []message{{Role: "user", Content: "hi"}}, nil)
+		_, err := chat(context.Background(), testAIConfig(srv.URL, "model"), []message{{Role: "user", Content: "hi"}}, nil)
 		if err == nil {
 			t.Fatalf("expected timeout error, got nil")
 		}
@@ -675,7 +755,7 @@ func TestChatIncludesToolsAndParsesToolCalls(t *testing.T) {
 		},
 	}}
 
-	resp, err := chat(context.Background(), srv.URL, "model", []message{{Role: "user", Content: "hi"}}, tools)
+	resp, err := chat(context.Background(), testAIConfig(srv.URL, "model"), []message{{Role: "user", Content: "hi"}}, tools)
 	if err != nil {
 		t.Fatalf("chat returned error: %v", err)
 	}
@@ -690,6 +770,25 @@ func TestChatIncludesToolsAndParsesToolCalls(t *testing.T) {
 
 	if resp.Message.ToolCalls[0].Function.Name != "run_unix_command" {
 		t.Fatalf("unexpected tool call name: %#v", resp.Message.ToolCalls)
+	}
+}
+
+func TestChatAddsAuthorizationHeader(t *testing.T) {
+	wantAuth := "Bearer secret-token"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != wantAuth {
+			t.Fatalf("authorization header mismatch: got %q want %q", got, wantAuth)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"message":{"role":"assistant","content":"ok"}}`))
+	}))
+	defer srv.Close()
+
+	cfg := testAIConfig(srv.URL, "model")
+	cfg.Authorization = wantAuth
+	_, err := chat(context.Background(), cfg, []message{{Role: "user", Content: "hi"}}, nil)
+	if err != nil {
+		t.Fatalf("chat returned error: %v", err)
 	}
 }
 
@@ -833,6 +932,264 @@ func TestLocalToolShimRunUnixCommandPolicy(t *testing.T) {
 	})
 }
 
+func TestLocalToolShimIncludesSchedulingAndWorkspaceTools(t *testing.T) {
+	shim := localToolShim{}
+	tools := shim.ListTools()
+	names := map[string]struct{}{}
+	for _, tool := range tools {
+		names[tool.Function.Name] = struct{}{}
+	}
+	for _, required := range []string{
+		"schedule_future_prompt",
+		"schedule_recurring_prompt",
+		"manage_recurring_jobs",
+		"ash_read_workspace_file",
+		"ash_write_workspace_file",
+	} {
+		if _, ok := names[required]; !ok {
+			t.Fatalf("expected tool %q to be published", required)
+		}
+	}
+}
+
+func TestBuildScheduledInvocationScript(t *testing.T) {
+	origExecutable := osExecutable
+	origGetwd := osGetwd
+	t.Cleanup(func() {
+		osExecutable = origExecutable
+		osGetwd = origGetwd
+	})
+
+	osExecutable = func() (string, error) { return "/usr/local/bin/ash", nil }
+	osGetwd = func() (string, error) { return "/tmp/project", nil }
+	t.Setenv("AI_ENDPOINT", "http://localhost:11434")
+	t.Setenv("AI_MODEL", "llama3.1")
+	t.Setenv("HOME", "/Users/tester")
+	t.Setenv("PATH", "/usr/bin:/bin")
+
+	got, err := buildScheduledInvocationScript("summarize git status", "")
+	if err != nil {
+		t.Fatalf("buildScheduledInvocationScript error: %v", err)
+	}
+	if !strings.Contains(got, "cd '/tmp/project'") {
+		t.Fatalf("expected cwd cd command, got %q", got)
+	}
+	if !strings.Contains(got, "AI_ENDPOINT='http://localhost:11434'") {
+		t.Fatalf("expected AI_ENDPOINT env assignment, got %q", got)
+	}
+	if !strings.Contains(got, "AI_MODEL='llama3.1'") {
+		t.Fatalf("expected AI_MODEL env assignment, got %q", got)
+	}
+	if !strings.Contains(got, "ASH_VERBOSE='1'") {
+		t.Fatalf("expected verbose logging to be enabled, got %q", got)
+	}
+	if !strings.Contains(got, "ASH_LOG_FILE='") || !strings.Contains(got, "/.ash/logs/scheduler.log'") {
+		t.Fatalf("expected scheduler log file assignment, got %q", got)
+	}
+	if !strings.Contains(got, "ASH_LOG_FORMAT='json'") {
+		t.Fatalf("expected JSON log format, got %q", got)
+	}
+	if !strings.Contains(got, "ASH_LOG_MAX_BYTES='1048576'") {
+		t.Fatalf("expected 1 MB log rotation default, got %q", got)
+	}
+	if !strings.Contains(got, "'/usr/local/bin/ash' 'summarize git status'") {
+		t.Fatalf("expected ash invocation, got %q", got)
+	}
+}
+
+func TestNormalizeFutureScheduleTime(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{name: "from now minutes", input: "2 minutes from now", want: "now + 2 minutes"},
+		{name: "from now hours", input: "1 hour from now", want: "now + 1 hour"},
+		{name: "in minutes", input: "in 3 minutes", want: "now + 3 minutes"},
+		{name: "already valid", input: "now + 5 minutes", want: "now + 5 minutes"},
+		{name: "unchanged fallback", input: "tomorrow", want: "tomorrow"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := normalizeFutureScheduleTime(tt.input); got != tt.want {
+				t.Fatalf("normalizeFutureScheduleTime(%q) = %q, want %q", tt.input, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestParseFutureScheduleTime(t *testing.T) {
+	now := time.Date(2026, time.July, 24, 10, 0, 0, 0, time.Local)
+
+	t.Run("relative offset", func(t *testing.T) {
+		got, err := parseFutureScheduleTime("in 5 minutes", now)
+		if err != nil {
+			t.Fatalf("parseFutureScheduleTime returned error: %v", err)
+		}
+		want := now.Add(5 * time.Minute)
+		if !got.Equal(want) {
+			t.Fatalf("parseFutureScheduleTime returned %v, want %v", got, want)
+		}
+	})
+
+	t.Run("rfc3339", func(t *testing.T) {
+		future := now.Add(1 * time.Hour).Format(time.RFC3339)
+		got, err := parseFutureScheduleTime(future, now)
+		if err != nil {
+			t.Fatalf("parseFutureScheduleTime returned error: %v", err)
+		}
+		want := now.Add(1 * time.Hour)
+		if !got.Equal(want) {
+			t.Fatalf("unexpected parsed time: got %v want %v", got, want)
+		}
+	})
+
+	t.Run("reject past", func(t *testing.T) {
+		if _, err := parseFutureScheduleTime("in 0 minutes", now); err == nil {
+			t.Fatalf("expected error for non-future schedule")
+		}
+	})
+}
+
+func TestSchedulerDebugLoggingRotatesJSON(t *testing.T) {
+	origWriter := debugWriter
+	origJSON := debugJSONLogging
+	t.Cleanup(func() {
+		debugWriter = origWriter
+		debugJSONLogging = origJSON
+	})
+
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("ASH_VERBOSE", "1")
+	t.Setenv("ASH_LOG_FILE", filepath.Join(home, ".ash", "logs", "scheduler.log"))
+	t.Setenv("ASH_LOG_FORMAT", "json")
+	t.Setenv("ASH_LOG_MAX_BYTES", "220")
+
+	configureDebugLogging()
+	if debugWriter == nil {
+		t.Fatalf("expected debug writer to be configured")
+	}
+
+	debugLogf("first %s", strings.Repeat("a", 120))
+	debugLogf("second %s", strings.Repeat("b", 120))
+
+	currentPath := filepath.Join(home, ".ash", "logs", "scheduler.log")
+	rotatedPath := currentPath + ".1"
+
+	currentData, err := os.ReadFile(currentPath)
+	if err != nil {
+		t.Fatalf("read current log: %v", err)
+	}
+	if !strings.Contains(string(currentData), `"level":"debug"`) {
+		t.Fatalf("expected JSON debug entry, got %q", string(currentData))
+	}
+
+	rotatedData, err := os.ReadFile(rotatedPath)
+	if err != nil {
+		t.Fatalf("read rotated log: %v", err)
+	}
+	if !strings.Contains(string(rotatedData), `"first `) {
+		t.Fatalf("expected first entry in rotated log, got %q", string(rotatedData))
+	}
+}
+
+func TestRecurringJobLineRoundTrip(t *testing.T) {
+	origTimeNow := timeNow
+	origExecutable := osExecutable
+	timeNow = func() time.Time {
+		return time.Date(2026, time.July, 24, 10, 0, 0, 0, time.UTC)
+	}
+	osExecutable = func() (string, error) { return "/usr/local/bin/ash", nil }
+	t.Cleanup(func() {
+		timeNow = origTimeNow
+		osExecutable = origExecutable
+	})
+
+	t.Setenv("AI_ENDPOINT", "http://localhost:11434")
+	t.Setenv("AI_MODEL", "llama3.1")
+	t.Setenv("HOME", "/Users/tester")
+	t.Setenv("PATH", "/usr/bin:/bin")
+
+	meta, line, err := buildRecurringJobLine("weekly review", "0 7 * * 1", "/Users/tester/work", "monday summary", "job-fixed")
+	if err != nil {
+		t.Fatalf("buildRecurringJobLine error: %v", err)
+	}
+	if !strings.Contains(line, "# ash:job job-fixed ") {
+		t.Fatalf("expected recurring marker in line, got %q", line)
+	}
+
+	parsed, err := parseRecurringJobs(line + "\n")
+	if err != nil {
+		t.Fatalf("parseRecurringJobs error: %v", err)
+	}
+	if len(parsed) != 1 {
+		t.Fatalf("expected one parsed job, got %d", len(parsed))
+	}
+	if parsed[0].Meta.ID != "job-fixed" || parsed[0].Meta.Prompt != "weekly review" {
+		t.Fatalf("unexpected parsed metadata: %#v", parsed[0].Meta)
+	}
+	if parsed[0].Meta.Cron != "0 7 * * 1" {
+		t.Fatalf("unexpected cron: %#v", parsed[0].Meta)
+	}
+	if meta.ID != parsed[0].Meta.ID {
+		t.Fatalf("round-trip id mismatch: %q vs %q", meta.ID, parsed[0].Meta.ID)
+	}
+}
+
+func TestWorkspaceReadWriteTools(t *testing.T) {
+	shim := localToolShim{}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	writeResult := shim.CallTool(context.Background(), "ash_write_workspace_file", map[string]any{
+		"path":    "state/counter.txt",
+		"content": "41",
+		"purpose": "Counter state used for invocation tracking",
+	})
+	if !strings.Contains(writeResult, `"ok":true`) {
+		t.Fatalf("expected successful write, got %s", writeResult)
+	}
+
+	workspaceFile := filepath.Join(home, ".ash", "state", "counter.txt")
+	data, err := os.ReadFile(workspaceFile)
+	if err != nil {
+		t.Fatalf("read workspace file: %v", err)
+	}
+	if string(data) != "41" {
+		t.Fatalf("unexpected workspace content: %q", string(data))
+	}
+
+	inventory, err := os.ReadFile(filepath.Join(home, ".ash", "inventory.md"))
+	if err != nil {
+		t.Fatalf("read inventory file: %v", err)
+	}
+	if !strings.Contains(string(inventory), "state/counter.txt | Counter state used for invocation tracking") {
+		t.Fatalf("expected inventory entry, got %q", string(inventory))
+	}
+
+	readResult := shim.CallTool(context.Background(), "ash_read_workspace_file", map[string]any{"path": "state/counter.txt"})
+	if !strings.Contains(readResult, `"ok":true`) || !strings.Contains(readResult, "41") {
+		t.Fatalf("expected successful read, got %s", readResult)
+	}
+}
+
+func TestWorkspaceWriteRejectsPathTraversal(t *testing.T) {
+	shim := localToolShim{}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+
+	result := shim.CallTool(context.Background(), "ash_write_workspace_file", map[string]any{
+		"path":    "../escape.txt",
+		"content": "bad",
+		"purpose": "invalid",
+	})
+	if !strings.Contains(result, "inside ~/.ash") {
+		t.Fatalf("expected containment error, got %s", result)
+	}
+}
+
 func TestRunToolLoop(t *testing.T) {
 	originalRunner := toolCommandRunner
 	t.Cleanup(func() { toolCommandRunner = originalRunner })
@@ -853,7 +1210,7 @@ func TestRunToolLoop(t *testing.T) {
 			if len(req.Tools) == 0 {
 				t.Fatalf("expected tools list in first request")
 			}
-			_, _ = w.Write([]byte(`{"message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"run_unix_command","arguments":{"command":"ls","args":["-1"]}}}]}}`))
+			_, _ = w.Write([]byte(`{"message":{"role":"assistant","content":"","tool_calls":[{"type":"function","function":{"index":0,"name":"run_unix_command","arguments":{"command":"ls","args":["-1"]}}}]}}`))
 			return
 		}
 
@@ -864,12 +1221,34 @@ func TestRunToolLoop(t *testing.T) {
 			t.Fatalf("expected tool_name in follow-up request, got %#v", req.Messages[len(req.Messages)-1])
 		}
 
+		assistantCallPreserved := false
+		for _, msg := range req.Messages {
+			if msg.Role != "assistant" || len(msg.ToolCalls) == 0 {
+				continue
+			}
+			call := msg.ToolCalls[0]
+			if call.Function.Name != "run_unix_command" {
+				continue
+			}
+			if call.Type != "function" {
+				t.Fatalf("expected assistant tool call type=function, got %#v", call)
+			}
+			if call.Function.Index == nil || *call.Function.Index != 0 {
+				t.Fatalf("expected assistant tool call index=0, got %#v", call.Function.Index)
+			}
+			assistantCallPreserved = true
+			break
+		}
+		if !assistantCallPreserved {
+			t.Fatalf("expected assistant tool call metadata in follow-up request, got %#v", req.Messages)
+		}
+
 		_, _ = w.Write([]byte(`{"message":{"role":"assistant","content":"done"}}`))
 	}))
 	defer srv.Close()
 
 	shim := localToolShim{allowlist: map[string]struct{}{"ls": {}}}
-	final, updated, err := runToolLoop(context.Background(), srv.URL, "model", "list files", []message{{Role: "user", Content: "list files"}}, shim)
+	final, updated, err := runToolLoop(context.Background(), testAIConfig(srv.URL, "model"), "list files", []message{{Role: "user", Content: "list files"}}, shim)
 	if err != nil {
 		t.Fatalf("runToolLoop returned error: %v", err)
 	}
@@ -913,8 +1292,7 @@ func TestRunToolLoopRetriesExecutionPrompt(t *testing.T) {
 	shim := localToolShim{allowlist: map[string]struct{}{}}
 	final, updated, err := runToolLoop(
 		context.Background(),
-		srv.URL,
-		"model",
+		testAIConfig(srv.URL, "model"),
 		"Use python to print hello world.",
 		[]message{{Role: "user", Content: "Use python to print hello world."}},
 		shim,
@@ -1024,7 +1402,7 @@ func TestRunToolLoopInjectsExecutionStateMessage(t *testing.T) {
 	defer srv.Close()
 
 	shim := localToolShim{allowlist: map[string]struct{}{"pwd": {}}}
-	final, _, err := runToolLoop(context.Background(), srv.URL, "model", "what directory am i in and list executables", []message{{Role: "user", Content: "what directory am i in and list executables"}}, shim)
+	final, _, err := runToolLoop(context.Background(), testAIConfig(srv.URL, "model"), "what directory am i in and list executables", []message{{Role: "user", Content: "what directory am i in and list executables"}}, shim)
 	if err != nil {
 		t.Fatalf("runToolLoop returned error: %v", err)
 	}
@@ -1078,7 +1456,7 @@ func TestChatVerboseLogsPayload(t *testing.T) {
 		},
 	}}
 
-	_, err := chat(context.Background(), srv.URL, "model", []message{{Role: "user", Content: "hi"}}, tools)
+	_, err := chat(context.Background(), testAIConfig(srv.URL, "model"), []message{{Role: "user", Content: "hi"}}, tools)
 	if err != nil {
 		t.Fatalf("chat returned error: %v", err)
 	}
@@ -1124,7 +1502,7 @@ func TestRunToolLoopVerboseLogsToolInvocation(t *testing.T) {
 	defer srv.Close()
 
 	shim := localToolShim{allowlist: map[string]struct{}{"ls": {}}}
-	_, _, err := runToolLoop(context.Background(), srv.URL, "model", "list files", []message{{Role: "user", Content: "list files"}}, shim)
+	_, _, err := runToolLoop(context.Background(), testAIConfig(srv.URL, "model"), "list files", []message{{Role: "user", Content: "list files"}}, shim)
 	if err != nil {
 		t.Fatalf("runToolLoop returned error: %v", err)
 	}
@@ -1523,32 +1901,38 @@ func TestRun(t *testing.T) {
 
 	t.Run("missing AI env", func(t *testing.T) {
 		t.Setenv("AI", "")
+		t.Setenv("AI_ENDPOINT", "")
+		t.Setenv("AI_MODEL", "")
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
 		code := run([]string{"hello"}, &stdout, &stderr)
 		if code != 1 {
 			t.Fatalf("expected exit code 1, got %d", code)
 		}
-		if !strings.Contains(stderr.String(), "AI environment variable is required") {
+		if !strings.Contains(stderr.String(), "AI_ENDPOINT is required") {
 			t.Fatalf("expected AI env error, got %q", stderr.String())
 		}
 	})
 
-	t.Run("invalid AI env", func(t *testing.T) {
-		t.Setenv("AI", "http://localhost/llama3.1")
+	t.Run("legacy AI env is rejected", func(t *testing.T) {
+		t.Setenv("AI", "ollama://localhost/llama3.1")
+		t.Setenv("AI_ENDPOINT", "")
+		t.Setenv("AI_MODEL", "")
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
 		code := run([]string{"hello"}, &stdout, &stderr)
 		if code != 1 {
 			t.Fatalf("expected exit code 1, got %d", code)
 		}
-		if !strings.Contains(stderr.String(), "invalid AI value") {
+		if !strings.Contains(stderr.String(), "AI is no longer supported") {
 			t.Fatalf("expected invalid AI error, got %q", stderr.String())
 		}
 	})
 
 	t.Run("empty input", func(t *testing.T) {
-		t.Setenv("AI", "ollama://localhost/llama3.1")
+		t.Setenv("AI", "")
+		t.Setenv("AI_ENDPOINT", "http://localhost:11434")
+		t.Setenv("AI_MODEL", "llama3.1")
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
 		code := run([]string{"   "}, &stdout, &stderr)
@@ -1572,7 +1956,9 @@ func TestRun(t *testing.T) {
 			t.Fatalf("write bad history: %v", err)
 		}
 
-		t.Setenv("AI", "ollama://localhost/llama3.1")
+		t.Setenv("AI", "")
+		t.Setenv("AI_ENDPOINT", "http://localhost:11434")
+		t.Setenv("AI_MODEL", "llama3.1")
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
 		code := run([]string{"hello"}, &stdout, &stderr)
@@ -1592,7 +1978,9 @@ func TestRun(t *testing.T) {
 			t.Fatalf("Chdir failed: %v", err)
 		}
 
-		t.Setenv("AI", "ollama://127.0.0.1:1/llama3.1")
+		t.Setenv("AI", "")
+		t.Setenv("AI_ENDPOINT", "http://127.0.0.1:1")
+		t.Setenv("AI_MODEL", "llama3.1")
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
 		code := run([]string{"hello"}, &stdout, &stderr)
@@ -1619,11 +2007,9 @@ func TestRun(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		u, err := url.Parse(srv.URL)
-		if err != nil {
-			t.Fatalf("parse server url: %v", err)
-		}
-		t.Setenv("AI", "ollama://"+u.Host+"/llama3.1")
+		t.Setenv("AI", "")
+		t.Setenv("AI_ENDPOINT", srv.URL)
+		t.Setenv("AI_MODEL", "llama3.1")
 
 		originalRenderer := markdownRenderer
 		t.Cleanup(func() { markdownRenderer = originalRenderer })
@@ -1670,11 +2056,9 @@ func TestRun(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		u, err := url.Parse(srv.URL)
-		if err != nil {
-			t.Fatalf("parse server url: %v", err)
-		}
-		t.Setenv("AI", "ollama://"+u.Host+"/llama3.1")
+		t.Setenv("AI", "")
+		t.Setenv("AI_ENDPOINT", srv.URL)
+		t.Setenv("AI_MODEL", "llama3.1")
 
 		originalWrite := osWriteFile
 		t.Cleanup(func() { osWriteFile = originalWrite })
@@ -1708,7 +2092,9 @@ func TestRun(t *testing.T) {
 			return origRead(path)
 		}
 
-		t.Setenv("AI", "ollama://localhost/llama3.1")
+		t.Setenv("AI", "")
+		t.Setenv("AI_ENDPOINT", "http://localhost:11434")
+		t.Setenv("AI_MODEL", "llama3.1")
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
 		code := run([]string{"hello"}, &stdout, &stderr)
@@ -1735,7 +2121,9 @@ func TestRun(t *testing.T) {
 		t.Cleanup(func() { osUserHomeDir = origHome })
 		osUserHomeDir = func() (string, error) { return "", errors.New("no home") }
 
-		t.Setenv("AI", "ollama://localhost/llama3.1")
+		t.Setenv("AI", "")
+		t.Setenv("AI_ENDPOINT", "http://localhost:11434")
+		t.Setenv("AI_MODEL", "llama3.1")
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
 		code := run([]string{"hello"}, &stdout, &stderr)
@@ -1748,6 +2136,12 @@ func TestRun(t *testing.T) {
 	})
 
 	t.Run("system prompt is sent in chat request", func(t *testing.T) {
+		origTimeNow := timeNow
+		timeNow = func() time.Time {
+			return time.Date(2026, time.July, 24, 7, 0, 0, 0, time.FixedZone("PDT", -7*3600))
+		}
+		t.Cleanup(func() { timeNow = origTimeNow })
+
 		home := t.TempDir()
 		cwd := t.TempDir()
 		t.Setenv("HOME", home)
@@ -1767,11 +2161,9 @@ func TestRun(t *testing.T) {
 		}))
 		defer srv.Close()
 
-		u, err := url.Parse(srv.URL)
-		if err != nil {
-			t.Fatalf("parse server url: %v", err)
-		}
-		t.Setenv("AI", "ollama://"+u.Host+"/llama3.1")
+		t.Setenv("AI", "")
+		t.Setenv("AI_ENDPOINT", srv.URL)
+		t.Setenv("AI_MODEL", "llama3.1")
 
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
@@ -1779,8 +2171,14 @@ func TestRun(t *testing.T) {
 		if code != 0 {
 			t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
 		}
-		if len(gotReq.Messages) == 0 || gotReq.Messages[0].Role != "system" || gotReq.Messages[0].Content != "sys-msg" {
+		if len(gotReq.Messages) == 0 || gotReq.Messages[0].Role != "system" {
 			t.Fatalf("expected first message to be system prompt, got %#v", gotReq.Messages)
+		}
+		if !strings.Contains(gotReq.Messages[0].Content, "Current local datetime: 2026-07-24T07:00:00-07:00") {
+			t.Fatalf("expected datetime in system prompt, got %q", gotReq.Messages[0].Content)
+		}
+		if !strings.HasSuffix(gotReq.Messages[0].Content, "sys-msg") {
+			t.Fatalf("expected original system prompt suffix, got %q", gotReq.Messages[0].Content)
 		}
 	})
 }
@@ -1806,16 +2204,13 @@ func TestMainEntrypoint(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	u, err := url.Parse(srv.URL)
-	if err != nil {
-		t.Fatalf("parse server url: %v", err)
-	}
-
 	cmd := exec.Command(os.Args[0], "-test.run=TestMainHelperProcess")
 	cmd.Dir = cwd
 	cmd.Env = append(os.Environ(),
 		"ASH_MAIN_HELPER=1",
-		"AI=ollama://"+u.Host+"/llama3.1",
+		"AI=",
+		"AI_ENDPOINT="+srv.URL,
+		"AI_MODEL=llama3.1",
 		"HOME="+home,
 	)
 
