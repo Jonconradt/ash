@@ -197,6 +197,22 @@ func TestReadSystemPrompt(t *testing.T) {
 	if prompt != cwdPrompt {
 		t.Fatalf("expected cwd prompt, got %q", prompt)
 	}
+
+	canonicalPrompt := "canonical prompt"
+	if err := os.MkdirAll(filepath.Join(home, ashWorkspaceDirName), 0o700); err != nil {
+		t.Fatalf("mkdir canonical workspace: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(home, ashWorkspaceDirName, systemFileName), []byte(canonicalPrompt), 0o600); err != nil {
+		t.Fatalf("write canonical prompt: %v", err)
+	}
+
+	prompt, err = readSystemPrompt()
+	if err != nil {
+		t.Fatalf("readSystemPrompt error: %v", err)
+	}
+	if prompt != canonicalPrompt {
+		t.Fatalf("expected canonical prompt, got %q", prompt)
+	}
 }
 
 func TestReadSystemPromptExpandsEnvironmentVariables(t *testing.T) {
@@ -843,6 +859,40 @@ func TestLoadAllowlistedCommands(t *testing.T) {
 		}
 		if _, ok := allowed["ps"]; !ok {
 			t.Fatalf("expected cwd allowlist to win, got %#v", allowed)
+		}
+	})
+
+	t.Run("canonical file wins over cwd and home", func(t *testing.T) {
+		t.Setenv("ASH_TOOL_ALLOWLIST", "")
+		home := t.TempDir()
+		cwd := t.TempDir()
+		t.Setenv("HOME", home)
+
+		if err := os.MkdirAll(filepath.Join(home, ashWorkspaceDirName), 0o700); err != nil {
+			t.Fatalf("mkdir canonical workspace: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(home, ashWorkspaceDirName, toolsFileName), []byte("say\n"), 0o600); err != nil {
+			t.Fatalf("write canonical tools file: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(home, toolsFileName), []byte("ls\n"), 0o600); err != nil {
+			t.Fatalf("write home tools file: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(cwd, toolsFileName), []byte("ps\n"), 0o600); err != nil {
+			t.Fatalf("write cwd tools file: %v", err)
+		}
+		if err := os.Chdir(cwd); err != nil {
+			t.Fatalf("Chdir failed: %v", err)
+		}
+
+		allowed, err := loadAllowlistedCommands()
+		if err != nil {
+			t.Fatalf("loadAllowlistedCommands error: %v", err)
+		}
+		if len(allowed) != 1 {
+			t.Fatalf("expected one allowlisted command, got %#v", allowed)
+		}
+		if _, ok := allowed["say"]; !ok {
+			t.Fatalf("expected canonical allowlist to win, got %#v", allowed)
 		}
 	})
 }
@@ -1627,6 +1677,20 @@ func TestInstallRecommendation(t *testing.T) {
 	if reco != "" {
 		t.Fatalf("expected no recommendation when installed, got %q", reco)
 	}
+
+	oldBlock := installBlockForShell("bash")
+	oldBlock = strings.Replace(oldBlock, "command_not_found_handle", "_old_command_not_found_handle", 1)
+	if err := os.WriteFile(rcPath, []byte(oldBlock), 0o600); err != nil {
+		t.Fatalf("write outdated rc file: %v", err)
+	}
+
+	reco, err = installRecommendation()
+	if err != nil {
+		t.Fatalf("installRecommendation returned error: %v", err)
+	}
+	if !strings.Contains(reco, "outdated") || !strings.Contains(reco, "ash install --shell bash") {
+		t.Fatalf("expected outdated recommendation, got %q", reco)
+	}
 }
 
 func TestRunInstall(t *testing.T) {
@@ -1639,8 +1703,18 @@ func TestRunInstall(t *testing.T) {
 	})
 
 	home := t.TempDir()
+	cwd := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("SHELL", "/bin/bash")
+	if err := os.Chdir(cwd); err != nil {
+		t.Fatalf("Chdir failed: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cwd, systemFileName), []byte("canonical system"), 0o600); err != nil {
+		t.Fatalf("write local system file: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cwd, toolsFileName), []byte("say\n"), 0o600); err != nil {
+		t.Fatalf("write local tools file: %v", err)
+	}
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -1678,6 +1752,48 @@ func TestRunInstall(t *testing.T) {
 	if strings.Count(string(rcContentAfter), installStartMarker) != 1 {
 		t.Fatalf("expected single install block, got %d", strings.Count(string(rcContentAfter), installStartMarker))
 	}
+
+	canonicalSystemPath := filepath.Join(home, ashWorkspaceDirName, systemFileName)
+	canonicalSystemContent, err := os.ReadFile(canonicalSystemPath)
+	if err != nil {
+		t.Fatalf("read canonical system file: %v", err)
+	}
+	if string(canonicalSystemContent) != "canonical system" {
+		t.Fatalf("canonical system mismatch: got %q", string(canonicalSystemContent))
+	}
+
+	canonicalToolsPath := filepath.Join(home, ashWorkspaceDirName, toolsFileName)
+	canonicalToolsContent, err := os.ReadFile(canonicalToolsPath)
+	if err != nil {
+		t.Fatalf("read canonical tools file: %v", err)
+	}
+	if !strings.Contains(string(canonicalToolsContent), "say") {
+		t.Fatalf("expected canonical tools content to include say, got %q", string(canonicalToolsContent))
+	}
+
+	staleBlock := installBlockForShell("bash")
+	staleBlock = strings.Replace(staleBlock, "command_not_found_handle", "_old_command_not_found_handle", 1)
+	if err := os.WriteFile(rcPath, []byte(staleBlock), 0o600); err != nil {
+		t.Fatalf("write stale rc file: %v", err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{"install", "--shell", "bash"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected update install to succeed, got %d stderr=%q", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "updated wrappers") {
+		t.Fatalf("expected update install message, got %q", stdout.String())
+	}
+
+	rcContentUpdated, err := os.ReadFile(rcPath)
+	if err != nil {
+		t.Fatalf("read rc file after update: %v", err)
+	}
+	if !strings.Contains(string(rcContentUpdated), "command_not_found_handle") {
+		t.Fatalf("expected refreshed install block to include command_not_found_handle")
+	}
 }
 
 func TestRunInstallDryRun(t *testing.T) {
@@ -1700,6 +1816,92 @@ func TestRunInstallDryRun(t *testing.T) {
 	rcPath := filepath.Join(home, ".zshrc")
 	if _, err := os.Stat(rcPath); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("expected no rc file write in dry-run, stat err=%v", err)
+	}
+}
+
+func TestRunInstallHardensWorkspacePermissions(t *testing.T) {
+	originalCwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd failed: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(originalCwd)
+	})
+
+	home := t.TempDir()
+	cwd := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SHELL", "/bin/bash")
+	if err := os.Chdir(cwd); err != nil {
+		t.Fatalf("Chdir failed: %v", err)
+	}
+
+	ashRoot := filepath.Join(home, ashWorkspaceDirName)
+	if err := os.MkdirAll(filepath.Join(ashRoot, "nested"), 0o777); err != nil {
+		t.Fatalf("mkdir nested: %v", err)
+	}
+	if err := os.Chmod(ashRoot, 0o777); err != nil {
+		t.Fatalf("chmod ash root: %v", err)
+	}
+	if err := os.Chmod(filepath.Join(ashRoot, "nested"), 0o777); err != nil {
+		t.Fatalf("chmod nested dir: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(ashRoot, "nested", "loose.txt"), []byte("secret"), 0o666); err != nil {
+		t.Fatalf("write loose file: %v", err)
+	}
+
+	if err := os.WriteFile(filepath.Join(cwd, systemFileName), []byte("system"), 0o600); err != nil {
+		t.Fatalf("write cwd system: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(cwd, toolsFileName), []byte("say\n"), 0o600); err != nil {
+		t.Fatalf("write cwd tools: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"install", "--shell", "bash"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected install success, got %d stderr=%q", code, stderr.String())
+	}
+
+	rootInfo, err := os.Stat(ashRoot)
+	if err != nil {
+		t.Fatalf("stat ash root: %v", err)
+	}
+	if got := rootInfo.Mode().Perm(); got != 0o700 {
+		t.Fatalf("ash root permissions mismatch: got %o want %o", got, 0o700)
+	}
+
+	nestedInfo, err := os.Stat(filepath.Join(ashRoot, "nested"))
+	if err != nil {
+		t.Fatalf("stat nested dir: %v", err)
+	}
+	if got := nestedInfo.Mode().Perm(); got != 0o700 {
+		t.Fatalf("nested dir permissions mismatch: got %o want %o", got, 0o700)
+	}
+
+	looseInfo, err := os.Stat(filepath.Join(ashRoot, "nested", "loose.txt"))
+	if err != nil {
+		t.Fatalf("stat loose file: %v", err)
+	}
+	if got := looseInfo.Mode().Perm(); got != 0o600 {
+		t.Fatalf("loose file permissions mismatch: got %o want %o", got, 0o600)
+	}
+
+	canonicalSystemInfo, err := os.Stat(filepath.Join(ashRoot, systemFileName))
+	if err != nil {
+		t.Fatalf("stat canonical system file: %v", err)
+	}
+	if got := canonicalSystemInfo.Mode().Perm(); got != 0o600 {
+		t.Fatalf("canonical system permissions mismatch: got %o want %o", got, 0o600)
+	}
+
+	canonicalToolsInfo, err := os.Stat(filepath.Join(ashRoot, toolsFileName))
+	if err != nil {
+		t.Fatalf("stat canonical tools file: %v", err)
+	}
+	if got := canonicalToolsInfo.Mode().Perm(); got != 0o600 {
+		t.Fatalf("canonical tools permissions mismatch: got %o want %o", got, 0o600)
 	}
 }
 
@@ -2023,6 +2225,40 @@ func TestRun(t *testing.T) {
 		}
 		if strings.Contains(stderr.String(), "ollama request failed") {
 			t.Fatalf("expected dedicated 503 message, got %q", stderr.String())
+		}
+	})
+
+	t.Run("cloud 500 shows playful server message", func(t *testing.T) {
+		home := t.TempDir()
+		cwd := t.TempDir()
+		t.Setenv("HOME", home)
+		if err := os.Chdir(cwd); err != nil {
+			t.Fatalf("Chdir failed: %v", err)
+		}
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+		}))
+		defer srv.Close()
+
+		origPicker := pickCloudServer500Message
+		t.Cleanup(func() { pickCloudServer500Message = origPicker })
+		pickCloudServer500Message = func() string { return "cloud 500 test fallback message" }
+
+		t.Setenv("AI", "")
+		t.Setenv("AI_ENDPOINT", srv.URL)
+		t.Setenv("AI_MODEL", "llama3.1")
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		code := run([]string{"hello"}, &stdout, &stderr)
+		if code != 1 {
+			t.Fatalf("expected exit code 1, got %d", code)
+		}
+		if !strings.Contains(stderr.String(), "cloud 500 test fallback message") {
+			t.Fatalf("expected playful 500 fallback, got %q", stderr.String())
+		}
+		if strings.Contains(stderr.String(), "ollama request failed") {
+			t.Fatalf("expected dedicated 500 message, got %q", stderr.String())
 		}
 	})
 

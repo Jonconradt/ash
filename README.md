@@ -13,7 +13,7 @@ the assistant response.
 - Shows an ANSI-friendly thinking indicator while waiting for Ollama
 - Supports `Ctrl-C` to abort an in-flight Ollama request
 - Keeps chat history across calls
-- Uses `.ash_system` as system prompt when present
+- Uses `~/.ash/.ash_system` as the canonical system prompt file when present
 - Always prepends current local date/time to the system prompt sent to the model
 - Supports emoji input/output (UTF-8)
 - Renders markdown output to terminal styling with ANSI fallback safety
@@ -100,10 +100,10 @@ Notes:
 - Cloud endpoints must use `https` and require bearer auth.
 - Legacy `AI=ollama://...` configuration is no longer supported.
 
-Optional system prompt file (checked in current directory first, then `$HOME`):
+Optional canonical system prompt file:
 
 ```text
-.ash_system
+$HOME/.ash/.ash_system
 ```
 
 Example `.ash_system` content:
@@ -152,6 +152,9 @@ ash install --shell bash --dry-run
 
 `ash install` is idempotent and appends a single managed block to your rc file.
 For bash it targets `~/.bashrc`; for zsh it targets `~/.zshrc`.
+During install, if `./.ash_system` or `./.ash_tools` exist in your current
+directory, they are copied into `~/.ash/` and become the canonical files used
+by `ash`.
 
 When enabled, `ash` logs:
 
@@ -184,7 +187,7 @@ Set allowlisted Unix executables with one of these methods:
 export ASH_TOOL_ALLOWLIST="ls,ps,man,osascript"
 ```
 
-2. Config file `.ash_tools` (checked in current directory first, then `$HOME`):
+2. Canonical config file `$HOME/.ash/.ash_tools`:
 
 ```text
 # one per line or comma-separated

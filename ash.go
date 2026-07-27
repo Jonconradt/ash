@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"net"
 	"net/http"
 	"net/url"
@@ -193,11 +194,12 @@ var (
 	newHTTPClient       = func(timeout time.Duration) *http.Client {
 		return &http.Client{Timeout: timeout}
 	}
-	argumentBlockPattern              = regexp.MustCompile(`(;|\|\||&&|\||` + "`" + `|\$\(|>|<|\x00|\n|\r)`)
-	toolCommandRunner                 = runToolCommand
-	pickCloudBusy503Message           = randomCloudBusy503Message
-	debugWriter             io.Writer = os.Stderr
-	debugJSONLogging        bool
+	argumentBlockPattern                = regexp.MustCompile(`(;|\|\||&&|\||` + "`" + `|\$\(|>|<|\x00|\n|\r)`)
+	toolCommandRunner                   = runToolCommand
+	pickCloudBusy503Message             = randomCloudBusy503Message
+	pickCloudServer500Message           = randomCloudServer500Message
+	debugWriter               io.Writer = os.Stderr
+	debugJSONLogging          bool
 )
 
 var cloudBusy503Messages = []string{
@@ -223,12 +225,43 @@ var cloudBusy503Messages = []string{
 	"Service unavailable: distracted by shiny logs and far too busy at the moment.",
 }
 
+var cloudServer500Messages = []string{
+	"Server hiccup: the wires are crossed and someone is rebooting the coffee machine.",
+	"The server tripped over its own stack trace. Please try again in a moment.",
+	"500 detected: backend gremlins are doing unauthorized maintenance.",
+	"General server error: the engine sneezed and dropped a few gears.",
+	"The server is currently having a dramatic monologue. Retry shortly.",
+	"Internal error: the hamster wheel paused for an unscheduled break.",
+	"Our server found a mysterious semicolon and needs a second attempt.",
+	"500: the backend lost the plot, but only temporarily.",
+	"Server confusion event: everything is technically on fire, politely.",
+	"The request hit a pothole in the server room. Please try again soon.",
+	"Internal server wobble. A quick retry usually fixes the vibe.",
+	"The backend is untangling cables in existential mode. Retry in a bit.",
+	"Server error: one subsystem blinked and everyone panicked.",
+	"The server dropped this request while juggling dependencies.",
+	"500 from upstream: we are sweeping up stack traces right now.",
+	"General server fault: the robots are rebooting their confidence.",
+	"The backend hit an oops and is patching itself together.",
+	"Server trouble: a tiny outage with big main-character energy.",
+	"Internal error: the logs are being read sternly by engineers.",
+	"The server took a wrong turn at runtime. Please retry shortly.",
+}
+
 func randomCloudBusy503Message() string {
 	if len(cloudBusy503Messages) == 0 {
 		return "The cloud model is distracted and too busy right now. Please try again shortly."
 	}
 	idx := int(uint64(timeNow().UnixNano()) % uint64(len(cloudBusy503Messages)))
 	return cloudBusy503Messages[idx]
+}
+
+func randomCloudServer500Message() string {
+	if len(cloudServer500Messages) == 0 {
+		return "The server hit an internal error. Please try again shortly."
+	}
+	idx := int(uint64(timeNow().UnixNano()) % uint64(len(cloudServer500Messages)))
+	return cloudServer500Messages[idx]
 }
 
 func main() {
@@ -317,9 +350,15 @@ func run(args []string, stdout, stderr io.Writer) int {
 			return 1
 		}
 		var statusErr chatStatusError
-		if errors.As(err, &statusErr) && statusErr.StatusCode == http.StatusServiceUnavailable {
-			fmt.Fprintln(stderr, pickCloudBusy503Message())
-			return 1
+		if errors.As(err, &statusErr) {
+			switch statusErr.StatusCode {
+			case http.StatusServiceUnavailable:
+				fmt.Fprintln(stderr, pickCloudBusy503Message())
+				return 1
+			case http.StatusInternalServerError:
+				fmt.Fprintln(stderr, pickCloudServer500Message())
+				return 1
+			}
 		}
 		fmt.Fprintf(stderr, "ollama request failed: %v\n", err)
 		return 1
@@ -377,8 +416,45 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	if strings.Contains(existing, installStartMarker) && strings.Contains(existing, installEndMarker) {
-		fmt.Fprintf(stdout, "ash install already present in %s\n", rcPath)
+	existingBlock, hasManagedBlock := extractManagedInstallBlock(existing)
+	if hasManagedBlock {
+		if strings.TrimSpace(existingBlock) == strings.TrimSpace(block) {
+			if err := finalizeInstallWorkspace(); err != nil {
+				fmt.Fprintf(stderr, "install error: %v\n", err)
+				return 1
+			}
+			fmt.Fprintf(stdout, "ash install already present in %s\n", rcPath)
+			fmt.Fprintln(stdout, "synced .ash_system/.ash_tools to ~/.ash when present")
+			return 0
+		}
+
+		updated, replaced := replaceManagedInstallBlock(existing, block)
+		if !replaced {
+			fmt.Fprintf(stderr, "install error: failed to update managed block in %s\n", rcPath)
+			return 1
+		}
+
+		if dryRun {
+			fmt.Fprintf(stdout, "[dry-run] would update install block in %s\n", rcPath)
+			fmt.Fprint(stdout, block)
+			if !strings.HasSuffix(block, "\n") {
+				fmt.Fprintln(stdout)
+			}
+			return 0
+		}
+
+		if err := osWriteFile(rcPath, []byte(updated), 0o600); err != nil {
+			fmt.Fprintf(stderr, "install error: failed to write %s: %v\n", rcPath, err)
+			return 1
+		}
+		if err := finalizeInstallWorkspace(); err != nil {
+			fmt.Fprintf(stderr, "install error: %v\n", err)
+			return 1
+		}
+
+		fmt.Fprintf(stdout, "ash install updated wrappers in %s\n", rcPath)
+		fmt.Fprintln(stdout, "synced .ash_system/.ash_tools to ~/.ash when present")
+		fmt.Fprintln(stdout, "restart your shell or source your rc file to activate wrappers")
 		return 0
 	}
 
@@ -396,10 +472,96 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "install error: failed to write %s: %v\n", rcPath, err)
 		return 1
 	}
+	if err := finalizeInstallWorkspace(); err != nil {
+		fmt.Fprintf(stderr, "install error: %v\n", err)
+		return 1
+	}
 
 	fmt.Fprintf(stdout, "ash install appended wrappers to %s\n", rcPath)
+	fmt.Fprintln(stdout, "synced .ash_system/.ash_tools to ~/.ash when present")
 	fmt.Fprintln(stdout, "restart your shell or source your rc file to activate wrappers")
 	return 0
+}
+
+func finalizeInstallWorkspace() error {
+	if err := syncCanonicalConfigFilesFromCWD(); err != nil {
+		return err
+	}
+	if err := hardenAshWorkspacePermissions(); err != nil {
+		return err
+	}
+	return nil
+}
+
+func syncCanonicalConfigFilesFromCWD() error {
+	root, err := ashWorkspaceDir()
+	if err != nil {
+		return err
+	}
+	if err := osMkdirAll(root, 0o700); err != nil {
+		return err
+	}
+
+	cwd, err := osGetwd()
+	if err != nil {
+		return err
+	}
+
+	for _, name := range []string{systemFileName, toolsFileName} {
+		srcPath := filepath.Join(cwd, name)
+		content, readErr := osReadFile(srcPath)
+		if errors.Is(readErr, os.ErrNotExist) {
+			continue
+		}
+		if readErr != nil {
+			return fmt.Errorf("failed to read %s: %w", srcPath, readErr)
+		}
+		dstPath := filepath.Join(root, name)
+		if writeErr := osWriteFile(dstPath, content, 0o600); writeErr != nil {
+			return fmt.Errorf("failed to write %s: %w", dstPath, writeErr)
+		}
+	}
+
+	return nil
+}
+
+func hardenAshWorkspacePermissions() error {
+	root, err := ashWorkspaceDir()
+	if err != nil {
+		return err
+	}
+	if err := osMkdirAll(root, 0o700); err != nil {
+		return err
+	}
+	if err := os.Chmod(root, 0o700); err != nil {
+		return err
+	}
+
+	return filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if path == root {
+			return nil
+		}
+
+		info, err := d.Info()
+		if err != nil {
+			return err
+		}
+		mode := info.Mode()
+		if mode&os.ModeSymlink != 0 {
+			return nil
+		}
+
+		if d.IsDir() {
+			return os.Chmod(path, 0o700)
+		}
+		if mode.IsRegular() {
+			return os.Chmod(path, 0o600)
+		}
+		return nil
+	})
 }
 
 func parseInstallArgs(args []string) (shellName string, dryRun bool, err error) {
@@ -470,6 +632,48 @@ func appendInstallBlock(existing, block string) string {
 	return updated
 }
 
+func extractManagedInstallBlock(content string) (string, bool) {
+	start := strings.Index(content, installStartMarker)
+	if start < 0 {
+		return "", false
+	}
+	endRel := strings.Index(content[start:], installEndMarker)
+	if endRel < 0 {
+		return "", false
+	}
+	end := start + endRel + len(installEndMarker)
+	return content[start:end], true
+}
+
+func replaceManagedInstallBlock(existing, block string) (string, bool) {
+	start := strings.Index(existing, installStartMarker)
+	if start < 0 {
+		return "", false
+	}
+	endRel := strings.Index(existing[start:], installEndMarker)
+	if endRel < 0 {
+		return "", false
+	}
+	end := start + endRel + len(installEndMarker)
+
+	prefix := existing[:start]
+	suffix := existing[end:]
+	suffix = strings.TrimPrefix(suffix, "\n")
+
+	var b strings.Builder
+	b.WriteString(prefix)
+	if prefix != "" && !strings.HasSuffix(prefix, "\n") {
+		b.WriteString("\n")
+	}
+	b.WriteString(block)
+	b.WriteString("\n")
+	if strings.TrimSpace(suffix) != "" {
+		b.WriteString("\n")
+		b.WriteString(suffix)
+	}
+	return b.String(), true
+}
+
 func installRecommendation() (string, error) {
 	shellName := detectShellName(os.Getenv("SHELL"))
 	if shellName == "" {
@@ -486,8 +690,12 @@ func installRecommendation() (string, error) {
 		return "", err
 	}
 
-	if strings.Contains(content, installStartMarker) && strings.Contains(content, installEndMarker) {
-		return "", nil
+	expected := installBlockForShell(shellName)
+	if existing, ok := extractManagedInstallBlock(content); ok {
+		if strings.TrimSpace(existing) == strings.TrimSpace(expected) {
+			return "", nil
+		}
+		return fmt.Sprintf("ash install for %s is outdated. Run: ash install --shell %s", shellName, shellName), nil
 	}
 
 	return fmt.Sprintf("ash is not installed for %s. Run: ash install --shell %s", shellName, shellName), nil
@@ -564,6 +772,18 @@ _ash_should_route() {
 				done
 			fi
 			;;
+		say)
+			if [[ $argc -ge 2 ]]; then
+				local first_token
+				first_token="$(printf '%s' "${args[0]}" | tr '[:upper:]' '[:lower:]')"
+				first_token="${first_token%%[?!.,:;]}"
+				case "$first_token" in
+					out|something|a|an|the|please|why|how|when|where|who|what|can|could|should|would)
+						return 0
+						;;
+				esac
+			fi
+			;;
 	esac
 
   return 1
@@ -595,6 +815,8 @@ which() { _ash_route_or_delegate which "$@"; }
 Which() { _ash_route_or_delegate Which "$@"; }
 who()   { _ash_route_or_delegate who   "$@"; }
 Who()   { _ash_route_or_delegate Who   "$@"; }
+say()   { _ash_route_or_delegate say   "$@"; }
+Say()   { _ash_route_or_delegate Say   "$@"; }
 
 test()  { _ash_route_or_delegate_builtin test "$@"; }
 Test()  { _ash_route_or_delegate_builtin test "$@"; }
@@ -1097,6 +1319,15 @@ func isCloudAIHost(host string) bool {
 }
 
 func readSystemPrompt() (string, error) {
+	if root, err := ashWorkspaceDir(); err == nil {
+		canonicalPath := filepath.Join(root, systemFileName)
+		if content, err := osReadFile(canonicalPath); err == nil {
+			return expandSystemPrompt(string(content)), nil
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return "", err
+		}
+	}
+
 	cwd, err := osGetwd()
 	if err != nil {
 		return "", err
@@ -1127,6 +1358,15 @@ func readSystemPrompt() (string, error) {
 func loadAllowlistedCommands() (map[string]struct{}, error) {
 	if raw := strings.TrimSpace(os.Getenv("ASH_TOOL_ALLOWLIST")); raw != "" {
 		return parseAllowlistCSV(raw), nil
+	}
+
+	if root, err := ashWorkspaceDir(); err == nil {
+		canonicalPath := filepath.Join(root, toolsFileName)
+		if content, err := osReadFile(canonicalPath); err == nil {
+			return parseAllowlistFile(string(content)), nil
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
 	}
 
 	cwd, err := osGetwd()
@@ -1529,12 +1769,18 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 }
 
 func (s localToolShim) ListTools() []toolDefinition {
+	runUnixDescription := "Run a single allowlisted Unix executable with direct args and no shell expansion"
+	allowed := sortedAllowlist(s.allowlist)
+	if len(allowed) > 0 {
+		runUnixDescription += ". Allowlisted executables: " + strings.Join(allowed, ", ")
+	}
+
 	return []toolDefinition{
 		{
 			Type: "function",
 			Function: toolFunctionDefinition{
 				Name:        "run_unix_command",
-				Description: "Run a single allowlisted Unix executable with direct args and no shell expansion",
+				Description: runUnixDescription,
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{

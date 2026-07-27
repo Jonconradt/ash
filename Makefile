@@ -49,6 +49,7 @@ staticcheck:
 
 install: test lint
 	go install ./...
+	ash install --shell bash
 
 release: release-check release-build release-pkg release-validate release-publish
 
