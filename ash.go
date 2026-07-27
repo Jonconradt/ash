@@ -80,6 +80,15 @@ type chatResponse struct {
 	Error   string  `json:"error"`
 }
 
+type chatStatusError struct {
+	StatusCode int
+	Body       string
+}
+
+func (e chatStatusError) Error() string {
+	return fmt.Sprintf("status %d: %s", e.StatusCode, strings.TrimSpace(e.Body))
+}
+
 type toolDefinition struct {
 	Type     string                 `json:"type"`
 	Function toolFunctionDefinition `json:"function"`
@@ -184,11 +193,43 @@ var (
 	newHTTPClient       = func(timeout time.Duration) *http.Client {
 		return &http.Client{Timeout: timeout}
 	}
-	argumentBlockPattern           = regexp.MustCompile(`(;|\|\||&&|\||` + "`" + `|\$\(|>|<|\x00|\n|\r)`)
-	toolCommandRunner              = runToolCommand
-	debugWriter          io.Writer = os.Stderr
-	debugJSONLogging     bool
+	argumentBlockPattern              = regexp.MustCompile(`(;|\|\||&&|\||` + "`" + `|\$\(|>|<|\x00|\n|\r)`)
+	toolCommandRunner                 = runToolCommand
+	pickCloudBusy503Message           = randomCloudBusy503Message
+	debugWriter             io.Writer = os.Stderr
+	debugJSONLogging        bool
 )
+
+var cloudBusy503Messages = []string{
+	"Cloud brain wandered off chasing a shiny thing. It is way too busy right now.",
+	"The cloud model is juggling too many tabs and got distracted. Try again in a moment.",
+	"Service is currently busy pretending to multitask. Give it another shot shortly.",
+	"The model is overbooked and daydreaming at the same time. Please retry soon.",
+	"503: the cloud got distracted mid-thought and is too busy to answer right now.",
+	"Our cloud assistant is in a meeting that should have been an email. Try again soon.",
+	"The model is currently swamped and staring into the middle distance. Retry in a bit.",
+	"Cloud queue is full and the model is politely panicking. Please try again shortly.",
+	"The service is busy speed-walking between tasks and forgot your question. Retry soon.",
+	"The model is distracted by an urgent nothing and cannot chat right now. Try again soon.",
+	"503 from the cloud: too busy, mildly frazzled, and temporarily unavailable.",
+	"The cloud model is taking a tiny chaos break. Please try again in a minute.",
+	"The model is currently overloaded and pretending it is fine. Retry shortly.",
+	"Too much happening upstairs in the cloud right now. Give it another try soon.",
+	"The service is busy and briefly out to lunch, mentally. Please retry in a moment.",
+	"Cloud model status: distracted, overbooked, and not accepting new thoughts right now.",
+	"503: the model is wearing too many hats and dropped this request. Try again soon.",
+	"The cloud is busy doing cloud things and got sidetracked. Please retry shortly.",
+	"The model is currently in maximum bustle mode. Give it another nudge in a bit.",
+	"Service unavailable: distracted by shiny logs and far too busy at the moment.",
+}
+
+func randomCloudBusy503Message() string {
+	if len(cloudBusy503Messages) == 0 {
+		return "The cloud model is distracted and too busy right now. Please try again shortly."
+	}
+	idx := int(uint64(timeNow().UnixNano()) % uint64(len(cloudBusy503Messages)))
+	return cloudBusy503Messages[idx]
+}
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
@@ -273,6 +314,11 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 		if errors.Is(err, context.DeadlineExceeded) {
 			fmt.Fprintf(stderr, "AI took longer than %s, so we should probably try again later\n", timeout)
+			return 1
+		}
+		var statusErr chatStatusError
+		if errors.As(err, &statusErr) && statusErr.StatusCode == http.StatusServiceUnavailable {
+			fmt.Fprintln(stderr, pickCloudBusy503Message())
 			return 1
 		}
 		fmt.Fprintf(stderr, "ollama request failed: %v\n", err)
@@ -1467,7 +1513,7 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 	debugLogf("AI response: status=%d body=%s", resp.StatusCode, string(body))
 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return chatResponse{}, fmt.Errorf("status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return chatResponse{}, chatStatusError{StatusCode: resp.StatusCode, Body: string(body)}
 	}
 
 	var parsed chatResponse

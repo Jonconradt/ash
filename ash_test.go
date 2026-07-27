@@ -1992,6 +1992,40 @@ func TestRun(t *testing.T) {
 		}
 	})
 
+	t.Run("cloud 503 shows playful busy message", func(t *testing.T) {
+		home := t.TempDir()
+		cwd := t.TempDir()
+		t.Setenv("HOME", home)
+		if err := os.Chdir(cwd); err != nil {
+			t.Fatalf("Chdir failed: %v", err)
+		}
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "upstream overloaded", http.StatusServiceUnavailable)
+		}))
+		defer srv.Close()
+
+		origPicker := pickCloudBusy503Message
+		t.Cleanup(func() { pickCloudBusy503Message = origPicker })
+		pickCloudBusy503Message = func() string { return "cloud test fallback message" }
+
+		t.Setenv("AI", "")
+		t.Setenv("AI_ENDPOINT", srv.URL)
+		t.Setenv("AI_MODEL", "llama3.1")
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		code := run([]string{"hello"}, &stdout, &stderr)
+		if code != 1 {
+			t.Fatalf("expected exit code 1, got %d", code)
+		}
+		if !strings.Contains(stderr.String(), "cloud test fallback message") {
+			t.Fatalf("expected playful 503 fallback, got %q", stderr.String())
+		}
+		if strings.Contains(stderr.String(), "ollama request failed") {
+			t.Fatalf("expected dedicated 503 message, got %q", stderr.String())
+		}
+	})
+
 	t.Run("success stores raw history", func(t *testing.T) {
 		home := t.TempDir()
 		cwd := t.TempDir()
