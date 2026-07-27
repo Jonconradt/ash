@@ -1,3 +1,4 @@
+# >>> ash install >>>
 case "$-" in
   *i*) ;;
   *) return ;;
@@ -52,6 +53,26 @@ _ash_should_route() {
       ;;
   esac
 
+  case "$(printf '%s' "$cmd" | tr '[:upper:]' '[:lower:]')" in
+    what|which|who|where)
+      if [[ $argc -ge 3 ]]; then
+        local limit=4
+        (( argc < limit )) && limit=$argc
+        local i token raw
+        for (( i=1; i<limit; i++ )); do
+          raw="${args[$i]}"
+          token="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
+          token="${token%%[?!.,:;]}"
+          case "$token" in
+            is|are|am|do|does|did|can|could|should|would|will|why|how|when|where|who|if)
+              return 0
+              ;;
+          esac
+        done
+      fi
+      ;;
+  esac
+
   # Rule G: default delegate.
   return 1
 }
@@ -91,3 +112,5 @@ type()  { _ash_route_or_delegate_builtin type "$@"; }
 Type()  { _ash_route_or_delegate_builtin type "$@"; }
 # `time` is a reserved shell keyword, so only title-case can be wrapped.
 Time()  { _ash_route_or_delegate Time "$@"; }
+# <<< ash install <<<
+# <<< ash install <<<

@@ -22,6 +22,7 @@ lint:
 	go run github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run ./...
 
 test:
+	bash -n sample_bashrc.txt
 	go test ./...
 
 test-race:
