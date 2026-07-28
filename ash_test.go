@@ -402,13 +402,35 @@ func TestGetHistoryPath(t *testing.T) {
 
 	home := t.TempDir()
 	osUserHomeDir = func() (string, error) { return home, nil }
+	t.Setenv("SESSION_ID", "abc123")
+	t.Setenv("ASH_SCHEDULED_TASK", "")
 
 	path, err := getHistoryPath()
 	if err != nil {
 		t.Fatalf("getHistoryPath returned error: %v", err)
 	}
 
-	want := filepath.Join(home, historyFileName)
+	want := filepath.Join(home, ashWorkspaceDirName, historyDirName, "abc123.json")
+	if path != want {
+		t.Fatalf("path mismatch: got %q want %q", path, want)
+	}
+}
+
+func TestGetHistoryPathScheduled(t *testing.T) {
+	origHome := osUserHomeDir
+	t.Cleanup(func() { osUserHomeDir = origHome })
+
+	home := t.TempDir()
+	osUserHomeDir = func() (string, error) { return home, nil }
+	t.Setenv("SESSION_ID", "abc123")
+	t.Setenv("ASH_SCHEDULED_TASK", "1")
+
+	path, err := getHistoryPath()
+	if err != nil {
+		t.Fatalf("getHistoryPath returned error: %v", err)
+	}
+
+	want := filepath.Join(home, ashWorkspaceDirName, historyDirName, "task_abc123.json")
 	if path != want {
 		t.Fatalf("path mismatch: got %q want %q", path, want)
 	}
@@ -1178,8 +1200,8 @@ func TestSchedulerLogFilePathRequiresSessionID(t *testing.T) {
 	t.Setenv("SESSION_ID", "")
 	if _, err := schedulerLogFilePath(true); err == nil {
 		t.Fatalf("expected error when SESSION_ID is missing")
-	} else if !strings.Contains(err.Error(), "Add this line to ~/.env") {
-		t.Fatalf("expected .env instruction in error, got %q", err.Error())
+	} else if !strings.Contains(err.Error(), "SESSION_ID is required") {
+		t.Fatalf("expected SESSION_ID requirement in error, got %q", err.Error())
 	}
 }
 
@@ -1704,7 +1726,7 @@ func TestInstallRecommendation(t *testing.T) {
 	}
 
 	rcPath := filepath.Join(home, ".bashrc")
-	if err := os.WriteFile(rcPath, []byte(installBlockForShell("bash")), 0o600); err != nil {
+	if err := os.WriteFile(rcPath, []byte(installSourceBlockForShell("bash")), 0o600); err != nil {
 		t.Fatalf("write rc file: %v", err)
 	}
 
@@ -1716,8 +1738,8 @@ func TestInstallRecommendation(t *testing.T) {
 		t.Fatalf("expected no recommendation when installed, got %q", reco)
 	}
 
-	oldBlock := installBlockForShell("bash")
-	oldBlock = strings.Replace(oldBlock, "command_not_found_handle", "_old_command_not_found_handle", 1)
+	oldBlock := installSourceBlockForShell("bash")
+	oldBlock = strings.Replace(oldBlock, ".ash_bashrc", ".ash_old_bashrc", 1)
 	if err := os.WriteFile(rcPath, []byte(oldBlock), 0o600); err != nil {
 		t.Fatalf("write outdated rc file: %v", err)
 	}
@@ -1728,6 +1750,43 @@ func TestInstallRecommendation(t *testing.T) {
 	}
 	if !strings.Contains(reco, "outdated") || !strings.Contains(reco, "ash install --shell bash") {
 		t.Fatalf("expected outdated recommendation, got %q", reco)
+	}
+
+	if err := os.Remove(rcPath); err != nil {
+		t.Fatalf("remove rc file: %v", err)
+	}
+
+	wrapperPath := filepath.Join(home, ashWorkspaceDirName, ".ash_bashrc")
+	if err := os.MkdirAll(filepath.Dir(wrapperPath), 0o700); err != nil {
+		t.Fatalf("mkdir ash workspace: %v", err)
+	}
+	if err := os.WriteFile(wrapperPath, []byte("# wrapper\n"), 0o600); err != nil {
+		t.Fatalf("write wrapper file: %v", err)
+	}
+
+	profilePath := filepath.Join(home, ".bash_profile")
+	if err := os.WriteFile(profilePath, []byte(`[ -f "$HOME/.ash/.ash_bashrc" ] && . "$HOME/.ash/.ash_bashrc"`+"\n"), 0o600); err != nil {
+		t.Fatalf("write bash profile: %v", err)
+	}
+
+	reco, err = installRecommendation()
+	if err != nil {
+		t.Fatalf("installRecommendation returned error: %v", err)
+	}
+	if reco != "" {
+		t.Fatalf("expected no recommendation when installed via bash_profile sourcing, got %q", reco)
+	}
+
+	if err := os.Remove(wrapperPath); err != nil {
+		t.Fatalf("remove wrapper file: %v", err)
+	}
+
+	reco, err = installRecommendation()
+	if err != nil {
+		t.Fatalf("installRecommendation returned error: %v", err)
+	}
+	if !strings.Contains(reco, "ash install --shell bash") {
+		t.Fatalf("expected recommendation when bash wrapper file is missing, got %q", reco)
 	}
 }
 
@@ -1791,6 +1850,15 @@ func TestRunInstall(t *testing.T) {
 		t.Fatalf("expected single install block, got %d", strings.Count(string(rcContentAfter), installStartMarker))
 	}
 
+	profilePath := filepath.Join(home, ".bash_profile")
+	profileContent, err := os.ReadFile(profilePath)
+	if err != nil {
+		t.Fatalf("read bash_profile: %v", err)
+	}
+	if !strings.Contains(string(profileContent), ".ash/.ash_bashrc") {
+		t.Fatalf("expected bash_profile to source .ash/.ash_bashrc, got %q", string(profileContent))
+	}
+
 	canonicalSystemPath := filepath.Join(home, ashWorkspaceDirName, systemFileName)
 	canonicalSystemContent, err := os.ReadFile(canonicalSystemPath)
 	if err != nil {
@@ -1809,8 +1877,8 @@ func TestRunInstall(t *testing.T) {
 		t.Fatalf("expected canonical tools content to include say, got %q", string(canonicalToolsContent))
 	}
 
-	staleBlock := installBlockForShell("bash")
-	staleBlock = strings.Replace(staleBlock, "command_not_found_handle", "_old_command_not_found_handle", 1)
+	staleBlock := installSourceBlockForShell("bash")
+	staleBlock = strings.Replace(staleBlock, ".ash_bashrc", ".ash_old_bashrc", 1)
 	if err := os.WriteFile(rcPath, []byte(staleBlock), 0o600); err != nil {
 		t.Fatalf("write stale rc file: %v", err)
 	}
@@ -1829,8 +1897,17 @@ func TestRunInstall(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read rc file after update: %v", err)
 	}
-	if !strings.Contains(string(rcContentUpdated), "command_not_found_handle") {
-		t.Fatalf("expected refreshed install block to include command_not_found_handle")
+	if !strings.Contains(string(rcContentUpdated), ".ash/.ash_bashrc") {
+		t.Fatalf("expected refreshed install block to source .ash/.ash_bashrc")
+	}
+
+	wrapperPath := filepath.Join(home, ashWorkspaceDirName, ".ash_bashrc")
+	wrapperContent, err := os.ReadFile(wrapperPath)
+	if err != nil {
+		t.Fatalf("read bash wrapper file: %v", err)
+	}
+	if !strings.Contains(string(wrapperContent), "command_not_found_handle") {
+		t.Fatalf("expected wrapper file to include command_not_found_handle")
 	}
 }
 
@@ -1855,6 +1932,101 @@ func TestRunInstallDryRun(t *testing.T) {
 	if _, err := os.Stat(rcPath); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("expected no rc file write in dry-run, stat err=%v", err)
 	}
+}
+
+func TestShouldConfigureInstallEnv(t *testing.T) {
+	t.Run("configures when ash env file missing and required env missing", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv("HOME", home)
+		t.Setenv(aiEnvEndpoint, "")
+		t.Setenv(aiEnvModel, "")
+		t.Setenv(aiEnvAuthType, "")
+		t.Setenv(aiEnvAuthToken, "")
+
+		got, err := shouldConfigureInstallEnv()
+		if err != nil {
+			t.Fatalf("shouldConfigureInstallEnv returned error: %v", err)
+		}
+		if !got {
+			t.Fatalf("expected shouldConfigureInstallEnv=true when .ash_env is missing and required env is absent")
+		}
+	})
+
+	t.Run("skips when ash env file exists", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv("HOME", home)
+		t.Setenv(aiEnvEndpoint, "")
+		t.Setenv(aiEnvModel, "")
+		t.Setenv(aiEnvAuthType, "")
+		t.Setenv(aiEnvAuthToken, "")
+
+		ashPath := filepath.Join(home, ashWorkspaceDirName, ".ash_env")
+		if err := os.MkdirAll(filepath.Dir(ashPath), 0o700); err != nil {
+			t.Fatalf("mkdir ash dir: %v", err)
+		}
+		if err := os.WriteFile(ashPath, []byte("export AI_ENDPOINT='http://localhost:11434'\n"), 0o600); err != nil {
+			t.Fatalf("write ash env file: %v", err)
+		}
+
+		got, err := shouldConfigureInstallEnv()
+		if err != nil {
+			t.Fatalf("shouldConfigureInstallEnv returned error: %v", err)
+		}
+		if got {
+			t.Fatalf("expected shouldConfigureInstallEnv=false when .ash_env exists")
+		}
+	})
+
+	t.Run("skips when required local env values already set", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv("HOME", home)
+		t.Setenv(aiEnvEndpoint, "http://localhost:11434")
+		t.Setenv(aiEnvModel, "llama3.1")
+		t.Setenv(aiEnvAuthType, "")
+		t.Setenv(aiEnvAuthToken, "")
+
+		got, err := shouldConfigureInstallEnv()
+		if err != nil {
+			t.Fatalf("shouldConfigureInstallEnv returned error: %v", err)
+		}
+		if got {
+			t.Fatalf("expected shouldConfigureInstallEnv=false when required local env is set")
+		}
+	})
+
+	t.Run("skips when required cloud env values already set", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv("HOME", home)
+		t.Setenv(aiEnvEndpoint, "https://api.openai.com/v1")
+		t.Setenv(aiEnvModel, "gpt-4.1")
+		t.Setenv(aiEnvAuthType, "bearer")
+		t.Setenv(aiEnvAuthToken, "token")
+
+		got, err := shouldConfigureInstallEnv()
+		if err != nil {
+			t.Fatalf("shouldConfigureInstallEnv returned error: %v", err)
+		}
+		if got {
+			t.Fatalf("expected shouldConfigureInstallEnv=false when required cloud env is set")
+		}
+	})
+
+	t.Run("configures when cloud env is incomplete", func(t *testing.T) {
+		home := t.TempDir()
+		t.Setenv("HOME", home)
+		t.Setenv(aiEnvEndpoint, "https://api.openai.com/v1")
+		t.Setenv(aiEnvModel, "gpt-4.1")
+		t.Setenv(aiEnvAuthType, "bearer")
+		t.Setenv(aiEnvAuthToken, "")
+
+		got, err := shouldConfigureInstallEnv()
+		if err != nil {
+			t.Fatalf("shouldConfigureInstallEnv returned error: %v", err)
+		}
+		if !got {
+			t.Fatalf("expected shouldConfigureInstallEnv=true when cloud auth vars are incomplete")
+		}
+	})
 }
 
 func TestRunInstallHardensWorkspacePermissions(t *testing.T) {
@@ -2234,7 +2406,11 @@ func TestRun(t *testing.T) {
 		if err := os.Chdir(cwd); err != nil {
 			t.Fatalf("Chdir failed: %v", err)
 		}
-		path := filepath.Join(home, historyFileName)
+		t.Setenv("SESSION_ID", "historyError")
+		path := filepath.Join(home, ashWorkspaceDirName, historyDirName, "historyError.json")
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			t.Fatalf("mkdir history dir: %v", err)
+		}
 		if err := os.WriteFile(path, []byte("not-json"), 0o600); err != nil {
 			t.Fatalf("write bad history: %v", err)
 		}
@@ -2371,6 +2547,8 @@ func TestRun(t *testing.T) {
 			return "\x1b[1mbold 🙂\x1b[0m", nil
 		}
 
+		t.Setenv("SESSION_ID", "historySuccess")
+
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
 		code := run([]string{"show", "files"}, &stdout, &stderr)
@@ -2381,7 +2559,7 @@ func TestRun(t *testing.T) {
 			t.Fatalf("expected ANSI output, got %q", stdout.String())
 		}
 
-		content, err := os.ReadFile(filepath.Join(home, historyFileName))
+		content, err := os.ReadFile(filepath.Join(home, ashWorkspaceDirName, historyDirName, "historySuccess.json"))
 		if err != nil {
 			t.Fatalf("read history file: %v", err)
 		}

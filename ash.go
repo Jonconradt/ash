@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -40,8 +42,11 @@ const (
 	defaultLaunchdTimeout             = 15 * time.Second
 	defaultCronTimeout                = 15 * time.Second
 	defaultSchedulerLogMaxBytes int64 = 1 << 20
+	defaultHistoryRetention           = 14 * 24 * time.Hour
+	defaultHistoryCleanupBudget       = 300 * time.Millisecond
 	sessionIDEnvName                  = "SESSION_ID"
-	historyFileName                   = ".ash_history.json"
+	scheduledTaskEnvName              = "ASH_SCHEDULED_TASK"
+	historyDirName                    = "history"
 	systemFileName                    = ".ash_system"
 	toolsFileName                     = ".ash_tools"
 	ashWorkspaceDirName               = ".ash"
@@ -55,6 +60,20 @@ const (
 )
 
 var sessionIDSanitizer = regexp.MustCompile(`[^A-Za-z0-9]+`)
+
+type endpointPreset struct {
+	Name string
+	URL  string
+}
+
+var installEndpointPresets = []endpointPreset{
+	{Name: "Ollama (local)", URL: "http://localhost:11434"},
+	{Name: "Ollama (cloud)", URL: "https://ollama.com"},
+	{Name: "OpenAI", URL: "https://api.openai.com/v1"},
+	{Name: "Anthropic", URL: "https://api.anthropic.com/v1"},
+	{Name: "Google Gemini (OpenAI-compatible)", URL: "https://generativelanguage.googleapis.com/v1beta/openai/"},
+	{Name: "HuggingFace Router (OpenAI-compatible)", URL: "https://router.huggingface.co/v1"},
+}
 
 const (
 	aiEnvEndpoint  = "AI_ENDPOINT"
@@ -280,7 +299,13 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runInstall(args[1:], stdout, stderr)
 	}
 
+	if _, err := ensureSessionID(); err != nil {
+		fmt.Fprintf(stderr, "failed to initialize SESSION_ID: %v\n", err)
+		return 1
+	}
+
 	configureDebugLogging()
+	defer cleanupHistoryRetention(defaultHistoryRetention, defaultHistoryCleanupBudget)
 
 	if recommendation, err := installRecommendation(); err == nil && recommendation != "" {
 		fmt.Fprintln(stderr, recommendation)
@@ -406,9 +431,17 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	block := installBlockForShell(shellName)
+	block := installSourceBlockForShell(shellName)
 	if block == "" {
 		fmt.Fprintf(stderr, "install error: unsupported shell %q\n", shellName)
+		return 1
+	}
+	if err := ensureInstallShellWrapper(shellName, dryRun, stdout); err != nil {
+		fmt.Fprintf(stderr, "install error: %v\n", err)
+		return 1
+	}
+	if err := ensureBashProfileSourcing(shellName, dryRun, stdout); err != nil {
+		fmt.Fprintf(stderr, "install error: %v\n", err)
 		return 1
 	}
 
@@ -422,6 +455,10 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 	if hasManagedBlock {
 		if strings.TrimSpace(existingBlock) == strings.TrimSpace(block) {
 			if err := finalizeInstallWorkspace(); err != nil {
+				fmt.Fprintf(stderr, "install error: %v\n", err)
+				return 1
+			}
+			if err := maybeConfigureInstallEnv(stdout, stderr, dryRun); err != nil {
 				fmt.Fprintf(stderr, "install error: %v\n", err)
 				return 1
 			}
@@ -453,6 +490,10 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintf(stderr, "install error: %v\n", err)
 			return 1
 		}
+		if err := maybeConfigureInstallEnv(stdout, stderr, dryRun); err != nil {
+			fmt.Fprintf(stderr, "install error: %v\n", err)
+			return 1
+		}
 
 		fmt.Fprintf(stdout, "ash install updated wrappers in %s\n", rcPath)
 		fmt.Fprintln(stdout, "synced .ash_system/.ash_tools to ~/.ash when present")
@@ -478,11 +519,244 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 		fmt.Fprintf(stderr, "install error: %v\n", err)
 		return 1
 	}
+	if err := maybeConfigureInstallEnv(stdout, stderr, dryRun); err != nil {
+		fmt.Fprintf(stderr, "install error: %v\n", err)
+		return 1
+	}
 
 	fmt.Fprintf(stdout, "ash install appended wrappers to %s\n", rcPath)
 	fmt.Fprintln(stdout, "synced .ash_system/.ash_tools to ~/.ash when present")
 	fmt.Fprintln(stdout, "restart your shell or source your rc file to activate wrappers")
 	return 0
+}
+
+func maybeConfigureInstallEnv(stdout, stderr io.Writer, dryRun bool) error {
+	if dryRun {
+		return nil
+	}
+
+	shouldConfigure, err := shouldConfigureInstallEnv()
+	if err != nil {
+		return err
+	}
+	if !shouldConfigure || !shouldPromptInstallEnv() {
+		return nil
+	}
+
+	reader := bufio.NewReader(os.Stdin)
+	values, err := promptInstallEnvValues(reader, stdout, stderr)
+	if err != nil {
+		return err
+	}
+	if len(values) == 0 {
+		return nil
+	}
+
+	path, err := ashEnvFilePath()
+	if err != nil {
+		return err
+	}
+	if err := osMkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+
+	if err := osWriteFile(path, []byte(buildManagedAshEnv(values)), 0o600); err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "updated %s\n", path)
+	return nil
+}
+
+func shouldConfigureInstallEnv() (bool, error) {
+	if hasRequiredInstallEnvValues() {
+		return false, nil
+	}
+
+	path, err := ashEnvFilePath()
+	if err != nil {
+		return false, err
+	}
+
+	if _, err := os.Stat(path); err == nil {
+		return false, nil
+	} else if errors.Is(err, os.ErrNotExist) {
+		return true, nil
+	} else {
+		return false, err
+	}
+}
+
+func hasRequiredInstallEnvValues() bool {
+	endpoint := strings.TrimSpace(os.Getenv(aiEnvEndpoint))
+	if endpoint == "" {
+		return false
+	}
+
+	model := strings.TrimSpace(os.Getenv(aiEnvModel))
+	if model == "" {
+		return false
+	}
+
+	_, host, _, err := parseAIEndpoint(endpoint)
+	if err != nil {
+		return false
+	}
+
+	if !isCloudAIHost(host) {
+		return true
+	}
+
+	authType := strings.ToLower(strings.TrimSpace(os.Getenv(aiEnvAuthType)))
+	authToken := strings.TrimSpace(os.Getenv(aiEnvAuthToken))
+	return authType == "bearer" && authToken != ""
+}
+
+func shouldPromptInstallEnv() bool {
+	if runningInCI() {
+		return false
+	}
+	stdinInfo, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	stdoutInfo, err := os.Stdout.Stat()
+	if err != nil {
+		return false
+	}
+	return (stdinInfo.Mode()&os.ModeCharDevice != 0) && (stdoutInfo.Mode()&os.ModeCharDevice != 0)
+}
+
+func runningInCI() bool {
+	for _, key := range []string{"CI", "GITHUB_ACTIONS", "BUILD_BUILDID", "JENKINS_URL", "BUILDKITE"} {
+		if strings.TrimSpace(os.Getenv(key)) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func ashEnvFilePath() (string, error) {
+	root, err := ashWorkspaceDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(root, ".ash_env"), nil
+}
+
+func promptInstallEnvValues(reader *bufio.Reader, stdout, stderr io.Writer) (map[string]string, error) {
+	fmt.Fprintln(stdout, "Configure ash environment values")
+	endpoint, err := promptEndpointWithPresets(reader, stdout)
+	if err != nil {
+		return nil, err
+	}
+	model, err := promptNonEmpty(reader, stdout, aiEnvModel)
+	if err != nil {
+		return nil, err
+	}
+
+	_, host, _, err := parseAIEndpoint(endpoint)
+	if err != nil {
+		return nil, err
+	}
+	cloud := isCloudAIHost(host)
+
+	authType := ""
+	authToken := ""
+	if cloud {
+		authType = "bearer"
+		authToken, err = promptNonEmpty(reader, stdout, aiEnvAuthToken)
+		if err != nil {
+			return nil, err
+		}
+		fmt.Fprintln(stderr, "selected cloud endpoint; using AI_AUTH_TYPE=bearer")
+	} else {
+		optionalToken, promptErr := promptOptional(reader, stdout, aiEnvAuthToken+" (optional for localhost)")
+		if promptErr != nil {
+			return nil, promptErr
+		}
+		if optionalToken != "" {
+			authType = "bearer"
+			authToken = optionalToken
+		}
+	}
+
+	values := map[string]string{
+		aiEnvEndpoint: endpoint,
+		aiEnvModel:    model,
+	}
+	if authType != "" {
+		values[aiEnvAuthType] = authType
+	}
+	if authToken != "" {
+		values[aiEnvAuthToken] = authToken
+	}
+	return values, nil
+}
+
+func promptEndpointWithPresets(reader *bufio.Reader, stdout io.Writer) (string, error) {
+	fmt.Fprintln(stdout, "Select AI endpoint preset or enter a custom URL:")
+	for i, preset := range installEndpointPresets {
+		fmt.Fprintf(stdout, "  %d) %s - %s\n", i+1, preset.Name, preset.URL)
+	}
+
+	for {
+		fmt.Fprintf(stdout, "%s: ", aiEnvEndpoint)
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			return "", err
+		}
+		input := strings.TrimSpace(line)
+		if input == "" {
+			continue
+		}
+		if idx, convErr := strconv.Atoi(input); convErr == nil {
+			if idx >= 1 && idx <= len(installEndpointPresets) {
+				return installEndpointPresets[idx-1].URL, nil
+			}
+		}
+		if _, _, _, parseErr := parseAIEndpoint(input); parseErr == nil {
+			return strings.TrimRight(input, "/"), nil
+		}
+		fmt.Fprintln(stdout, "invalid endpoint, enter a preset number or full http(s) URL")
+	}
+}
+
+func promptNonEmpty(reader *bufio.Reader, stdout io.Writer, key string) (string, error) {
+	for {
+		fmt.Fprintf(stdout, "%s: ", key)
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			return "", err
+		}
+		value := strings.TrimSpace(line)
+		if value != "" {
+			return value, nil
+		}
+	}
+}
+
+func promptOptional(reader *bufio.Reader, stdout io.Writer, key string) (string, error) {
+	fmt.Fprintf(stdout, "%s: ", key)
+	line, err := reader.ReadString('\n')
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(line), nil
+}
+
+func buildManagedAshEnv(values map[string]string) string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	var b strings.Builder
+	b.WriteString("# managed by ash install\n")
+	for _, key := range keys {
+		b.WriteString(fmt.Sprintf("export %s=%s\n", key, shellQuote(values[key])))
+	}
+	return b.String()
 }
 
 func finalizeInstallWorkspace() error {
@@ -682,6 +956,16 @@ func installRecommendation() (string, error) {
 		return "", nil
 	}
 
+	if shellName == "bash" {
+		installedViaProfile, err := bashInstalledViaProfileSourcing()
+		if err != nil {
+			return "", err
+		}
+		if installedViaProfile {
+			return "", nil
+		}
+	}
+
 	rcPath, err := rcPathForShell(shellName)
 	if err != nil {
 		return "", err
@@ -692,7 +976,7 @@ func installRecommendation() (string, error) {
 		return "", err
 	}
 
-	expected := installBlockForShell(shellName)
+	expected := installSourceBlockForShell(shellName)
 	if existing, ok := extractManagedInstallBlock(content); ok {
 		if strings.TrimSpace(existing) == strings.TrimSpace(expected) {
 			return "", nil
@@ -701,6 +985,124 @@ func installRecommendation() (string, error) {
 	}
 
 	return fmt.Sprintf("ash is not installed for %s. Run: ash install --shell %s", shellName, shellName), nil
+}
+
+func bashInstalledViaProfileSourcing() (bool, error) {
+	home, err := osUserHomeDir()
+	if err != nil {
+		return false, err
+	}
+
+	profilePath := filepath.Join(home, ".bash_profile")
+	profileContent, err := readFileIfExists(profilePath)
+	if err != nil {
+		return false, err
+	}
+	if !strings.Contains(profileContent, ".ash/.ash_bashrc") {
+		return false, nil
+	}
+
+	wrapperPath, err := installShellWrapperPath("bash")
+	if err != nil {
+		return false, err
+	}
+	if _, err := os.Stat(wrapperPath); err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return true, nil
+}
+
+func installSourceBlockForShell(shellName string) string {
+	scriptName := ""
+	switch shellName {
+	case "bash":
+		scriptName = ".ash_bashrc"
+	case "zsh":
+		scriptName = ".ash_zshrc"
+	default:
+		return ""
+	}
+
+	return strings.TrimSpace(`
+` + installStartMarker + `
+[ -f "$HOME/.ash/.ash_env" ] && . "$HOME/.ash/.ash_env"
+[ -f "$HOME/.ash/` + scriptName + `" ] && . "$HOME/.ash/` + scriptName + `"
+` + installEndMarker)
+}
+
+func installShellWrapperPath(shellName string) (string, error) {
+	root, err := ashWorkspaceDir()
+	if err != nil {
+		return "", err
+	}
+
+	fileName := ""
+	switch shellName {
+	case "bash":
+		fileName = ".ash_bashrc"
+	case "zsh":
+		fileName = ".ash_zshrc"
+	default:
+		return "", fmt.Errorf("unsupported shell %q", shellName)
+	}
+	return filepath.Join(root, fileName), nil
+}
+
+func ensureInstallShellWrapper(shellName string, dryRun bool, stdout io.Writer) error {
+	content := installBlockForShell(shellName)
+	if content == "" {
+		return fmt.Errorf("unsupported shell %q", shellName)
+	}
+
+	path, err := installShellWrapperPath(shellName)
+	if err != nil {
+		return err
+	}
+	if dryRun {
+		fmt.Fprintf(stdout, "[dry-run] would write shell wrapper file %s\n", path)
+		return nil
+	}
+
+	if err := osMkdirAll(filepath.Dir(path), 0o700); err != nil {
+		return err
+	}
+	return osWriteFile(path, []byte(content+"\n"), 0o600)
+}
+
+func ensureBashProfileSourcing(shellName string, dryRun bool, stdout io.Writer) error {
+	if shellName != "bash" {
+		return nil
+	}
+	home, err := osUserHomeDir()
+	if err != nil {
+		return err
+	}
+	profilePath := filepath.Join(home, ".bash_profile")
+	line := `[ -f "$HOME/.ash/.ash_bashrc" ] && . "$HOME/.ash/.ash_bashrc"`
+
+	existing, err := readFileIfExists(profilePath)
+	if err != nil {
+		return err
+	}
+	if strings.Contains(existing, line) {
+		return nil
+	}
+
+	if dryRun {
+		fmt.Fprintf(stdout, "[dry-run] would append ash source line to %s\n", profilePath)
+		return nil
+	}
+
+	updated := existing
+	if updated != "" && !strings.HasSuffix(updated, "\n") {
+		updated += "\n"
+	}
+	updated += line + "\n"
+	return osWriteFile(profilePath, []byte(updated), 0o600)
 }
 
 func installBlockForShell(shellName string) string {
@@ -1554,12 +1956,69 @@ func expandSystemPrompt(prompt string) string {
 }
 
 func getHistoryPath() (string, error) {
+	if _, err := ensureSessionID(); err != nil {
+		return "", err
+	}
+
 	home, err := osUserHomeDir()
 	if err != nil {
 		return "", err
 	}
+	historyDir := filepath.Join(home, ashWorkspaceDirName, historyDirName)
+	if err := osMkdirAll(historyDir, 0o700); err != nil {
+		return "", err
+	}
 
-	return filepath.Join(home, historyFileName), nil
+	sessionID, err := sanitizedSessionIDForLogFile()
+	if err != nil {
+		return "", err
+	}
+
+	filename := sessionID + ".json"
+	if isScheduledTaskRun() {
+		filename = "task_" + sessionID + ".json"
+	}
+
+	return filepath.Join(historyDir, filename), nil
+}
+
+func isScheduledTaskRun() bool {
+	raw := strings.TrimSpace(strings.ToLower(os.Getenv(scheduledTaskEnvName)))
+	return raw == "1" || raw == "true" || raw == "yes"
+}
+
+func cleanupHistoryRetention(maxAge, budget time.Duration) {
+	if maxAge <= 0 || budget <= 0 {
+		return
+	}
+	home, err := osUserHomeDir()
+	if err != nil {
+		return
+	}
+	historyDir := filepath.Join(home, ashWorkspaceDirName, historyDirName)
+	entries, err := os.ReadDir(historyDir)
+	if err != nil {
+		return
+	}
+
+	deadline := timeNow().Add(budget)
+	cutoff := timeNow().Add(-maxAge)
+	for _, entry := range entries {
+		if timeNow().After(deadline) {
+			return
+		}
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+			continue
+		}
+		info, infoErr := entry.Info()
+		if infoErr != nil {
+			continue
+		}
+		if info.ModTime().After(cutoff) {
+			continue
+		}
+		_ = os.Remove(filepath.Join(historyDir, entry.Name()))
+	}
 }
 
 func loadHistory(path string) (historyData, error) {
@@ -2458,6 +2917,8 @@ func schedulerEnvAllowlist() map[string]string {
 		aiEnvModel,
 		aiEnvAuthType,
 		aiEnvAuthToken,
+		sessionIDEnvName,
+		scheduledTaskEnvName,
 		"HOME",
 		"PATH",
 		"AI_TIMEOUT",
@@ -2484,11 +2945,17 @@ func schedulerEnvAllowlist() map[string]string {
 
 func schedulerInvocationEnv() map[string]string {
 	env := schedulerEnvAllowlist()
+	if strings.TrimSpace(env[sessionIDEnvName]) == "" {
+		if generated, err := generateSessionID(); err == nil {
+			env[sessionIDEnvName] = generated
+		}
+	}
+	env[scheduledTaskEnvName] = "1"
 	if strings.TrimSpace(env["ASH_VERBOSE"]) == "" {
 		env["ASH_VERBOSE"] = "1"
 	}
 	if strings.TrimSpace(env["ASH_LOG_FILE"]) == "" {
-		if logFile, err := schedulerLogFilePath(true); err == nil {
+		if logFile, err := schedulerLogFilePathForSession(env[sessionIDEnvName], true); err == nil {
 			env["ASH_LOG_FILE"] = logFile
 		} else {
 			fmt.Fprintln(os.Stderr, err)
@@ -2550,30 +3017,61 @@ func shellQuote(value string) string {
 }
 
 func schedulerLogFilePath(isScheduledTask bool) (string, error) {
-	home, err := osUserHomeDir()
-	if err != nil {
-		return "", err
-	}
 	sessionID, err := sanitizedSessionIDForLogFile()
 	if err != nil {
 		return "", err
 	}
-	if isScheduledTask {
-		sessionID = "task_" + sessionID
+	return schedulerLogFilePathForSession(sessionID, isScheduledTask)
+}
+
+func schedulerLogFilePathForSession(sessionID string, isScheduledTask bool) (string, error) {
+	home, err := osUserHomeDir()
+	if err != nil {
+		return "", err
 	}
-	return filepath.Join(home, ashWorkspaceDirName, schedulerLogDirName, sessionID+".log"), nil
+	sanitized := sessionIDSanitizer.ReplaceAllString(strings.TrimSpace(sessionID), "")
+	if sanitized == "" {
+		return "", errors.New("SESSION_ID must be set for log file naming")
+	}
+	if isScheduledTask {
+		sanitized = "task_" + sanitized
+	}
+	return filepath.Join(home, ashWorkspaceDirName, schedulerLogDirName, sanitized+".log"), nil
 }
 
 func sanitizedSessionIDForLogFile() (string, error) {
 	raw := strings.TrimSpace(os.Getenv(sessionIDEnvName))
 	if raw == "" {
-		return "", errors.New("SESSION_ID is required for log file naming. Add this line to ~/.env: export SESSION_ID=\"$(cat /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)\"")
+		return "", errors.New("SESSION_ID is required for log file naming")
 	}
 	sanitized := sessionIDSanitizer.ReplaceAllString(raw, "")
 	if sanitized == "" {
 		return "", errors.New("SESSION_ID must contain at least one ASCII letter or digit")
 	}
 	return sanitized, nil
+}
+
+func ensureSessionID() (string, error) {
+	if existing, err := sanitizedSessionIDForLogFile(); err == nil {
+		return existing, nil
+	}
+
+	generated, err := generateSessionID()
+	if err != nil {
+		return "", err
+	}
+	if err := os.Setenv(sessionIDEnvName, generated); err != nil {
+		return "", err
+	}
+	return generated, nil
+}
+
+func generateSessionID() (string, error) {
+	raw := make([]byte, 8)
+	if _, err := rand.Read(raw); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(raw), nil
 }
 
 func buildFuturePromptLaunchAgent(prompt, cwd string, scheduledAt time.Time) (string, string, string, error) {

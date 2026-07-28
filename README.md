@@ -35,6 +35,7 @@ make lint
 make test
 make install
 make verify
+make version
 make release
 make release RELEASE_VERSION=v1.2.3
 ```
@@ -43,6 +44,7 @@ make release RELEASE_VERSION=v1.2.3
 - `make test` runs `go test ./...`
 - `make install` runs `go install ./...`
 - `make verify` runs strict checks (tests, race, coverage gate, vet, staticcheck)
+- `make version` runs quality checks and builds installer artifacts for the selected host/targets
 - `make release` runs quality checks, builds an arm64 macOS `.pkg`, validates it,
   writes a SHA-256 checksum to `dist/release/`, creates the release tag, and pushes
   it to `origin`
@@ -57,21 +59,27 @@ Canonical publishing is tag-driven in GitHub Actions.
 
 1. Run `make release RELEASE_VERSION=v1.2.3` (or omit `RELEASE_VERSION` to auto-derive).
 2. `make release` creates and pushes the release tag to `origin`.
-3. The `release` workflow builds and validates the macOS installer package.
+3. The `release` workflow runs `make version` in macOS and Linux packaging jobs.
 4. GitHub Release assets are published automatically:
-   - `ash-v1.2.3-darwin-arm64.pkg`
-   - `ash-v1.2.3-darwin-arm64.pkg.sha256`
+  - `ash-v1.2.3-darwin-amd64.pkg`
+  - `ash-v1.2.3-darwin-arm64.pkg`
+  - `ash-v1.2.3-linux-amd64.deb`
+  - `ash-v1.2.3-linux-arm64.deb`
+  - `ash-v1.2.3-linux-amd64.rpm`
+  - `ash-v1.2.3-linux-arm64.rpm`
+  - `ash-v1.2.3-<os>-<arch>.tar.gz`
+  - matching `.sha256` files for each artifact
 
-For local maintainer checks without publishing, run the release build steps directly:
+For local maintainer checks without publishing, run:
 
 ```bash
-make release-check
-make release-build release-pkg release-validate RELEASE_VERSION=v1.2.3
+make version RELEASE_VERSION=v1.2.3
 ```
 
 Requirements for local packaging:
 
 - macOS with `pkgbuild` and `pkgutil` available
+- Linux packaging requires `fpm` (for `.deb`/`.rpm`) plus `dpkg-deb`/`rpm` for validation
 - Go toolchain installed
 
 The package is currently unsigned and not notarized by design.
@@ -94,6 +102,14 @@ export AI_AUTH_TYPE="bearer"
 export AI_AUTH_TOKEN="<token>"
 ```
 
+Common `AI_ENDPOINT` values:
+
+- Ollama: `http://localhost:11434`
+- OpenAI: `https://api.openai.com/v1`
+- Anthropic: `https://api.anthropic.com/v1`
+- Google Gemini (OpenAI-compatible): `https://generativelanguage.googleapis.com/v1beta/openai/`
+- HuggingFace Router (OpenAI-compatible): `https://router.huggingface.co/v1`
+
 Notes:
 
 - Cloud endpoints are inferred when the host is not `localhost` or `127.0.0.1`.
@@ -115,8 +131,16 @@ You are a concise shell assistant. Keep answers short and practical. 🙂
 History is stored in:
 
 ```text
-$HOME/.ash_history.json
+$HOME/.ash/history/$SESSION_ID.json
 ```
+
+Scheduled invocations write task-specific history files:
+
+```text
+$HOME/.ash/history/task_$SESSION_ID.json
+```
+
+Legacy `$HOME/.ash_history.json` is ignored.
 
 Optional max history messages (default: `40`):
 
