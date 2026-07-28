@@ -37,6 +37,7 @@ type toolCommandResult struct {
 	Stdout   string `json:"stdout,omitempty"`
 	Stderr   string `json:"stderr,omitempty"`
 	Error    string `json:"error,omitempty"`
+	EID      string `json:"eid,omitempty"`
 }
 
 type recurringJobMetadata struct {

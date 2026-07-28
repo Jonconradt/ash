@@ -1,4 +1,4 @@
-.PHONY: all verify lint test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install version release release-check release-build release-pkg release-validate release-publish release-artifacts release-build-one release-pkg-one release-validate-one
+.PHONY: all verify lint test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install setup-hooks version release release-check release-build release-pkg release-validate release-publish release-artifacts release-build-one release-pkg-one release-validate-one
 
 SHELL := /bin/bash
 
@@ -73,6 +73,11 @@ staticcheck:
 install: test lint  gosec 
 	go install ./...
 	ash install --shell bash
+	$(MAKE) setup-hooks
+
+setup-hooks:
+	git config core.hooksPath githooks
+	chmod +x githooks/pre-commit
 
 version: release-check release-artifacts
 

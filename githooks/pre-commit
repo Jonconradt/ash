@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Ensure EID is appended to slog calls in staged Go files before commit
+
+ROOT_DIR="$(git rev-parse --show-toplevel)"
+cd "$ROOT_DIR"
+
+# Collect staged .go files (added, copied, modified, renamed).
+# Use -z + read loop for macOS bash 3.2 compatibility (no mapfile).
+GO_FILES=()
+while IFS= read -r -d '' file; do
+  GO_FILES+=("$file")
+done < <(git diff --cached --name-only -z --diff-filter=ACMR -- '*.go' || true)
+
+if [ ${#GO_FILES[@]} -eq 0 ]; then
+  exit 0
+fi
+
+echo "[pre-commit] Ensuring slog calls include trailing EID..."
+
+# Run the injector
+if ! go run ./scripts/eid-injector "${GO_FILES[@]}"; then
+  echo "[pre-commit] eid-injector failed. Aborting commit." >&2
+  exit 1
+fi
+
+# Re-add potentially modified files to the index
+git add -- "${GO_FILES[@]}"
+
+exit 0
