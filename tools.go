@@ -1,0 +1,601 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+)
+
+type mcpToolShim interface {
+	ListTools() []toolDefinition
+	CallTool(ctx context.Context, name string, args map[string]any) string
+}
+
+type localToolShim struct {
+	allowlist map[string]struct{}
+}
+
+// ListTools returns the tool definitions exposed by the local shim.
+func (s localToolShim) ListTools() []toolDefinition {
+	runUnixDescription := "Run a single allowlisted Unix executable with direct args and no shell expansion"
+	allowed := sortedAllowlist(s.allowlist)
+	if len(allowed) > 0 {
+		runUnixDescription += ". Allowlisted executables: " + strings.Join(allowed, ", ")
+	}
+
+	return []toolDefinition{
+		{
+			Type: "function",
+			Function: toolFunctionDefinition{
+				Name:        "run_unix_command",
+				Description: runUnixDescription,
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"command": map[string]any{
+							"type":        "string",
+							"description": "Executable name to run (must be allowlisted)",
+						},
+						"args": map[string]any{
+							"type": "array",
+							"items": map[string]any{
+								"type": "string",
+							},
+							"description": "Direct argv passed to the executable",
+						},
+					},
+					"required": []string{"command"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: toolFunctionDefinition{
+				Name:        "run_python3",
+				Description: "Execute Python 3 code via python3 -c and return stdout/stderr",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"code": map[string]any{
+							"type":        "string",
+							"description": "Python code to execute",
+						},
+						"argv": map[string]any{
+							"type": "array",
+							"items": map[string]any{
+								"type": "string",
+							},
+							"description": "Optional argv values visible to the script as sys.argv[1:]",
+						},
+					},
+					"required": []string{"code"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: toolFunctionDefinition{
+				Name:        "schedule_future_prompt",
+				Description: "Schedule one future ash invocation with a prompt using a user launchd LaunchAgent; accepts common offsets like '2 minutes from now'",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"prompt": map[string]any{
+							"type":        "string",
+							"description": "Prompt text to run later",
+						},
+						"when": map[string]any{
+							"type":        "string",
+							"description": "Future schedule string such as 'now + 5 minutes', 'in 10 minutes', or RFC3339 datetime",
+						},
+						"cwd": map[string]any{
+							"type":        "string",
+							"description": "Optional working directory for the scheduled invocation",
+						},
+					},
+					"required": []string{"prompt", "when"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: toolFunctionDefinition{
+				Name:        "schedule_recurring_prompt",
+				Description: "Schedule a recurring ash invocation with a cron expression",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"prompt": map[string]any{
+							"type":        "string",
+							"description": "Prompt text to run on schedule",
+						},
+						"cron": map[string]any{
+							"type":        "string",
+							"description": "Cron expression (5 fields) or @weekly/@daily style macro",
+						},
+						"cwd": map[string]any{
+							"type":        "string",
+							"description": "Optional working directory for the scheduled invocation",
+						},
+						"purpose": map[string]any{
+							"type":        "string",
+							"description": "Optional purpose text for job explain output",
+						},
+					},
+					"required": []string{"prompt", "cron"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: toolFunctionDefinition{
+				Name:        "manage_recurring_jobs",
+				Description: "List, cancel, modify, or explain recurring ash cron jobs",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"action": map[string]any{
+							"type":        "string",
+							"description": "One of list|cancel|modify|explain",
+						},
+						"id": map[string]any{
+							"type":        "string",
+							"description": "Recurring job id (required for cancel/modify/explain single job)",
+						},
+						"cron": map[string]any{
+							"type":        "string",
+							"description": "Replacement cron expression for modify",
+						},
+						"prompt": map[string]any{
+							"type":        "string",
+							"description": "Replacement prompt text for modify",
+						},
+						"cwd": map[string]any{
+							"type":        "string",
+							"description": "Replacement working directory for modify",
+						},
+						"purpose": map[string]any{
+							"type":        "string",
+							"description": "Replacement purpose text for modify",
+						},
+					},
+					"required": []string{"action"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: toolFunctionDefinition{
+				Name:        "ash_read_workspace_file",
+				Description: "Read a file inside ~/.ash workspace",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"path": map[string]any{
+							"type":        "string",
+							"description": "Path relative to ~/.ash",
+						},
+					},
+					"required": []string{"path"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: toolFunctionDefinition{
+				Name:        "ash_write_workspace_file",
+				Description: "Write a file inside ~/.ash workspace and update inventory.md",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"path": map[string]any{
+							"type":        "string",
+							"description": "Path relative to ~/.ash",
+						},
+						"content": map[string]any{
+							"type":        "string",
+							"description": "File contents to write",
+						},
+						"purpose": map[string]any{
+							"type":        "string",
+							"description": "Purpose text stored in ~/.ash/inventory.md",
+						},
+					},
+					"required": []string{"path", "content", "purpose"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: toolFunctionDefinition{
+				Name:        "python3",
+				Description: "Execute Python 3 code via python3 -c and return stdout/stderr",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"code": map[string]any{
+							"type":        "string",
+							"description": "Python code to execute",
+						},
+						"argv": map[string]any{
+							"type": "array",
+							"items": map[string]any{
+								"type": "string",
+							},
+							"description": "Optional argv values visible to the script as sys.argv[1:]",
+						},
+					},
+					"required": []string{"code"},
+				},
+			},
+		},
+	}
+}
+
+// CallTool dispatches a tool call to the matching local shim handler.
+func (s localToolShim) CallTool(ctx context.Context, name string, args map[string]any) string {
+	var result toolCommandResult
+
+	switch name {
+	case "run_unix_command":
+		result = s.callUnixCommand(ctx, args)
+	case "run_python3", "python3":
+		result = s.callPython3(ctx, args)
+	case "schedule_future_prompt":
+		result = s.callScheduleFuturePrompt(ctx, args)
+	case "schedule_recurring_prompt":
+		result = s.callScheduleRecurringPrompt(ctx, args)
+	case "manage_recurring_jobs":
+		result = s.callManageRecurringJobs(ctx, args)
+	case "ash_read_workspace_file":
+		result = s.callReadWorkspaceFile(args)
+	case "ash_write_workspace_file":
+		result = s.callWriteWorkspaceFile(args)
+	default:
+		result = toolCommandResult{OK: false, Error: fmt.Sprintf("unknown tool: %s", name)}
+	}
+
+	encoded, err := json.Marshal(result)
+	if err != nil {
+		return fmt.Sprintf(`{"ok":false,"error":"failed to encode tool result: %s"}`, sanitizeJSONError(err.Error()))
+	}
+
+	return string(encoded)
+}
+
+// callUnixCommand invokes the underlying tool implementation.
+func (s localToolShim) callUnixCommand(ctx context.Context, args map[string]any) toolCommandResult {
+	commandInput, ok := toStringArg(args["command"])
+	if !ok {
+		return toolCommandResult{OK: false, Error: "command must be a string"}
+	}
+
+	fields := strings.Fields(commandInput)
+	if len(fields) == 0 {
+		return toolCommandResult{OK: false, Error: "command must be a bare executable name"}
+	}
+
+	commandName := fields[0]
+	inlineArgs := fields[1:]
+
+	commandName = normalizeToolName(commandName)
+	if commandName == "" {
+		return toolCommandResult{OK: false, Error: "command must be a bare executable name"}
+	}
+
+	if _, allowed := s.allowlist[commandName]; !allowed {
+		return toolCommandResult{OK: false, Command: commandName, Error: "command is not allowlisted"}
+	}
+
+	argv, err := toStringSliceArg(args["args"])
+	if err != nil {
+		return toolCommandResult{OK: false, Command: commandName, Error: err.Error()}
+	}
+	argv = append(inlineArgs, argv...)
+
+	for _, arg := range argv {
+		if isBlockedArgument(arg) {
+			return toolCommandResult{OK: false, Command: commandName, Error: "argument contains blocked shell control pattern"}
+		}
+	}
+
+	return toolCommandRunner(ctx, commandName, argv, toolTimeout(), toolOutputLimit())
+}
+
+// callPython3 invokes the underlying tool implementation.
+func (s localToolShim) callPython3(ctx context.Context, args map[string]any) toolCommandResult {
+	code, ok := toStringArg(args["code"])
+	if !ok || strings.TrimSpace(code) == "" {
+		return toolCommandResult{OK: false, Command: "python3", Error: "code must be a non-empty string"}
+	}
+
+	argv, err := toStringSliceArg(args["argv"])
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "python3", Error: err.Error()}
+	}
+
+	for _, arg := range argv {
+		if isBlockedArgument(arg) {
+			return toolCommandResult{OK: false, Command: "python3", Error: "argv contains blocked shell control pattern"}
+		}
+	}
+
+	pythonArgs := append([]string{"-c", code}, argv...)
+	return toolCommandRunner(ctx, "python3", pythonArgs, toolTimeout(), toolOutputLimit())
+}
+
+// callScheduleFuturePrompt invokes the underlying tool implementation.
+func (s localToolShim) callScheduleFuturePrompt(ctx context.Context, args map[string]any) toolCommandResult {
+	prompt, ok := toStringArg(args["prompt"])
+	if !ok || strings.TrimSpace(prompt) == "" {
+		return toolCommandResult{OK: false, Command: "launchctl", Error: "prompt must be a non-empty string"}
+	}
+	when, ok := toStringArg(args["when"])
+	if !ok || strings.TrimSpace(when) == "" {
+		return toolCommandResult{OK: false, Command: "launchctl", Error: "when must be a non-empty string"}
+	}
+	scheduledAt, err := parseFutureScheduleTime(when, timeNow())
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "launchctl", Error: err.Error()}
+	}
+
+	cwd, err := optionalStringArg(args, "cwd")
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "launchctl", Error: err.Error()}
+	}
+
+	label, plistPath, plistContent, err := buildFuturePromptLaunchAgent(prompt, cwd, scheduledAt)
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "launchctl", Error: err.Error()}
+	}
+	if err := osMkdirAll(filepath.Dir(plistPath), 0o700); err != nil {
+		return toolCommandResult{OK: false, Command: "launchctl", Error: err.Error()}
+	}
+	if err := osWriteFile(plistPath, []byte(plistContent), 0o600); err != nil {
+		return toolCommandResult{OK: false, Command: "launchctl", Error: err.Error()}
+	}
+
+	serviceDomain := fmt.Sprintf("gui/%d", os.Getuid())
+	result := toolCommandRunner(ctx, "launchctl", []string{"bootstrap", serviceDomain, plistPath}, defaultLaunchdTimeout, toolOutputLimit())
+	if !result.OK {
+		return result
+	}
+
+	result.Stdout = fmt.Sprintf("scheduled future job label=%s at=%s plist=%s", label, scheduledAt.Format(time.RFC3339), plistPath)
+	return result
+}
+
+// callScheduleRecurringPrompt invokes the underlying tool implementation.
+func (s localToolShim) callScheduleRecurringPrompt(ctx context.Context, args map[string]any) toolCommandResult {
+	prompt, ok := toStringArg(args["prompt"])
+	if !ok || strings.TrimSpace(prompt) == "" {
+		return toolCommandResult{OK: false, Command: "crontab", Error: "prompt must be a non-empty string"}
+	}
+
+	cronExpr, ok := toStringArg(args["cron"])
+	if !ok {
+		return toolCommandResult{OK: false, Command: "crontab", Error: "cron must be a string"}
+	}
+	cronExpr = strings.TrimSpace(cronExpr)
+	if err := validateCronExpr(cronExpr); err != nil {
+		return toolCommandResult{OK: false, Command: "crontab", Error: err.Error()}
+	}
+
+	cwd, err := optionalStringArg(args, "cwd")
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "crontab", Error: err.Error()}
+	}
+	purpose, err := optionalStringArg(args, "purpose")
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "crontab", Error: err.Error()}
+	}
+
+	meta, line, err := buildRecurringJobLine(prompt, cronExpr, cwd, purpose, "")
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "crontab", Error: err.Error()}
+	}
+
+	content, err := loadCurrentCrontab(ctx)
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "crontab -l", Error: err.Error()}
+	}
+	updated := appendCrontabLine(content, line)
+	writeResult := writeCrontab(ctx, updated)
+	if !writeResult.OK {
+		return writeResult
+	}
+	writeResult.Stdout = strings.TrimSpace(fmt.Sprintf("scheduled recurring job id=%s cron=%s", meta.ID, meta.Cron))
+	return writeResult
+}
+
+// callManageRecurringJobs invokes the underlying tool implementation.
+func (s localToolShim) callManageRecurringJobs(ctx context.Context, args map[string]any) toolCommandResult {
+	actionRaw, ok := toStringArg(args["action"])
+	if !ok {
+		return toolCommandResult{OK: false, Command: "crontab", Error: "action must be a string"}
+	}
+	action := strings.ToLower(strings.TrimSpace(actionRaw))
+
+	content, err := loadCurrentCrontab(ctx)
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "crontab -l", Error: err.Error()}
+	}
+	records, err := parseRecurringJobs(content)
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "crontab -l", Error: err.Error()}
+	}
+
+	switch action {
+	case "list":
+		body, _ := json.Marshal(records)
+		return toolCommandResult{OK: true, Command: "crontab -l", ExitCode: 0, Stdout: string(body)}
+	case "explain":
+		id, _ := toStringArg(args["id"])
+		id = strings.TrimSpace(id)
+		if id == "" {
+			var b strings.Builder
+			if len(records) == 0 {
+				b.WriteString("no recurring ash jobs found")
+			} else {
+				for _, rec := range records {
+					b.WriteString(fmt.Sprintf("id=%s cron=%s cwd=%s purpose=%s\n", rec.Meta.ID, rec.Meta.Cron, rec.Meta.Cwd, strings.TrimSpace(rec.Meta.Purpose)))
+				}
+			}
+			return toolCommandResult{OK: true, Command: "crontab -l", ExitCode: 0, Stdout: strings.TrimSpace(b.String())}
+		}
+		rec, found := findRecurringJob(records, id)
+		if !found {
+			return toolCommandResult{OK: false, Command: "crontab -l", Error: "recurring job id not found"}
+		}
+		return toolCommandResult{
+			OK:       true,
+			Command:  "crontab -l",
+			ExitCode: 0,
+			Stdout:   fmt.Sprintf("id=%s cron=%s cwd=%s purpose=%s prompt=%s", rec.Meta.ID, rec.Meta.Cron, rec.Meta.Cwd, strings.TrimSpace(rec.Meta.Purpose), rec.Meta.Prompt),
+		}
+	case "cancel":
+		id, _ := toStringArg(args["id"])
+		id = strings.TrimSpace(id)
+		if id == "" {
+			return toolCommandResult{OK: false, Command: "crontab", Error: "id is required for cancel"}
+		}
+		updated, removed := removeRecurringJobFromCrontab(content, id)
+		if !removed {
+			return toolCommandResult{OK: false, Command: "crontab", Error: "recurring job id not found"}
+		}
+		result := writeCrontab(ctx, updated)
+		if !result.OK {
+			return result
+		}
+		result.Stdout = fmt.Sprintf("canceled recurring job id=%s", id)
+		return result
+	case "modify":
+		id, _ := toStringArg(args["id"])
+		id = strings.TrimSpace(id)
+		if id == "" {
+			return toolCommandResult{OK: false, Command: "crontab", Error: "id is required for modify"}
+		}
+		rec, found := findRecurringJob(records, id)
+		if !found {
+			return toolCommandResult{OK: false, Command: "crontab", Error: "recurring job id not found"}
+		}
+
+		if cronExpr, ok := args["cron"]; ok {
+			value, ok := cronExpr.(string)
+			if !ok {
+				return toolCommandResult{OK: false, Command: "crontab", Error: "cron must be a string"}
+			}
+			value = strings.TrimSpace(value)
+			if err := validateCronExpr(value); err != nil {
+				return toolCommandResult{OK: false, Command: "crontab", Error: err.Error()}
+			}
+			rec.Meta.Cron = value
+		}
+		if prompt, ok := args["prompt"]; ok {
+			value, ok := prompt.(string)
+			if !ok || strings.TrimSpace(value) == "" {
+				return toolCommandResult{OK: false, Command: "crontab", Error: "prompt must be a non-empty string"}
+			}
+			rec.Meta.Prompt = strings.TrimSpace(value)
+		}
+		if cwd, ok := args["cwd"]; ok {
+			value, ok := cwd.(string)
+			if !ok {
+				return toolCommandResult{OK: false, Command: "crontab", Error: "cwd must be a string"}
+			}
+			rec.Meta.Cwd = strings.TrimSpace(value)
+		}
+		if purpose, ok := args["purpose"]; ok {
+			value, ok := purpose.(string)
+			if !ok {
+				return toolCommandResult{OK: false, Command: "crontab", Error: "purpose must be a string"}
+			}
+			rec.Meta.Purpose = strings.TrimSpace(value)
+		}
+
+		script, err := buildScheduledInvocationScriptWithEnv(rec.Meta.Prompt, rec.Meta.Cwd, rec.Meta.Env)
+		if err != nil {
+			return toolCommandResult{OK: false, Command: "crontab", Error: err.Error()}
+		}
+		line, err := buildRecurringCrontabLine(rec.Meta, script)
+		if err != nil {
+			return toolCommandResult{OK: false, Command: "crontab", Error: err.Error()}
+		}
+		updated := replaceRecurringJobLine(content, id, line)
+		result := writeCrontab(ctx, updated)
+		if !result.OK {
+			return result
+		}
+		result.Stdout = fmt.Sprintf("modified recurring job id=%s", id)
+		return result
+	default:
+		return toolCommandResult{OK: false, Command: "crontab", Error: "action must be one of list, cancel, modify, explain"}
+	}
+}
+
+// callReadWorkspaceFile invokes the underlying tool implementation.
+func (s localToolShim) callReadWorkspaceFile(args map[string]any) toolCommandResult {
+	rel, ok := toStringArg(args["path"])
+	if !ok || strings.TrimSpace(rel) == "" {
+		return toolCommandResult{OK: false, Command: "ash_read_workspace_file", Error: "path must be a non-empty string"}
+	}
+	root, err := ashWorkspaceDir()
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "ash_read_workspace_file", Error: err.Error()}
+	}
+	absolutePath, relPath, err := resolveWorkspacePath(root, rel)
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "ash_read_workspace_file", Error: err.Error()}
+	}
+
+	content, err := osReadFile(absolutePath)
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "ash_read_workspace_file", Error: err.Error()}
+	}
+
+	return toolCommandResult{OK: true, Command: "ash_read_workspace_file", ExitCode: 0, Stdout: fmt.Sprintf("path=%s\n%s", relPath, string(content))}
+}
+
+// callWriteWorkspaceFile invokes the underlying tool implementation.
+func (s localToolShim) callWriteWorkspaceFile(args map[string]any) toolCommandResult {
+	rel, ok := toStringArg(args["path"])
+	if !ok || strings.TrimSpace(rel) == "" {
+		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: "path must be a non-empty string"}
+	}
+	content, ok := toStringArg(args["content"])
+	if !ok {
+		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: "content must be a string"}
+	}
+	purpose, ok := toStringArg(args["purpose"])
+	if !ok || strings.TrimSpace(purpose) == "" {
+		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: "purpose must be a non-empty string"}
+	}
+
+	root, err := ashWorkspaceDir()
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: err.Error()}
+	}
+	if err := osMkdirAll(root, 0o700); err != nil {
+		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: err.Error()}
+	}
+	absolutePath, relPath, err := resolveWorkspacePath(root, rel)
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: err.Error()}
+	}
+
+	if err := osMkdirAll(filepath.Dir(absolutePath), 0o700); err != nil {
+		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: err.Error()}
+	}
+	if err := osWriteFile(absolutePath, []byte(content), 0o600); err != nil {
+		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: err.Error()}
+	}
+	if err := updateWorkspaceInventory(root, relPath, strings.TrimSpace(purpose)); err != nil {
+		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: err.Error()}
+	}
+
+	return toolCommandResult{OK: true, Command: "ash_write_workspace_file", ExitCode: 0, Stdout: fmt.Sprintf("wrote %s", relPath)}
+}
