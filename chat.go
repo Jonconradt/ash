@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"strings"
+	"time"
 )
 
 type message struct {
@@ -143,40 +144,128 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 	debugLogf("AI request: url=%s/api/chat", aiCfg.BaseURL)
 	debugLogf("AI request payload: %s", string(payload))
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, aiCfg.BaseURL+"/api/chat", bytes.NewReader(payload))
-	if err != nil {
-		return chatResponse{}, err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if aiCfg.Authorization != "" {
-		req.Header.Set("Authorization", aiCfg.Authorization)
+	attempts := retryMaxAttempts()
+	baseDelay := retryBaseDelay()
+	maxDelay := retryMaxDelay()
+	for attempt := 1; attempt <= attempts; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, aiCfg.BaseURL+"/api/chat", bytes.NewReader(payload))
+		if err != nil {
+			return chatResponse{}, err
+		}
+		req.Header.Set("Content-Type", "application/json")
+		if aiCfg.Authorization != "" {
+			req.Header.Set("Authorization", aiCfg.Authorization)
+		}
+
+		client := newHTTPClient(aiTimeout())
+		resp, err := client.Do(req)
+		if err != nil {
+			if !shouldRetryAIError(err, attempt, attempts) {
+				return chatResponse{}, err
+			}
+			debugLogf("AI request attempt %d/%d failed: %v", attempt, attempts, err)
+			if err := sleepWithContext(ctx, backoffDelay(attempt, baseDelay, maxDelay)); err != nil {
+				return chatResponse{}, err
+			}
+			continue
+		}
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return chatResponse{}, err
+		}
+		debugLogf("AI response: status=%d body=%s", resp.StatusCode, string(body))
+
+		if resp.StatusCode < 200 || resp.StatusCode > 299 {
+			statusErr := chatStatusError{StatusCode: resp.StatusCode, Body: string(body)}
+			if !shouldRetryStatusCode(resp.StatusCode, attempt, attempts) {
+				return chatResponse{}, statusErr
+			}
+			debugLogf("AI request attempt %d/%d got status %d", attempt, attempts, resp.StatusCode)
+			if err := sleepWithContext(ctx, backoffDelay(attempt, baseDelay, maxDelay)); err != nil {
+				return chatResponse{}, err
+			}
+			continue
+		}
+
+		var parsed chatResponse
+		if err := json.Unmarshal(body, &parsed); err != nil {
+			return chatResponse{}, err
+		}
+
+		if parsed.Error != "" {
+			if !shouldRetryAIError(errors.New(parsed.Error), attempt, attempts) {
+				return chatResponse{}, errors.New(parsed.Error)
+			}
+			debugLogf("AI request attempt %d/%d returned model error: %s", attempt, attempts, parsed.Error)
+			if err := sleepWithContext(ctx, backoffDelay(attempt, baseDelay, maxDelay)); err != nil {
+				return chatResponse{}, err
+			}
+			continue
+		}
+
+		return parsed, nil
 	}
 
-	client := newHTTPClient(aiTimeout())
-	resp, err := client.Do(req)
-	if err != nil {
-		return chatResponse{}, err
-	}
-	defer resp.Body.Close()
+	return chatResponse{}, errors.New("AI request failed after retries")
+}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return chatResponse{}, err
+func shouldRetryAIError(err error, attempt, maxAttempts int) bool {
+	if attempt >= maxAttempts {
+		return false
 	}
-	debugLogf("AI response: status=%d body=%s", resp.StatusCode, string(body))
-
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return chatResponse{}, chatStatusError{StatusCode: resp.StatusCode, Body: string(body)}
+	if err == nil {
+		return false
 	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "timeout") || strings.Contains(msg, "temporarily unavailable") || strings.Contains(msg, "busy") || strings.Contains(msg, "connection") || strings.Contains(msg, "EOF") || strings.Contains(msg, "reset") || strings.Contains(msg, "refused")
+}
 
-	var parsed chatResponse
-	if err := json.Unmarshal(body, &parsed); err != nil {
-		return chatResponse{}, err
+func shouldRetryStatusCode(statusCode, attempt, maxAttempts int) bool {
+	if attempt >= maxAttempts {
+		return false
 	}
-
-	if parsed.Error != "" {
-		return chatResponse{}, errors.New(parsed.Error)
+	switch statusCode {
+	case http.StatusTooManyRequests, http.StatusRequestTimeout, http.StatusConflict, http.StatusServiceUnavailable, http.StatusGatewayTimeout, http.StatusBadGateway, http.StatusInternalServerError:
+		return true
+	default:
+		return false
 	}
+}
 
-	return parsed, nil
+func backoffDelay(attempt int, base, max time.Duration) time.Duration {
+	if attempt <= 1 || base <= 0 {
+		return 0
+	}
+	const maxDuration = time.Duration(1<<63 - 1)
+	delay := base
+	for step := 2; step < attempt; step++ {
+		if max > 0 && delay >= max {
+			return max
+		}
+		if delay > maxDuration/2 {
+			if max > 0 {
+				return max
+			}
+			return maxDuration
+		}
+		delay *= 2
+	}
+	if max > 0 && delay > max {
+		return max
+	}
+	return delay
+}
+
+func sleepWithContext(ctx context.Context, delay time.Duration) error {
+	if delay <= 0 {
+		return nil
+	}
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-time.After(delay):
+		return nil
+	}
 }

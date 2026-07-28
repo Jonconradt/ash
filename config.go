@@ -281,6 +281,36 @@ func aiTimeout() time.Duration {
 	return defaultAITimeout
 }
 
+// retryMaxAttempts returns the computed value for this helper.
+func retryMaxAttempts() int {
+	if raw := strings.TrimSpace(os.Getenv("ASH_RETRY_MAX_ATTEMPTS")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			return parsed
+		}
+	}
+	return defaultRetryMaxAttempts
+}
+
+// retryBaseDelay returns the computed value for this helper.
+func retryBaseDelay() time.Duration {
+	if raw := strings.TrimSpace(os.Getenv("ASH_RETRY_BASE_DELAY")); raw != "" {
+		if parsed, err := time.ParseDuration(raw); err == nil && parsed >= 0 {
+			return parsed
+		}
+	}
+	return defaultRetryBaseDelay
+}
+
+// retryMaxDelay returns the computed value for this helper.
+func retryMaxDelay() time.Duration {
+	if raw := strings.TrimSpace(os.Getenv("ASH_RETRY_MAX_DELAY")); raw != "" {
+		if parsed, err := time.ParseDuration(raw); err == nil && parsed >= 0 {
+			return parsed
+		}
+	}
+	return defaultRetryMaxDelay
+}
+
 // toolTimeout returns the computed value for this helper.
 func toolTimeout() time.Duration {
 	if raw := strings.TrimSpace(os.Getenv("ASH_TOOL_TIMEOUT")); raw != "" {

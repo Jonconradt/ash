@@ -23,6 +23,13 @@ jobs:
       - name: Run quality checks
         run: make lint test
 
+      - name: Generate SBOM
+        uses: anchore/sbom-action@v0.17.2
+        with:
+          path: .
+          format: spdx-json
+          output-file: dist/sbom.spdx.json
+
   package-macos:
     runs-on: macos-14
     needs: quality

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -22,8 +23,74 @@ import (
 	"github.com/charmbracelet/glamour"
 )
 
+type stubToolShim struct {
+	tools []toolDefinition
+}
+
+func (s stubToolShim) ListTools() []toolDefinition { return s.tools }
+func (s stubToolShim) CallTool(ctx context.Context, name string, args map[string]any) string {
+	return `{"ok":true,"command":"` + name + `","exit_code":0,"stdout":"ok"}`
+}
+
 func testAIConfig(baseURL, model string) aiConfig {
 	return aiConfig{BaseURL: baseURL, Model: model, HistoryKey: baseURL + "/" + model}
+}
+
+func TestChatRetriesTransientFailures(t *testing.T) {
+	var attempts atomic.Int32
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch attempts.Add(1) {
+		case 1, 2:
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte(`{"error":"busy"}`))
+		default:
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"message":{"role":"assistant","content":"ok"}}`))
+		}
+	}))
+	defer srv.Close()
+
+	t.Setenv("AI_ENDPOINT", srv.URL)
+	t.Setenv("AI_MODEL", "test-model")
+	t.Setenv("ASH_RETRY_MAX_ATTEMPTS", "3")
+	t.Setenv("ASH_RETRY_BASE_DELAY", "0s")
+	t.Setenv("ASH_RETRY_MAX_DELAY", "0s")
+
+	cfg := aiConfig{BaseURL: srv.URL, Model: "test-model", HistoryKey: srv.URL + "/test-model"}
+	resp, err := chat(context.Background(), cfg, []message{{Role: "user", Content: "hi"}}, nil)
+	if err != nil {
+		t.Fatalf("chat returned error: %v", err)
+	}
+	if got := attempts.Load(); got != 3 {
+		t.Fatalf("expected 3 attempts, got %d", got)
+	}
+	if resp.Message.Content != "ok" {
+		t.Fatalf("expected assistant content ok, got %q", resp.Message.Content)
+	}
+}
+
+func TestBackoffDelay(t *testing.T) {
+	tests := []struct {
+		name    string
+		attempt int
+		base    time.Duration
+		max     time.Duration
+		want    time.Duration
+	}{
+		{name: "first attempt has no delay", attempt: 1, base: time.Second, max: 0, want: 0},
+		{name: "second attempt uses base delay", attempt: 2, base: time.Second, max: 0, want: time.Second},
+		{name: "third attempt doubles base delay", attempt: 3, base: time.Second, max: 0, want: 2 * time.Second},
+		{name: "delay clamps to max", attempt: 10, base: time.Second, max: 5 * time.Second, want: 5 * time.Second},
+		{name: "large attempt count still clamps to max", attempt: 1000, base: time.Second, max: 30 * time.Second, want: 30 * time.Second},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := backoffDelay(tt.attempt, tt.base, tt.max); got != tt.want {
+				t.Fatalf("backoffDelay(%d, %v, %v) = %v, want %v", tt.attempt, tt.base, tt.max, got, tt.want)
+			}
+		})
+	}
 }
 
 func TestParseAIConfigFromEnv(t *testing.T) {
@@ -304,6 +371,136 @@ func TestReadSystemPromptExpandsUname(t *testing.T) {
 	if prompt != want {
 		t.Fatalf("expanded prompt mismatch: got %q want %q", prompt, want)
 	}
+}
+
+func TestToolExecutionAndWorkspaceHelpers(t *testing.T) {
+	t.Run("sanitizeJSONError and blocked argument", func(t *testing.T) {
+		if got := sanitizeJSONError("line\n\"quoted\""); got != "line 'quoted'" {
+			t.Fatalf("unexpected sanitized output: %q", got)
+		}
+		if !isBlockedArgument("a && b") {
+			t.Fatalf("expected blocking pattern to match")
+		}
+	})
+
+	t.Run("runToolCommand uses exit errors and timeouts", func(t *testing.T) {
+		ctx := context.Background()
+		result := runToolCommand(ctx, "sh", []string{"-c", "exit 3"}, time.Second, 128)
+		if result.OK || result.ExitCode != 3 {
+			t.Fatalf("expected exit code 3, got %+v", result)
+		}
+
+		result = runToolCommand(ctx, "sh", []string{"-c", "sleep 0.2"}, 10*time.Millisecond, 128)
+		if result.OK || result.ExitCode != -1 || !strings.Contains(result.Error, "status") && !strings.Contains(result.Error, "timed out") {
+			t.Fatalf("expected command failure, got %+v", result)
+		}
+	})
+
+	t.Run("workspace inventory and path resolution", func(t *testing.T) {
+		root := t.TempDir()
+		if err := os.MkdirAll(root, 0o700); err != nil {
+			t.Fatalf("mkdir root: %v", err)
+		}
+		if err := updateWorkspaceInventory(root, "notes.txt", "scratch"); err != nil {
+			t.Fatalf("update inventory: %v", err)
+		}
+		content, err := os.ReadFile(filepath.Join(root, inventoryFileName))
+		if err != nil {
+			t.Fatalf("read inventory: %v", err)
+		}
+		if !strings.Contains(string(content), "notes.txt | scratch") {
+			t.Fatalf("inventory content mismatch: %q", string(content))
+		}
+
+		abs, rel, err := resolveWorkspacePath(root, "subdir/../file.txt")
+		if err != nil {
+			t.Fatalf("resolve path: %v", err)
+		}
+		if rel != "file.txt" {
+			t.Fatalf("unexpected relative path: %q", rel)
+		}
+		if abs != filepath.Join(root, "file.txt") {
+			t.Fatalf("unexpected absolute path: %q", abs)
+		}
+	})
+
+	t.Run("future schedule parsing", func(t *testing.T) {
+		now := time.Date(2026, time.July, 28, 12, 0, 0, 0, time.UTC)
+		parsed, err := parseFutureScheduleTime("now + 5 minutes", now)
+		if err != nil {
+			t.Fatalf("parse future schedule: %v", err)
+		}
+		if parsed.Sub(now) != 5*time.Minute {
+			t.Fatalf("unexpected parsed time: %v", parsed)
+		}
+	})
+}
+
+func TestToolLoopAndSchedulingBranches(t *testing.T) {
+	t.Run("task progression and stall handling", func(t *testing.T) {
+		tasks := []executionTask{{ID: 1, Goal: "one", Status: taskStatusPending}, {ID: 2, Goal: "two", Status: taskStatusPending}}
+		promoteNextPendingTask(tasks)
+		if tasks[0].Status != taskStatusRunning {
+			t.Fatalf("expected first task to become running")
+		}
+		applyToolObservationToTasks(tasks, toolObservation{OK: true, Summary: "done"})
+		if tasks[0].Status != taskStatusDone {
+			t.Fatalf("expected first task to be done")
+		}
+		if !hasPendingExecutionTasks(tasks) {
+			t.Fatalf("expected second task to remain pending")
+		}
+	})
+
+	t.Run("tool loop retries execution-style prompts", func(t *testing.T) {
+		stub := stubToolShim{tools: []toolDefinition{{Type: "function", Function: toolFunctionDefinition{Name: "run_unix_command"}}}}
+		messages := []message{{Role: "user", Content: "please run this command"}}
+		aiCfg := testAIConfig("http://example.test", "model")
+		calls := 0
+		chatStub := func(ctx context.Context, cfg aiConfig, msgs []message, tools []toolDefinition) (chatResponse, error) {
+			calls++
+			if calls == 1 {
+				return chatResponse{Message: message{Role: "assistant", Content: "I can help"}}, nil
+			}
+			return chatResponse{Message: message{Role: "assistant", Content: "done"}}, nil
+		}
+		origChat := chatExecutor
+		chatExecutor = chatStub
+		defer func() { chatExecutor = origChat }()
+		got, _, err := runToolLoop(context.Background(), aiCfg, "please run this command", messages, stub)
+		if err != nil {
+			t.Fatalf("runToolLoop returned error: %v", err)
+		}
+		if got != "I can help" {
+			t.Fatalf("unexpected result: %q", got)
+		}
+		if calls != 1 {
+			t.Fatalf("expected the forced retry path to stop after the first turn, got %d calls", calls)
+		}
+	})
+
+	t.Run("scheduling helpers", func(t *testing.T) {
+		meta, line, err := buildRecurringJobLine("echo hi", "@daily", "/tmp", "test", "")
+		if err != nil {
+			t.Fatalf("buildRecurringJobLine error: %v", err)
+		}
+		if meta.ID == "" || !strings.Contains(line, jobMarkerPrefix) {
+			t.Fatalf("unexpected recurring job line: %q", line)
+		}
+
+		payload, err := json.Marshal(recurringJobMetadata{ID: "job-1", Cron: "@daily", Prompt: "echo hi", Cwd: "/tmp", Env: map[string]string{"PATH": "/usr/bin"}, Purpose: "test", CreatedAt: time.Now().Format(time.RFC3339)})
+		if err != nil {
+			t.Fatalf("marshal metadata: %v", err)
+		}
+		encoded := base64.RawStdEncoding.EncodeToString(payload)
+		records, err := parseRecurringJobs("@daily /bin/sh # ash:job job-1 " + encoded)
+		if err != nil {
+			t.Fatalf("parseRecurringJobs error: %v", err)
+		}
+		if len(records) != 1 || records[0].Meta.ID != "job-1" {
+			t.Fatalf("expected one recurring job record, got %#v", records)
+		}
+	})
 }
 
 func TestReadSystemPromptErrors(t *testing.T) {

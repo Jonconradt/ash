@@ -78,7 +78,16 @@ var (
 	pickCloudServer500Message           = randomCloudServer500Message
 	debugWriter               io.Writer = os.Stderr
 	debugJSONLogging          bool
+	requestIDGenerator        func() string
 )
+
+func init() {
+	requestIDGenerator = func() string {
+		buf := make([]byte, 8)
+		_, _ = rand.Read(buf)
+		return hex.EncodeToString(buf)
+	}
+}
 
 // verboseLoggingEnabled returns the computed value for this helper.
 func verboseLoggingEnabled() bool {
@@ -134,11 +143,13 @@ func debugLogf(format string, args ...any) {
 	if debugWriter == nil {
 		return
 	}
+	message := fmt.Sprintf(format, args...)
 	if debugJSONLogging {
 		record := map[string]any{
-			"time":    timeNow().UTC().Format(time.RFC3339Nano),
-			"level":   "debug",
-			"message": fmt.Sprintf(format, args...),
+			"time":       timeNow().UTC().Format(time.RFC3339Nano),
+			"level":      "debug",
+			"message":    message,
+			"request_id": requestIDGenerator(),
 		}
 		encoded, err := json.Marshal(record)
 		if err != nil {
@@ -148,7 +159,7 @@ func debugLogf(format string, args ...any) {
 		_, _ = debugWriter.Write(append(encoded, '\n'))
 		return
 	}
-	_, _ = fmt.Fprintf(debugWriter, "[ash-debug] "+format+"\n", args...)
+	_, _ = fmt.Fprintf(debugWriter, "[ash-debug] %s\n", message)
 }
 
 type rotatingSchedulerLogWriter struct {

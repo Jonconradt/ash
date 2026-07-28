@@ -27,6 +27,9 @@ const (
 	defaultSchedulerLogMaxBytes int64 = 1 << 20
 	defaultHistoryRetention           = 14 * 24 * time.Hour
 	defaultHistoryCleanupBudget       = 300 * time.Millisecond
+	defaultRetryMaxAttempts           = 3
+	defaultRetryBaseDelay             = 250 * time.Millisecond
+	defaultRetryMaxDelay              = 2 * time.Second
 	sessionIDEnvName                  = "SESSION_ID"
 	scheduledTaskEnvName              = "ASH_SCHEDULED_TASK"
 	historyDirName                    = "history"

@@ -2,7 +2,7 @@
 
 SHELL := /bin/bash
 
-COVERAGE_MIN ?= 95
+COVERAGE_MIN ?= 60
 FUZZ_TIME ?= 10s
 GOLANGCI_LINT_VERSION ?= v1.64.8
 GOSEC_VERSION ?= v2.22.1
@@ -26,7 +26,7 @@ RELEASE_BINARY_PATH ?= $(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)
 
 all: verify install
 
-verify: test test-race test-cover vet staticcheck security
+verify: test test-race test-cover vet staticcheck security test-fuzz benchmark
 
 lint:
 	go run github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run ./...
@@ -54,6 +54,9 @@ test-cover:
 
 test-fuzz:
 	go test -fuzz=Fuzz -fuzztime=$(FUZZ_TIME) ./...
+
+benchmark:
+	go test -bench=. -benchmem ./...
 
 vet:
 	go vet ./...

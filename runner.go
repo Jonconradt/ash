@@ -8,6 +8,8 @@ import (
 	"strings"
 )
 
+var chatExecutor = chat
+
 type executionTask struct {
 	ID     int
 	Goal   string
@@ -49,7 +51,7 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 			roundMessages = append(roundMessages[:insertAt], append([]message{stateMessage}, roundMessages[insertAt:]...)...)
 		}
 
-		response, err := chat(ctx, aiCfg, roundMessages, tools)
+		response, err := chatExecutor(ctx, aiCfg, roundMessages, tools)
 		if err != nil {
 			return "", nil, err
 		}
