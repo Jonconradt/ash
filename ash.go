@@ -107,6 +107,7 @@ type chatStatusError struct {
 	Body       string
 }
 
+// Error returns the error message.
 func (e chatStatusError) Error() string {
 	return fmt.Sprintf("status %d: %s", e.StatusCode, strings.TrimSpace(e.Body))
 }
@@ -269,6 +270,7 @@ var cloudServer500Messages = []string{
 	"The server took a wrong turn at runtime. Please retry shortly.",
 }
 
+// randomCloudBusy503Message returns the computed value for this helper.
 func randomCloudBusy503Message() string {
 	if len(cloudBusy503Messages) == 0 {
 		return "The cloud model is distracted and too busy right now. Please try again shortly."
@@ -277,6 +279,7 @@ func randomCloudBusy503Message() string {
 	return cloudBusy503Messages[idx]
 }
 
+// randomCloudServer500Message returns the computed value for this helper.
 func randomCloudServer500Message() string {
 	if len(cloudServer500Messages) == 0 {
 		return "The server hit an internal error. Please try again shortly."
@@ -285,10 +288,12 @@ func randomCloudServer500Message() string {
 	return cloudServer500Messages[idx]
 }
 
+// main is the program entry point.
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
 
+// run runs the requested operation.
 func run(args []string, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
 		printUsage(stderr)
@@ -405,11 +410,13 @@ func run(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
+// printUsage returns the computed value for this helper.
 func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "usage: ash <text>")
 	fmt.Fprintln(w, "       ash install [--shell bash|zsh] [--dry-run]")
 }
 
+// runInstall runs the requested operation.
 func runInstall(args []string, stdout, stderr io.Writer) int {
 	shellName, dryRun, err := parseInstallArgs(args)
 	if err != nil {
@@ -530,6 +537,7 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
+// maybeConfigureInstallEnv returns the computed value for this helper.
 func maybeConfigureInstallEnv(stdout, stderr io.Writer, dryRun bool) error {
 	if dryRun {
 		return nil
@@ -567,6 +575,7 @@ func maybeConfigureInstallEnv(stdout, stderr io.Writer, dryRun bool) error {
 	return nil
 }
 
+// shouldConfigureInstallEnv reports whether the condition is true.
 func shouldConfigureInstallEnv() (bool, error) {
 	if hasRequiredInstallEnvValues() {
 		return false, nil
@@ -586,6 +595,7 @@ func shouldConfigureInstallEnv() (bool, error) {
 	}
 }
 
+// hasRequiredInstallEnvValues reports whether the condition is true.
 func hasRequiredInstallEnvValues() bool {
 	endpoint := strings.TrimSpace(os.Getenv(aiEnvEndpoint))
 	if endpoint == "" {
@@ -611,6 +621,7 @@ func hasRequiredInstallEnvValues() bool {
 	return authType == "bearer" && authToken != ""
 }
 
+// shouldPromptInstallEnv reports whether the condition is true.
 func shouldPromptInstallEnv() bool {
 	if runningInCI() {
 		return false
@@ -626,6 +637,7 @@ func shouldPromptInstallEnv() bool {
 	return (stdinInfo.Mode()&os.ModeCharDevice != 0) && (stdoutInfo.Mode()&os.ModeCharDevice != 0)
 }
 
+// runningInCI runs the requested operation.
 func runningInCI() bool {
 	for _, key := range []string{"CI", "GITHUB_ACTIONS", "BUILD_BUILDID", "JENKINS_URL", "BUILDKITE"} {
 		if strings.TrimSpace(os.Getenv(key)) != "" {
@@ -635,6 +647,7 @@ func runningInCI() bool {
 	return false
 }
 
+// ashEnvFilePath returns the computed value for this helper.
 func ashEnvFilePath() (string, error) {
 	root, err := ashWorkspaceDir()
 	if err != nil {
@@ -643,6 +656,7 @@ func ashEnvFilePath() (string, error) {
 	return filepath.Join(root, ".ash_env"), nil
 }
 
+// promptInstallEnvValues prompts for and returns user input.
 func promptInstallEnvValues(reader *bufio.Reader, stdout, stderr io.Writer) (map[string]string, error) {
 	fmt.Fprintln(stdout, "Configure ash environment values")
 	endpoint, err := promptEndpointWithPresets(reader, stdout)
@@ -693,6 +707,7 @@ func promptInstallEnvValues(reader *bufio.Reader, stdout, stderr io.Writer) (map
 	return values, nil
 }
 
+// promptEndpointWithPresets prompts for and returns user input.
 func promptEndpointWithPresets(reader *bufio.Reader, stdout io.Writer) (string, error) {
 	fmt.Fprintln(stdout, "Select AI endpoint preset or enter a custom URL:")
 	for i, preset := range installEndpointPresets {
@@ -721,6 +736,7 @@ func promptEndpointWithPresets(reader *bufio.Reader, stdout io.Writer) (string, 
 	}
 }
 
+// promptNonEmpty prompts for and returns user input.
 func promptNonEmpty(reader *bufio.Reader, stdout io.Writer, key string) (string, error) {
 	for {
 		fmt.Fprintf(stdout, "%s: ", key)
@@ -735,6 +751,7 @@ func promptNonEmpty(reader *bufio.Reader, stdout io.Writer, key string) (string,
 	}
 }
 
+// promptOptional prompts for and returns user input.
 func promptOptional(reader *bufio.Reader, stdout io.Writer, key string) (string, error) {
 	fmt.Fprintf(stdout, "%s: ", key)
 	line, err := reader.ReadString('\n')
@@ -744,6 +761,7 @@ func promptOptional(reader *bufio.Reader, stdout io.Writer, key string) (string,
 	return strings.TrimSpace(line), nil
 }
 
+// buildManagedAshEnv builds and returns a derived value.
 func buildManagedAshEnv(values map[string]string) string {
 	keys := make([]string, 0, len(values))
 	for key := range values {
@@ -759,6 +777,7 @@ func buildManagedAshEnv(values map[string]string) string {
 	return b.String()
 }
 
+// finalizeInstallWorkspace returns the computed value for this helper.
 func finalizeInstallWorkspace() error {
 	if err := syncCanonicalConfigFilesFromCWD(); err != nil {
 		return err
@@ -769,6 +788,7 @@ func finalizeInstallWorkspace() error {
 	return nil
 }
 
+// syncCanonicalConfigFilesFromCWD returns the computed value for this helper.
 func syncCanonicalConfigFilesFromCWD() error {
 	root, err := ashWorkspaceDir()
 	if err != nil {
@@ -801,6 +821,7 @@ func syncCanonicalConfigFilesFromCWD() error {
 	return nil
 }
 
+// hardenAshWorkspacePermissions returns the computed value for this helper.
 func hardenAshWorkspacePermissions() error {
 	root, err := ashWorkspaceDir()
 	if err != nil {
@@ -840,6 +861,7 @@ func hardenAshWorkspacePermissions() error {
 	})
 }
 
+// parseInstallArgs parses and validates input values.
 func parseInstallArgs(args []string) (shellName string, dryRun bool, err error) {
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -858,6 +880,7 @@ func parseInstallArgs(args []string) (shellName string, dryRun bool, err error) 
 	return shellName, dryRun, nil
 }
 
+// detectShellName detects and returns the matching shell name.
 func detectShellName(shellPath string) string {
 	base := strings.TrimSpace(filepath.Base(shellPath))
 	switch base {
@@ -868,6 +891,7 @@ func detectShellName(shellPath string) string {
 	}
 }
 
+// rcPathForShell returns the computed value for this helper.
 func rcPathForShell(shellName string) (string, error) {
 	home, err := osUserHomeDir()
 	if err != nil {
@@ -884,6 +908,7 @@ func rcPathForShell(shellName string) (string, error) {
 	}
 }
 
+// readFileIfExists reads data from the filesystem.
 func readFileIfExists(path string) (string, error) {
 	content, err := osReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -895,6 +920,7 @@ func readFileIfExists(path string) (string, error) {
 	return string(content), nil
 }
 
+// appendInstallBlock appends content and returns the updated result.
 func appendInstallBlock(existing, block string) string {
 	if existing == "" {
 		return block + "\n"
@@ -908,6 +934,7 @@ func appendInstallBlock(existing, block string) string {
 	return updated
 }
 
+// extractManagedInstallBlock extracts the managed block from the provided content.
 func extractManagedInstallBlock(content string) (string, bool) {
 	start := strings.Index(content, installStartMarker)
 	if start < 0 {
@@ -921,6 +948,7 @@ func extractManagedInstallBlock(content string) (string, bool) {
 	return content[start:end], true
 }
 
+// replaceManagedInstallBlock replaces content and returns the updated result.
 func replaceManagedInstallBlock(existing, block string) (string, bool) {
 	start := strings.Index(existing, installStartMarker)
 	if start < 0 {
@@ -950,6 +978,7 @@ func replaceManagedInstallBlock(existing, block string) (string, bool) {
 	return b.String(), true
 }
 
+// installRecommendation returns the computed value for this helper.
 func installRecommendation() (string, error) {
 	shellName := detectShellName(os.Getenv("SHELL"))
 	if shellName == "" {
@@ -987,6 +1016,7 @@ func installRecommendation() (string, error) {
 	return fmt.Sprintf("ash is not installed for %s. Run: ash install --shell %s", shellName, shellName), nil
 }
 
+// bashInstalledViaProfileSourcing returns the computed value for this helper.
 func bashInstalledViaProfileSourcing() (bool, error) {
 	home, err := osUserHomeDir()
 	if err != nil {
@@ -1016,6 +1046,7 @@ func bashInstalledViaProfileSourcing() (bool, error) {
 	return true, nil
 }
 
+// installSourceBlockForShell returns the computed value for this helper.
 func installSourceBlockForShell(shellName string) string {
 	scriptName := ""
 	switch shellName {
@@ -1034,6 +1065,7 @@ func installSourceBlockForShell(shellName string) string {
 ` + installEndMarker)
 }
 
+// installShellWrapperPath returns the computed value for this helper.
 func installShellWrapperPath(shellName string) (string, error) {
 	root, err := ashWorkspaceDir()
 	if err != nil {
@@ -1052,6 +1084,7 @@ func installShellWrapperPath(shellName string) (string, error) {
 	return filepath.Join(root, fileName), nil
 }
 
+// ensureInstallShellWrapper ensures required state exists and is up to date.
 func ensureInstallShellWrapper(shellName string, dryRun bool, stdout io.Writer) error {
 	content := installBlockForShell(shellName)
 	if content == "" {
@@ -1073,6 +1106,7 @@ func ensureInstallShellWrapper(shellName string, dryRun bool, stdout io.Writer) 
 	return osWriteFile(path, []byte(content+"\n"), 0o600)
 }
 
+// ensureBashProfileSourcing ensures required state exists and is up to date.
 func ensureBashProfileSourcing(shellName string, dryRun bool, stdout io.Writer) error {
 	if shellName != "bash" {
 		return nil
@@ -1105,6 +1139,7 @@ func ensureBashProfileSourcing(shellName string, dryRun bool, stdout io.Writer) 
 	return osWriteFile(profilePath, []byte(updated), 0o600)
 }
 
+// installBlockForShell returns the computed value for this helper.
 func installBlockForShell(shellName string) string {
 	switch shellName {
 	case "bash":
@@ -1434,6 +1469,7 @@ Time()  { _ash_route_or_delegate Time "$@"; }
 	}
 }
 
+// runToolLoop runs the requested operation.
 func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages []message, shim mcpToolShim) (string, []message, error) {
 	maxIters := maxToolIterations()
 	tools := shim.ListTools()
@@ -1531,6 +1567,7 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 	return "", nil, errors.New("unreachable tool loop state")
 }
 
+// shouldForceToolRetry reports whether the condition is true.
 func shouldForceToolRetry(userInput, assistantContent string, tools []toolDefinition) bool {
 	if len(tools) == 0 {
 		return false
@@ -1555,6 +1592,7 @@ func shouldForceToolRetry(userInput, assistantContent string, tools []toolDefini
 	return false
 }
 
+// verboseLoggingEnabled returns the computed value for this helper.
 func verboseLoggingEnabled() bool {
 	raw := strings.ToLower(strings.TrimSpace(os.Getenv("ASH_VERBOSE")))
 	switch raw {
@@ -1565,6 +1603,7 @@ func verboseLoggingEnabled() bool {
 	}
 }
 
+// configureDebugLogging returns the computed value for this helper.
 func configureDebugLogging() {
 	debugWriter = os.Stderr
 	debugJSONLogging = false
@@ -1599,6 +1638,7 @@ func configureDebugLogging() {
 	debugJSONLogging = strings.EqualFold(strings.TrimSpace(os.Getenv("ASH_LOG_FORMAT")), "json")
 }
 
+// debugLogf returns the computed value for this helper.
 func debugLogf(format string, args ...any) {
 	if !verboseLoggingEnabled() {
 		return
@@ -1631,6 +1671,7 @@ type rotatingSchedulerLogWriter struct {
 	size     int64
 }
 
+// newRotatingSchedulerLogWriter returns the computed value for this helper.
 func newRotatingSchedulerLogWriter(path string, maxBytes int64) (*rotatingSchedulerLogWriter, error) {
 	if strings.TrimSpace(path) == "" {
 		return nil, errors.New("log file path must be a non-empty string")
@@ -1648,6 +1689,7 @@ func newRotatingSchedulerLogWriter(path string, maxBytes int64) (*rotatingSchedu
 	return writer, nil
 }
 
+// Write writes data to the current log file, rotating when needed.
 func (w *rotatingSchedulerLogWriter) Write(p []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
@@ -1669,6 +1711,7 @@ func (w *rotatingSchedulerLogWriter) Write(p []byte) (int, error) {
 	return n, err
 }
 
+// openCurrent opens the current log file handle.
 func (w *rotatingSchedulerLogWriter) openCurrent() error {
 	file, err := os.OpenFile(w.path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0o600)
 	if err != nil {
@@ -1687,6 +1730,7 @@ func (w *rotatingSchedulerLogWriter) openCurrent() error {
 	return nil
 }
 
+// rotateCurrent rotates the current log file.
 func (w *rotatingSchedulerLogWriter) rotateCurrent() error {
 	if w.file != nil {
 		_ = w.file.Close()
@@ -1708,6 +1752,7 @@ func (w *rotatingSchedulerLogWriter) rotateCurrent() error {
 	return nil
 }
 
+// marshalForDebug marshals the value for debug logging.
 func marshalForDebug(value any) string {
 	encoded, err := json.Marshal(value)
 	if err != nil {
@@ -1716,6 +1761,7 @@ func marshalForDebug(value any) string {
 	return string(encoded)
 }
 
+// sortedAllowlist returns a sorted copy of the input values.
 func sortedAllowlist(allowlist map[string]struct{}) []string {
 	out := make([]string, 0, len(allowlist))
 	for name := range allowlist {
@@ -1725,6 +1771,7 @@ func sortedAllowlist(allowlist map[string]struct{}) []string {
 	return out
 }
 
+// stripSystemMessage removes the leading system message when present.
 func stripSystemMessage(messages []message) []message {
 	if len(messages) == 0 {
 		return nil
@@ -1735,6 +1782,7 @@ func stripSystemMessage(messages []message) []message {
 	return append([]message(nil), messages...)
 }
 
+// parseAIConfigFromEnv parses and validates input values.
 func parseAIConfigFromEnv() (aiConfig, error) {
 	if legacy := strings.TrimSpace(os.Getenv("AI")); legacy != "" {
 		return aiConfig{}, errors.New("AI is no longer supported; use AI_ENDPOINT and AI_MODEL")
@@ -1788,6 +1836,7 @@ func parseAIConfigFromEnv() (aiConfig, error) {
 	return cfg, nil
 }
 
+// parseAIEndpoint parses and validates input values.
 func parseAIEndpoint(value string) (baseURL string, host string, scheme string, err error) {
 	u, err := url.Parse(value)
 	if err != nil {
@@ -1811,6 +1860,7 @@ func parseAIEndpoint(value string) (baseURL string, host string, scheme string, 
 	return baseURL, host, scheme, nil
 }
 
+// isCloudAIHost reports whether the condition is true.
 func isCloudAIHost(host string) bool {
 	h := strings.TrimSpace(strings.ToLower(host))
 	if h == "localhost" {
@@ -1823,6 +1873,7 @@ func isCloudAIHost(host string) bool {
 	return !ip.IsLoopback()
 }
 
+// readSystemPrompt reads data from the filesystem.
 func readSystemPrompt() (string, error) {
 	if root, err := ashWorkspaceDir(); err == nil {
 		canonicalPath := filepath.Join(root, systemFileName)
@@ -1860,6 +1911,7 @@ func readSystemPrompt() (string, error) {
 	return "", nil
 }
 
+// loadAllowlistedCommands loads data from storage.
 func loadAllowlistedCommands() (map[string]struct{}, error) {
 	if raw := strings.TrimSpace(os.Getenv("ASH_TOOL_ALLOWLIST")); raw != "" {
 		return parseAllowlistCSV(raw), nil
@@ -1901,6 +1953,7 @@ func loadAllowlistedCommands() (map[string]struct{}, error) {
 	return map[string]struct{}{}, nil
 }
 
+// parseAllowlistCSV parses and validates input values.
 func parseAllowlistCSV(raw string) map[string]struct{} {
 	set := map[string]struct{}{}
 	for _, part := range strings.Split(raw, ",") {
@@ -1913,6 +1966,7 @@ func parseAllowlistCSV(raw string) map[string]struct{} {
 	return set
 }
 
+// parseAllowlistFile parses and validates input values.
 func parseAllowlistFile(raw string) map[string]struct{} {
 	set := map[string]struct{}{}
 	for _, line := range strings.Split(raw, "\n") {
@@ -1931,6 +1985,7 @@ func parseAllowlistFile(raw string) map[string]struct{} {
 	return set
 }
 
+// normalizeToolName normalizes and returns the canonical value.
 func normalizeToolName(value string) string {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" || strings.Contains(trimmed, "/") {
@@ -1939,6 +1994,7 @@ func normalizeToolName(value string) string {
 	return trimmed
 }
 
+// expandSystemPrompt returns the computed value for this helper.
 func expandSystemPrompt(prompt string) string {
 	unameValue := ""
 	if _, err := execLookPath("uname"); err == nil {
@@ -1955,6 +2011,7 @@ func expandSystemPrompt(prompt string) string {
 	})
 }
 
+// getHistoryPath returns the computed value for this helper.
 func getHistoryPath() (string, error) {
 	if _, err := ensureSessionID(); err != nil {
 		return "", err
@@ -1982,11 +2039,13 @@ func getHistoryPath() (string, error) {
 	return filepath.Join(historyDir, filename), nil
 }
 
+// isScheduledTaskRun reports whether the condition is true.
 func isScheduledTaskRun() bool {
 	raw := strings.TrimSpace(strings.ToLower(os.Getenv(scheduledTaskEnvName)))
 	return raw == "1" || raw == "true" || raw == "yes"
 }
 
+// cleanupHistoryRetention returns the computed value for this helper.
 func cleanupHistoryRetention(maxAge, budget time.Duration) {
 	if maxAge <= 0 || budget <= 0 {
 		return
@@ -2021,6 +2080,7 @@ func cleanupHistoryRetention(maxAge, budget time.Duration) {
 	}
 }
 
+// loadHistory loads data from storage.
 func loadHistory(path string) (historyData, error) {
 	content, err := osReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -2041,6 +2101,7 @@ func loadHistory(path string) (historyData, error) {
 	return data, nil
 }
 
+// saveHistory saves data to storage.
 func saveHistory(path string, data historyData) error {
 	content, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
@@ -2050,6 +2111,7 @@ func saveHistory(path string, data historyData) error {
 	return osWriteFile(path, content, 0o600)
 }
 
+// historyLimit returns the computed value for this helper.
 func historyLimit() int {
 	if raw := strings.TrimSpace(os.Getenv("ASH_HISTORY_MAX")); raw != "" {
 		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
@@ -2060,6 +2122,7 @@ func historyLimit() int {
 	return defaultHistoryMax
 }
 
+// aiTimeout returns the computed value for this helper.
 func aiTimeout() time.Duration {
 	if raw := strings.TrimSpace(os.Getenv("AI_TIMEOUT")); raw != "" {
 		if parsed, err := time.ParseDuration(raw); err == nil && parsed > 0 {
@@ -2070,6 +2133,7 @@ func aiTimeout() time.Duration {
 	return defaultAITimeout
 }
 
+// toolTimeout returns the computed value for this helper.
 func toolTimeout() time.Duration {
 	if raw := strings.TrimSpace(os.Getenv("ASH_TOOL_TIMEOUT")); raw != "" {
 		if parsed, err := time.ParseDuration(raw); err == nil && parsed > 0 {
@@ -2079,6 +2143,7 @@ func toolTimeout() time.Duration {
 	return defaultToolTimeout
 }
 
+// toolOutputLimit returns the computed value for this helper.
 func toolOutputLimit() int {
 	if raw := strings.TrimSpace(os.Getenv("ASH_TOOL_OUTPUT_MAX")); raw != "" {
 		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
@@ -2088,6 +2153,7 @@ func toolOutputLimit() int {
 	return defaultToolOutputMax
 }
 
+// maxToolIterations returns the computed value for this helper.
 func maxToolIterations() int {
 	if raw := strings.TrimSpace(os.Getenv("ASH_MAX_TOOL_ITERS")); raw != "" {
 		if parsed, err := strconv.Atoi(raw); err == nil && parsed >= 0 {
@@ -2097,6 +2163,7 @@ func maxToolIterations() int {
 	return defaultMaxToolIters
 }
 
+// keepRecentMessages returns the computed value for this helper.
 func keepRecentMessages(messages []message, max int) []message {
 	if len(messages) <= max {
 		return messages
@@ -2105,6 +2172,7 @@ func keepRecentMessages(messages []message, max int) []message {
 	return append([]message(nil), messages[len(messages)-max:]...)
 }
 
+// taskListMax returns the computed value for this helper.
 func taskListMax() int {
 	if raw := strings.TrimSpace(os.Getenv("ASH_TASK_MAX")); raw != "" {
 		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
@@ -2114,6 +2182,7 @@ func taskListMax() int {
 	return defaultTaskMax
 }
 
+// relevanceWindow returns the computed value for this helper.
 func relevanceWindow() int {
 	if raw := strings.TrimSpace(os.Getenv("ASH_RELEVANCE_WINDOW")); raw != "" {
 		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
@@ -2123,6 +2192,7 @@ func relevanceWindow() int {
 	return defaultRelevanceWin
 }
 
+// maxTaskStallRounds returns the computed value for this helper.
 func maxTaskStallRounds() int {
 	if raw := strings.TrimSpace(os.Getenv("ASH_TASK_STALL_ROUNDS")); raw != "" {
 		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
@@ -2132,6 +2202,7 @@ func maxTaskStallRounds() int {
 	return defaultStallRounds
 }
 
+// buildExecutionTasks builds and returns a derived value.
 func buildExecutionTasks(userInput string, max int) []executionTask {
 	normalized := strings.TrimSpace(userInput)
 	if normalized == "" {
@@ -2170,6 +2241,7 @@ func buildExecutionTasks(userInput string, max int) []executionTask {
 	return tasks
 }
 
+// buildExecutionStateMessage builds and returns a derived value.
 func buildExecutionStateMessage(userInput string, tasks []executionTask, observations []toolObservation, window int) message {
 	if window <= 0 {
 		window = defaultRelevanceWin
@@ -2216,6 +2288,7 @@ func buildExecutionStateMessage(userInput string, tasks []executionTask, observa
 	return message{Role: "system", Content: b.String()}
 }
 
+// parseToolObservation parses and validates input values.
 func parseToolObservation(toolResult string) toolObservation {
 	var parsed toolCommandResult
 	if err := json.Unmarshal([]byte(toolResult), &parsed); err != nil {
@@ -2244,6 +2317,7 @@ func parseToolObservation(toolResult string) toolObservation {
 	}
 }
 
+// promoteNextPendingTask returns the computed value for this helper.
 func promoteNextPendingTask(tasks []executionTask) {
 	for i := range tasks {
 		if tasks[i].Status == taskStatusPending {
@@ -2253,6 +2327,7 @@ func promoteNextPendingTask(tasks []executionTask) {
 	}
 }
 
+// applyToolObservationToTasks returns the computed value for this helper.
 func applyToolObservationToTasks(tasks []executionTask, observation toolObservation) {
 	for i := range tasks {
 		if tasks[i].Status != taskStatusPending && tasks[i].Status != taskStatusRunning {
@@ -2268,6 +2343,7 @@ func applyToolObservationToTasks(tasks []executionTask, observation toolObservat
 	}
 }
 
+// hasPendingExecutionTasks reports whether the condition is true.
 func hasPendingExecutionTasks(tasks []executionTask) bool {
 	for _, task := range tasks {
 		if task.Status == taskStatusPending || task.Status == taskStatusRunning {
@@ -2277,6 +2353,7 @@ func hasPendingExecutionTasks(tasks []executionTask) bool {
 	return false
 }
 
+// chat returns the computed value for this helper.
 func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolDefinition) (chatResponse, error) {
 	requestBody := chatRequest{
 		Model:    aiCfg.Model,
@@ -2330,6 +2407,7 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 	return parsed, nil
 }
 
+// ListTools returns the tool definitions exposed by the local shim.
 func (s localToolShim) ListTools() []toolDefinition {
 	runUnixDescription := "Run a single allowlisted Unix executable with direct args and no shell expansion"
 	allowed := sortedAllowlist(s.allowlist)
@@ -2546,6 +2624,7 @@ func (s localToolShim) ListTools() []toolDefinition {
 	}
 }
 
+// CallTool dispatches a tool call to the matching local shim handler.
 func (s localToolShim) CallTool(ctx context.Context, name string, args map[string]any) string {
 	var result toolCommandResult
 
@@ -2576,6 +2655,7 @@ func (s localToolShim) CallTool(ctx context.Context, name string, args map[strin
 	return string(encoded)
 }
 
+// callUnixCommand invokes the underlying tool implementation.
 func (s localToolShim) callUnixCommand(ctx context.Context, args map[string]any) toolCommandResult {
 	commandInput, ok := toStringArg(args["command"])
 	if !ok {
@@ -2614,6 +2694,7 @@ func (s localToolShim) callUnixCommand(ctx context.Context, args map[string]any)
 	return toolCommandRunner(ctx, commandName, argv, toolTimeout(), toolOutputLimit())
 }
 
+// callPython3 invokes the underlying tool implementation.
 func (s localToolShim) callPython3(ctx context.Context, args map[string]any) toolCommandResult {
 	code, ok := toStringArg(args["code"])
 	if !ok || strings.TrimSpace(code) == "" {
@@ -2635,6 +2716,7 @@ func (s localToolShim) callPython3(ctx context.Context, args map[string]any) too
 	return toolCommandRunner(ctx, "python3", pythonArgs, toolTimeout(), toolOutputLimit())
 }
 
+// callScheduleFuturePrompt invokes the underlying tool implementation.
 func (s localToolShim) callScheduleFuturePrompt(ctx context.Context, args map[string]any) toolCommandResult {
 	prompt, ok := toStringArg(args["prompt"])
 	if !ok || strings.TrimSpace(prompt) == "" {
@@ -2675,6 +2757,7 @@ func (s localToolShim) callScheduleFuturePrompt(ctx context.Context, args map[st
 	return result
 }
 
+// callScheduleRecurringPrompt invokes the underlying tool implementation.
 func (s localToolShim) callScheduleRecurringPrompt(ctx context.Context, args map[string]any) toolCommandResult {
 	prompt, ok := toStringArg(args["prompt"])
 	if !ok || strings.TrimSpace(prompt) == "" {
@@ -2717,6 +2800,7 @@ func (s localToolShim) callScheduleRecurringPrompt(ctx context.Context, args map
 	return writeResult
 }
 
+// callManageRecurringJobs invokes the underlying tool implementation.
 func (s localToolShim) callManageRecurringJobs(ctx context.Context, args map[string]any) toolCommandResult {
 	actionRaw, ok := toStringArg(args["action"])
 	if !ok {
@@ -2841,6 +2925,7 @@ func (s localToolShim) callManageRecurringJobs(ctx context.Context, args map[str
 	}
 }
 
+// callReadWorkspaceFile invokes the underlying tool implementation.
 func (s localToolShim) callReadWorkspaceFile(args map[string]any) toolCommandResult {
 	rel, ok := toStringArg(args["path"])
 	if !ok || strings.TrimSpace(rel) == "" {
@@ -2863,6 +2948,7 @@ func (s localToolShim) callReadWorkspaceFile(args map[string]any) toolCommandRes
 	return toolCommandResult{OK: true, Command: "ash_read_workspace_file", ExitCode: 0, Stdout: fmt.Sprintf("path=%s\n%s", relPath, string(content))}
 }
 
+// callWriteWorkspaceFile invokes the underlying tool implementation.
 func (s localToolShim) callWriteWorkspaceFile(args map[string]any) toolCommandResult {
 	rel, ok := toStringArg(args["path"])
 	if !ok || strings.TrimSpace(rel) == "" {
@@ -2902,6 +2988,7 @@ func (s localToolShim) callWriteWorkspaceFile(args map[string]any) toolCommandRe
 	return toolCommandResult{OK: true, Command: "ash_write_workspace_file", ExitCode: 0, Stdout: fmt.Sprintf("wrote %s", relPath)}
 }
 
+// buildSystemPrompt builds and returns a derived value.
 func buildSystemPrompt(userPrompt string, now time.Time) string {
 	header := fmt.Sprintf("Current local datetime: %s", now.Format(time.RFC3339))
 	trimmed := strings.TrimSpace(userPrompt)
@@ -2911,6 +2998,7 @@ func buildSystemPrompt(userPrompt string, now time.Time) string {
 	return header + "\n\n" + trimmed
 }
 
+// schedulerEnvAllowlist returns the computed value for this helper.
 func schedulerEnvAllowlist() map[string]string {
 	keys := []string{
 		aiEnvEndpoint,
@@ -2943,6 +3031,7 @@ func schedulerEnvAllowlist() map[string]string {
 	return out
 }
 
+// schedulerInvocationEnv returns the computed value for this helper.
 func schedulerInvocationEnv() map[string]string {
 	env := schedulerEnvAllowlist()
 	if strings.TrimSpace(env[sessionIDEnvName]) == "" {
@@ -2970,10 +3059,12 @@ func schedulerInvocationEnv() map[string]string {
 	return env
 }
 
+// buildScheduledInvocationScript builds and returns a derived value.
 func buildScheduledInvocationScript(prompt, cwd string) (string, error) {
 	return buildScheduledInvocationScriptWithEnv(prompt, cwd, schedulerInvocationEnv())
 }
 
+// buildScheduledInvocationScriptWithEnv builds and returns a derived value.
 func buildScheduledInvocationScriptWithEnv(prompt, cwd string, env map[string]string) (string, error) {
 	trimmedPrompt := strings.TrimSpace(prompt)
 	if trimmedPrompt == "" {
@@ -3009,6 +3100,7 @@ func buildScheduledInvocationScriptWithEnv(prompt, cwd string, env map[string]st
 	return strings.Join(parts, " && "), nil
 }
 
+// shellQuote returns the computed value for this helper.
 func shellQuote(value string) string {
 	if value == "" {
 		return "''"
@@ -3016,6 +3108,7 @@ func shellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
 }
 
+// schedulerLogFilePath returns the computed value for this helper.
 func schedulerLogFilePath(isScheduledTask bool) (string, error) {
 	sessionID, err := sanitizedSessionIDForLogFile()
 	if err != nil {
@@ -3024,6 +3117,7 @@ func schedulerLogFilePath(isScheduledTask bool) (string, error) {
 	return schedulerLogFilePathForSession(sessionID, isScheduledTask)
 }
 
+// schedulerLogFilePathForSession returns the computed value for this helper.
 func schedulerLogFilePathForSession(sessionID string, isScheduledTask bool) (string, error) {
 	home, err := osUserHomeDir()
 	if err != nil {
@@ -3039,6 +3133,7 @@ func schedulerLogFilePathForSession(sessionID string, isScheduledTask bool) (str
 	return filepath.Join(home, ashWorkspaceDirName, schedulerLogDirName, sanitized+".log"), nil
 }
 
+// sanitizedSessionIDForLogFile returns the computed value for this helper.
 func sanitizedSessionIDForLogFile() (string, error) {
 	raw := strings.TrimSpace(os.Getenv(sessionIDEnvName))
 	if raw == "" {
@@ -3051,6 +3146,7 @@ func sanitizedSessionIDForLogFile() (string, error) {
 	return sanitized, nil
 }
 
+// ensureSessionID ensures required state exists and is up to date.
 func ensureSessionID() (string, error) {
 	if existing, err := sanitizedSessionIDForLogFile(); err == nil {
 		return existing, nil
@@ -3066,6 +3162,7 @@ func ensureSessionID() (string, error) {
 	return generated, nil
 }
 
+// generateSessionID returns the computed value for this helper.
 func generateSessionID() (string, error) {
 	raw := make([]byte, 8)
 	if _, err := rand.Read(raw); err != nil {
@@ -3074,6 +3171,7 @@ func generateSessionID() (string, error) {
 	return hex.EncodeToString(raw), nil
 }
 
+// buildFuturePromptLaunchAgent builds and returns a derived value.
 func buildFuturePromptLaunchAgent(prompt, cwd string, scheduledAt time.Time) (string, string, string, error) {
 	trimmedPrompt := strings.TrimSpace(prompt)
 	if trimmedPrompt == "" {
@@ -3102,6 +3200,7 @@ func buildFuturePromptLaunchAgent(prompt, cwd string, scheduledAt time.Time) (st
 	return label, plistPath, plist, nil
 }
 
+// buildLaunchAgentPlist builds and returns a derived value.
 func buildLaunchAgentPlist(label string, programArgs []string, env map[string]string, cwd string, scheduledAt time.Time) string {
 	envKeys := make([]string, 0, len(env))
 	for key := range env {
@@ -3146,6 +3245,7 @@ func buildLaunchAgentPlist(label string, programArgs []string, env map[string]st
 	return b.String()
 }
 
+// parseFutureScheduleTime parses and validates input values.
 func parseFutureScheduleTime(value string, now time.Time) (time.Time, error) {
 	trimmed := normalizeFutureScheduleTime(value)
 	if trimmed == "" {
@@ -3186,6 +3286,7 @@ func parseFutureScheduleTime(value string, now time.Time) (time.Time, error) {
 	return time.Time{}, errors.New("unsupported when format; use 'now + 5 minutes', 'in 10 minutes', or an RFC3339 timestamp")
 }
 
+// addScheduleOffset returns the computed value for this helper.
 func addScheduleOffset(now time.Time, amount int, unit string) (time.Time, error) {
 	if amount <= 0 {
 		return time.Time{}, errors.New("time offset must be greater than zero")
@@ -3207,6 +3308,7 @@ func addScheduleOffset(now time.Time, amount int, unit string) (time.Time, error
 	}
 }
 
+// xmlEscape returns the computed value for this helper.
 func xmlEscape(value string) string {
 	replacer := strings.NewReplacer(
 		"&", "&amp;",
@@ -3218,6 +3320,7 @@ func xmlEscape(value string) string {
 	return replacer.Replace(value)
 }
 
+// normalizeFutureScheduleTime normalizes and returns the canonical value.
 func normalizeFutureScheduleTime(value string) string {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" {
@@ -3242,6 +3345,7 @@ func normalizeFutureScheduleTime(value string) string {
 	return trimmed
 }
 
+// optionalStringArg returns the computed value for this helper.
 func optionalStringArg(args map[string]any, key string) (string, error) {
 	if _, ok := args[key]; !ok {
 		return "", nil
@@ -3253,6 +3357,7 @@ func optionalStringArg(args map[string]any, key string) (string, error) {
 	return strings.TrimSpace(raw), nil
 }
 
+// validateCronExpr returns the computed value for this helper.
 func validateCronExpr(expr string) error {
 	if strings.TrimSpace(expr) == "" {
 		return errors.New("cron must be a non-empty string")
@@ -3271,6 +3376,7 @@ func validateCronExpr(expr string) error {
 	return nil
 }
 
+// buildRecurringJobLine builds and returns a derived value.
 func buildRecurringJobLine(prompt, cronExpr, cwd, purpose, id string) (recurringJobMetadata, string, error) {
 	env := schedulerEnvAllowlist()
 	if strings.TrimSpace(id) == "" {
@@ -3296,6 +3402,7 @@ func buildRecurringJobLine(prompt, cronExpr, cwd, purpose, id string) (recurring
 	return meta, line, nil
 }
 
+// buildRecurringCrontabLine builds and returns a derived value.
 func buildRecurringCrontabLine(meta recurringJobMetadata, script string) (string, error) {
 	payload, err := json.Marshal(meta)
 	if err != nil {
@@ -3305,6 +3412,7 @@ func buildRecurringCrontabLine(meta recurringJobMetadata, script string) (string
 	return fmt.Sprintf("%s %s %s%s %s", meta.Cron, script, jobMarkerPrefix, meta.ID, encoded), nil
 }
 
+// appendCrontabLine appends content and returns the updated result.
 func appendCrontabLine(content, line string) string {
 	trimmed := strings.TrimRight(content, "\n")
 	if trimmed == "" {
@@ -3313,6 +3421,7 @@ func appendCrontabLine(content, line string) string {
 	return trimmed + "\n" + line + "\n"
 }
 
+// parseRecurringJobs parses and validates input values.
 func parseRecurringJobs(content string) ([]recurringJobRecord, error) {
 	lines := strings.Split(content, "\n")
 	records := make([]recurringJobRecord, 0)
@@ -3348,6 +3457,7 @@ func parseRecurringJobs(content string) ([]recurringJobRecord, error) {
 	return records, nil
 }
 
+// findRecurringJob returns the computed value for this helper.
 func findRecurringJob(records []recurringJobRecord, id string) (recurringJobRecord, bool) {
 	for _, rec := range records {
 		if rec.Meta.ID == id {
@@ -3357,6 +3467,7 @@ func findRecurringJob(records []recurringJobRecord, id string) (recurringJobReco
 	return recurringJobRecord{}, false
 }
 
+// removeRecurringJobFromCrontab returns the computed value for this helper.
 func removeRecurringJobFromCrontab(content, id string) (string, bool) {
 	lines := strings.Split(content, "\n")
 	kept := make([]string, 0, len(lines))
@@ -3378,6 +3489,7 @@ func removeRecurringJobFromCrontab(content, id string) (string, bool) {
 	return strings.Join(kept, "\n") + "\n", removed
 }
 
+// replaceRecurringJobLine replaces content and returns the updated result.
 func replaceRecurringJobLine(content, id, replacement string) string {
 	lines := strings.Split(content, "\n")
 	updated := make([]string, 0, len(lines))
@@ -3398,6 +3510,7 @@ func replaceRecurringJobLine(content, id, replacement string) string {
 	return strings.Join(updated, "\n") + "\n"
 }
 
+// loadCurrentCrontab loads data from storage.
 func loadCurrentCrontab(ctx context.Context) (string, error) {
 	result := runToolCommandWithInput(ctx, "crontab", []string{"-l"}, "", defaultCronTimeout, toolOutputLimit())
 	if result.OK {
@@ -3410,10 +3523,12 @@ func loadCurrentCrontab(ctx context.Context) (string, error) {
 	return "", errors.New(strings.TrimSpace(result.Stderr + " " + result.Error))
 }
 
+// writeCrontab writes data to the target destination.
 func writeCrontab(ctx context.Context, content string) toolCommandResult {
 	return runToolCommandWithInput(ctx, "crontab", []string{"-"}, content, defaultCronTimeout, toolOutputLimit())
 }
 
+// runToolCommandWithInput runs the requested operation.
 func runToolCommandWithInput(ctx context.Context, name string, args []string, stdin string, timeout time.Duration, outputMax int) toolCommandResult {
 	commandCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -3456,6 +3571,7 @@ func runToolCommandWithInput(ctx context.Context, name string, args []string, st
 	return result
 }
 
+// ashWorkspaceDir returns the computed value for this helper.
 func ashWorkspaceDir() (string, error) {
 	home, err := osUserHomeDir()
 	if err != nil {
@@ -3464,6 +3580,7 @@ func ashWorkspaceDir() (string, error) {
 	return filepath.Join(home, ashWorkspaceDirName), nil
 }
 
+// resolveWorkspacePath returns the computed value for this helper.
 func resolveWorkspacePath(root, userPath string) (absolute string, rel string, err error) {
 	cleanInput := strings.TrimSpace(userPath)
 	if cleanInput == "" {
@@ -3493,6 +3610,7 @@ func resolveWorkspacePath(root, userPath string) (absolute string, rel string, e
 	return clean, filepath.ToSlash(relPath), nil
 }
 
+// updateWorkspaceInventory returns the computed value for this helper.
 func updateWorkspaceInventory(root, relPath, purpose string) error {
 	if filepath.ToSlash(relPath) == inventoryFileName {
 		return nil
@@ -3537,6 +3655,7 @@ func updateWorkspaceInventory(root, relPath, purpose string) error {
 	return osWriteFile(inventoryPath, []byte(b.String()), 0o600)
 }
 
+// runToolCommand runs the requested operation.
 func runToolCommand(ctx context.Context, name string, args []string, timeout time.Duration, outputMax int) toolCommandResult {
 	commandCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -3578,6 +3697,7 @@ func runToolCommand(ctx context.Context, name string, args []string, timeout tim
 	return result
 }
 
+// truncateForToolOutput truncates output to the configured maximum length.
 func truncateForToolOutput(value string, max int) string {
 	if max <= 0 || len(value) <= max {
 		return value
@@ -3585,6 +3705,7 @@ func truncateForToolOutput(value string, max int) string {
 	return value[:max] + "\n...truncated..."
 }
 
+// toStringArg converts the value to a string argument when possible.
 func toStringArg(value any) (string, bool) {
 	v, ok := value.(string)
 	if !ok {
@@ -3593,6 +3714,7 @@ func toStringArg(value any) (string, bool) {
 	return v, true
 }
 
+// toStringSliceArg converts the value to a string argument when possible.
 func toStringSliceArg(value any) ([]string, error) {
 	if value == nil {
 		return nil, nil
@@ -3618,15 +3740,18 @@ func toStringSliceArg(value any) ([]string, error) {
 	return out, nil
 }
 
+// isBlockedArgument reports whether the condition is true.
 func isBlockedArgument(arg string) bool {
 	return argumentBlockPattern.MatchString(arg)
 }
 
+// sanitizeJSONError returns the computed value for this helper.
 func sanitizeJSONError(value string) string {
 	value = strings.ReplaceAll(value, `"`, `'`)
 	return strings.ReplaceAll(value, "\n", " ")
 }
 
+// startThinkingIndicator starts the thinking indicator and returns a stop function.
 func startThinkingIndicator(w io.Writer) func() {
 	frames := []string{"|", "/", "-", "\\"}
 	done := make(chan struct{})
@@ -3660,6 +3785,7 @@ func startThinkingIndicator(w io.Writer) func() {
 	}
 }
 
+// renderMarkdownWithGlamour renders markdown using terminal styling.
 func renderMarkdownWithGlamour(markdown string) (string, error) {
 	renderer, err := newTermRenderer(
 		glamour.WithAutoStyle(),
@@ -3672,6 +3798,7 @@ func renderMarkdownWithGlamour(markdown string) (string, error) {
 	return renderer.Render(markdown)
 }
 
+// formatAssistantOutput formats assistant output for display.
 func formatAssistantOutput(raw string) string {
 	rendered, err := markdownRenderer(raw)
 	if err != nil {
@@ -3681,6 +3808,7 @@ func formatAssistantOutput(raw string) string {
 	return ensureSingleTrailingNewline(rendered)
 }
 
+// ensureSingleTrailingNewline ensures required state exists and is up to date.
 func ensureSingleTrailingNewline(value string) string {
 	trimmed := strings.TrimRight(value, "\n")
 	return trimmed + "\n"
