@@ -208,7 +208,7 @@ func (s localToolShim) CallTool(ctx context.Context, name string, args map[strin
 	case "ash_write_workspace_file":
 		result = s.callWriteWorkspaceFile(args)
 	default:
-		result = toolCommandResult{OK: false, Error: fmt.Sprintf("unknown tool: %s", name)}
+		result = toolCommandResult{OK: false, Error: fmt.Sprintf("unknown tool: %s", name), EID: "Ryr9hU7l"}
 	}
 
 	encoded, err := json.Marshal(result)
@@ -223,12 +223,12 @@ func (s localToolShim) CallTool(ctx context.Context, name string, args map[strin
 func (s localToolShim) callUnixCommand(ctx context.Context, args map[string]any) toolCommandResult {
 	commandInput, ok := toStringArg(args["command"])
 	if !ok {
-		return toolCommandResult{OK: false, Error: "command must be a string"}
+		return toolCommandResult{OK: false, Error: "command must be a string", EID: "jGDQaWr5"}
 	}
 
 	fields := strings.Fields(commandInput)
 	if len(fields) == 0 {
-		return toolCommandResult{OK: false, Error: "command must be a bare executable name"}
+		return toolCommandResult{OK: false, Error: "command must be a bare executable name", EID: "8Q8QmB9t"}
 	}
 
 	commandName := fields[0]
@@ -236,22 +236,22 @@ func (s localToolShim) callUnixCommand(ctx context.Context, args map[string]any)
 
 	commandName = normalizeToolName(commandName)
 	if commandName == "" {
-		return toolCommandResult{OK: false, Error: "command must be a bare executable name"}
+		return toolCommandResult{OK: false, Error: "command must be a bare executable name", EID: "o3UdEAP7"}
 	}
 
 	if _, allowed := s.allowlist[commandName]; !allowed {
-		return toolCommandResult{OK: false, Command: commandName, Error: "command is not allowlisted"}
+		return toolCommandResult{OK: false, Command: commandName, Error: "command is not allowlisted", EID: "ABLaPipP"}
 	}
 
 	argv, err := toStringSliceArg(args["args"])
 	if err != nil {
-		return toolCommandResult{OK: false, Command: commandName, Error: err.Error()}
+		return toolCommandResult{OK: false, Command: commandName, Error: err.Error(), EID: "8t4jO24H"}
 	}
 	argv = append(inlineArgs, argv...)
 
 	for _, arg := range argv {
 		if isBlockedArgument(arg) {
-			return toolCommandResult{OK: false, Command: commandName, Error: "argument contains blocked shell control pattern"}
+			return toolCommandResult{OK: false, Command: commandName, Error: "argument contains blocked shell control pattern", EID: "nnbIek1C"}
 		}
 	}
 
@@ -262,17 +262,17 @@ func (s localToolShim) callUnixCommand(ctx context.Context, args map[string]any)
 func (s localToolShim) callPython3(ctx context.Context, args map[string]any) toolCommandResult {
 	code, ok := toStringArg(args["code"])
 	if !ok || strings.TrimSpace(code) == "" {
-		return toolCommandResult{OK: false, Command: "python3", Error: "code must be a non-empty string"}
+		return toolCommandResult{OK: false, Command: "python3", Error: "code must be a non-empty string", EID: "GmnCP0Ho"}
 	}
 
 	argv, err := toStringSliceArg(args["argv"])
 	if err != nil {
-		return toolCommandResult{OK: false, Command: "python3", Error: err.Error()}
+		return toolCommandResult{OK: false, Command: "python3", Error: err.Error(), EID: "c6BJjKpr"}
 	}
 
 	for _, arg := range argv {
 		if isBlockedArgument(arg) {
-			return toolCommandResult{OK: false, Command: "python3", Error: "argv contains blocked shell control pattern"}
+			return toolCommandResult{OK: false, Command: "python3", Error: "argv contains blocked shell control pattern", EID: "WT86KNdu"}
 		}
 	}
 
@@ -284,31 +284,31 @@ func (s localToolShim) callPython3(ctx context.Context, args map[string]any) too
 func (s localToolShim) callScheduleFuturePrompt(ctx context.Context, args map[string]any) toolCommandResult {
 	prompt, ok := toStringArg(args["prompt"])
 	if !ok || strings.TrimSpace(prompt) == "" {
-		return toolCommandResult{OK: false, Command: "launchctl", Error: "prompt must be a non-empty string"}
+		return toolCommandResult{OK: false, Command: "launchctl", Error: "prompt must be a non-empty string", EID: "PLVMuQid"}
 	}
 	when, ok := toStringArg(args["when"])
 	if !ok || strings.TrimSpace(when) == "" {
-		return toolCommandResult{OK: false, Command: "launchctl", Error: "when must be a non-empty string"}
+		return toolCommandResult{OK: false, Command: "launchctl", Error: "when must be a non-empty string", EID: "qMF65jqp"}
 	}
 	scheduledAt, err := parseFutureScheduleTime(when, timeNow())
 	if err != nil {
-		return toolCommandResult{OK: false, Command: "launchctl", Error: err.Error()}
+		return toolCommandResult{OK: false, Command: "launchctl", Error: err.Error(), EID: "BYsHkqp5"}
 	}
 
 	cwd, err := optionalStringArg(args, "cwd")
 	if err != nil {
-		return toolCommandResult{OK: false, Command: "launchctl", Error: err.Error()}
+		return toolCommandResult{OK: false, Command: "launchctl", Error: err.Error(), EID: "3qd8ULhl"}
 	}
 
 	label, plistPath, plistContent, err := buildFuturePromptLaunchAgent(prompt, cwd, scheduledAt)
 	if err != nil {
-		return toolCommandResult{OK: false, Command: "launchctl", Error: err.Error()}
+		return toolCommandResult{OK: false, Command: "launchctl", Error: err.Error(), EID: "ldXnrVSd"}
 	}
 	if err := osMkdirAll(filepath.Dir(plistPath), 0o700); err != nil {
-		return toolCommandResult{OK: false, Command: "launchctl", Error: err.Error()}
+		return toolCommandResult{OK: false, Command: "launchctl", Error: err.Error(), EID: "h8wUphkW"}
 	}
 	if err := osWriteFile(plistPath, []byte(plistContent), 0o600); err != nil {
-		return toolCommandResult{OK: false, Command: "launchctl", Error: err.Error()}
+		return toolCommandResult{OK: false, Command: "launchctl", Error: err.Error(), EID: "IN04IUqF"}
 	}
 
 	serviceDomain := fmt.Sprintf("gui/%d", os.Getuid())
@@ -325,35 +325,35 @@ func (s localToolShim) callScheduleFuturePrompt(ctx context.Context, args map[st
 func (s localToolShim) callScheduleRecurringPrompt(ctx context.Context, args map[string]any) toolCommandResult {
 	prompt, ok := toStringArg(args["prompt"])
 	if !ok || strings.TrimSpace(prompt) == "" {
-		return toolCommandResult{OK: false, Command: "crontab", Error: "prompt must be a non-empty string"}
+		return toolCommandResult{OK: false, Command: "crontab", Error: "prompt must be a non-empty string", EID: "isM7Rvej"}
 	}
 
 	cronExpr, ok := toStringArg(args["cron"])
 	if !ok {
-		return toolCommandResult{OK: false, Command: "crontab", Error: "cron must be a string"}
+		return toolCommandResult{OK: false, Command: "crontab", Error: "cron must be a string", EID: "DFyb7D5R"}
 	}
 	cronExpr = strings.TrimSpace(cronExpr)
 	if err := validateCronExpr(cronExpr); err != nil {
-		return toolCommandResult{OK: false, Command: "crontab", Error: err.Error()}
+		return toolCommandResult{OK: false, Command: "crontab", Error: err.Error(), EID: "KYq9yJfj"}
 	}
 
 	cwd, err := optionalStringArg(args, "cwd")
 	if err != nil {
-		return toolCommandResult{OK: false, Command: "crontab", Error: err.Error()}
+		return toolCommandResult{OK: false, Command: "crontab", Error: err.Error(), EID: "Sb3GpJXW"}
 	}
 	purpose, err := optionalStringArg(args, "purpose")
 	if err != nil {
-		return toolCommandResult{OK: false, Command: "crontab", Error: err.Error()}
+		return toolCommandResult{OK: false, Command: "crontab", Error: err.Error(), EID: "Aj2YDiWD"}
 	}
 
 	meta, line, err := buildRecurringJobLine(prompt, cronExpr, cwd, purpose, "")
 	if err != nil {
-		return toolCommandResult{OK: false, Command: "crontab", Error: err.Error()}
+		return toolCommandResult{OK: false, Command: "crontab", Error: err.Error(), EID: "x2NlkF1G"}
 	}
 
 	content, err := loadCurrentCrontab(ctx)
 	if err != nil {
-		return toolCommandResult{OK: false, Command: "crontab -l", Error: err.Error()}
+		return toolCommandResult{OK: false, Command: "crontab -l", Error: err.Error(), EID: "qCyMVGqt"}
 	}
 	updated := appendCrontabLine(content, line)
 	writeResult := writeCrontab(ctx, updated)
@@ -368,17 +368,17 @@ func (s localToolShim) callScheduleRecurringPrompt(ctx context.Context, args map
 func (s localToolShim) callManageRecurringJobs(ctx context.Context, args map[string]any) toolCommandResult {
 	actionRaw, ok := toStringArg(args["action"])
 	if !ok {
-		return toolCommandResult{OK: false, Command: "crontab", Error: "action must be a string"}
+		return toolCommandResult{OK: false, Command: "crontab", Error: "action must be a string", EID: "hFDmBJwy"}
 	}
 	action := strings.ToLower(strings.TrimSpace(actionRaw))
 
 	content, err := loadCurrentCrontab(ctx)
 	if err != nil {
-		return toolCommandResult{OK: false, Command: "crontab -l", Error: err.Error()}
+		return toolCommandResult{OK: false, Command: "crontab -l", Error: err.Error(), EID: "KZSvjnlE"}
 	}
 	records, err := parseRecurringJobs(content)
 	if err != nil {
-		return toolCommandResult{OK: false, Command: "crontab -l", Error: err.Error()}
+		return toolCommandResult{OK: false, Command: "crontab -l", Error: err.Error(), EID: "kpCdXkJ4"}
 	}
 
 	switch action {
@@ -401,7 +401,7 @@ func (s localToolShim) callManageRecurringJobs(ctx context.Context, args map[str
 		}
 		rec, found := findRecurringJob(records, id)
 		if !found {
-			return toolCommandResult{OK: false, Command: "crontab -l", Error: "recurring job id not found"}
+			return toolCommandResult{OK: false, Command: "crontab -l", Error: "recurring job id not found", EID: "vVYTo0QW"}
 		}
 		return toolCommandResult{
 			OK:       true,
@@ -413,11 +413,11 @@ func (s localToolShim) callManageRecurringJobs(ctx context.Context, args map[str
 		id, _ := toStringArg(args["id"])
 		id = strings.TrimSpace(id)
 		if id == "" {
-			return toolCommandResult{OK: false, Command: "crontab", Error: "id is required for cancel"}
+			return toolCommandResult{OK: false, Command: "crontab", Error: "id is required for cancel", EID: "Abfeqr4e"}
 		}
 		updated, removed := removeRecurringJobFromCrontab(content, id)
 		if !removed {
-			return toolCommandResult{OK: false, Command: "crontab", Error: "recurring job id not found"}
+			return toolCommandResult{OK: false, Command: "crontab", Error: "recurring job id not found", EID: "LXmp52fG"}
 		}
 		result := writeCrontab(ctx, updated)
 		if !result.OK {
@@ -429,53 +429,53 @@ func (s localToolShim) callManageRecurringJobs(ctx context.Context, args map[str
 		id, _ := toStringArg(args["id"])
 		id = strings.TrimSpace(id)
 		if id == "" {
-			return toolCommandResult{OK: false, Command: "crontab", Error: "id is required for modify"}
+			return toolCommandResult{OK: false, Command: "crontab", Error: "id is required for modify", EID: "odqZtaW5"}
 		}
 		rec, found := findRecurringJob(records, id)
 		if !found {
-			return toolCommandResult{OK: false, Command: "crontab", Error: "recurring job id not found"}
+			return toolCommandResult{OK: false, Command: "crontab", Error: "recurring job id not found", EID: "QwF0ZRUd"}
 		}
 
 		if cronExpr, ok := args["cron"]; ok {
 			value, ok := cronExpr.(string)
 			if !ok {
-				return toolCommandResult{OK: false, Command: "crontab", Error: "cron must be a string"}
+				return toolCommandResult{OK: false, Command: "crontab", Error: "cron must be a string", EID: "e3j81cyX"}
 			}
 			value = strings.TrimSpace(value)
 			if err := validateCronExpr(value); err != nil {
-				return toolCommandResult{OK: false, Command: "crontab", Error: err.Error()}
+				return toolCommandResult{OK: false, Command: "crontab", Error: err.Error(), EID: "Qzcy0srJ"}
 			}
 			rec.Meta.Cron = value
 		}
 		if prompt, ok := args["prompt"]; ok {
 			value, ok := prompt.(string)
 			if !ok || strings.TrimSpace(value) == "" {
-				return toolCommandResult{OK: false, Command: "crontab", Error: "prompt must be a non-empty string"}
+				return toolCommandResult{OK: false, Command: "crontab", Error: "prompt must be a non-empty string", EID: "Zt8MYi2h"}
 			}
 			rec.Meta.Prompt = strings.TrimSpace(value)
 		}
 		if cwd, ok := args["cwd"]; ok {
 			value, ok := cwd.(string)
 			if !ok {
-				return toolCommandResult{OK: false, Command: "crontab", Error: "cwd must be a string"}
+				return toolCommandResult{OK: false, Command: "crontab", Error: "cwd must be a string", EID: "fPDwlvP0"}
 			}
 			rec.Meta.Cwd = strings.TrimSpace(value)
 		}
 		if purpose, ok := args["purpose"]; ok {
 			value, ok := purpose.(string)
 			if !ok {
-				return toolCommandResult{OK: false, Command: "crontab", Error: "purpose must be a string"}
+				return toolCommandResult{OK: false, Command: "crontab", Error: "purpose must be a string", EID: "LYvpumps"}
 			}
 			rec.Meta.Purpose = strings.TrimSpace(value)
 		}
 
 		script, err := buildScheduledInvocationScriptWithEnv(rec.Meta.Prompt, rec.Meta.Cwd, rec.Meta.Env)
 		if err != nil {
-			return toolCommandResult{OK: false, Command: "crontab", Error: err.Error()}
+			return toolCommandResult{OK: false, Command: "crontab", Error: err.Error(), EID: "yL111oxZ"}
 		}
 		line, err := buildRecurringCrontabLine(rec.Meta, script)
 		if err != nil {
-			return toolCommandResult{OK: false, Command: "crontab", Error: err.Error()}
+			return toolCommandResult{OK: false, Command: "crontab", Error: err.Error(), EID: "0ebHsoMO"}
 		}
 		updated := replaceRecurringJobLine(content, id, line)
 		result := writeCrontab(ctx, updated)
@@ -485,7 +485,7 @@ func (s localToolShim) callManageRecurringJobs(ctx context.Context, args map[str
 		result.Stdout = fmt.Sprintf("modified recurring job id=%s", id)
 		return result
 	default:
-		return toolCommandResult{OK: false, Command: "crontab", Error: "action must be one of list, cancel, modify, explain"}
+		return toolCommandResult{OK: false, Command: "crontab", Error: "action must be one of list, cancel, modify, explain", EID: "UqRfg64F"}
 	}
 }
 
@@ -493,20 +493,20 @@ func (s localToolShim) callManageRecurringJobs(ctx context.Context, args map[str
 func (s localToolShim) callReadWorkspaceFile(args map[string]any) toolCommandResult {
 	rel, ok := toStringArg(args["path"])
 	if !ok || strings.TrimSpace(rel) == "" {
-		return toolCommandResult{OK: false, Command: "ash_read_workspace_file", Error: "path must be a non-empty string"}
+		return toolCommandResult{OK: false, Command: "ash_read_workspace_file", Error: "path must be a non-empty string", EID: "CG1OcnY1"}
 	}
 	root, err := ashWorkspaceDir()
 	if err != nil {
-		return toolCommandResult{OK: false, Command: "ash_read_workspace_file", Error: err.Error()}
+		return toolCommandResult{OK: false, Command: "ash_read_workspace_file", Error: err.Error(), EID: "vf5wMgIA"}
 	}
 	absolutePath, relPath, err := resolveWorkspacePath(root, rel)
 	if err != nil {
-		return toolCommandResult{OK: false, Command: "ash_read_workspace_file", Error: err.Error()}
+		return toolCommandResult{OK: false, Command: "ash_read_workspace_file", Error: err.Error(), EID: "QuI4aNev"}
 	}
 
 	content, err := osReadFile(absolutePath)
 	if err != nil {
-		return toolCommandResult{OK: false, Command: "ash_read_workspace_file", Error: err.Error()}
+		return toolCommandResult{OK: false, Command: "ash_read_workspace_file", Error: err.Error(), EID: "j2lS5Gcq"}
 	}
 
 	return toolCommandResult{OK: true, Command: "ash_read_workspace_file", ExitCode: 0, Stdout: fmt.Sprintf("path=%s\n%s", relPath, string(content))}
@@ -516,37 +516,37 @@ func (s localToolShim) callReadWorkspaceFile(args map[string]any) toolCommandRes
 func (s localToolShim) callWriteWorkspaceFile(args map[string]any) toolCommandResult {
 	rel, ok := toStringArg(args["path"])
 	if !ok || strings.TrimSpace(rel) == "" {
-		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: "path must be a non-empty string"}
+		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: "path must be a non-empty string", EID: "bcrwU2oy"}
 	}
 	content, ok := toStringArg(args["content"])
 	if !ok {
-		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: "content must be a string"}
+		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: "content must be a string", EID: "5UBAdjJm"}
 	}
 	purpose, ok := toStringArg(args["purpose"])
 	if !ok || strings.TrimSpace(purpose) == "" {
-		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: "purpose must be a non-empty string"}
+		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: "purpose must be a non-empty string", EID: "UGCt8jy5"}
 	}
 
 	root, err := ashWorkspaceDir()
 	if err != nil {
-		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: err.Error()}
+		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: err.Error(), EID: "DZWzaDfp"}
 	}
 	if err := osMkdirAll(root, 0o700); err != nil {
-		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: err.Error()}
+		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: err.Error(), EID: "P4ycQbQa"}
 	}
 	absolutePath, relPath, err := resolveWorkspacePath(root, rel)
 	if err != nil {
-		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: err.Error()}
+		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: err.Error(), EID: "2cY8kwX2"}
 	}
 
 	if err := osMkdirAll(filepath.Dir(absolutePath), 0o700); err != nil {
-		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: err.Error()}
+		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: err.Error(), EID: "c8bZZLmn"}
 	}
 	if err := osWriteFile(absolutePath, []byte(content), 0o600); err != nil {
-		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: err.Error()}
+		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: err.Error(), EID: "SJBHjzxh"}
 	}
 	if err := updateWorkspaceInventory(root, relPath, strings.TrimSpace(purpose)); err != nil {
-		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: err.Error()}
+		return toolCommandResult{OK: false, Command: "ash_write_workspace_file", Error: err.Error(), EID: "kUR2qxI1"}
 	}
 
 	return toolCommandResult{OK: true, Command: "ash_write_workspace_file", ExitCode: 0, Stdout: fmt.Sprintf("wrote %s", relPath)}

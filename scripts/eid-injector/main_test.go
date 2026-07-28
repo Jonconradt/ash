@@ -92,6 +92,56 @@ func TestResolveFilesAllModeSkipsTempAndInjectorSource(t *testing.T) {
 	}
 }
 
+func TestResolveFilesRejectsPathTraversalOutsideRoot(t *testing.T) {
+	rootDir := t.TempDir()
+	outsideDir := t.TempDir()
+	outsideFile := filepath.Join(outsideDir, "outside.go")
+	if err := os.WriteFile(outsideFile, []byte("package main\n"), 0o644); err != nil {
+		t.Fatalf("write outside file: %v", err)
+	}
+
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	defer func() { _ = os.Chdir(oldWD) }()
+	if err := os.Chdir(rootDir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+
+	_, err = resolveFiles(false, []string{outsideFile})
+	if err == nil {
+		t.Fatalf("expected traversal path rejection")
+	}
+}
+
+func TestResolveFilesRejectsSymlinkEscapingRoot(t *testing.T) {
+	rootDir := t.TempDir()
+	outsideDir := t.TempDir()
+	outsideFile := filepath.Join(outsideDir, "outside.go")
+	if err := os.WriteFile(outsideFile, []byte("package main\n"), 0o644); err != nil {
+		t.Fatalf("write outside file: %v", err)
+	}
+
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	defer func() { _ = os.Chdir(oldWD) }()
+	if err := os.Chdir(rootDir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+
+	if err := os.Symlink(outsideFile, filepath.Join(rootDir, "linked.go")); err != nil {
+		t.Fatalf("symlink: %v", err)
+	}
+
+	_, err = resolveFiles(false, []string{"linked.go"})
+	if err == nil {
+		t.Fatalf("expected symlink escape rejection")
+	}
+}
+
 func TestBuildPlanReturnsErrNoChangesForUnmodifiedNonAllMode(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "plain.go")

@@ -59,7 +59,7 @@ func TestRunGoldenFailurePromptDirectoryAndExecutables(t *testing.T) {
 		case "find":
 			return toolCommandResult{OK: true, Command: "find -maxdepth 1 -type f -perm -111", ExitCode: 0, Stdout: "./ash\n./scripts/release/next_version.sh\n"}
 		default:
-			return toolCommandResult{OK: false, Command: name, ExitCode: 127, Error: "unexpected command in golden test"}
+			return toolCommandResult{OK: false, Command: name, ExitCode: 127, Error: "unexpected command in golden test", EID: "ekYOiDsB"}
 		}
 	}
 

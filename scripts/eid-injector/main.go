@@ -95,6 +95,15 @@ func main() {
 }
 
 func resolveFiles(allMode bool, args []string) ([]string, error) {
+	rootAbs, err := filepath.Abs(".")
+	if err != nil {
+		return nil, err
+	}
+	rootEval, err := filepath.EvalSymlinks(rootAbs)
+	if err != nil {
+		rootEval = rootAbs
+	}
+
 	//nolint:nestif // Repository walk filters are explicit and bounded.
 	if allMode {
 		files := make([]string, 0, 256)
@@ -117,7 +126,11 @@ func resolveFiles(allMode bool, args []string) ([]string, error) {
 				return nil
 			}
 			if strings.HasSuffix(path, ".go") {
-				files = append(files, path)
+				safePath, err := constrainToRoot(path, rootEval)
+				if err != nil {
+					return err
+				}
+				files = append(files, safePath)
 			}
 			return nil
 		})
@@ -130,14 +143,51 @@ func resolveFiles(allMode bool, args []string) ([]string, error) {
 	files := make([]string, 0, len(args))
 	for _, file := range args {
 		if strings.HasSuffix(file, ".go") {
-			files = append(files, file)
+			safePath, err := constrainToRoot(file, rootEval)
+			if err != nil {
+				return nil, err
+			}
+			files = append(files, safePath)
 		}
 	}
 	return files, nil
 }
 
+func constrainToRoot(path string, root string) (string, error) {
+	if path == "" {
+		return "", fmt.Errorf("empty path")
+	}
+
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+
+	resolvedPath, err := filepath.EvalSymlinks(absPath)
+	if err != nil {
+		resolvedPath = absPath
+	}
+
+	rel, err := filepath.Rel(root, resolvedPath)
+	if err != nil {
+		return "", err
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return "", fmt.Errorf("path escapes repository root: %s", path)
+	}
+
+	info, err := os.Stat(resolvedPath)
+	if err != nil {
+		return "", err
+	}
+	if info.IsDir() {
+		return "", fmt.Errorf("expected file, got directory: %s", path)
+	}
+
+	return resolvedPath, nil
+}
+
 func buildPlan(filename string, allMode bool) (*filePlan, error) {
-	//nolint:gosec // file list is constrained by resolveFiles and repository walk.
 	originalSrc, err := os.ReadFile(filename)
 	if err != nil {
 		return nil, err
