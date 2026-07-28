@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 )
 
@@ -32,16 +33,18 @@ const (
 
 // runToolLoop runs the requested operation.
 func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages []message, shim mcpToolShim) (string, []message, error) {
+	configureDebugLogging()
+
 	maxIters := maxToolIterations()
 	tools := shim.ListTools()
 	tasks := buildExecutionTasks(userInput, taskListMax())
 	observations := make([]toolObservation, 0, 8)
 	stallRounds := 0
 	forcedToolRetryUsed := false
-	debugLogf("Tool loop started: max_iters=%d tools=%d", maxIters, len(tools))
+	slog.Debug("Tool loop started", "request_id", requestIDGenerator(), "max_iters", maxIters, "tools", len(tools), "EID", "kLt1nKGy")
 
 	for i := 0; i <= maxIters; i++ {
-		debugLogf("Tool loop iteration=%d message_count=%d", i+1, len(messages))
+		slog.Debug("Tool loop iteration", "request_id", requestIDGenerator(), "iteration", i+1, "message_count", len(messages), "EID", "K9mhqboH")
 		roundMessages := append([]message{}, messages...)
 		stateMessage := buildExecutionStateMessage(userInput, tasks, observations, relevanceWindow())
 		if len(roundMessages) == 0 {
@@ -72,7 +75,7 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 		messages = append(messages, assistant)
 
 		if len(assistant.ToolCalls) == 0 {
-			debugLogf("Assistant returned no tool calls")
+			slog.Debug("Assistant returned no tool calls", "request_id", requestIDGenerator(), "EID", "lEPk12rd")
 			if hasPendingExecutionTasks(tasks) {
 				stallRounds++
 			} else {
@@ -81,7 +84,7 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 
 			if !forcedToolRetryUsed && shouldForceToolRetry(userInput, assistant.Content, tools) {
 				forcedToolRetryUsed = true
-				debugLogf("Execution-style prompt detected, forcing one retry with tool-use instruction")
+				slog.Debug("Execution-style prompt detected, forcing one retry with tool-use instruction", "request_id", requestIDGenerator(), "EID", "aDx9FvQa")
 				messages = append(messages, message{
 					Role:    "system",
 					Content: "When a user asks to run or execute code/commands and tools are available, call an appropriate tool instead of only explaining.",
@@ -108,9 +111,9 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 		promoteNextPendingTask(tasks)
 		for _, call := range assistant.ToolCalls {
 			toolName := strings.TrimSpace(call.Function.Name)
-			debugLogf("Tool invocation requested: name=%s args=%s", toolName, marshalForDebug(call.Function.Arguments))
+			slog.Debug("Tool invocation requested", "request_id", requestIDGenerator(), "name", toolName, "args", marshalForDebug(call.Function.Arguments), "EID", "iYWCHf8N")
 			toolResult := shim.CallTool(ctx, toolName, call.Function.Arguments)
-			debugLogf("Tool invocation result: name=%s result=%s", toolName, toolResult)
+			slog.Debug("Tool invocation result", "request_id", requestIDGenerator(), "name", toolName, "result", toolResult, "EID", "L6UuVgEs")
 			observation := parseToolObservation(toolResult)
 			if observation.Command == "" {
 				observation.Command = toolName

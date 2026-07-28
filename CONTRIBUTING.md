@@ -8,13 +8,11 @@ Run:
 make lint test
 ```
 
-Run install once to configure repository hooks:
+Run install once to configure the local shell integration:
 
 ```bash
 make install
 ```
-
-The install target sets Git `core.hooksPath` to `githooks`, and the pre-commit hook runs `scripts/eid-injector` on staged `.go` files before each commit.
 
 For a full release-style verification pass, run:
 

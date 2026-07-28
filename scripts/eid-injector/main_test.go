@@ -115,6 +115,29 @@ func TestResolveFilesRejectsPathTraversalOutsideRoot(t *testing.T) {
 	}
 }
 
+func TestBuildPlanRejectsPathTraversalOutsideRoot(t *testing.T) {
+	rootDir := t.TempDir()
+	outsideDir := t.TempDir()
+	outsideFile := filepath.Join(outsideDir, "outside.go")
+	if err := os.WriteFile(outsideFile, []byte("package main\n"), 0o644); err != nil {
+		t.Fatalf("write outside file: %v", err)
+	}
+
+	oldWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	defer func() { _ = os.Chdir(oldWD) }()
+	if err := os.Chdir(rootDir); err != nil {
+		t.Fatalf("chdir: %v", err)
+	}
+
+	_, err = buildPlan(outsideFile, false)
+	if err == nil {
+		t.Fatalf("expected traversal path rejection")
+	}
+}
+
 func TestResolveFilesRejectsSymlinkEscapingRoot(t *testing.T) {
 	rootDir := t.TempDir()
 	outsideDir := t.TempDir()
@@ -247,6 +270,158 @@ func f(message, eid string, err error, attrs []any) {
 	plan, err := buildPlan(file, false)
 	if !errors.Is(err, errNoChanges) {
 		t.Fatalf("expected errNoChanges for existing dynamic EID append spread; plan=%v err=%v", plan, err)
+	}
+}
+
+func TestBuildPlanInjectsEIDForWriteLogfCalls(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "write_logf.go")
+	src := `package main
+
+import "io"
+
+func f(w io.Writer, err error) {
+	writeLogf(w, "", "hello %v", err)
+}
+`
+	if err := os.WriteFile(file, []byte(src), 0o644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	plan, err := buildPlan(file, false)
+	if err != nil {
+		t.Fatalf("buildPlan: %v", err)
+	}
+	if plan == nil || !plan.changed {
+		t.Fatalf("expected changed plan for writeLogf")
+	}
+	if _, err := writePlan(plan); err != nil {
+		t.Fatalf("writePlan: %v", err)
+	}
+
+	out, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatalf("read output: %v", err)
+	}
+	got := string(out)
+	if !regexp.MustCompile(`writeLogf\(w, " \[EID=[A-Za-z0-9]{8}\]", "hello %v", err\)`).MatchString(got) {
+		t.Fatalf("expected writeLogf rewrite with deterministic EID literal, got:\n%s", got)
+	}
+}
+
+func TestBuildPlanInjectsEIDForWriteLogLineCalls(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "write_log_line.go")
+	src := `package main
+
+import "io"
+
+func f(w io.Writer) {
+	writeLogLine(w, "", "hello")
+}
+`
+	if err := os.WriteFile(file, []byte(src), 0o644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	plan, err := buildPlan(file, false)
+	if err != nil {
+		t.Fatalf("buildPlan: %v", err)
+	}
+	if plan == nil || !plan.changed {
+		t.Fatalf("expected changed plan for writeLogLine")
+	}
+	if _, err := writePlan(plan); err != nil {
+		t.Fatalf("writePlan: %v", err)
+	}
+
+	out, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatalf("read output: %v", err)
+	}
+	got := string(out)
+	if !regexp.MustCompile(`writeLogLine\(w, " \[EID=[A-Za-z0-9]{8}\]", "hello"\)`).MatchString(got) {
+		t.Fatalf("expected writeLogLine rewrite with deterministic EID literal, got:\n%s", got)
+	}
+}
+
+func TestBuildPlanInjectsEIDForFmtFprintfCalls(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "fmt_fprintf.go")
+	src := `package main
+
+import (
+	"fmt"
+	"io"
+)
+
+func f(w io.Writer, err error) {
+	fmt.Fprintf(w, "hello %v\n", err)
+}
+`
+	if err := os.WriteFile(file, []byte(src), 0o644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	plan, err := buildPlan(file, false)
+	if err != nil {
+		t.Fatalf("buildPlan: %v", err)
+	}
+	if plan == nil || !plan.changed {
+		t.Fatalf("expected changed plan for fmt.Fprintf")
+	}
+	if _, err := writePlan(plan); err != nil {
+		t.Fatalf("writePlan: %v", err)
+	}
+
+	out, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatalf("read output: %v", err)
+	}
+	got := string(out)
+	re := regexp.MustCompile(`fmt\.Fprintf\(w,\s*"hello %v\\n \[EID=[A-Za-z0-9]{8}\]",\s*err\)`)
+	if !re.MatchString(got) {
+		t.Fatalf("expected fmt.Fprintf rewrite with trailing EID, got:\n%s", got)
+	}
+}
+
+func TestBuildPlanInjectsEIDForFmtFprintlnCalls(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "fmt_fprintln.go")
+	src := `package main
+
+import (
+	"fmt"
+	"os"
+)
+
+func f() {
+	fmt.Fprintln(os.Stderr, "hello")
+}
+`
+	if err := os.WriteFile(file, []byte(src), 0o644); err != nil {
+		t.Fatalf("write file: %v", err)
+	}
+
+	plan, err := buildPlan(file, false)
+	if err != nil {
+		t.Fatalf("buildPlan: %v", err)
+	}
+	if plan == nil || !plan.changed {
+		t.Fatalf("expected changed plan for fmt.Fprintln")
+	}
+	if _, err := writePlan(plan); err != nil {
+		t.Fatalf("writePlan: %v", err)
+	}
+
+	out, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatalf("read output: %v", err)
+	}
+	got := string(out)
+	re := regexp.MustCompile(`fmt\.Fprintln\(os\.Stderr,\s*"hello \[EID=[A-Za-z0-9]{8}\]"\)`)
+	if !re.MatchString(got) {
+		t.Fatalf("expected fmt.Fprintln rewrite with trailing EID, got:\n%s", got)
 	}
 }
 

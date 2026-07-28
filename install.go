@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -34,9 +35,11 @@ var installEndpointPresets = []endpointPreset{
 
 // runInstall runs the requested operation.
 func runInstall(args []string, stdout, stderr io.Writer) int {
+	configureDebugLogging(stderr)
+
 	shellName, dryRun, err := parseInstallArgs(args)
 	if err != nil {
-		fmt.Fprintf(stderr, "install error: %v\n", err)
+		slog.Error(fmt.Sprintf("install error: %v", err), "EID", "EpbG2YtZ")
 		printUsage(stderr)
 		return 1
 	}
@@ -50,27 +53,27 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 
 	rcPath, err := rcPathForShell(shellName)
 	if err != nil {
-		fmt.Fprintf(stderr, "install error: %v\n", err)
+		slog.Error(fmt.Sprintf("install error: %v", err), "EID", "n0lHsTQp")
 		return 1
 	}
 
 	block := installSourceBlockForShell(shellName)
 	if block == "" {
-		fmt.Fprintf(stderr, "install error: unsupported shell %q\n", shellName)
+		slog.Error(fmt.Sprintf("install error: unsupported shell %q", shellName), "EID", "ZIw1nK74")
 		return 1
 	}
 	if err := ensureInstallShellWrapper(shellName, dryRun, stdout); err != nil {
-		fmt.Fprintf(stderr, "install error: %v\n", err)
+		slog.Error(fmt.Sprintf("install error: %v", err), "EID", "RtRyQwEX")
 		return 1
 	}
 	if err := ensureBashProfileSourcing(shellName, dryRun, stdout); err != nil {
-		fmt.Fprintf(stderr, "install error: %v\n", err)
+		slog.Error(fmt.Sprintf("install error: %v", err), "EID", "bnjrQttE")
 		return 1
 	}
 
 	existing, err := readFileIfExists(rcPath)
 	if err != nil {
-		fmt.Fprintf(stderr, "install error: failed to read %s: %v\n", rcPath, err)
+		slog.Error(fmt.Sprintf("install error: failed to read %s: %v", rcPath, err), "EID", "uUVX5Blo")
 		return 1
 	}
 
@@ -78,26 +81,26 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 	if hasManagedBlock {
 		if strings.TrimSpace(existingBlock) == strings.TrimSpace(block) {
 			if err := finalizeInstallWorkspace(); err != nil {
-				fmt.Fprintf(stderr, "install error: %v\n", err)
+				slog.Error(fmt.Sprintf("install error: %v", err), "EID", "Ez8nV4zY")
 				return 1
 			}
 			if err := maybeConfigureInstallEnv(stdout, stderr, dryRun); err != nil {
-				fmt.Fprintf(stderr, "install error: %v\n", err)
+				slog.Error(fmt.Sprintf("install error: %v", err), "EID", "j6SE1V4c")
 				return 1
 			}
-			fmt.Fprintf(stdout, "ash install already present in %s\n", rcPath)
-			fmt.Fprintln(stdout, "synced .ash_system/.ash_tools to ~/.ash when present")
+			fmt.Fprintf(stdout, "ash install already present in %s\n [EID=VMTz0Q9J]", rcPath)
+			fmt.Fprintln(stdout, "synced .ash_system/.ash_tools to ~/.ash when present [EID=C2BX5iWX]")
 			return 0
 		}
 
 		updated, replaced := replaceManagedInstallBlock(existing, block)
 		if !replaced {
-			fmt.Fprintf(stderr, "install error: failed to update managed block in %s\n", rcPath)
+			slog.Error(fmt.Sprintf("install error: failed to update managed block in %s", rcPath), "EID", "qNtX7PSU")
 			return 1
 		}
 
 		if dryRun {
-			fmt.Fprintf(stdout, "[dry-run] would update install block in %s\n", rcPath)
+			fmt.Fprintf(stdout, "[dry-run] would update install block in %s\n [EID=TamndUy2]", rcPath)
 			fmt.Fprint(stdout, block)
 			if !strings.HasSuffix(block, "\n") {
 				fmt.Fprintln(stdout)
@@ -106,27 +109,27 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 		}
 
 		if err := osWriteFile(rcPath, []byte(updated), 0o600); err != nil {
-			fmt.Fprintf(stderr, "install error: failed to write %s: %v\n", rcPath, err)
+			slog.Error(fmt.Sprintf("install error: failed to write %s: %v", rcPath, err), "EID", "J3crjWvv")
 			return 1
 		}
 		if err := finalizeInstallWorkspace(); err != nil {
-			fmt.Fprintf(stderr, "install error: %v\n", err)
+			slog.Error(fmt.Sprintf("install error: %v", err), "EID", "J6UlMz4P")
 			return 1
 		}
 		if err := maybeConfigureInstallEnv(stdout, stderr, dryRun); err != nil {
-			fmt.Fprintf(stderr, "install error: %v\n", err)
+			slog.Error(fmt.Sprintf("install error: %v", err), "EID", "55cquv9b")
 			return 1
 		}
 
-		fmt.Fprintf(stdout, "ash install updated wrappers in %s\n", rcPath)
-		fmt.Fprintln(stdout, "synced .ash_system/.ash_tools to ~/.ash when present")
-		fmt.Fprintln(stdout, "restart your shell or source your rc file to activate wrappers")
+		fmt.Fprintf(stdout, "ash install updated wrappers in %s\n [EID=QWTxkqkR]", rcPath)
+		fmt.Fprintln(stdout, "synced .ash_system/.ash_tools to ~/.ash when present [EID=gL7ivLRV]")
+		fmt.Fprintln(stdout, "restart your shell or source your rc file to activate wrappers [EID=HykFkJhf]")
 		return 0
 	}
 
 	updated := appendInstallBlock(existing, block)
 	if dryRun {
-		fmt.Fprintf(stdout, "[dry-run] would append install block to %s\n", rcPath)
+		fmt.Fprintf(stdout, "[dry-run] would append install block to %s\n [EID=RUV7K3SU]", rcPath)
 		fmt.Fprint(stdout, block)
 		if !strings.HasSuffix(block, "\n") {
 			fmt.Fprintln(stdout)
@@ -135,21 +138,21 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 	}
 
 	if err := osWriteFile(rcPath, []byte(updated), 0o600); err != nil {
-		fmt.Fprintf(stderr, "install error: failed to write %s: %v\n", rcPath, err)
+		slog.Error(fmt.Sprintf("install error: failed to write %s: %v", rcPath, err), "EID", "juoFEIwD")
 		return 1
 	}
 	if err := finalizeInstallWorkspace(); err != nil {
-		fmt.Fprintf(stderr, "install error: %v\n", err)
+		slog.Error(fmt.Sprintf("install error: %v", err), "EID", "SyhbVcO3")
 		return 1
 	}
 	if err := maybeConfigureInstallEnv(stdout, stderr, dryRun); err != nil {
-		fmt.Fprintf(stderr, "install error: %v\n", err)
+		slog.Error(fmt.Sprintf("install error: %v", err), "EID", "BwUzNiql")
 		return 1
 	}
 
-	fmt.Fprintf(stdout, "ash install appended wrappers to %s\n", rcPath)
-	fmt.Fprintln(stdout, "synced .ash_system/.ash_tools to ~/.ash when present")
-	fmt.Fprintln(stdout, "restart your shell or source your rc file to activate wrappers")
+	fmt.Fprintf(stdout, "ash install appended wrappers to %s\n [EID=i18Pw61Q]", rcPath)
+	fmt.Fprintln(stdout, "synced .ash_system/.ash_tools to ~/.ash when present [EID=jicN0CJT]")
+	fmt.Fprintln(stdout, "restart your shell or source your rc file to activate wrappers [EID=z6myqpKQ]")
 	return 0
 }
 
@@ -187,7 +190,7 @@ func maybeConfigureInstallEnv(stdout, stderr io.Writer, dryRun bool) error {
 	if err := osWriteFile(path, []byte(buildManagedAshEnv(values)), 0o600); err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "updated %s\n", path)
+	fmt.Fprintf(stdout, "updated %s\n [EID=NKtm1vW9]", path)
 	return nil
 }
 
@@ -274,7 +277,7 @@ func ashEnvFilePath() (string, error) {
 
 // promptInstallEnvValues collects the AI endpoint and authentication values needed to create a managed ash environment file.
 func promptInstallEnvValues(reader *bufio.Reader, stdout, stderr io.Writer) (map[string]string, error) {
-	fmt.Fprintln(stdout, "Configure ash environment values")
+	fmt.Fprintln(stdout, "Configure ash environment values [EID=t4cPqgSP]")
 	endpoint, err := promptEndpointWithPresets(reader, stdout)
 	if err != nil {
 		return nil, err
@@ -298,7 +301,7 @@ func promptInstallEnvValues(reader *bufio.Reader, stdout, stderr io.Writer) (map
 		if err != nil {
 			return nil, err
 		}
-		fmt.Fprintln(stderr, "selected cloud endpoint; using AI_AUTH_TYPE=bearer")
+		fmt.Fprintln(stderr, "selected cloud endpoint; using AI_AUTH_TYPE=bearer [EID=AZy2ywFW]")
 	} else {
 		optionalToken, promptErr := promptOptional(reader, stdout, aiEnvAuthToken+" (optional for localhost)")
 		if promptErr != nil {
@@ -325,13 +328,13 @@ func promptInstallEnvValues(reader *bufio.Reader, stdout, stderr io.Writer) (map
 
 // promptEndpointWithPresets prompts for an AI endpoint, accepting either a preset choice or a custom URL.
 func promptEndpointWithPresets(reader *bufio.Reader, stdout io.Writer) (string, error) {
-	fmt.Fprintln(stdout, "Select AI endpoint preset or enter a custom URL:")
+	fmt.Fprintln(stdout, "Select AI endpoint preset or enter a custom URL: [EID=7S59VnAa]")
 	for i, preset := range installEndpointPresets {
-		fmt.Fprintf(stdout, "  %d) %s - %s\n", i+1, preset.Name, preset.URL)
+		fmt.Fprintf(stdout, "  %d) %s - %s\n [EID=YJHDscqw]", i+1, preset.Name, preset.URL)
 	}
 
 	for {
-		fmt.Fprintf(stdout, "%s: ", aiEnvEndpoint)
+		fmt.Fprintf(stdout, "%s:  [EID=mDR5pWbt]", aiEnvEndpoint)
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			return "", err
@@ -348,14 +351,14 @@ func promptEndpointWithPresets(reader *bufio.Reader, stdout io.Writer) (string, 
 		if _, _, _, parseErr := parseAIEndpoint(input); parseErr == nil {
 			return strings.TrimRight(input, "/"), nil
 		}
-		fmt.Fprintln(stdout, "invalid endpoint, enter a preset number or full http(s) URL")
+		fmt.Fprintln(stdout, "invalid endpoint, enter a preset number or full http(s) URL [EID=Vnj6q9H1]")
 	}
 }
 
 // promptNonEmpty reads a non-empty value from the user for the provided prompt key.
 func promptNonEmpty(reader *bufio.Reader, stdout io.Writer, key string) (string, error) {
 	for {
-		fmt.Fprintf(stdout, "%s: ", key)
+		fmt.Fprintf(stdout, "%s:  [EID=16dzWzny]", key)
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			return "", err
@@ -369,7 +372,7 @@ func promptNonEmpty(reader *bufio.Reader, stdout io.Writer, key string) (string,
 
 // promptOptional reads an optional value from the user for the provided prompt key.
 func promptOptional(reader *bufio.Reader, stdout io.Writer, key string) (string, error) {
-	fmt.Fprintf(stdout, "%s: ", key)
+	fmt.Fprintf(stdout, "%s:  [EID=BNIyuKK0]", key)
 	line, err := reader.ReadString('\n')
 	if err != nil {
 		return "", err
@@ -715,7 +718,7 @@ func ensureInstallShellWrapper(shellName string, dryRun bool, stdout io.Writer) 
 		return err
 	}
 	if dryRun {
-		fmt.Fprintf(stdout, "[dry-run] would write shell wrapper file %s\n", path)
+		fmt.Fprintf(stdout, "[dry-run] would write shell wrapper file %s\n [EID=KO5pe6Pn]", path)
 		return nil
 	}
 
@@ -746,7 +749,7 @@ func ensureBashProfileSourcing(shellName string, dryRun bool, stdout io.Writer) 
 	}
 
 	if dryRun {
-		fmt.Fprintf(stdout, "[dry-run] would append ash source line to %s\n", profilePath)
+		fmt.Fprintf(stdout, "[dry-run] would append ash source line to %s\n [EID=B6FN70Z4]", profilePath)
 		return nil
 	}
 

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -1346,8 +1347,8 @@ func TestSchedulerDebugLoggingRotatesJSON(t *testing.T) {
 		t.Fatalf("expected debug writer to be configured")
 	}
 
-	debugLogf("first %s", strings.Repeat("a", 120))
-	debugLogf("second %s", strings.Repeat("b", 120))
+	slog.Debug("first ", "request_id", requestIDGenerator(), "value", strings.Repeat("a", 120), "EID", "IXk2kUYH")
+	slog.Debug("second ", "request_id", requestIDGenerator(), "value", strings.Repeat("b", 120), "EID", "x1z9lqDJ")
 
 	currentPath := filepath.Join(home, ".ash", "logs", "scheduler.log")
 	rotatedPath := currentPath + ".1"
@@ -1366,6 +1367,48 @@ func TestSchedulerDebugLoggingRotatesJSON(t *testing.T) {
 	}
 	if !strings.Contains(string(rotatedData), `"first `) {
 		t.Fatalf("expected first entry in rotated log, got %q", string(rotatedData))
+	}
+}
+
+func TestVerboseDebugLogsUseStructuredJSON(t *testing.T) {
+	origWriter := debugWriter
+	origJSON := debugJSONLogging
+	t.Cleanup(func() {
+		debugWriter = origWriter
+		debugJSONLogging = origJSON
+	})
+
+	var buf bytes.Buffer
+	debugWriter = &buf
+	debugJSONLogging = true
+	t.Setenv("ASH_VERBOSE", "1")
+
+	configureDebugLogging()
+	slog.Debug("structured debug output", "request_id", requestIDGenerator(), "EID", "LsSPp1Zz")
+
+	output := strings.TrimSpace(buf.String())
+	if output == "" {
+		t.Fatal("expected debug output, got empty string")
+	}
+
+	var record map[string]any
+	if err := json.Unmarshal([]byte(output), &record); err != nil {
+		t.Fatalf("expected JSON debug payload, got %q: %v", output, err)
+	}
+	if record["level"] != "debug" {
+		t.Fatalf("expected debug level in payload, got %#v", record["level"])
+	}
+	if record["message"] != "structured debug output" {
+		t.Fatalf("expected structured message, got %#v", record["message"])
+	}
+	if _, ok := record["time"]; !ok {
+		t.Fatalf("expected timestamp field in payload, got %#v", record)
+	}
+	if _, ok := record["request_id"]; !ok {
+		t.Fatalf("expected request_id field in payload, got %#v", record)
+	}
+	if strings.Contains(output, "[EID=") {
+		t.Fatalf("expected no EID markers in structured payload, got %q", output)
 	}
 }
 
@@ -1769,14 +1812,17 @@ func TestChatVerboseLogsPayload(t *testing.T) {
 	}
 
 	logs := logOutput.String()
-	if !strings.Contains(logs, "AI request payload") {
+	if !strings.Contains(logs, `"message":"AI request payload"`) {
 		t.Fatalf("expected payload debug log, got %q", logs)
 	}
-	if !strings.Contains(logs, `"tools":[`) {
-		t.Fatalf("expected tool schema in payload logs, got %q", logs)
+	if !strings.Contains(logs, `run_unix_command`) || !strings.Contains(logs, `run command`) {
+		t.Fatalf("expected tool schema details in payload logs, got %q", logs)
 	}
-	if !strings.Contains(logs, "AI response: status=200") {
+	if !strings.Contains(logs, `"message":"AI response"`) {
 		t.Fatalf("expected response debug log, got %q", logs)
+	}
+	if !strings.Contains(logs, `"status":200`) {
+		t.Fatalf("expected response status in debug log, got %q", logs)
 	}
 }
 
@@ -1815,10 +1861,13 @@ func TestRunToolLoopVerboseLogsToolInvocation(t *testing.T) {
 	}
 
 	logs := logOutput.String()
-	if !strings.Contains(logs, "Tool invocation requested: name=run_unix_command") {
+	if !strings.Contains(logs, `"message":"Tool invocation requested"`) {
 		t.Fatalf("expected tool invocation debug log, got %q", logs)
 	}
-	if !strings.Contains(logs, "Tool invocation result: name=run_unix_command") {
+	if !strings.Contains(logs, `"name":"run_unix_command"`) {
+		t.Fatalf("expected tool name in invocation debug log, got %q", logs)
+	}
+	if !strings.Contains(logs, `"message":"Tool invocation result"`) {
 		t.Fatalf("expected tool result debug log, got %q", logs)
 	}
 }

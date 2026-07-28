@@ -10,6 +10,7 @@ import (
 	"go/format"
 	"go/parser"
 	"go/token"
+	"io"
 	"io/fs"
 	"math/big"
 	"os"
@@ -40,18 +41,27 @@ type filePlan struct {
 	eids     []*ast.BasicLit
 }
 
+func writeEIDLogf(w io.Writer, format string, args ...any) {
+	if w == nil {
+		return
+	}
+	message := fmt.Sprintf(format, args...)
+	message = strings.TrimRight(message, "\r\n")
+	_, _ = fmt.Fprintf(w, "%s [EID=%s]\n", message, mustRandAlphaNum(8))
+}
+
 func main() {
 	allMode := flag.Bool("all", false, "scan all .go files recursively from current directory")
 	flag.Usage = func() {
-		_, _ = fmt.Fprintln(flag.CommandLine.Output(), "Usage: eid-injector [--all] [files.go ...]")
-		_, _ = fmt.Fprintln(flag.CommandLine.Output(), "Ensures each slog log call ends with \"EID\", <code>.")
-		_, _ = fmt.Fprintln(flag.CommandLine.Output(), "In --all mode, it also validates/fixes logPersistenceError EIDs and de-duplicates literal EIDs globally.")
+		_, _ = fmt.Fprintln(flag.CommandLine.Output(), "Usage: eid-injector [--all] [files.go ...] [EID=rn8kf5vA]")
+		_, _ = fmt.Fprintln(flag.CommandLine.Output(), "Ensures each slog log call ends with \"EID\", <code>. [EID=pdMQ4jAS]")
+		_, _ = fmt.Fprintln(flag.CommandLine.Output(), "In --all mode, it also validates/fixes logPersistenceError EIDs and de-duplicates literal EIDs globally. [EID=sIh9akd6]")
 	}
 	flag.Parse()
 
 	files, err := resolveFiles(*allMode, flag.Args())
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "eid-injector: %v\n", err)
+		writeEIDLogf(os.Stderr, "eid-injector: %v", err)
 		os.Exit(1)
 	}
 	if len(files) == 0 {
@@ -65,7 +75,7 @@ func main() {
 			if errors.Is(err, errNoChanges) {
 				continue
 			}
-			fmt.Fprintf(os.Stderr, "eid-injector: %s: %v\n", file, err)
+			writeEIDLogf(os.Stderr, "eid-injector: %s: %v", file, err)
 			continue
 		}
 		if plan != nil {
@@ -81,7 +91,7 @@ func main() {
 	for _, plan := range plans {
 		changed, err := writePlan(plan)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "eid-injector: %s: %v\n", plan.filename, err)
+			writeEIDLogf(os.Stderr, "eid-injector: %s: %v", plan.filename, err)
 			continue
 		}
 		if changed {
@@ -90,7 +100,7 @@ func main() {
 	}
 
 	if wroteAny {
-		_, _ = fmt.Fprintln(os.Stdout, "eid-injector: injected/standardized EIDs where needed.")
+		writeEIDLogf(os.Stdout, "eid-injector: injected/standardized EIDs where needed.")
 	}
 }
 
@@ -187,8 +197,40 @@ func constrainToRoot(path string, root string) (string, error) {
 	return resolvedPath, nil
 }
 
+func resolveInputFilePath(path string) (string, error) {
+	if strings.TrimSpace(path) == "" {
+		return "", fmt.Errorf("empty path")
+	}
+
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+
+	resolvedPath, err := filepath.EvalSymlinks(absPath)
+	if err != nil {
+		resolvedPath = absPath
+	}
+
+	info, err := os.Stat(resolvedPath)
+	if err != nil {
+		return "", err
+	}
+	if info.IsDir() {
+		return "", fmt.Errorf("expected file, got directory: %s", path)
+	}
+
+	return resolvedPath, nil
+}
+
 func buildPlan(filename string, allMode bool) (*filePlan, error) {
-	originalSrc, err := os.ReadFile(filename)
+	safePath, err := resolveInputFilePath(filename)
+	if err != nil {
+		return nil, err
+	}
+
+	// #nosec G304 -- safePath has already been resolved and validated before use
+	originalSrc, err := os.ReadFile(safePath)
 	if err != nil {
 		return nil, err
 	}
@@ -221,7 +263,7 @@ func buildPlan(filename string, allMode bool) (*filePlan, error) {
 		}
 	}
 
-	plan := &filePlan{filename: filename, src: originalSrc, file: f, fset: fset, changed: precleanChanged}
+	plan := &filePlan{filename: safePath, src: originalSrc, file: f, fset: fset, changed: precleanChanged}
 
 	//nolint:nestif // AST traversal conditions remain explicit for safety.
 	if hasSlog {
@@ -254,6 +296,24 @@ func buildPlan(filename string, allMode bool) (*filePlan, error) {
 			return true
 		})
 	}
+
+	ast.Inspect(f, func(n ast.Node) bool {
+		call, ok := n.(*ast.CallExpr)
+		if !ok {
+			return true
+		}
+		if len(call.Args) == 0 {
+			return true
+		}
+		changed, lit := normalizeFmtLogCall(call)
+		if changed {
+			plan.changed = true
+		}
+		if lit != nil {
+			plan.eids = append(plan.eids, lit)
+		}
+		return true
+	})
 
 	ast.Inspect(f, func(n ast.Node) bool {
 		lit, ok := n.(*ast.CompositeLit)
@@ -299,6 +359,89 @@ func buildPlan(filename string, allMode bool) (*filePlan, error) {
 		return nil, errNoChanges
 	}
 	return plan, nil
+}
+
+func normalizeFmtLogCall(call *ast.CallExpr) (bool, *ast.BasicLit) {
+	if len(call.Args) == 0 {
+		return false, nil
+	}
+
+	if ident, ok := call.Fun.(*ast.Ident); ok {
+		switch ident.Name {
+		case "writeLogf":
+			return normalizeWriteLogfCall(call)
+		case "writeLogLine":
+			return normalizeWriteLogLineCall(call)
+		}
+	}
+
+	sel, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok {
+		return false, nil
+	}
+	ident, ok := sel.X.(*ast.Ident)
+	if !ok || ident.Name != "fmt" {
+		return false, nil
+	}
+
+	switch sel.Sel.Name {
+	case "Fprintf":
+		return normalizeFmtFprintfCall(call)
+	case "Fprint", "Fprintln":
+		return normalizeFmtFprintLikeCall(call)
+	default:
+		return false, nil
+	}
+}
+
+func normalizeWriteLogfCall(call *ast.CallExpr) (bool, *ast.BasicLit) {
+	return normalizeStringLiteralCall(call, 1)
+}
+
+func normalizeWriteLogLineCall(call *ast.CallExpr) (bool, *ast.BasicLit) {
+	return normalizeStringLiteralCall(call, 1)
+}
+
+func normalizeStringLiteralCall(call *ast.CallExpr, index int) (bool, *ast.BasicLit) {
+	if len(call.Args) <= index {
+		return false, nil
+	}
+	lit, ok := call.Args[index].(*ast.BasicLit)
+	if !ok || lit.Kind != token.STRING {
+		return false, nil
+	}
+	value, ok := parseStringLiteral(lit)
+	if !ok || strings.Contains(value, "EID=") {
+		return false, nil
+	}
+	newValue := value + " [EID=" + mustRandAlphaNum(8) + "]"
+	lit.Value = strconv.Quote(newValue)
+	return true, nil
+}
+
+func normalizeFmtFprintfCall(call *ast.CallExpr) (bool, *ast.BasicLit) {
+	return normalizeFmtStringLiteralCall(call, 1)
+}
+
+func normalizeFmtFprintLikeCall(call *ast.CallExpr) (bool, *ast.BasicLit) {
+	return normalizeFmtStringLiteralCall(call, 1)
+}
+
+func normalizeFmtStringLiteralCall(call *ast.CallExpr, index int) (bool, *ast.BasicLit) {
+	if len(call.Args) <= index {
+		return false, nil
+	}
+	lit, ok := call.Args[index].(*ast.BasicLit)
+	if !ok || lit.Kind != token.STRING {
+		return false, nil
+	}
+	value, ok := parseStringLiteral(lit)
+	if !ok || strings.Contains(value, "EID=") {
+		return false, nil
+	}
+	newValue := value + " [EID=" + mustRandAlphaNum(8) + "]"
+	lit.Value = strconv.Quote(newValue)
+	return true, nil
 }
 
 func normalizeSlogCall(call *ast.CallExpr) (bool, *ast.BasicLit) {

@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/exec"
@@ -80,13 +81,12 @@ var (
 	debugWriter               io.Writer = os.Stderr
 	debugJSONLogging          bool
 	requestIDGenerator        func() string
+	appLogger                 *slog.Logger
 )
 
 func init() {
 	requestIDGenerator = func() string {
-		buf := make([]byte, 8)
-		_, _ = rand.Read(buf)
-		return hex.EncodeToString(buf)
+		return hex.EncodeToString(make([]byte, 8))
 	}
 }
 
@@ -101,66 +101,61 @@ func verboseLoggingEnabled() bool {
 	}
 }
 
-// configureDebugLogging wires debug logging to stderr or a rotating log file based on the current environment.
-func configureDebugLogging() {
-	debugWriter = os.Stderr
-	debugJSONLogging = false
-
-	if !verboseLoggingEnabled() {
-		return
+func newStructuredLogger(w io.Writer, level slog.Level) *slog.Logger {
+	if w == nil {
+		w = os.Stderr
 	}
-
-	logFile := strings.TrimSpace(os.Getenv("ASH_LOG_FILE"))
-	if logFile == "" {
-		computedPath, err := schedulerLogFilePath(false)
-		if err != nil {
-			fmt.Fprintln(os.Stderr, err)
-			return
-		}
-		logFile = computedPath
-	}
-
-	maxBytes := defaultSchedulerLogMaxBytes
-	if raw := strings.TrimSpace(os.Getenv("ASH_LOG_MAX_BYTES")); raw != "" {
-		if parsed, err := strconv.ParseInt(raw, 10, 64); err == nil && parsed > 0 {
-			maxBytes = parsed
-		}
-	}
-
-	writer, err := newRotatingSchedulerLogWriter(logFile, maxBytes)
-	if err != nil {
-		return
-	}
-
-	debugWriter = writer
-	debugJSONLogging = strings.EqualFold(strings.TrimSpace(os.Getenv("ASH_LOG_FORMAT")), "json")
+	return slog.New(slog.NewJSONHandler(w, &slog.HandlerOptions{
+		Level: level,
+		ReplaceAttr: func(groups []string, attr slog.Attr) slog.Attr {
+			if attr.Key == slog.MessageKey {
+				attr.Key = "message"
+			}
+			if attr.Key == slog.LevelKey {
+				attr.Value = slog.StringValue(strings.ToLower(attr.Value.String()))
+			}
+			return attr
+		},
+	}))
 }
 
-// debugLogf writes a debug log message when verbose logging is enabled.
-func debugLogf(format string, args ...any) {
-	if !verboseLoggingEnabled() {
-		return
+// configureDebugLogging wires debug logging to stderr or a rotating log file based on the current environment.
+func configureDebugLogging(writers ...io.Writer) {
+	defaultWriter := debugWriter
+	if len(writers) > 0 && writers[0] != nil {
+		defaultWriter = writers[0]
 	}
-	if debugWriter == nil {
-		return
+	if defaultWriter == nil {
+		defaultWriter = os.Stderr
 	}
-	message := fmt.Sprintf(format, args...)
-	if debugJSONLogging {
-		record := map[string]any{
-			"time":       timeNow().UTC().Format(time.RFC3339Nano),
-			"level":      "debug",
-			"message":    message,
-			"request_id": requestIDGenerator(),
+	currentWriter := defaultWriter
+
+	if verboseLoggingEnabled() {
+		logFile := strings.TrimSpace(os.Getenv("ASH_LOG_FILE"))
+		if logFile != "" {
+			maxBytes := defaultSchedulerLogMaxBytes
+			if raw := strings.TrimSpace(os.Getenv("ASH_LOG_MAX_BYTES")); raw != "" {
+				if parsed, err := strconv.ParseInt(raw, 10, 64); err == nil && parsed > 0 {
+					maxBytes = parsed
+				}
+			}
+
+			writer, err := newRotatingSchedulerLogWriter(logFile, maxBytes)
+			if err == nil {
+				currentWriter = writer
+			}
 		}
-		encoded, err := json.Marshal(record)
-		if err != nil {
-			_, _ = fmt.Fprintf(debugWriter, "[ash-debug] %s\n", sanitizeJSONError(err.Error()))
-			return
-		}
-		_, _ = debugWriter.Write(append(encoded, '\n'))
-		return
 	}
-	_, _ = fmt.Fprintf(debugWriter, "[ash-debug] %s\n", message)
+
+	level := slog.LevelInfo
+	if verboseLoggingEnabled() {
+		level = slog.LevelDebug
+	}
+
+	appLogger = newStructuredLogger(currentWriter, level)
+	debugWriter = currentWriter
+	debugJSONLogging = true
+	slog.SetDefault(appLogger)
 }
 
 type rotatingSchedulerLogWriter struct {
@@ -1159,12 +1154,12 @@ func startThinkingIndicator(w io.Writer) func() {
 
 		frame := 0
 		for {
-			fmt.Fprintf(w, "\rThinking... %s", frames[frame])
+			fmt.Fprintf(w, "\rThinking... %s [EID=dzvTcfc1]", frames[frame])
 			frame = (frame + 1) % len(frames)
 
 			select {
 			case <-done:
-				fmt.Fprint(w, "\r                \r")
+				fmt.Fprint(w, "\r                \r [EID=K4LiufMz]")
 				return
 			case <-ticker.C:
 			}

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -130,6 +131,8 @@ func randomCloudServer500Message() string {
 
 // chat sends a chat request to the configured AI endpoint and returns the assistant response or an error.
 func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolDefinition) (chatResponse, error) {
+	configureDebugLogging()
+
 	requestBody := chatRequest{
 		Model:    aiCfg.Model,
 		Messages: messages,
@@ -141,8 +144,8 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 	if err != nil {
 		return chatResponse{}, err
 	}
-	debugLogf("AI request: url=%s/api/chat", aiCfg.BaseURL)
-	debugLogf("AI request payload: %s", string(payload))
+	slog.Debug("AI request", "request_id", requestIDGenerator(), "url", aiCfg.BaseURL+"/api/chat", "EID", "UqNZjp9I")
+	slog.Debug("AI request payload", "request_id", requestIDGenerator(), "payload", string(payload), "EID", "aPkzWTCJ")
 
 	attempts := retryMaxAttempts()
 	baseDelay := retryBaseDelay()
@@ -163,7 +166,7 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 			if !shouldRetryAIError(err, attempt, attempts) {
 				return chatResponse{}, err
 			}
-			debugLogf("AI request attempt %d/%d failed: %v", attempt, attempts, err)
+			slog.Debug("AI request attempt failed", "request_id", requestIDGenerator(), "attempt", attempt, "max_attempts", attempts, "error", err, "EID", "0s3aTomF")
 			if err := sleepWithContext(ctx, backoffDelay(attempt, baseDelay, maxDelay)); err != nil {
 				return chatResponse{}, err
 			}
@@ -175,14 +178,14 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 		if err != nil {
 			return chatResponse{}, err
 		}
-		debugLogf("AI response: status=%d body=%s", resp.StatusCode, string(body))
+		slog.Debug("AI response", "request_id", requestIDGenerator(), "status", resp.StatusCode, "body", string(body), "EID", "2D1hx03p")
 
 		if resp.StatusCode < 200 || resp.StatusCode > 299 {
 			statusErr := chatStatusError{StatusCode: resp.StatusCode, Body: string(body)}
 			if !shouldRetryStatusCode(resp.StatusCode, attempt, attempts) {
 				return chatResponse{}, statusErr
 			}
-			debugLogf("AI request attempt %d/%d got status %d", attempt, attempts, resp.StatusCode)
+			slog.Debug("AI request attempt status", "request_id", requestIDGenerator(), "attempt", attempt, "max_attempts", attempts, "status", resp.StatusCode, "EID", "VUGCSB86")
 			if err := sleepWithContext(ctx, backoffDelay(attempt, baseDelay, maxDelay)); err != nil {
 				return chatResponse{}, err
 			}
@@ -198,7 +201,7 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 			if !shouldRetryAIError(errors.New(parsed.Error), attempt, attempts) {
 				return chatResponse{}, errors.New(parsed.Error)
 			}
-			debugLogf("AI request attempt %d/%d returned model error: %s", attempt, attempts, parsed.Error)
+			slog.Debug("AI request attempt model error", "request_id", requestIDGenerator(), "attempt", attempt, "max_attempts", attempts, "error", parsed.Error, "EID", "wnrl8LcI")
 			if err := sleepWithContext(ctx, backoffDelay(attempt, baseDelay, maxDelay)); err != nil {
 				return chatResponse{}, err
 			}

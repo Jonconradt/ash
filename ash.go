@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"os"
 	"regexp"
@@ -57,12 +58,14 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
+	configureDebugLogging(stderr)
+
 	if args[0] == "install" {
 		return runInstall(args[1:], stdout, stderr)
 	}
 
 	if _, err := ensureSessionID(); err != nil {
-		fmt.Fprintf(stderr, "failed to initialize SESSION_ID: %v\n", err)
+		slog.Error("failed to initialize SESSION_ID", "error", err, "EID", "xYQ5IJX7")
 		return 1
 	}
 
@@ -70,46 +73,46 @@ func run(args []string, stdout, stderr io.Writer) int {
 	defer cleanupHistoryRetention(defaultHistoryRetention, defaultHistoryCleanupBudget)
 
 	if recommendation, err := installRecommendation(); err == nil && recommendation != "" {
-		fmt.Fprintln(stderr, recommendation)
+		slog.Info(recommendation, "EID", "Ss6EkIfE")
 	}
 
 	aiCfg, err := parseAIConfigFromEnv()
 	if err != nil {
-		fmt.Fprintf(stderr, "invalid AI configuration: %v\n", err)
+		slog.Error(fmt.Sprintf("invalid AI configuration: %v", err), "EID", "2BiYZgst")
 		return 1
 	}
 
 	userInput := strings.TrimSpace(strings.Join(args, " "))
 	if userInput == "" {
-		fmt.Fprintln(stderr, "empty input")
+		slog.Info("empty input", "EID", "CPAVWywB")
 		return 1
 	}
 
 	systemPrompt, err := readSystemPrompt()
 	if err != nil {
-		fmt.Fprintf(stderr, "failed to read %s: %v\n", systemFileName, err)
+		slog.Error(fmt.Sprintf("failed to read %s: %v", systemFileName, err), "EID", "8N3r3Vz0")
 		return 1
 	}
 	systemPrompt = buildSystemPrompt(systemPrompt, timeNow())
 
 	historyPath, err := getHistoryPath()
 	if err != nil {
-		fmt.Fprintf(stderr, "failed to resolve history path: %v\n", err)
+		slog.Error(fmt.Sprintf("failed to resolve history path: %v", err), "EID", "7rF5MhPj")
 		return 1
 	}
 
 	history, err := loadHistory(historyPath)
 	if err != nil {
-		fmt.Fprintf(stderr, "failed to load history: %v\n", err)
+		slog.Error(fmt.Sprintf("failed to load history: %v", err), "EID", "UxY51gAq")
 		return 1
 	}
 
 	allowlist, err := loadAllowlistedCommands()
 	if err != nil {
-		fmt.Fprintf(stderr, "failed to read %s: %v\n", toolsFileName, err)
+		slog.Error(fmt.Sprintf("failed to read %s: %v", toolsFileName, err), "EID", "f6qdSTFE")
 		return 1
 	}
-	debugLogf("Allowlist loaded: %s", strings.Join(sortedAllowlist(allowlist), ","))
+	slog.Debug("Allowlist loaded", "request_id", requestIDGenerator(), "allowlist", strings.Join(sortedAllowlist(allowlist), ","), "EID", "oYccBW9V")
 
 	toolShim := localToolShim{allowlist: allowlist}
 
@@ -129,31 +132,31 @@ func run(args []string, stdout, stderr io.Writer) int {
 	assistantReply, updatedMessages, err := runToolLoop(ctx, aiCfg, userInput, messages, toolShim)
 	stopSpinner()
 	if err != nil {
-		debugLogf("run failed: %v", err)
+		slog.Debug("run failed", "request_id", requestIDGenerator(), "error", err, "EID", "DFr6nXH9")
 		if errors.Is(err, context.Canceled) {
-			fmt.Fprintln(stderr, "AI doesn't feel like talking right now. Try again later.")
+			slog.Info("AI doesn't feel like talking right now. Try again later.", "EID", "LAOqomnJ")
 			return 130
 		}
 		if errors.Is(err, context.DeadlineExceeded) {
-			fmt.Fprintf(stderr, "AI took longer than %s, so we should probably try again later\n", timeout)
+			slog.Warn(fmt.Sprintf("AI took longer than %s, so we should probably try again later", timeout), "EID", "80FzBwhZ")
 			return 1
 		}
 		var statusErr chatStatusError
 		if errors.As(err, &statusErr) {
 			switch statusErr.StatusCode {
 			case http.StatusServiceUnavailable:
-				fmt.Fprintln(stderr, pickCloudBusy503Message())
+				slog.Warn(pickCloudBusy503Message(), "EID", "PUNKPM4h")
 				return 1
 			case http.StatusInternalServerError:
-				fmt.Fprintln(stderr, pickCloudServer500Message())
+				slog.Warn(pickCloudServer500Message(), "EID", "Aew3mapm")
 				return 1
 			}
 		}
-		fmt.Fprintf(stderr, "ollama request failed: %v\n", err)
+		slog.Error(fmt.Sprintf("ollama request failed: %v", err), "EID", "XflUmD5L")
 		return 1
 	}
 
-	debugLogf("assistant final reply: %q", assistantReply)
+	slog.Debug("assistant final reply", "request_id", requestIDGenerator(), "reply", assistantReply, "EID", "jzszDMVF")
 	fmt.Fprint(stdout, formatAssistantOutput(assistantReply))
 
 	conversation = stripSystemMessage(updatedMessages)
@@ -161,7 +164,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	history.Conversations[aiCfg.HistoryKey] = conversation
 
 	if err := saveHistory(historyPath, history); err != nil {
-		fmt.Fprintf(stderr, "warning: failed to save history: %v\n", err)
+		slog.Warn(fmt.Sprintf("warning: failed to save history: %v", err), "EID", "NIRzpBgV")
 	}
 
 	return 0
@@ -169,6 +172,6 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 // printUsage writes the CLI usage text for the ash command to w.
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "usage: ash <text>")
-	fmt.Fprintln(w, "       ash install [--shell bash|zsh] [--dry-run]")
+	fmt.Fprintln(w, "usage: ash <text> [EID=OlQrvR8L]")
+	fmt.Fprintln(w, "       ash install [--shell bash|zsh] [--dry-run] [EID=NWPmSFPs]")
 }

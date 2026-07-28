@@ -53,7 +53,7 @@ test-cover:
 	@go tool cover -func=coverage.out | awk '/^total:/ {gsub("%", "", $$3); if ($$3 + 0 < $(COVERAGE_MIN)) {printf("coverage %.1f%% is below %s%%\n", $$3, "$(COVERAGE_MIN)"); exit 1} else {printf("coverage %.1f%% meets %s%%\n", $$3, "$(COVERAGE_MIN)")}}'
 
 test-fuzz:
-	go test -fuzz=Fuzz -fuzztime=$(FUZZ_TIME) ./...
+	go test -fuzz=Fuzz -fuzztime=$(FUZZ_TIME) .
 
 benchmark:
 	go test -bench=. -benchmem ./...
@@ -73,11 +73,6 @@ staticcheck:
 install: test lint  gosec 
 	go install ./...
 	ash install --shell bash
-	$(MAKE) setup-hooks
-
-setup-hooks:
-	git config core.hooksPath githooks
-	chmod +x githooks/pre-commit
 
 version: release-check release-artifacts
 
