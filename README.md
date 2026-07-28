@@ -41,9 +41,10 @@ make release RELEASE_VERSION=v1.2.3
 ```
 
 - `make lint` runs `golangci-lint` checks across the module
+- `make security` runs `gosec` and `govulncheck` for security scanning
 - `make test` runs `go test ./...`
 - `make install` runs `go install ./...`
-- `make verify` runs strict checks (tests, race, coverage gate, vet, staticcheck)
+- `make verify` runs strict checks (tests, race, coverage gate, vet, staticcheck, gosec, govulncheck)
 - `make version` runs quality checks and builds installer artifacts for the selected host/targets
 - `make release` runs quality checks, builds an arm64 macOS `.pkg`, validates it,
   writes a SHA-256 checksum to `dist/release/`, creates the release tag, and pushes

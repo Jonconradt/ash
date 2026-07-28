@@ -13,9 +13,13 @@ import (
 )
 
 const (
-	aiEnvEndpoint  = "AI_ENDPOINT"
-	aiEnvModel     = "AI_MODEL"
-	aiEnvAuthType  = "AI_AUTH_TYPE"
+	// #nosec G101 -- these are environment variable names, not secrets.
+	aiEnvEndpoint = "AI_ENDPOINT"
+	// #nosec G101 -- these are environment variable names, not secrets.
+	aiEnvModel = "AI_MODEL"
+	// #nosec G101 -- these are environment variable names, not secrets.
+	aiEnvAuthType = "AI_AUTH_TYPE"
+	// #nosec G101 -- these are environment variable names, not secrets.
 	aiEnvAuthToken = "AI_AUTH_TOKEN"
 )
 

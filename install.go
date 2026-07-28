@@ -446,6 +446,7 @@ func hardenAshWorkspacePermissions() error {
 	if err := osMkdirAll(root, 0o700); err != nil {
 		return err
 	}
+	// #nosec G302 -- the workspace root must remain accessible only to the current user.
 	if err := os.Chmod(root, 0o700); err != nil {
 		return err
 	}
@@ -468,9 +469,11 @@ func hardenAshWorkspacePermissions() error {
 		}
 
 		if d.IsDir() {
+			// #nosec G302 -- directories in the workspace need restricted access for the current user only.
 			return os.Chmod(path, 0o700)
 		}
 		if mode.IsRegular() {
+			//nolint:gosec // Regular files in the workspace need restricted access for the current user only.
 			return os.Chmod(path, 0o600)
 		}
 		return nil

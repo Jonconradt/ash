@@ -1,10 +1,12 @@
-.PHONY: all verify lint test test-race test-cover test-fuzz vet staticcheck install version release release-check release-build release-pkg release-validate release-publish release-artifacts release-build-one release-pkg-one release-validate-one
+.PHONY: all verify lint test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install version release release-check release-build release-pkg release-validate release-publish release-artifacts release-build-one release-pkg-one release-validate-one
 
 SHELL := /bin/bash
 
 COVERAGE_MIN ?= 95
 FUZZ_TIME ?= 10s
 GOLANGCI_LINT_VERSION ?= v1.64.8
+GOSEC_VERSION ?= v2.22.1
+GOVULNCHECK_VERSION ?= v1.1.4
 APP_NAME ?= ash
 RELEASE_ARCH ?= arm64
 RELEASE_OUTPUT_DIR ?= dist/release
@@ -24,10 +26,20 @@ RELEASE_BINARY_PATH ?= $(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)
 
 all: verify install
 
-verify: test test-race test-cover vet staticcheck
+verify: test test-race test-cover vet staticcheck security
 
 lint:
 	go run github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run ./...
+
+security: gosec govulncheck
+
+gosec:
+	go run github.com/securego/gosec/v2/cmd/gosec@$(GOSEC_VERSION) ./...
+
+govulncheck:
+	go get -u ./...
+	go mod tidy
+	go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...
 
 test:
 	bash -n sample_bashrc.txt
@@ -55,7 +67,7 @@ staticcheck:
 		echo "staticcheck not installed; skipping"; \
 	fi
 
-install: test lint
+install: test lint  gosec 
 	go install ./...
 	ash install --shell bash
 
@@ -63,7 +75,7 @@ version: release-check release-artifacts
 
 release: release-check release-build release-pkg release-validate release-publish
 
-release-check: lint test
+release-check: lint test gosec govulncheck
 	@if [[ -n "$$(git status --porcelain)" ]]; then \
 		echo "git working tree is dirty; commit or stash changes before release"; \
 		git status --short; \

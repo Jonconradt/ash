@@ -114,7 +114,7 @@ func randomCloudBusy503Message() string {
 	if len(cloudBusy503Messages) == 0 {
 		return "The cloud model is distracted and too busy right now. Please try again shortly."
 	}
-	idx := int(uint64(timeNow().UnixNano()) % uint64(len(cloudBusy503Messages)))
+	idx := int(timeNow().UnixNano() % int64(len(cloudBusy503Messages)))
 	return cloudBusy503Messages[idx]
 }
 
@@ -123,7 +123,7 @@ func randomCloudServer500Message() string {
 	if len(cloudServer500Messages) == 0 {
 		return "The server hit an internal error. Please try again shortly."
 	}
-	idx := int(uint64(timeNow().UnixNano()) % uint64(len(cloudServer500Messages)))
+	idx := int(timeNow().UnixNano() % int64(len(cloudServer500Messages)))
 	return cloudServer500Messages[idx]
 }
 
