@@ -153,7 +153,7 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// maybeConfigureInstallEnv returns the computed value for this helper.
+// maybeConfigureInstallEnv writes managed environment settings to the user workspace when the install flow is interactive and needs configuration.
 func maybeConfigureInstallEnv(stdout, stderr io.Writer, dryRun bool) error {
 	if dryRun {
 		return nil
@@ -263,7 +263,7 @@ func runningInCI() bool {
 	return false
 }
 
-// ashEnvFilePath returns the computed value for this helper.
+// ashEnvFilePath returns the path to the managed ash environment file inside the workspace.
 func ashEnvFilePath() (string, error) {
 	root, err := ashWorkspaceDir()
 	if err != nil {
@@ -272,7 +272,7 @@ func ashEnvFilePath() (string, error) {
 	return filepath.Join(root, ".ash_env"), nil
 }
 
-// promptInstallEnvValues prompts for and returns user input.
+// promptInstallEnvValues collects the AI endpoint and authentication values needed to create a managed ash environment file.
 func promptInstallEnvValues(reader *bufio.Reader, stdout, stderr io.Writer) (map[string]string, error) {
 	fmt.Fprintln(stdout, "Configure ash environment values")
 	endpoint, err := promptEndpointWithPresets(reader, stdout)
@@ -323,7 +323,7 @@ func promptInstallEnvValues(reader *bufio.Reader, stdout, stderr io.Writer) (map
 	return values, nil
 }
 
-// promptEndpointWithPresets prompts for and returns user input.
+// promptEndpointWithPresets prompts for an AI endpoint, accepting either a preset choice or a custom URL.
 func promptEndpointWithPresets(reader *bufio.Reader, stdout io.Writer) (string, error) {
 	fmt.Fprintln(stdout, "Select AI endpoint preset or enter a custom URL:")
 	for i, preset := range installEndpointPresets {
@@ -352,7 +352,7 @@ func promptEndpointWithPresets(reader *bufio.Reader, stdout io.Writer) (string, 
 	}
 }
 
-// promptNonEmpty prompts for and returns user input.
+// promptNonEmpty reads a non-empty value from the user for the provided prompt key.
 func promptNonEmpty(reader *bufio.Reader, stdout io.Writer, key string) (string, error) {
 	for {
 		fmt.Fprintf(stdout, "%s: ", key)
@@ -367,7 +367,7 @@ func promptNonEmpty(reader *bufio.Reader, stdout io.Writer, key string) (string,
 	}
 }
 
-// promptOptional prompts for and returns user input.
+// promptOptional reads an optional value from the user for the provided prompt key.
 func promptOptional(reader *bufio.Reader, stdout io.Writer, key string) (string, error) {
 	fmt.Fprintf(stdout, "%s: ", key)
 	line, err := reader.ReadString('\n')
@@ -377,7 +377,7 @@ func promptOptional(reader *bufio.Reader, stdout io.Writer, key string) (string,
 	return strings.TrimSpace(line), nil
 }
 
-// buildManagedAshEnv builds and returns a derived value.
+// buildManagedAshEnv renders the managed ash environment file content from the supplied key/value settings.
 func buildManagedAshEnv(values map[string]string) string {
 	keys := make([]string, 0, len(values))
 	for key := range values {
@@ -393,7 +393,7 @@ func buildManagedAshEnv(values map[string]string) string {
 	return b.String()
 }
 
-// finalizeInstallWorkspace returns the computed value for this helper.
+// finalizeInstallWorkspace syncs canonical config files into the workspace and hardens workspace permissions.
 func finalizeInstallWorkspace() error {
 	if err := syncCanonicalConfigFilesFromCWD(); err != nil {
 		return err
@@ -404,7 +404,7 @@ func finalizeInstallWorkspace() error {
 	return nil
 }
 
-// syncCanonicalConfigFilesFromCWD returns the computed value for this helper.
+// syncCanonicalConfigFilesFromCWD copies the current directory's ash config files into the canonical workspace directory when present.
 func syncCanonicalConfigFilesFromCWD() error {
 	root, err := ashWorkspaceDir()
 	if err != nil {
@@ -437,7 +437,7 @@ func syncCanonicalConfigFilesFromCWD() error {
 	return nil
 }
 
-// hardenAshWorkspacePermissions returns the computed value for this helper.
+// hardenAshWorkspacePermissions restricts workspace directories and files to the current user.
 func hardenAshWorkspacePermissions() error {
 	root, err := ashWorkspaceDir()
 	if err != nil {
@@ -480,7 +480,7 @@ func hardenAshWorkspacePermissions() error {
 	})
 }
 
-// parseInstallArgs parses and validates input values.
+// parseInstallArgs validates command-line arguments for the install subcommand and returns the parsed options.
 func parseInstallArgs(args []string) (shellName string, dryRun bool, err error) {
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
@@ -499,7 +499,7 @@ func parseInstallArgs(args []string) (shellName string, dryRun bool, err error) 
 	return shellName, dryRun, nil
 }
 
-// detectShellName detects and returns the matching shell name.
+// detectShellName returns the canonical shell name for a shell executable path, or empty if unsupported.
 func detectShellName(shellPath string) string {
 	base := strings.TrimSpace(filepath.Base(shellPath))
 	switch base {
@@ -510,7 +510,7 @@ func detectShellName(shellPath string) string {
 	}
 }
 
-// rcPathForShell returns the computed value for this helper.
+// rcPathForShell returns the user rc file path for the supplied shell name.
 func rcPathForShell(shellName string) (string, error) {
 	home, err := osUserHomeDir()
 	if err != nil {
@@ -527,7 +527,7 @@ func rcPathForShell(shellName string) (string, error) {
 	}
 }
 
-// readFileIfExists reads data from the filesystem.
+// readFileIfExists returns the contents of path when it exists, or an empty string when the file is absent.
 func readFileIfExists(path string) (string, error) {
 	content, err := osReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
@@ -539,7 +539,7 @@ func readFileIfExists(path string) (string, error) {
 	return string(content), nil
 }
 
-// appendInstallBlock appends content and returns the updated result.
+// appendInstallBlock appends a managed install block to existing shell config content.
 func appendInstallBlock(existing, block string) string {
 	if existing == "" {
 		return block + "\n"
@@ -553,7 +553,7 @@ func appendInstallBlock(existing, block string) string {
 	return updated
 }
 
-// extractManagedInstallBlock extracts the managed block from the provided content.
+// extractManagedInstallBlock returns the managed ash install block from content when present.
 func extractManagedInstallBlock(content string) (string, bool) {
 	start := strings.Index(content, installStartMarker)
 	if start < 0 {
@@ -567,7 +567,7 @@ func extractManagedInstallBlock(content string) (string, bool) {
 	return content[start:end], true
 }
 
-// replaceManagedInstallBlock replaces content and returns the updated result.
+// replaceManagedInstallBlock replaces the existing managed ash install block in the supplied content.
 func replaceManagedInstallBlock(existing, block string) (string, bool) {
 	start := strings.Index(existing, installStartMarker)
 	if start < 0 {
@@ -597,7 +597,7 @@ func replaceManagedInstallBlock(existing, block string) (string, bool) {
 	return b.String(), true
 }
 
-// installRecommendation returns the computed value for this helper.
+// installRecommendation returns guidance for installing or updating ash for the current shell, if needed.
 func installRecommendation() (string, error) {
 	shellName := detectShellName(os.Getenv("SHELL"))
 	if shellName == "" {
@@ -635,7 +635,7 @@ func installRecommendation() (string, error) {
 	return fmt.Sprintf("ash is not installed for %s. Run: ash install --shell %s", shellName, shellName), nil
 }
 
-// bashInstalledViaProfileSourcing returns the computed value for this helper.
+// bashInstalledViaProfileSourcing reports whether bash is already configured to source ash through .bash_profile.
 func bashInstalledViaProfileSourcing() (bool, error) {
 	home, err := osUserHomeDir()
 	if err != nil {
@@ -665,7 +665,7 @@ func bashInstalledViaProfileSourcing() (bool, error) {
 	return true, nil
 }
 
-// installSourceBlockForShell returns the computed value for this helper.
+// installSourceBlockForShell returns the shell snippet that sources ash for the supplied shell name.
 func installSourceBlockForShell(shellName string) string {
 	scriptName := ""
 	switch shellName {
@@ -684,7 +684,7 @@ func installSourceBlockForShell(shellName string) string {
 ` + installEndMarker)
 }
 
-// installShellWrapperPath returns the computed value for this helper.
+// installShellWrapperPath returns the path to the shell wrapper file used by ash for the supplied shell.
 func installShellWrapperPath(shellName string) (string, error) {
 	root, err := ashWorkspaceDir()
 	if err != nil {

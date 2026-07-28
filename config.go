@@ -233,7 +233,7 @@ func parseAllowlistFile(raw string) map[string]struct{} {
 	return set
 }
 
-// normalizeToolName normalizes and returns the canonical value.
+// normalizeToolName trims whitespace and rejects slash-delimited values so tool names remain canonical.
 func normalizeToolName(value string) string {
 	trimmed := strings.TrimSpace(value)
 	if trimmed == "" || strings.Contains(trimmed, "/") {
@@ -242,7 +242,7 @@ func normalizeToolName(value string) string {
 	return trimmed
 }
 
-// expandSystemPrompt returns the computed value for this helper.
+// expandSystemPrompt expands environment variables and the UNAME placeholder in the supplied prompt template.
 func expandSystemPrompt(prompt string) string {
 	unameValue := ""
 	if _, err := execLookPath("uname"); err == nil {
@@ -259,7 +259,7 @@ func expandSystemPrompt(prompt string) string {
 	})
 }
 
-// historyLimit returns the computed value for this helper.
+// historyLimit returns the maximum number of messages retained for chat history, or the default when unset or invalid.
 func historyLimit() int {
 	if raw := strings.TrimSpace(os.Getenv("ASH_HISTORY_MAX")); raw != "" {
 		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
@@ -270,7 +270,7 @@ func historyLimit() int {
 	return defaultHistoryMax
 }
 
-// aiTimeout returns the computed value for this helper.
+// aiTimeout returns the configured AI request timeout, or the default when unset or invalid.
 func aiTimeout() time.Duration {
 	if raw := strings.TrimSpace(os.Getenv("AI_TIMEOUT")); raw != "" {
 		if parsed, err := time.ParseDuration(raw); err == nil && parsed > 0 {
@@ -281,7 +281,7 @@ func aiTimeout() time.Duration {
 	return defaultAITimeout
 }
 
-// retryMaxAttempts returns the computed value for this helper.
+// retryMaxAttempts returns the configured number of retry attempts, or the default when unset or invalid.
 func retryMaxAttempts() int {
 	if raw := strings.TrimSpace(os.Getenv("ASH_RETRY_MAX_ATTEMPTS")); raw != "" {
 		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
@@ -291,7 +291,7 @@ func retryMaxAttempts() int {
 	return defaultRetryMaxAttempts
 }
 
-// retryBaseDelay returns the computed value for this helper.
+// retryBaseDelay returns the configured delay before the first retry, or the default when unset or invalid.
 func retryBaseDelay() time.Duration {
 	if raw := strings.TrimSpace(os.Getenv("ASH_RETRY_BASE_DELAY")); raw != "" {
 		if parsed, err := time.ParseDuration(raw); err == nil && parsed >= 0 {
@@ -301,7 +301,7 @@ func retryBaseDelay() time.Duration {
 	return defaultRetryBaseDelay
 }
 
-// retryMaxDelay returns the computed value for this helper.
+// retryMaxDelay returns the configured maximum retry delay, or the default when unset or invalid.
 func retryMaxDelay() time.Duration {
 	if raw := strings.TrimSpace(os.Getenv("ASH_RETRY_MAX_DELAY")); raw != "" {
 		if parsed, err := time.ParseDuration(raw); err == nil && parsed >= 0 {
@@ -311,7 +311,7 @@ func retryMaxDelay() time.Duration {
 	return defaultRetryMaxDelay
 }
 
-// toolTimeout returns the computed value for this helper.
+// toolTimeout returns the configured timeout for tool commands, or the default when unset or invalid.
 func toolTimeout() time.Duration {
 	if raw := strings.TrimSpace(os.Getenv("ASH_TOOL_TIMEOUT")); raw != "" {
 		if parsed, err := time.ParseDuration(raw); err == nil && parsed > 0 {
@@ -321,7 +321,7 @@ func toolTimeout() time.Duration {
 	return defaultToolTimeout
 }
 
-// toolOutputLimit returns the computed value for this helper.
+// toolOutputLimit returns the configured maximum output size for tool command results, or the default when unset or invalid.
 func toolOutputLimit() int {
 	if raw := strings.TrimSpace(os.Getenv("ASH_TOOL_OUTPUT_MAX")); raw != "" {
 		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
@@ -331,7 +331,7 @@ func toolOutputLimit() int {
 	return defaultToolOutputMax
 }
 
-// maxToolIterations returns the computed value for this helper.
+// maxToolIterations returns the configured maximum number of tool iterations, or the default when unset or invalid.
 func maxToolIterations() int {
 	if raw := strings.TrimSpace(os.Getenv("ASH_MAX_TOOL_ITERS")); raw != "" {
 		if parsed, err := strconv.Atoi(raw); err == nil && parsed >= 0 {
@@ -341,7 +341,7 @@ func maxToolIterations() int {
 	return defaultMaxToolIters
 }
 
-// keepRecentMessages returns the computed value for this helper.
+// keepRecentMessages returns the most recent messages up to max, preserving their existing order.
 func keepRecentMessages(messages []message, max int) []message {
 	if len(messages) <= max {
 		return messages
@@ -350,7 +350,7 @@ func keepRecentMessages(messages []message, max int) []message {
 	return append([]message(nil), messages[len(messages)-max:]...)
 }
 
-// taskListMax returns the computed value for this helper.
+// taskListMax returns the configured maximum number of execution tasks, or the default when unset or invalid.
 func taskListMax() int {
 	if raw := strings.TrimSpace(os.Getenv("ASH_TASK_MAX")); raw != "" {
 		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
@@ -360,7 +360,7 @@ func taskListMax() int {
 	return defaultTaskMax
 }
 
-// relevanceWindow returns the computed value for this helper.
+// relevanceWindow returns the configured number of recent tool observations to include in task state messages, or the default when unset or invalid.
 func relevanceWindow() int {
 	if raw := strings.TrimSpace(os.Getenv("ASH_RELEVANCE_WINDOW")); raw != "" {
 		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
@@ -370,7 +370,7 @@ func relevanceWindow() int {
 	return defaultRelevanceWin
 }
 
-// maxTaskStallRounds returns the computed value for this helper.
+// maxTaskStallRounds returns the configured number of stalled rounds before execution stops, or the default when unset or invalid.
 func maxTaskStallRounds() int {
 	if raw := strings.TrimSpace(os.Getenv("ASH_TASK_STALL_ROUNDS")); raw != "" {
 		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {

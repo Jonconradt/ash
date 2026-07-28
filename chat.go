@@ -37,7 +37,7 @@ type chatStatusError struct {
 	Body       string
 }
 
-// Error returns the error message.
+// Error returns the HTTP status code and response body as a formatted error string.
 func (e chatStatusError) Error() string {
 	return fmt.Sprintf("status %d: %s", e.StatusCode, strings.TrimSpace(e.Body))
 }
@@ -110,7 +110,7 @@ var cloudServer500Messages = []string{
 	"The server took a wrong turn at runtime. Please retry shortly.",
 }
 
-// randomCloudBusy503Message returns the computed value for this helper.
+// randomCloudBusy503Message returns a humorous retry message for transient 503 service-busy responses.
 func randomCloudBusy503Message() string {
 	if len(cloudBusy503Messages) == 0 {
 		return "The cloud model is distracted and too busy right now. Please try again shortly."
@@ -119,7 +119,7 @@ func randomCloudBusy503Message() string {
 	return cloudBusy503Messages[idx]
 }
 
-// randomCloudServer500Message returns the computed value for this helper.
+// randomCloudServer500Message returns a humorous retry message for transient 500 server errors.
 func randomCloudServer500Message() string {
 	if len(cloudServer500Messages) == 0 {
 		return "The server hit an internal error. Please try again shortly."
@@ -128,7 +128,7 @@ func randomCloudServer500Message() string {
 	return cloudServer500Messages[idx]
 }
 
-// chat returns the computed value for this helper.
+// chat sends a chat request to the configured AI endpoint and returns the assistant response or an error.
 func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolDefinition) (chatResponse, error) {
 	requestBody := chatRequest{
 		Model:    aiCfg.Model,

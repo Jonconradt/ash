@@ -167,7 +167,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	return 0
 }
 
-// printUsage returns the computed value for this helper.
+// printUsage writes the CLI usage text for the ash command to w.
 func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "usage: ash <text>")
 	fmt.Fprintln(w, "       ash install [--shell bash|zsh] [--dry-run]")

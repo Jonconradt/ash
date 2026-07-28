@@ -153,7 +153,7 @@ func shouldForceToolRetry(userInput, assistantContent string, tools []toolDefini
 	return false
 }
 
-// buildExecutionTasks builds and returns a derived value.
+// buildExecutionTasks splits the user's request into execution tasks, honoring the configured task limit.
 func buildExecutionTasks(userInput string, max int) []executionTask {
 	normalized := strings.TrimSpace(userInput)
 	if normalized == "" {
@@ -192,7 +192,7 @@ func buildExecutionTasks(userInput string, max int) []executionTask {
 	return tasks
 }
 
-// buildExecutionStateMessage builds and returns a derived value.
+// buildExecutionStateMessage constructs the system prompt that summarizes the current execution plan and recent tool observations.
 func buildExecutionStateMessage(userInput string, tasks []executionTask, observations []toolObservation, window int) message {
 	if window <= 0 {
 		window = defaultRelevanceWin
@@ -239,7 +239,7 @@ func buildExecutionStateMessage(userInput string, tasks []executionTask, observa
 	return message{Role: "system", Content: b.String()}
 }
 
-// parseToolObservation parses and validates input values.
+// parseToolObservation converts a tool result payload into a compact observation suitable for task tracking.
 func parseToolObservation(toolResult string) toolObservation {
 	var parsed toolCommandResult
 	if err := json.Unmarshal([]byte(toolResult), &parsed); err != nil {
@@ -268,7 +268,7 @@ func parseToolObservation(toolResult string) toolObservation {
 	}
 }
 
-// promoteNextPendingTask returns the computed value for this helper.
+// promoteNextPendingTask marks the next pending task as running so execution can proceed.
 func promoteNextPendingTask(tasks []executionTask) {
 	for i := range tasks {
 		if tasks[i].Status == taskStatusPending {
@@ -278,7 +278,7 @@ func promoteNextPendingTask(tasks []executionTask) {
 	}
 }
 
-// applyToolObservationToTasks returns the computed value for this helper.
+// applyToolObservationToTasks updates the active execution task with the latest tool observation outcome.
 func applyToolObservationToTasks(tasks []executionTask, observation toolObservation) {
 	for i := range tasks {
 		if tasks[i].Status != taskStatusPending && tasks[i].Status != taskStatusRunning {
@@ -294,7 +294,7 @@ func applyToolObservationToTasks(tasks []executionTask, observation toolObservat
 	}
 }
 
-// hasPendingExecutionTasks reports whether the condition is true.
+// hasPendingExecutionTasks reports whether any execution task is still pending or running.
 func hasPendingExecutionTasks(tasks []executionTask) bool {
 	for _, task := range tasks {
 		if task.Status == taskStatusPending || task.Status == taskStatusRunning {

@@ -19,7 +19,7 @@ type localToolShim struct {
 	allowlist map[string]struct{}
 }
 
-// ListTools returns the tool definitions exposed by the local shim.
+// ListTools returns the tool definitions exposed to the AI client by the local shim.
 func (s localToolShim) ListTools() []toolDefinition {
 	runUnixDescription := "Run a single allowlisted Unix executable with direct args and no shell expansion"
 	allowed := sortedAllowlist(s.allowlist)
@@ -49,30 +49,6 @@ func (s localToolShim) ListTools() []toolDefinition {
 						},
 					},
 					"required": []string{"command"},
-				},
-			},
-		},
-		{
-			Type: "function",
-			Function: toolFunctionDefinition{
-				Name:        "run_python3",
-				Description: "Execute Python 3 code via python3 -c and return stdout/stderr",
-				Parameters: map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"code": map[string]any{
-							"type":        "string",
-							"description": "Python code to execute",
-						},
-						"argv": map[string]any{
-							"type": "array",
-							"items": map[string]any{
-								"type": "string",
-							},
-							"description": "Optional argv values visible to the script as sys.argv[1:]",
-						},
-					},
-					"required": []string{"code"},
 				},
 			},
 		},
@@ -209,34 +185,10 @@ func (s localToolShim) ListTools() []toolDefinition {
 				},
 			},
 		},
-		{
-			Type: "function",
-			Function: toolFunctionDefinition{
-				Name:        "python3",
-				Description: "Execute Python 3 code via python3 -c and return stdout/stderr",
-				Parameters: map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"code": map[string]any{
-							"type":        "string",
-							"description": "Python code to execute",
-						},
-						"argv": map[string]any{
-							"type": "array",
-							"items": map[string]any{
-								"type": "string",
-							},
-							"description": "Optional argv values visible to the script as sys.argv[1:]",
-						},
-					},
-					"required": []string{"code"},
-				},
-			},
-		},
 	}
 }
 
-// CallTool dispatches a tool call to the matching local shim handler.
+// CallTool dispatches a tool call to the matching local shim handler and returns the serialized result.
 func (s localToolShim) CallTool(ctx context.Context, name string, args map[string]any) string {
 	var result toolCommandResult
 
@@ -267,7 +219,7 @@ func (s localToolShim) CallTool(ctx context.Context, name string, args map[strin
 	return string(encoded)
 }
 
-// callUnixCommand invokes the underlying tool implementation.
+// callUnixCommand executes an allowlisted Unix command with the provided arguments and validates safety constraints.
 func (s localToolShim) callUnixCommand(ctx context.Context, args map[string]any) toolCommandResult {
 	commandInput, ok := toStringArg(args["command"])
 	if !ok {
@@ -306,7 +258,7 @@ func (s localToolShim) callUnixCommand(ctx context.Context, args map[string]any)
 	return toolCommandRunner(ctx, commandName, argv, toolTimeout(), toolOutputLimit())
 }
 
-// callPython3 invokes the underlying tool implementation.
+// callPython3 executes a Python snippet via python3 -c after validating the provided code and argv values.
 func (s localToolShim) callPython3(ctx context.Context, args map[string]any) toolCommandResult {
 	code, ok := toStringArg(args["code"])
 	if !ok || strings.TrimSpace(code) == "" {
@@ -328,7 +280,7 @@ func (s localToolShim) callPython3(ctx context.Context, args map[string]any) too
 	return toolCommandRunner(ctx, "python3", pythonArgs, toolTimeout(), toolOutputLimit())
 }
 
-// callScheduleFuturePrompt invokes the underlying tool implementation.
+// callScheduleFuturePrompt schedules a future ash prompt using launchd and returns the resulting execution status.
 func (s localToolShim) callScheduleFuturePrompt(ctx context.Context, args map[string]any) toolCommandResult {
 	prompt, ok := toStringArg(args["prompt"])
 	if !ok || strings.TrimSpace(prompt) == "" {
@@ -369,7 +321,7 @@ func (s localToolShim) callScheduleFuturePrompt(ctx context.Context, args map[st
 	return result
 }
 
-// callScheduleRecurringPrompt invokes the underlying tool implementation.
+// callScheduleRecurringPrompt creates a recurring crontab entry that re-invokes ash on the supplied schedule.
 func (s localToolShim) callScheduleRecurringPrompt(ctx context.Context, args map[string]any) toolCommandResult {
 	prompt, ok := toStringArg(args["prompt"])
 	if !ok || strings.TrimSpace(prompt) == "" {
@@ -412,7 +364,7 @@ func (s localToolShim) callScheduleRecurringPrompt(ctx context.Context, args map
 	return writeResult
 }
 
-// callManageRecurringJobs invokes the underlying tool implementation.
+// callManageRecurringJobs lists, explains, cancels, or modifies recurring ash jobs stored in the user's crontab.
 func (s localToolShim) callManageRecurringJobs(ctx context.Context, args map[string]any) toolCommandResult {
 	actionRaw, ok := toStringArg(args["action"])
 	if !ok {
@@ -537,7 +489,7 @@ func (s localToolShim) callManageRecurringJobs(ctx context.Context, args map[str
 	}
 }
 
-// callReadWorkspaceFile invokes the underlying tool implementation.
+// callReadWorkspaceFile reads a file from the canonical ash workspace and returns its contents with the workspace-relative path.
 func (s localToolShim) callReadWorkspaceFile(args map[string]any) toolCommandResult {
 	rel, ok := toStringArg(args["path"])
 	if !ok || strings.TrimSpace(rel) == "" {
@@ -560,7 +512,7 @@ func (s localToolShim) callReadWorkspaceFile(args map[string]any) toolCommandRes
 	return toolCommandResult{OK: true, Command: "ash_read_workspace_file", ExitCode: 0, Stdout: fmt.Sprintf("path=%s\n%s", relPath, string(content))}
 }
 
-// callWriteWorkspaceFile invokes the underlying tool implementation.
+// callWriteWorkspaceFile writes a file into the canonical ash workspace and records its purpose in the workspace inventory.
 func (s localToolShim) callWriteWorkspaceFile(args map[string]any) toolCommandResult {
 	rel, ok := toStringArg(args["path"])
 	if !ok || strings.TrimSpace(rel) == "" {
