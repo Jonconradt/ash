@@ -2268,6 +2268,11 @@ func runShellCollisionFixture(t *testing.T, shell, fixture, invocation string) s
 }
 
 func TestBashCollisionWrappers(t *testing.T) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("UserHomeDir failed: %v", err)
+	}
+
 	tests := []struct {
 		name       string
 		invocation string
@@ -2277,7 +2282,7 @@ func TestBashCollisionWrappers(t *testing.T) {
 		{name: "lower case what routed", invocation: "what time is it?", want: "ASH:what time is it?"},
 		{name: "what interrogative routed", invocation: "what is awk", want: "ASH:what is awk"},
 		{name: "what mid auxiliary routed", invocation: "What directory am I in and are there any executeable files Run multiple tools if necessary", want: "ASH:What directory am I in and are there any executeable files Run multiple tools if necessary"},
-		{name: "what sentence with path routed", invocation: "what time is it and list all of the files in the ~/.ash/logs", want: "ASH:what time is it and list all of the files in the /Users/jon/.ash/logs"},
+		{name: "what sentence with path routed", invocation: "what time is it and list all of the files in the ~/.ash/logs", want: "ASH:what time is it and list all of the files in the " + filepath.Join(homeDir, ".ash", "logs")},
 		{name: "what path delegates", invocation: "what /usr/bin/what", want: "DELEGATE:what:/usr/bin/what"},
 		{name: "what flag delegates", invocation: "what -s file", want: "DELEGATE:what:-s file"},
 		{name: "title case time routed", invocation: "Time is it late?", want: "ASH:Time is it late?"},
@@ -2288,7 +2293,7 @@ func TestBashCollisionWrappers(t *testing.T) {
 		{name: "which question routed", invocation: "which should I use ripgrep or grep", want: "ASH:which should I use ripgrep or grep"},
 		{name: "which command form delegates", invocation: "which ls", want: "DELEGATE:which:ls"},
 		{name: "who question routed", invocation: "who am I?", want: "ASH:who am I?"},
-		{name: "who with path routed", invocation: "who am I and list files in ~/.ash/logs", want: "ASH:who am I and list files in /Users/jon/.ash/logs"},
+		{name: "who with path routed", invocation: "who am I and list files in ~/.ash/logs", want: "ASH:who am I and list files in " + filepath.Join(homeDir, ".ash", "logs")},
 		{name: "who no args delegates", invocation: "who", want: "DELEGATE:who:"},
 		{name: "at natural routed", invocation: "at remind me tomorrow", want: "ASH:at remind me tomorrow"},
 		{name: "at scheduler delegates", invocation: "at 5pm", want: "DELEGATE:at:5pm"},
@@ -2305,6 +2310,11 @@ func TestBashCollisionWrappers(t *testing.T) {
 }
 
 func TestZshCollisionWrappers(t *testing.T) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatalf("UserHomeDir failed: %v", err)
+	}
+
 	tests := []struct {
 		name       string
 		invocation string
@@ -2313,12 +2323,12 @@ func TestZshCollisionWrappers(t *testing.T) {
 		{name: "title case what routed", invocation: "What time is it?", want: "ASH:What time is it?"},
 		{name: "lower case what routed", invocation: "what time is it?", want: "ASH:what time is it?"},
 		{name: "what mid auxiliary routed", invocation: "What directory am I in and are there any executeable files Run multiple tools if necessary", want: "ASH:What directory am I in and are there any executeable files Run multiple tools if necessary"},
-		{name: "what sentence with path routed", invocation: "what time is it and list all of the files in the ~/.ash/logs", want: "ASH:what time is it and list all of the files in the /Users/jon/.ash/logs"},
+		{name: "what sentence with path routed", invocation: "what time is it and list all of the files in the ~/.ash/logs", want: "ASH:what time is it and list all of the files in the " + filepath.Join(homeDir, ".ash", "logs")},
 		{name: "what path delegates", invocation: "what /usr/bin/what", want: "DELEGATE:what:/usr/bin/what"},
 		{name: "title case time routed", invocation: "Time is it late?", want: "ASH:Time is it late?"},
 		{name: "where question routed", invocation: "where should logs go", want: "ASH:where should logs go"},
 		{name: "where command form delegates", invocation: "where ls", want: "DELEGATE:where:ls"},
-		{name: "who with path routed", invocation: "who am I and list files in ~/.ash/logs", want: "ASH:who am I and list files in /Users/jon/.ash/logs"},
+		{name: "who with path routed", invocation: "who am I and list files in ~/.ash/logs", want: "ASH:who am I and list files in " + filepath.Join(homeDir, ".ash", "logs")},
 		{name: "at natural routed", invocation: "at remind me tomorrow", want: "ASH:at remind me tomorrow"},
 		{name: "at scheduler delegates", invocation: "at 5pm", want: "DELEGATE:at:5pm"},
 	}
