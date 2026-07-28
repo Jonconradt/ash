@@ -216,6 +216,13 @@ release-artifacts:
 	done
 
 release-publish:
+	@current_branch="$$(git rev-parse --abbrev-ref HEAD)"; \
+	if [[ "$$current_branch" == "HEAD" ]]; then \
+		echo "cannot publish release from detached HEAD"; \
+		exit 1; \
+	fi; \
+	git push origin "$$current_branch"; \
+	echo "pushed branch $$current_branch to origin"
 	@head_sha="$$(git rev-parse HEAD)"; \
 	local_sha="$$(git rev-parse -q --verify "refs/tags/$(RELEASE_VERSION)^{}" 2>/dev/null || true)"; \
 	if [[ -n "$$local_sha" && "$$local_sha" != "$$head_sha" ]]; then \
