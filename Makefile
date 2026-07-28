@@ -97,11 +97,11 @@ release-check: lint test gosec govulncheck
 
 release-build:
 	@mkdir -p "$(RELEASE_OUTPUT_DIR)"
-	GOOS=darwin GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "$(RELEASE_OUTPUT_DIR)/$(APP_NAME)" ./...
+	GOOS=darwin GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "$(RELEASE_OUTPUT_DIR)/$(APP_NAME)" .
 
 release-build-one:
 	@mkdir -p "$(RELEASE_OUTPUT_DIR)"
-	GOOS=$(RELEASE_GOOS) GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "$(RELEASE_BINARY_PATH)" ./...
+	GOOS=$(RELEASE_GOOS) GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "$(RELEASE_BINARY_PATH)" .
 
 release-pkg:
 	@mkdir -p "$(RELEASE_PACKAGE_DIR)"
