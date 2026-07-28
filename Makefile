@@ -1,5 +1,7 @@
 .PHONY: all verify lint test test-race test-cover test-fuzz vet staticcheck install version release release-check release-build release-pkg release-validate release-publish release-artifacts release-build-one release-pkg-one release-validate-one
 
+SHELL := /bin/bash
+
 COVERAGE_MIN ?= 95
 FUZZ_TIME ?= 10s
 GOLANGCI_LINT_VERSION ?= v1.64.8
