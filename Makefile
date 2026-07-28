@@ -252,17 +252,6 @@ release-publish:
 	else \
 		echo "local tag $(RELEASE_VERSION) already exists at HEAD"; \
 	fi
-	@remote_sha="$$(git ls-remote --tags origin "refs/tags/$(RELEASE_VERSION)^{}" | awk '{print $$1}')"; \
-	head_sha="$$(git rev-parse HEAD)"; \
-	if [[ -n "$$remote_sha" ]]; then \
-		if [[ "$$remote_sha" == "$$head_sha" ]]; then \
-			echo "remote tag $(RELEASE_VERSION) already exists at HEAD; nothing to push"; \
-		else \
-			echo "remote tag $(RELEASE_VERSION) already exists and points to $$remote_sha, not HEAD ($$head_sha)"; \
-			echo "choose a new RELEASE_VERSION or move the tag manually"; \
-			exit 1; \
-		fi; \
-	else \
-		git push origin "refs/tags/$(RELEASE_VERSION):refs/tags/$(RELEASE_VERSION)"; \
-		echo "pushed tag $(RELEASE_VERSION) to origin"; \
-	fi
+	@echo "pushing tag $(RELEASE_VERSION) to origin"; \
+	git push origin "refs/tags/$(RELEASE_VERSION):refs/tags/$(RELEASE_VERSION)"; \
+	echo "pushed tag $(RELEASE_VERSION) to origin"

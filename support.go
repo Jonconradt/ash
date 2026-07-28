@@ -1154,12 +1154,12 @@ func startThinkingIndicator(w io.Writer) func() {
 
 		frame := 0
 		for {
-			fmt.Fprintf(w, "\rThinking... %s [EID=dzvTcfc1]", frames[frame])
+			fmt.Fprintf(w, "\rThinking... %s [EID=r3Samcjb]", frames[frame])
 			frame = (frame + 1) % len(frames)
 
 			select {
 			case <-done:
-				fmt.Fprint(w, "\r                \r [EID=K4LiufMz]")
+				fmt.Fprint(w, "\r                \r [EID=QY2o9gQZ]")
 				return
 			case <-ticker.C:
 			}
