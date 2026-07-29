@@ -63,6 +63,8 @@ var (
 	osUserHomeDir       = os.UserHomeDir
 	osReadFile          = os.ReadFile
 	osWriteFile         = os.WriteFile
+	stdinIsInteractive  = isInteractiveStdin
+	readPromptFromStdin = readAllPromptFromStdin
 	execLookPath        = exec.LookPath
 	execCommandOutput   = func(name string, args ...string) ([]byte, error) { return exec.Command(name, args...).Output() }
 	execCommandContext  = exec.CommandContext
@@ -88,6 +90,24 @@ func init() {
 	requestIDGenerator = func() string {
 		return hex.EncodeToString(make([]byte, 8))
 	}
+}
+
+// isInteractiveStdin reports whether stdin is connected to a terminal device.
+func isInteractiveStdin() bool {
+	info, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return info.Mode()&os.ModeCharDevice != 0
+}
+
+// readAllPromptFromStdin reads all available stdin data as prompt text.
+func readAllPromptFromStdin() (string, error) {
+	data, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		return "", err
+	}
+	return string(data), nil
 }
 
 // verboseLoggingEnabled reports whether debug logging is enabled from the environment.

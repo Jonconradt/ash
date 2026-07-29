@@ -4,6 +4,9 @@
 It sends the command text to an Ollama model using the Ollama Chat API and prints
 the assistant response.
 
+When invoked without positional arguments, `ash` reads prompt text from non-interactive
+stdin (for example, shell pipes or redirected files).
+
 ## Features
 
 - Uses `AI_ENDPOINT` and `AI_MODEL` to target local or cloud Ollama Chat API endpoints
@@ -101,6 +104,13 @@ export AI_ENDPOINT="https://ollama.example.com"
 export AI_MODEL="llama3.1:latest"
 export AI_AUTH_TYPE="bearer"
 export AI_AUTH_TOKEN="<token>"
+```
+
+Pipeline examples:
+
+```bash
+echo "summarize the current directory" | ash
+cat prompt.txt | ash
 ```
 
 Common `AI_ENDPOINT` values:

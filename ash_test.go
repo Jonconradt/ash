@@ -2599,6 +2599,10 @@ func TestRun(t *testing.T) {
 	})
 
 	t.Run("missing args", func(t *testing.T) {
+		origStdinInteractive := stdinIsInteractive
+		t.Cleanup(func() { stdinIsInteractive = origStdinInteractive })
+		stdinIsInteractive = func() bool { return true }
+
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
 		code := run(nil, &stdout, &stderr)
@@ -2607,6 +2611,105 @@ func TestRun(t *testing.T) {
 		}
 		if !strings.Contains(stderr.String(), "usage: ash") {
 			t.Fatalf("expected usage message, got %q", stderr.String())
+		}
+	})
+
+	t.Run("no args reads piped stdin", func(t *testing.T) {
+		origStdinInteractive := stdinIsInteractive
+		origReadPromptFromStdin := readPromptFromStdin
+		t.Cleanup(func() {
+			stdinIsInteractive = origStdinInteractive
+			readPromptFromStdin = origReadPromptFromStdin
+		})
+		stdinIsInteractive = func() bool { return false }
+		readPromptFromStdin = func() (string, error) { return "  prompt from stdin  ", nil }
+
+		var gotReq chatRequest
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			body, _ := io.ReadAll(r.Body)
+			_ = json.Unmarshal(body, &gotReq)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"message":{"role":"assistant","content":"ok"}}`))
+		}))
+		defer srv.Close()
+
+		t.Setenv("AI", "")
+		t.Setenv("AI_ENDPOINT", srv.URL)
+		t.Setenv("AI_MODEL", "llama3.1")
+
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		code := run(nil, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
+		}
+		if len(gotReq.Messages) == 0 {
+			t.Fatalf("expected request messages")
+		}
+		last := gotReq.Messages[len(gotReq.Messages)-1]
+		if last.Role != "user" || last.Content != "prompt from stdin" {
+			t.Fatalf("expected stdin prompt as final user message, got role=%q content=%q", last.Role, last.Content)
+		}
+	})
+
+	t.Run("no args with empty piped stdin returns empty input", func(t *testing.T) {
+		origStdinInteractive := stdinIsInteractive
+		origReadPromptFromStdin := readPromptFromStdin
+		t.Cleanup(func() {
+			stdinIsInteractive = origStdinInteractive
+			readPromptFromStdin = origReadPromptFromStdin
+		})
+		stdinIsInteractive = func() bool { return false }
+		readPromptFromStdin = func() (string, error) { return "   \n\t", nil }
+
+		t.Setenv("AI", "")
+		t.Setenv("AI_ENDPOINT", "http://localhost:11434")
+		t.Setenv("AI_MODEL", "llama3.1")
+
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		code := run(nil, &stdout, &stderr)
+		if code != 1 {
+			t.Fatalf("expected exit code 1, got %d", code)
+		}
+		if !strings.Contains(stderr.String(), "empty input") {
+			t.Fatalf("expected empty input error, got %q", stderr.String())
+		}
+	})
+
+	t.Run("args take priority over piped stdin", func(t *testing.T) {
+		origReadPromptFromStdin := readPromptFromStdin
+		t.Cleanup(func() { readPromptFromStdin = origReadPromptFromStdin })
+		readPromptFromStdin = func() (string, error) {
+			t.Fatalf("stdin should not be read when args are provided")
+			return "", nil
+		}
+
+		var gotReq chatRequest
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			body, _ := io.ReadAll(r.Body)
+			_ = json.Unmarshal(body, &gotReq)
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"message":{"role":"assistant","content":"ok"}}`))
+		}))
+		defer srv.Close()
+
+		t.Setenv("AI", "")
+		t.Setenv("AI_ENDPOINT", srv.URL)
+		t.Setenv("AI_MODEL", "llama3.1")
+
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		code := run([]string{"prompt", "from", "args"}, &stdout, &stderr)
+		if code != 0 {
+			t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
+		}
+		if len(gotReq.Messages) == 0 {
+			t.Fatalf("expected request messages")
+		}
+		last := gotReq.Messages[len(gotReq.Messages)-1]
+		if last.Role != "user" || last.Content != "prompt from args" {
+			t.Fatalf("expected argv prompt as final user message, got role=%q content=%q", last.Role, last.Content)
 		}
 	})
 

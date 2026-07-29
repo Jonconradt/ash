@@ -54,8 +54,17 @@ func main() {
 // run runs the requested operation.
 func run(args []string, stdout, stderr io.Writer) int {
 	if len(args) < 1 {
-		printUsage(stderr)
-		return 1
+		if stdinIsInteractive() {
+			printUsage(stderr)
+			return 1
+		}
+
+		stdinPrompt, err := readPromptFromStdin()
+		if err != nil {
+			slog.Error(fmt.Sprintf("failed to read stdin prompt: %v", err), "EID", "f9hH5RjM")
+			return 1
+		}
+		args = []string{stdinPrompt}
 	}
 
 	configureDebugLogging(stderr)
