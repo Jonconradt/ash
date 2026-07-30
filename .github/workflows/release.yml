@@ -52,7 +52,7 @@ jobs:
 
       - name: Build and package macOS artifacts
         run: |
-          make version RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES=${{ matrix.arch }} RELEASE_VERSION="${GITHUB_REF_NAME}"
+          make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES=${{ matrix.arch }} RELEASE_VERSION="${GITHUB_REF_NAME}"
 
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v5
@@ -84,7 +84,7 @@ jobs:
 
       - name: Build and package Linux artifacts
         run: |
-          make version RELEASE_TARGET_OSES=linux RELEASE_TARGET_ARCHES=${{ matrix.arch }} RELEASE_VERSION="${GITHUB_REF_NAME}"
+          make release-artifacts RELEASE_TARGET_OSES=linux RELEASE_TARGET_ARCHES=${{ matrix.arch }} RELEASE_VERSION="${GITHUB_REF_NAME}"
 
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v5
