@@ -1,4 +1,4 @@
-.PHONY: all verify lint test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install setup-hooks version release release-check release-build release-pkg release-validate release-publish release-artifacts release-build-one release-pkg-one release-validate-one
+.PHONY: all verify lint test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install setup-hooks version release release-check release-build release-pkg release-validate release-publish release-watch release-artifacts release-build-one release-pkg-one release-validate-one
 
 SHELL := /bin/bash
 
@@ -15,6 +15,8 @@ RELEASE_TARGET_ARCHES ?= amd64 arm64
 RELEASE_TARGET_OSES ?= auto
 RELEASE_GOOS ?= darwin
 RELEASE_FORMAT ?= pkg
+RELEASE_WATCH ?= 1
+RELEASE_WATCH_STRICT ?= 1
 LATEST_RELEASE_TAG ?= $(shell git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$$' | head -n1)
 AUTO_RELEASE_VERSION ?= $(shell ./scripts/release/next_version.sh)
 RELEASE_VERSION ?= $(AUTO_RELEASE_VERSION)
@@ -80,7 +82,7 @@ install: test lint  gosec
 
 version: release-check release-artifacts
 
-release: release-check release-build release-pkg release-validate release-publish
+release: release-check release-build release-pkg release-validate release-publish release-watch
 
 release-check: lint test gosec govulncheck
 	@if [[ -n "$$(git status --porcelain)" ]]; then \
@@ -281,3 +283,31 @@ release-publish:
 	@echo "pushing tag $(RELEASE_VERSION) to origin"; \
 	git push origin "refs/tags/$(RELEASE_VERSION):refs/tags/$(RELEASE_VERSION)"; \
 	echo "pushed tag $(RELEASE_VERSION) to origin"
+
+release-watch:
+	@if [[ "$(RELEASE_WATCH)" != "1" ]]; then \
+		echo "release watch disabled (set RELEASE_WATCH=1 to enable)"; \
+		exit 0; \
+	fi
+	@if ! command -v gh >/dev/null 2>&1; then \
+		echo "gh CLI not found; skipping remote release watch"; \
+		exit 0; \
+	fi
+	@repo="$$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null || true)"; \
+	if [[ -z "$$repo" ]]; then \
+		echo "unable to resolve GitHub repository from gh; skipping remote release watch"; \
+		exit 0; \
+	fi; \
+	run_id="$$(GH_PAGER=cat gh run list -R "$$repo" --workflow release.yml --limit 20 --json databaseId,headBranch,event --jq 'map(select(.headBranch == "$(RELEASE_VERSION)" and .event == "push")) | first | .databaseId' 2>/dev/null || true)"; \
+	if [[ -z "$$run_id" || "$$run_id" == "null" ]]; then \
+		echo "release workflow run for tag $(RELEASE_VERSION) not visible yet; skipping watch"; \
+		echo "manual check: GH_PAGER=cat gh run list -R $$repo --workflow release.yml --limit 5"; \
+		exit 0; \
+	fi; \
+	echo "watching release workflow run $$run_id for tag $(RELEASE_VERSION)"; \
+	if ! GH_PAGER=cat gh run watch "$$run_id" -R "$$repo" --exit-status; then \
+		if [[ "$(RELEASE_WATCH_STRICT)" == "1" ]]; then \
+			exit 1; \
+		fi; \
+		echo "release workflow failed, but continuing because RELEASE_WATCH_STRICT=$(RELEASE_WATCH_STRICT)"; \
+	fi
