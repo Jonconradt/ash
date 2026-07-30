@@ -1,0 +1,159 @@
+.TH ASH 1 "July 2026" "ash" "User Commands"
+.SH NAME
+ash \- practical shell assistant for command-not-found workflows
+.SH SYNOPSIS
+.B ash
+.RI [ text ... ]
+.br
+.B ash
+.B install
+.RI [ --shell " bash|zsh" ]
+.RI [ --dry-run ]
+.SH DESCRIPTION
+.B ash
+sends prompt text to the configured AI endpoint and prints the assistant response.
+When no positional text is provided,
+.B ash
+reads prompt text from non-interactive standard input.
+.PP
+The
+.B install
+subcommand adds a managed integration block to shell startup files.
+For bash, the target is
+.I ~/.bashrc
+and for zsh the target is
+.I ~/.zshrc.
+.SH COMMANDS
+.TP
+.B ash [text ...]
+Run a single assistant request.
+.TP
+.B ash install [--shell bash|zsh] [--dry-run]
+Install or update shell integration.
+.IP
+.B --shell
+Select a shell explicitly. When omitted,
+.B ash
+uses the current shell when possible.
+.IP
+.B --dry-run
+Preview file changes without writing.
+.SH ENVIRONMENT
+.TP
+.B AI_ENDPOINT
+Required. Base URL for the chat API endpoint.
+.TP
+.B AI_MODEL
+Required. Model name sent to the endpoint.
+.TP
+.B AI_AUTH_TYPE
+Optional. For cloud endpoints use
+.B bearer.
+.TP
+.B AI_AUTH_TOKEN
+Optional bearer token for authenticated endpoints.
+.TP
+.B AI
+Legacy setting that is no longer supported.
+Use
+.B AI_ENDPOINT
+and
+.B AI_MODEL
+instead.
+.TP
+.B AI_TIMEOUT
+Optional request timeout. Default is 3m.
+.TP
+.B ASH_HISTORY_MAX
+Optional max number of history messages retained per key. Default is 40.
+.TP
+.B ASH_TOOL_ALLOWLIST
+Optional comma-separated allowlist for
+.B run_unix_command
+tool executables. When unset,
+.I ~/.ash/.ash_tools
+is used if present.
+.TP
+.B ASH_TOOL_TIMEOUT
+Optional timeout for local tool command execution. Default is 15s.
+.TP
+.B ASH_TOOL_OUTPUT_MAX
+Optional maximum bytes captured from tool output. Default is 8192.
+.TP
+.B ASH_MAX_TOOL_ITERS
+Optional maximum AI tool-call loop iterations. Default is 4.
+.TP
+.B ASH_TASK_MAX
+Optional cap on execution tasks derived from a request. Default is 6.
+.TP
+.B ASH_RELEVANCE_WINDOW
+Optional number of recent tool observations included in execution state. Default is 4.
+.TP
+.B ASH_TASK_STALL_ROUNDS
+Optional maximum assistant stall rounds before stopping execution. Default is 2.
+.TP
+.B ASH_RETRY_MAX_ATTEMPTS
+Optional maximum AI request attempts on retryable failures. Default is 3.
+.TP
+.B ASH_RETRY_BASE_DELAY
+Optional base retry backoff delay. Default is 250ms.
+.TP
+.B ASH_RETRY_MAX_DELAY
+Optional maximum retry backoff delay. Default is 2s.
+.TP
+.B ASH_VERBOSE
+Optional debug logging toggle.
+.TP
+.B ASH_LOG_FILE
+Optional path for debug log output when verbose logging is enabled.
+.TP
+.B ASH_LOG_MAX_BYTES
+Optional maximum log file size before rotation when
+.B ASH_LOG_FILE
+is used. Default is 1048576.
+.TP
+.B SESSION_ID
+Session identifier used for persistent history/log file naming. Generated automatically when missing for interactive runs; required for some scheduled logging paths.
+.TP
+.B SHELL
+Shell detection input for
+.B ash install
+and install recommendations.
+.TP
+.B ASH_SCHEDULED_TASK
+Internal scheduler flag. Set by ash-managed scheduled invocations.
+.TP
+.B HOME
+Determines the ash workspace location under
+.I ~/.ash.
+.TP
+.B PATH
+Used to locate executables for tool commands and helper utilities.
+.SH FILES
+.TP
+.I ~/.ash/.ash_system
+Canonical system prompt file.
+.TP
+.I ~/.ash/.ash_tools
+Canonical tool allowlist file.
+.TP
+.I ~/.ash/history/
+Conversation history files.
+.SH EXIT STATUS
+.B ash
+returns 0 on success.
+It returns non-zero when configuration, network requests, or tool execution fail.
+.SH EXAMPLES
+.TP
+.B echo "summarize this directory" | ash
+Read prompt text from stdin.
+.TP
+.B ash install --shell bash
+Install managed bash integration.
+.TP
+.B ash install --shell zsh --dry-run
+Preview zsh integration changes.
+.SH SEE ALSO
+.BR bash (1),
+.BR zsh (1),
+.BR man (1)

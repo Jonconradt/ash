@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/base64"
@@ -1885,6 +1886,9 @@ func TestStartThinkingIndicator(t *testing.T) {
 	if !strings.Contains(got, "\r") {
 		t.Fatalf("expected carriage return output, got %q", got)
 	}
+	if strings.Contains(got, "[EID=") {
+		t.Fatalf("expected thinking indicator to omit EIDs, got %q", got)
+	}
 }
 
 func TestRenderMarkdownWithGlamourEmojiPassthrough(t *testing.T) {
@@ -2152,6 +2156,9 @@ func TestRunInstall(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read bash wrapper file: %v", err)
 	}
+	if !strings.Contains(string(wrapperContent), `[ -f "$HOME/.ash/.ash_env" ] && . "$HOME/.ash/.ash_env"`) {
+		t.Fatalf("expected wrapper file to source .ash/.ash_env")
+	}
 	if !strings.Contains(string(wrapperContent), "command_not_found_handle") {
 		t.Fatalf("expected wrapper file to include command_not_found_handle")
 	}
@@ -2172,6 +2179,9 @@ func TestRunInstallDryRun(t *testing.T) {
 
 	if !strings.Contains(stdout.String(), "[dry-run]") {
 		t.Fatalf("expected dry-run output, got %q", stdout.String())
+	}
+	if strings.Contains(stdout.String(), "[EID=") {
+		t.Fatalf("expected dry-run output without EIDs, got %q", stdout.String())
 	}
 
 	rcPath := filepath.Join(home, ".zshrc")
@@ -2271,6 +2281,34 @@ func TestShouldConfigureInstallEnv(t *testing.T) {
 		}
 		if !got {
 			t.Fatalf("expected shouldConfigureInstallEnv=true when cloud auth vars are incomplete")
+		}
+	})
+}
+
+func TestPromptEndpointWithPresets(t *testing.T) {
+	t.Run("accepts numeric preset selection", func(t *testing.T) {
+		reader := bufio.NewReader(strings.NewReader("2\n"))
+		var stdout bytes.Buffer
+
+		got, err := promptEndpointWithPresets(reader, &stdout)
+		if err != nil {
+			t.Fatalf("promptEndpointWithPresets returned error: %v", err)
+		}
+		if got != installEndpointPresets[1].URL {
+			t.Fatalf("promptEndpointWithPresets returned %q, want %q", got, installEndpointPresets[1].URL)
+		}
+	})
+
+	t.Run("accepts and normalizes custom URL", func(t *testing.T) {
+		reader := bufio.NewReader(strings.NewReader("https://example.com/custom/\n"))
+		var stdout bytes.Buffer
+
+		got, err := promptEndpointWithPresets(reader, &stdout)
+		if err != nil {
+			t.Fatalf("promptEndpointWithPresets returned error: %v", err)
+		}
+		if got != "https://example.com/custom" {
+			t.Fatalf("promptEndpointWithPresets returned %q, want %q", got, "https://example.com/custom")
 		}
 	})
 }
@@ -2611,6 +2649,9 @@ func TestRun(t *testing.T) {
 		}
 		if !strings.Contains(stderr.String(), "usage: ash") {
 			t.Fatalf("expected usage message, got %q", stderr.String())
+		}
+		if strings.Contains(stderr.String(), "[EID=") {
+			t.Fatalf("expected usage output without EIDs, got %q", stderr.String())
 		}
 	})
 

@@ -74,6 +74,19 @@ Canonical publishing is tag-driven in GitHub Actions.
   - `ash-v1.2.3-<os>-<arch>.tar.gz`
   - matching `.sha256` files for each artifact
 
+Installer man pages are included in release artifacts:
+
+- macOS `.pkg`: `/usr/local/share/man/man1/ash.1`
+- Linux `.deb`/`.rpm`: `/usr/share/man/man1/ash.1`
+- `.tar.gz`: `usr/share/man/man1/ash.1`
+
+On some macOS setups, `/usr/local/share/man` may not be in the default `MANPATH`.
+If `man ash` does not resolve after install, run:
+
+```bash
+man -M /usr/local/share/man ash
+```
+
 For local maintainer checks without publishing, run:
 
 ```bash
@@ -126,6 +139,35 @@ Notes:
 - Cloud endpoints are inferred when the host is not `localhost` or `127.0.0.1`.
 - Cloud endpoints must use `https` and require bearer auth.
 - Legacy `AI=ollama://...` configuration is no longer supported.
+
+### Complete environment variable reference
+
+- `AI_ENDPOINT` (required): Base URL for the chat API endpoint.
+- `AI_MODEL` (required): Model name sent to the endpoint.
+- `AI_AUTH_TYPE` (optional): Use `bearer` for authenticated cloud endpoints.
+- `AI_AUTH_TOKEN` (optional): Bearer token used when `AI_AUTH_TYPE=bearer`.
+- `AI` (legacy, unsupported): Deprecated and rejected; use `AI_ENDPOINT` and `AI_MODEL`.
+- `AI_TIMEOUT` (optional): AI request timeout. Default `3m`.
+- `ASH_HISTORY_MAX` (optional): Max retained history messages per key. Default `40`.
+- `ASH_TOOL_ALLOWLIST` (optional): Comma-separated allowlisted executables for `run_unix_command`.
+- `ASH_TOOL_TIMEOUT` (optional): Timeout for local tool execution. Default `15s`.
+- `ASH_TOOL_OUTPUT_MAX` (optional): Max bytes captured from tool output. Default `8192`.
+- `ASH_MAX_TOOL_ITERS` (optional): Maximum AI tool-loop iterations. Default `4`.
+- `ASH_TASK_MAX` (optional): Maximum execution tasks derived from a request. Default `6`.
+- `ASH_RELEVANCE_WINDOW` (optional): Number of recent tool observations included in execution state. Default `4`.
+- `ASH_TASK_STALL_ROUNDS` (optional): Maximum stalled assistant rounds before stopping execution. Default `2`.
+- `ASH_RETRY_MAX_ATTEMPTS` (optional): Max retry attempts for retryable AI failures. Default `3`.
+- `ASH_RETRY_BASE_DELAY` (optional): Base retry backoff delay. Default `250ms`.
+- `ASH_RETRY_MAX_DELAY` (optional): Maximum retry backoff delay. Default `2s`.
+- `ASH_VERBOSE` (optional): Enable verbose debug logging (`1`, `true`, `yes`, `on`, `debug`).
+- `ASH_LOG_FILE` (optional): File path for verbose debug logs.
+- `ASH_LOG_MAX_BYTES` (optional): Max log size before rotation when `ASH_LOG_FILE` is used. Default `1048576` (1 MiB).
+- `ASH_LOG_FORMAT` (scheduler/internal): Log format set to `json` for scheduled invocations.
+- `SESSION_ID`: Session identifier used for history and scheduled log naming (generated when missing in interactive runs).
+- `ASH_SCHEDULED_TASK` (internal): Set by scheduled invocations to mark task execution context.
+- `SHELL`: Used by `ash install` and install recommendations to detect bash/zsh.
+- `HOME`: Determines ash workspace root under `$HOME/.ash`.
+- `PATH`: Used to locate executables for tool commands and helper utilities.
 
 Optional canonical system prompt file:
 
@@ -251,7 +293,7 @@ The Unix tool rejects risky shell-control argument patterns and always executes 
 - One-off scheduling uses a user `launchd` LaunchAgent under `~/.ash/launchagents/` with a per-invocation `com.user.gonetwork.<id>.plist` filename and loads it with `launchctl`.
 - Recurring scheduling uses user `crontab` entries with ash metadata markers.
 - Recurring-job management (`list`, `cancel`, `modify`, `explain`) operates only on ash-owned crontab entries.
-- Scheduled runs capture prompt + working directory and replay a minimal environment allowlist (`AI`, `HOME`, `PATH`, and selected ash config vars).
+- Scheduled runs capture prompt + working directory and replay a minimal environment allowlist (`AI_ENDPOINT`, `AI_MODEL`, auth/session variables, `HOME`, `PATH`, and selected ash config vars).
 - One-off scheduled runs also enable verbose logging and write JSON debug logs to `~/.ash/logs/task_$SESSION_ID.log`, rotating the file at 1 MB.
 - SESSION_ID is required for default log naming and is sanitized to alphanumeric characters for filename safety.
 

@@ -21,6 +21,10 @@ RELEASE_VERSION ?= $(AUTO_RELEASE_VERSION)
 RELEASE_PKG_NAME ?= $(APP_NAME)-$(RELEASE_VERSION)-darwin-$(RELEASE_ARCH).pkg
 RELEASE_PKG_PATH ?= $(RELEASE_PACKAGE_DIR)/$(RELEASE_PKG_NAME)
 RELEASE_INSTALL_PATH ?= /usr/local/bin
+MAN_PAGE_PATH ?= docs/ash.1
+MAN_INSTALL_PATH_LINUX ?= /usr/share/man/man1
+MAN_INSTALL_PATH_MACOS ?= /usr/local/share/man/man1
+TARBALL_MAN_PATH ?= usr/share/man/man1
 RELEASE_ARTIFACT_BASE ?= $(APP_NAME)-$(RELEASE_VERSION)-$(RELEASE_GOOS)-$(RELEASE_ARCH)
 RELEASE_BINARY_PATH ?= $(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)
 
@@ -110,6 +114,8 @@ release-pkg:
 		--version "$(RELEASE_VERSION)" \
 		--binary "$(RELEASE_OUTPUT_DIR)/$(APP_NAME)" \
 		--install-path "$(RELEASE_INSTALL_PATH)" \
+		--man-page "$(MAN_PAGE_PATH)" \
+		--man-install-path "$(MAN_INSTALL_PATH_MACOS)" \
 		--output "$(RELEASE_PKG_PATH)"
 
 release-pkg-one:
@@ -125,6 +131,8 @@ release-pkg-one:
 				--version "$(RELEASE_VERSION)" \
 				--binary "$(RELEASE_BINARY_PATH)" \
 				--install-path "$(RELEASE_INSTALL_PATH)" \
+				--man-page "$(MAN_PAGE_PATH)" \
+				--man-install-path "$(MAN_INSTALL_PATH_MACOS)" \
 				--output "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).pkg"; \
 			;; \
 		deb) \
@@ -134,6 +142,8 @@ release-pkg-one:
 				--arch "$(RELEASE_ARCH)" \
 				--binary "$(RELEASE_BINARY_PATH)" \
 				--install-path "$(RELEASE_INSTALL_PATH)" \
+				--man-page "$(MAN_PAGE_PATH)" \
+				--man-install-path "$(MAN_INSTALL_PATH_LINUX)" \
 				--output "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).deb"; \
 			;; \
 		rpm) \
@@ -143,10 +153,21 @@ release-pkg-one:
 				--arch "$(RELEASE_ARCH)" \
 				--binary "$(RELEASE_BINARY_PATH)" \
 				--install-path "$(RELEASE_INSTALL_PATH)" \
+				--man-page "$(MAN_PAGE_PATH)" \
+				--man-install-path "$(MAN_INSTALL_PATH_LINUX)" \
 				--output "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).rpm"; \
 			;; \
 		tar.gz) \
-			tar -C "$(RELEASE_OUTPUT_DIR)" -czf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" "$(notdir $(RELEASE_BINARY_PATH))"; \
+			if [[ ! -f "$(MAN_PAGE_PATH)" ]]; then \
+				echo "man page not found: $(MAN_PAGE_PATH)"; \
+				exit 1; \
+			fi; \
+			tmp_dir="$$(mktemp -d)"; \
+			trap 'rm -rf "$$tmp_dir"' EXIT; \
+			cp "$(RELEASE_BINARY_PATH)" "$$tmp_dir/$(notdir $(RELEASE_BINARY_PATH))"; \
+			mkdir -p "$$tmp_dir/$(TARBALL_MAN_PATH)"; \
+			install -m 0644 "$(MAN_PAGE_PATH)" "$$tmp_dir/$(TARBALL_MAN_PATH)/$(APP_NAME).1"; \
+			tar -C "$$tmp_dir" -czf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" "$(notdir $(RELEASE_BINARY_PATH))" "$(TARBALL_MAN_PATH)/$(APP_NAME).1"; \
 			;; \
 		*) \
 			echo "unsupported RELEASE_FORMAT=$(RELEASE_FORMAT)"; \
@@ -158,6 +179,7 @@ release-validate:
 	@./scripts/package/macos/validate_pkg.sh \
 		--pkg "$(RELEASE_PKG_PATH)" \
 		--install-path "$(RELEASE_INSTALL_PATH)" \
+		--man-path "$(MAN_INSTALL_PATH_MACOS)/$(APP_NAME).1" \
 		--app-name "$(APP_NAME)"
 	@shasum -a 256 "$(RELEASE_PKG_PATH)" > "$(RELEASE_PKG_PATH).sha256"
 
@@ -167,6 +189,7 @@ release-validate-one:
 			./scripts/package/macos/validate_pkg.sh \
 				--pkg "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).pkg" \
 				--install-path "$(RELEASE_INSTALL_PATH)" \
+				--man-path "$(MAN_INSTALL_PATH_MACOS)/$(APP_NAME).1" \
 				--app-name "$(APP_NAME)"; \
 			shasum -a 256 "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).pkg" > "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).pkg.sha256"; \
 			;; \
@@ -174,6 +197,7 @@ release-validate-one:
 			./scripts/package/linux/validate_deb.sh \
 				--pkg "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).deb" \
 				--install-path "$(RELEASE_INSTALL_PATH)" \
+				--man-path "$(MAN_INSTALL_PATH_LINUX)/$(APP_NAME).1" \
 				--app-name "$(APP_NAME)"; \
 			shasum -a 256 "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).deb" > "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).deb.sha256"; \
 			;; \
@@ -181,11 +205,13 @@ release-validate-one:
 			./scripts/package/linux/validate_rpm.sh \
 				--pkg "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).rpm" \
 				--install-path "$(RELEASE_INSTALL_PATH)" \
+				--man-path "$(MAN_INSTALL_PATH_LINUX)/$(APP_NAME).1" \
 				--app-name "$(APP_NAME)"; \
 			shasum -a 256 "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).rpm" > "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).rpm.sha256"; \
 			;; \
 		tar.gz) \
 			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^$(notdir $(RELEASE_BINARY_PATH))$$"; \
+			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^$(TARBALL_MAN_PATH)/$(APP_NAME)\.1$$"; \
 			shasum -a 256 "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" > "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz.sha256"; \
 			;; \
 		*) \

@@ -298,24 +298,6 @@ func buildPlan(filename string, allMode bool) (*filePlan, error) {
 	}
 
 	ast.Inspect(f, func(n ast.Node) bool {
-		call, ok := n.(*ast.CallExpr)
-		if !ok {
-			return true
-		}
-		if len(call.Args) == 0 {
-			return true
-		}
-		changed, lit := normalizeFmtLogCall(call)
-		if changed {
-			plan.changed = true
-		}
-		if lit != nil {
-			plan.eids = append(plan.eids, lit)
-		}
-		return true
-	})
-
-	ast.Inspect(f, func(n ast.Node) bool {
 		lit, ok := n.(*ast.CompositeLit)
 		if !ok {
 			return true
@@ -359,89 +341,6 @@ func buildPlan(filename string, allMode bool) (*filePlan, error) {
 		return nil, errNoChanges
 	}
 	return plan, nil
-}
-
-func normalizeFmtLogCall(call *ast.CallExpr) (bool, *ast.BasicLit) {
-	if len(call.Args) == 0 {
-		return false, nil
-	}
-
-	if ident, ok := call.Fun.(*ast.Ident); ok {
-		switch ident.Name {
-		case "writeLogf":
-			return normalizeWriteLogfCall(call)
-		case "writeLogLine":
-			return normalizeWriteLogLineCall(call)
-		}
-	}
-
-	sel, ok := call.Fun.(*ast.SelectorExpr)
-	if !ok {
-		return false, nil
-	}
-	ident, ok := sel.X.(*ast.Ident)
-	if !ok || ident.Name != "fmt" {
-		return false, nil
-	}
-
-	switch sel.Sel.Name {
-	case "Fprintf":
-		return normalizeFmtFprintfCall(call)
-	case "Fprint", "Fprintln":
-		return normalizeFmtFprintLikeCall(call)
-	default:
-		return false, nil
-	}
-}
-
-func normalizeWriteLogfCall(call *ast.CallExpr) (bool, *ast.BasicLit) {
-	return normalizeStringLiteralCall(call, 1)
-}
-
-func normalizeWriteLogLineCall(call *ast.CallExpr) (bool, *ast.BasicLit) {
-	return normalizeStringLiteralCall(call, 1)
-}
-
-func normalizeStringLiteralCall(call *ast.CallExpr, index int) (bool, *ast.BasicLit) {
-	if len(call.Args) <= index {
-		return false, nil
-	}
-	lit, ok := call.Args[index].(*ast.BasicLit)
-	if !ok || lit.Kind != token.STRING {
-		return false, nil
-	}
-	value, ok := parseStringLiteral(lit)
-	if !ok || strings.Contains(value, "EID=") {
-		return false, nil
-	}
-	newValue := value + " [EID=" + mustRandAlphaNum(8) + "]"
-	lit.Value = strconv.Quote(newValue)
-	return true, nil
-}
-
-func normalizeFmtFprintfCall(call *ast.CallExpr) (bool, *ast.BasicLit) {
-	return normalizeFmtStringLiteralCall(call, 1)
-}
-
-func normalizeFmtFprintLikeCall(call *ast.CallExpr) (bool, *ast.BasicLit) {
-	return normalizeFmtStringLiteralCall(call, 1)
-}
-
-func normalizeFmtStringLiteralCall(call *ast.CallExpr, index int) (bool, *ast.BasicLit) {
-	if len(call.Args) <= index {
-		return false, nil
-	}
-	lit, ok := call.Args[index].(*ast.BasicLit)
-	if !ok || lit.Kind != token.STRING {
-		return false, nil
-	}
-	value, ok := parseStringLiteral(lit)
-	if !ok || strings.Contains(value, "EID=") {
-		return false, nil
-	}
-	newValue := value + " [EID=" + mustRandAlphaNum(8) + "]"
-	lit.Value = strconv.Quote(newValue)
-	return true, nil
 }
 
 func normalizeSlogCall(call *ast.CallExpr) (bool, *ast.BasicLit) {

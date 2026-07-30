@@ -273,7 +273,7 @@ func f(message, eid string, err error, attrs []any) {
 	}
 }
 
-func TestBuildPlanInjectsEIDForWriteLogfCalls(t *testing.T) {
+func TestBuildPlanDoesNotInjectEIDForWriteLogfCalls(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "write_logf.go")
 	src := `package main
@@ -289,27 +289,12 @@ func f(w io.Writer, err error) {
 	}
 
 	plan, err := buildPlan(file, false)
-	if err != nil {
-		t.Fatalf("buildPlan: %v", err)
-	}
-	if plan == nil || !plan.changed {
-		t.Fatalf("expected changed plan for writeLogf")
-	}
-	if _, err := writePlan(plan); err != nil {
-		t.Fatalf("writePlan: %v", err)
-	}
-
-	out, err := os.ReadFile(file)
-	if err != nil {
-		t.Fatalf("read output: %v", err)
-	}
-	got := string(out)
-	if !regexp.MustCompile(`writeLogf\(w, " \[EID=[A-Za-z0-9]{8}\]", "hello %v", err\)`).MatchString(got) {
-		t.Fatalf("expected writeLogf rewrite with deterministic EID literal, got:\n%s", got)
+	if !errors.Is(err, errNoChanges) {
+		t.Fatalf("expected errNoChanges for writeLogf user output path; plan=%v err=%v", plan, err)
 	}
 }
 
-func TestBuildPlanInjectsEIDForWriteLogLineCalls(t *testing.T) {
+func TestBuildPlanDoesNotInjectEIDForWriteLogLineCalls(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "write_log_line.go")
 	src := `package main
@@ -325,27 +310,12 @@ func f(w io.Writer) {
 	}
 
 	plan, err := buildPlan(file, false)
-	if err != nil {
-		t.Fatalf("buildPlan: %v", err)
-	}
-	if plan == nil || !plan.changed {
-		t.Fatalf("expected changed plan for writeLogLine")
-	}
-	if _, err := writePlan(plan); err != nil {
-		t.Fatalf("writePlan: %v", err)
-	}
-
-	out, err := os.ReadFile(file)
-	if err != nil {
-		t.Fatalf("read output: %v", err)
-	}
-	got := string(out)
-	if !regexp.MustCompile(`writeLogLine\(w, " \[EID=[A-Za-z0-9]{8}\]", "hello"\)`).MatchString(got) {
-		t.Fatalf("expected writeLogLine rewrite with deterministic EID literal, got:\n%s", got)
+	if !errors.Is(err, errNoChanges) {
+		t.Fatalf("expected errNoChanges for writeLogLine user output path; plan=%v err=%v", plan, err)
 	}
 }
 
-func TestBuildPlanInjectsEIDForFmtFprintfCalls(t *testing.T) {
+func TestBuildPlanDoesNotInjectEIDForFmtFprintfCalls(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "fmt_fprintf.go")
 	src := `package main
@@ -364,28 +334,12 @@ func f(w io.Writer, err error) {
 	}
 
 	plan, err := buildPlan(file, false)
-	if err != nil {
-		t.Fatalf("buildPlan: %v", err)
-	}
-	if plan == nil || !plan.changed {
-		t.Fatalf("expected changed plan for fmt.Fprintf")
-	}
-	if _, err := writePlan(plan); err != nil {
-		t.Fatalf("writePlan: %v", err)
-	}
-
-	out, err := os.ReadFile(file)
-	if err != nil {
-		t.Fatalf("read output: %v", err)
-	}
-	got := string(out)
-	re := regexp.MustCompile(`fmt\.Fprintf\(w,\s*"hello %v\\n \[EID=[A-Za-z0-9]{8}\]",\s*err\)`)
-	if !re.MatchString(got) {
-		t.Fatalf("expected fmt.Fprintf rewrite with trailing EID, got:\n%s", got)
+	if !errors.Is(err, errNoChanges) {
+		t.Fatalf("expected errNoChanges for fmt.Fprintf user output path; plan=%v err=%v", plan, err)
 	}
 }
 
-func TestBuildPlanInjectsEIDForFmtFprintlnCalls(t *testing.T) {
+func TestBuildPlanDoesNotInjectEIDForFmtFprintlnCalls(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "fmt_fprintln.go")
 	src := `package main
@@ -404,24 +358,8 @@ func f() {
 	}
 
 	plan, err := buildPlan(file, false)
-	if err != nil {
-		t.Fatalf("buildPlan: %v", err)
-	}
-	if plan == nil || !plan.changed {
-		t.Fatalf("expected changed plan for fmt.Fprintln")
-	}
-	if _, err := writePlan(plan); err != nil {
-		t.Fatalf("writePlan: %v", err)
-	}
-
-	out, err := os.ReadFile(file)
-	if err != nil {
-		t.Fatalf("read output: %v", err)
-	}
-	got := string(out)
-	re := regexp.MustCompile(`fmt\.Fprintln\(os\.Stderr,\s*"hello \[EID=[A-Za-z0-9]{8}\]"\)`)
-	if !re.MatchString(got) {
-		t.Fatalf("expected fmt.Fprintln rewrite with trailing EID, got:\n%s", got)
+	if !errors.Is(err, errNoChanges) {
+		t.Fatalf("expected errNoChanges for fmt.Fprintln user output path; plan=%v err=%v", plan, err)
 	}
 }
 

@@ -4,7 +4,7 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  build_deb.sh --app-name <name> --version <vX.Y.Z> --arch <amd64|arm64> --binary <path> --install-path </path> --output <path.deb>
+  build_deb.sh --app-name <name> --version <vX.Y.Z> --arch <amd64|arm64> --binary <path> --install-path </path> --man-page <path> --man-install-path </path> --output <path.deb>
 EOF
 }
 
@@ -13,6 +13,8 @@ version=""
 arch=""
 binary_path=""
 install_path=""
+man_page_path=""
+man_install_path=""
 output_path=""
 
 while [[ $# -gt 0 ]]; do
@@ -37,6 +39,14 @@ while [[ $# -gt 0 ]]; do
       install_path="${2:-}"
       shift 2
       ;;
+    --man-page)
+      man_page_path="${2:-}"
+      shift 2
+      ;;
+    --man-install-path)
+      man_install_path="${2:-}"
+      shift 2
+      ;;
     --output)
       output_path="${2:-}"
       shift 2
@@ -53,7 +63,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$app_name" || -z "$version" || -z "$arch" || -z "$binary_path" || -z "$install_path" || -z "$output_path" ]]; then
+if [[ -z "$app_name" || -z "$version" || -z "$arch" || -z "$binary_path" || -z "$install_path" || -z "$man_page_path" || -z "$man_install_path" || -z "$output_path" ]]; then
   echo "all arguments are required" >&2
   usage >&2
   exit 1
@@ -64,8 +74,18 @@ if [[ "$install_path" != /* ]]; then
   exit 1
 fi
 
+if [[ "$man_install_path" != /* ]]; then
+  echo "man install path must be absolute: $man_install_path" >&2
+  exit 1
+fi
+
 if [[ ! -x "$binary_path" ]]; then
   echo "binary not found or not executable: $binary_path" >&2
+  exit 1
+fi
+
+if [[ ! -f "$man_page_path" ]]; then
+  echo "man page not found: $man_page_path" >&2
   exit 1
 fi
 
@@ -93,8 +113,11 @@ trap cleanup EXIT
 
 payload_root="$stage_dir/root"
 target_dir="$payload_root$install_path"
+target_man_dir="$payload_root$man_install_path"
 mkdir -p "$target_dir"
+mkdir -p "$target_man_dir"
 install -m 0755 "$binary_path" "$target_dir/$app_name"
+install -m 0644 "$man_page_path" "$target_man_dir/$app_name.1"
 
 clean_version="${version#v}"
 

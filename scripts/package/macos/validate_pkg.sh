@@ -4,12 +4,13 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  validate_pkg.sh --pkg <path.pkg> --install-path </path> --app-name <name>
+  validate_pkg.sh --pkg <path.pkg> --install-path </path> --man-path </path/name.1> --app-name <name>
 EOF
 }
 
 pkg_path=""
 install_path=""
+man_path=""
 app_name=""
 
 while [[ $# -gt 0 ]]; do
@@ -20,6 +21,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --install-path)
       install_path="${2:-}"
+      shift 2
+      ;;
+    --man-path)
+      man_path="${2:-}"
       shift 2
       ;;
     --app-name)
@@ -38,7 +43,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$pkg_path" || -z "$install_path" || -z "$app_name" ]]; then
+if [[ -z "$pkg_path" || -z "$install_path" || -z "$man_path" || -z "$app_name" ]]; then
   echo "all arguments are required" >&2
   usage >&2
   exit 1
@@ -55,6 +60,7 @@ if ! command -v pkgutil >/dev/null 2>&1; then
 fi
 
 expected_path="${install_path%/}/$app_name"
+expected_man_path="${man_path%/}"
 payload_list="$(pkgutil --payload-files "$pkg_path")"
 
 if [[ -z "$payload_list" ]]; then
@@ -68,6 +74,13 @@ fi
 
 if ! grep -Eq "^(\./)?${expected_path#/}$" <<<"$payload_list"; then
   echo "expected payload entry missing: $expected_path" >&2
+  echo "payload entries:" >&2
+  echo "$payload_list" >&2
+  exit 1
+fi
+
+if ! grep -Eq "^(\./)?${expected_man_path#/}$" <<<"$payload_list"; then
+  echo "expected payload entry missing: $expected_man_path" >&2
   echo "payload entries:" >&2
   echo "$payload_list" >&2
   exit 1
