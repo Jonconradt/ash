@@ -21,6 +21,8 @@ const (
 	aiEnvAuthType = "AI_AUTH_TYPE"
 	// #nosec G101 -- these are environment variable names, not secrets.
 	aiEnvAuthToken = "AI_AUTH_TOKEN"
+	// #nosec G101 -- these are environment variable names, not secrets.
+	aiEnvProvider = "AI_PROVIDER"
 )
 
 type aiConfig struct {
@@ -28,6 +30,7 @@ type aiConfig struct {
 	Model         string
 	HistoryKey    string
 	Authorization string
+	Provider      aiProvider
 }
 
 // parseAIConfigFromEnv parses and validates input values.
@@ -47,6 +50,11 @@ func parseAIConfigFromEnv() (aiConfig, error) {
 	}
 
 	baseURL, host, scheme, err := parseAIEndpoint(rawEndpoint)
+	if err != nil {
+		return aiConfig{}, err
+	}
+
+	provider, err := resolveAIProvider(strings.TrimSpace(os.Getenv(aiEnvProvider)), baseURL, host)
 	if err != nil {
 		return aiConfig{}, err
 	}
@@ -76,12 +84,52 @@ func parseAIConfigFromEnv() (aiConfig, error) {
 		BaseURL:    baseURL,
 		Model:      model,
 		HistoryKey: fmt.Sprintf("%s/%s", baseURL, model),
+		Provider:   provider,
 	}
 	if authType == "bearer" {
 		cfg.Authorization = "Bearer " + authToken
 	}
 
 	return cfg, nil
+}
+
+func resolveAIProvider(override string, baseURL string, host string) (aiProvider, error) {
+	if strings.TrimSpace(override) == "" {
+		return detectAIProvider(baseURL, host), nil
+	}
+
+	switch strings.ToLower(strings.TrimSpace(override)) {
+	case string(providerOllama):
+		return providerOllama, nil
+	case string(providerOpenAI):
+		return providerOpenAI, nil
+	case "gemini", string(providerGoogle):
+		return providerGoogle, nil
+	case string(providerAnthropic):
+		return providerAnthropic, nil
+	default:
+		return "", fmt.Errorf("%s must be one of: ollama, openai, google, gemini, anthropic", aiEnvProvider)
+	}
+}
+
+func detectAIProvider(baseURL string, host string) aiProvider {
+	h := strings.ToLower(strings.TrimSpace(host))
+	url := strings.ToLower(strings.TrimSpace(baseURL))
+
+	if strings.Contains(h, "anthropic.com") {
+		return providerAnthropic
+	}
+	if strings.Contains(h, "openai.com") {
+		return providerOpenAI
+	}
+	if strings.Contains(h, "googleapis.com") && strings.Contains(url, "/openai") {
+		return providerGoogle
+	}
+	if strings.Contains(h, "googleapis.com") && strings.Contains(h, "generativelanguage") {
+		return providerGoogle
+	}
+
+	return providerOllama
 }
 
 // parseAIEndpoint parses and validates input values.

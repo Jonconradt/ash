@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -133,32 +132,28 @@ func randomCloudServer500Message() string {
 func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolDefinition) (chatResponse, error) {
 	configureDebugLogging()
 
-	requestBody := chatRequest{
-		Model:    aiCfg.Model,
-		Messages: messages,
-		Tools:    tools,
-		Stream:   false,
-	}
-
-	payload, err := json.Marshal(requestBody)
+	adapter, err := adapterForProvider(aiCfg.Provider)
 	if err != nil {
 		return chatResponse{}, err
 	}
-	slog.Debug("AI request", "request_id", requestIDGenerator(), "url", aiCfg.BaseURL+"/api/chat", "EID", "UqNZjp9I")
+
+	payload, err := adapter.BuildPayload(aiCfg, messages, tools)
+	if err != nil {
+		return chatResponse{}, err
+	}
+	endpointURL := adapter.Endpoint(aiCfg.BaseURL)
+	slog.Debug("AI request", "request_id", requestIDGenerator(), "url", endpointURL, "provider", adapter.Name(), "EID", "UqNZjp9I")
 	slog.Debug("AI request payload", "request_id", requestIDGenerator(), "payload", string(payload), "EID", "aPkzWTCJ")
 
 	attempts := retryMaxAttempts()
 	baseDelay := retryBaseDelay()
 	maxDelay := retryMaxDelay()
 	for attempt := 1; attempt <= attempts; attempt++ {
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, aiCfg.BaseURL+"/api/chat", bytes.NewReader(payload))
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpointURL, bytes.NewReader(payload))
 		if err != nil {
 			return chatResponse{}, err
 		}
-		req.Header.Set("Content-Type", "application/json")
-		if aiCfg.Authorization != "" {
-			req.Header.Set("Authorization", aiCfg.Authorization)
-		}
+		adapter.ApplyHeaders(req, aiCfg)
 
 		client := newHTTPClient(aiTimeout())
 		resp, err := client.Do(req)
@@ -192,8 +187,8 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 			continue
 		}
 
-		var parsed chatResponse
-		if err := json.Unmarshal(body, &parsed); err != nil {
+		parsed, err := adapter.ParseResponse(body)
+		if err != nil {
 			return chatResponse{}, err
 		}
 

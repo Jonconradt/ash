@@ -35,7 +35,7 @@ func (s stubToolShim) CallTool(ctx context.Context, name string, args map[string
 }
 
 func testAIConfig(baseURL, model string) aiConfig {
-	return aiConfig{BaseURL: baseURL, Model: model, HistoryKey: baseURL + "/" + model}
+	return aiConfig{BaseURL: baseURL, Model: model, HistoryKey: baseURL + "/" + model, Provider: providerOllama}
 }
 
 func TestChatRetriesTransientFailures(t *testing.T) {
@@ -58,7 +58,7 @@ func TestChatRetriesTransientFailures(t *testing.T) {
 	t.Setenv("ASH_RETRY_BASE_DELAY", "0s")
 	t.Setenv("ASH_RETRY_MAX_DELAY", "0s")
 
-	cfg := aiConfig{BaseURL: srv.URL, Model: "test-model", HistoryKey: srv.URL + "/test-model"}
+	cfg := aiConfig{BaseURL: srv.URL, Model: "test-model", HistoryKey: srv.URL + "/test-model", Provider: providerOllama}
 	resp, err := chat(context.Background(), cfg, []message{{Role: "user", Content: "hi"}}, nil)
 	if err != nil {
 		t.Fatalf("chat returned error: %v", err)
@@ -103,6 +103,7 @@ func TestParseAIConfigFromEnv(t *testing.T) {
 		wantModel      string
 		wantHistoryKey string
 		wantAuth       string
+		wantProvider   aiProvider
 		wantErr        string
 	}{
 		{
@@ -114,6 +115,7 @@ func TestParseAIConfigFromEnv(t *testing.T) {
 			wantBaseURL:    "http://localhost:11434",
 			wantModel:      "llama3.1",
 			wantHistoryKey: "http://localhost:11434/llama3.1",
+			wantProvider:   providerOllama,
 		},
 		{
 			name: "cloud endpoint with bearer auth",
@@ -127,6 +129,33 @@ func TestParseAIConfigFromEnv(t *testing.T) {
 			wantModel:      "mistral",
 			wantHistoryKey: "https://api.example.com/ollama/mistral",
 			wantAuth:       "Bearer abc123",
+			wantProvider:   providerOllama,
+		},
+		{
+			name: "auto-detect openai provider",
+			env: map[string]string{
+				"AI_ENDPOINT":   "https://api.openai.com/v1",
+				"AI_MODEL":      "gpt-4.1-mini",
+				"AI_AUTH_TYPE":  "bearer",
+				"AI_AUTH_TOKEN": "openai-token",
+			},
+			wantBaseURL:    "https://api.openai.com/v1",
+			wantModel:      "gpt-4.1-mini",
+			wantHistoryKey: "https://api.openai.com/v1/gpt-4.1-mini",
+			wantAuth:       "Bearer openai-token",
+			wantProvider:   providerOpenAI,
+		},
+		{
+			name: "optional provider override",
+			env: map[string]string{
+				"AI_ENDPOINT": "http://localhost:11434",
+				"AI_MODEL":    "llama3.1",
+				"AI_PROVIDER": "google",
+			},
+			wantBaseURL:    "http://localhost:11434",
+			wantModel:      "llama3.1",
+			wantHistoryKey: "http://localhost:11434/llama3.1",
+			wantProvider:   providerGoogle,
 		},
 		{
 			name: "legacy AI env rejected",
@@ -181,6 +210,15 @@ func TestParseAIConfigFromEnv(t *testing.T) {
 			},
 			wantErr: "cloud endpoints require AI_AUTH_TYPE=bearer and AI_AUTH_TOKEN",
 		},
+		{
+			name: "invalid provider override",
+			env: map[string]string{
+				"AI_ENDPOINT": "http://localhost:11434",
+				"AI_MODEL":    "llama3.1",
+				"AI_PROVIDER": "unsupported-provider",
+			},
+			wantErr: "AI_PROVIDER must be one of",
+		},
 	}
 
 	for _, tt := range tests {
@@ -190,6 +228,7 @@ func TestParseAIConfigFromEnv(t *testing.T) {
 			t.Setenv("AI_MODEL", "")
 			t.Setenv("AI_AUTH_TYPE", "")
 			t.Setenv("AI_AUTH_TOKEN", "")
+			t.Setenv("AI_PROVIDER", "")
 			for k, v := range tt.env {
 				t.Setenv(k, v)
 			}
@@ -219,6 +258,9 @@ func TestParseAIConfigFromEnv(t *testing.T) {
 			}
 			if cfg.Authorization != tt.wantAuth {
 				t.Fatalf("authorization mismatch: got %q want %q", cfg.Authorization, tt.wantAuth)
+			}
+			if tt.wantProvider != "" && cfg.Provider != tt.wantProvider {
+				t.Fatalf("provider mismatch: got %q want %q", cfg.Provider, tt.wantProvider)
 			}
 		})
 	}
