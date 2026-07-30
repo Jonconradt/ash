@@ -21,7 +21,7 @@ _ash_should_route() {
   cmd_lower="$(printf '%s' "$cmd" | tr '[:upper:]' '[:lower:]')"
   local natural_wrapper=0
   case "$cmd_lower" in
-    what|which|who|where|at) natural_wrapper=1 ;;
+    what|which|who|where|at|in|for) natural_wrapper=1 ;;
   esac
 
   [[ $argc -eq 0 ]] && return 1
@@ -102,6 +102,18 @@ _ash_should_route() {
         done
       fi
       ;;
+    in|for)
+      if [[ $argc -ge 2 ]]; then
+        local first_token
+        first_token="$(printf '%s' "${args[0]}" | tr '[:upper:]' '[:lower:]')"
+        first_token="${first_token%%[?!.,:;]}"
+        case "$first_token" in
+          this|that|these|those|the|a|an|my|our|your|please|what|when|how|why|who|where|is|are|do|can|should|would)
+            return 0
+            ;;
+        esac
+      fi
+      ;;
     at)
       if [[ $argc -ge 2 ]]; then
         local first_token
@@ -147,6 +159,8 @@ who()   { _ash_route_or_delegate who   "$@"; }
 Who()   { _ash_route_or_delegate Who   "$@"; }
 at()    { _ash_route_or_delegate at    "$@"; }
 At()    { _ash_route_or_delegate At    "$@"; }
+In()    { _ash_route_or_delegate In    "$@"; }
+For()   { _ash_route_or_delegate For   "$@"; }
 
 test()  { _ash_route_or_delegate_builtin test "$@"; }
 Test()  { _ash_route_or_delegate_builtin test "$@"; }

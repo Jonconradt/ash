@@ -2415,7 +2415,7 @@ func shouldRouteToAshConservative(command string, args []string) bool {
 	}
 
 	cmdLower := strings.ToLower(command)
-	naturalWrapper := cmdLower == "what" || cmdLower == "which" || cmdLower == "who" || cmdLower == "where"
+	naturalWrapper := cmdLower == "what" || cmdLower == "which" || cmdLower == "who" || cmdLower == "where" || cmdLower == "in" || cmdLower == "for"
 	hasPathLike := false
 
 	// Rule C: path-like args generally delegate, except natural-language wrapper
@@ -2485,6 +2485,14 @@ func shouldRouteToAshConservative(command string, args []string) bool {
 				}
 			}
 		}
+	case "in", "for":
+		if len(args) >= 2 {
+			firstToken := strings.ToLower(strings.Trim(args[0], "?!.:,;"))
+			switch firstToken {
+			case "this", "that", "these", "those", "the", "a", "an", "my", "our", "your", "please", "what", "when", "how", "why", "who", "where", "is", "are", "do", "can", "should", "would":
+				return true
+			}
+		}
 	case "at":
 		if len(args) >= 2 {
 			firstToken := strings.ToLower(strings.Trim(args[0], "?!.:,;"))
@@ -2515,6 +2523,8 @@ func TestShouldRouteToAshConservative(t *testing.T) {
 		{name: "rule F2 natural language mid auxiliary", command: "What", args: []string{"directory", "am", "I", "in", "and", "are", "there", "any", "executeable", "files", "Run", "multiple", "tools", "if", "necessary"}, want: true},
 		{name: "rule F2 natural language with path token", command: "what", args: []string{"time", "is", "it", "and", "list", "all", "files", "in", "~/.ash/logs"}, want: true},
 		{name: "rule F interrogative with path token for who", command: "who", args: []string{"am", "I", "and", "list", "files", "in", "~/.ash/logs"}, want: true},
+		{name: "rule in natural prompt routed", command: "In", args: []string{"this", "repo", "what", "files", "changed"}, want: true},
+		{name: "rule for natural prompt routed", command: "For", args: []string{"this", "error", "what", "should", "I", "do"}, want: true},
 		{name: "rule at natural prompt routed", command: "at", args: []string{"remind", "me", "tomorrow"}, want: true},
 		{name: "rule at scheduler time delegates", command: "at", args: []string{"5pm"}, want: false},
 		{name: "rule at now delegates", command: "at", args: []string{"now", "+", "1", "minute"}, want: false},
@@ -2579,6 +2589,9 @@ func TestBashCollisionWrappers(t *testing.T) {
 		{name: "who question routed", invocation: "who am I?", want: "ASH:who am I?"},
 		{name: "who with path routed", invocation: "who am I and list files in ~/.ash/logs", want: "ASH:who am I and list files in " + filepath.Join(homeDir, ".ash", "logs")},
 		{name: "who no args delegates", invocation: "who", want: "DELEGATE:who:"},
+		{name: "In title case routed", invocation: "In this repo what files changed", want: "ASH:In this repo what files changed"},
+		{name: "For title case routed", invocation: "For this error what should I do", want: "ASH:For this error what should I do"},
+		{name: "for loop unchanged", invocation: "for x in a b; do echo $x; done", want: "a\nb"},
 		{name: "at natural routed", invocation: "at remind me tomorrow", want: "ASH:at remind me tomorrow"},
 		{name: "at scheduler delegates", invocation: "at 5pm", want: "DELEGATE:at:5pm"},
 	}
@@ -2613,6 +2626,9 @@ func TestZshCollisionWrappers(t *testing.T) {
 		{name: "where question routed", invocation: "where should logs go", want: "ASH:where should logs go"},
 		{name: "where command form delegates", invocation: "where ls", want: "DELEGATE:where:ls"},
 		{name: "who with path routed", invocation: "who am I and list files in ~/.ash/logs", want: "ASH:who am I and list files in " + filepath.Join(homeDir, ".ash", "logs")},
+		{name: "In title case routed", invocation: "In this repo what files changed", want: "ASH:In this repo what files changed"},
+		{name: "For title case routed", invocation: "For this error what should I do", want: "ASH:For this error what should I do"},
+		{name: "for loop unchanged", invocation: "for x in a b; do echo $x; done", want: "a\nb"},
 		{name: "at natural routed", invocation: "at remind me tomorrow", want: "ASH:at remind me tomorrow"},
 		{name: "at scheduler delegates", invocation: "at 5pm", want: "DELEGATE:at:5pm"},
 	}
