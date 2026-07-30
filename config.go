@@ -23,14 +23,18 @@ const (
 	aiEnvAuthToken = "AI_AUTH_TOKEN"
 	// #nosec G101 -- these are environment variable names, not secrets.
 	aiEnvProvider = "AI_PROVIDER"
+	// #nosec G101 -- these are environment variable names, not secrets.
+	aiEnvCache = "AI_CACHE"
 )
 
 type aiConfig struct {
-	BaseURL       string
-	Model         string
-	HistoryKey    string
-	Authorization string
-	Provider      aiProvider
+	BaseURL          string
+	Model            string
+	HistoryKey       string
+	Authorization    string
+	AuthToken        string
+	Provider         aiProvider
+	UseNativeCaching bool
 }
 
 // parseAIConfigFromEnv parses and validates input values.
@@ -59,6 +63,11 @@ func parseAIConfigFromEnv() (aiConfig, error) {
 		return aiConfig{}, err
 	}
 
+	useCaching, err := parseAICacheEnabled(strings.TrimSpace(os.Getenv(aiEnvCache)))
+	if err != nil {
+		return aiConfig{}, err
+	}
+
 	authType := strings.ToLower(strings.TrimSpace(os.Getenv(aiEnvAuthType)))
 	authToken := strings.TrimSpace(os.Getenv(aiEnvAuthToken))
 	if authToken != "" && authType == "" {
@@ -81,16 +90,33 @@ func parseAIConfigFromEnv() (aiConfig, error) {
 	}
 
 	cfg := aiConfig{
-		BaseURL:    baseURL,
-		Model:      model,
-		HistoryKey: fmt.Sprintf("%s/%s", baseURL, model),
-		Provider:   provider,
+		BaseURL:          baseURL,
+		Model:            model,
+		HistoryKey:       fmt.Sprintf("%s/%s", baseURL, model),
+		Provider:         provider,
+		UseNativeCaching: useCaching,
 	}
 	if authType == "bearer" {
 		cfg.Authorization = "Bearer " + authToken
+		cfg.AuthToken = authToken
 	}
 
 	return cfg, nil
+}
+
+func parseAICacheEnabled(raw string) (bool, error) {
+	trimmed := strings.ToLower(strings.TrimSpace(raw))
+	if trimmed == "" {
+		return true, nil
+	}
+	switch trimmed {
+	case "1", "true", "yes", "on", "enabled":
+		return true, nil
+	case "0", "false", "no", "off", "disabled":
+		return false, nil
+	default:
+		return false, fmt.Errorf("%s must be a boolean-like value (true/false)", aiEnvCache)
+	}
 }
 
 func resolveAIProvider(override string, baseURL string, host string) (aiProvider, error) {

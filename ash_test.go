@@ -35,7 +35,7 @@ func (s stubToolShim) CallTool(ctx context.Context, name string, args map[string
 }
 
 func testAIConfig(baseURL, model string) aiConfig {
-	return aiConfig{BaseURL: baseURL, Model: model, HistoryKey: baseURL + "/" + model, Provider: providerOllama}
+	return aiConfig{BaseURL: baseURL, Model: model, HistoryKey: baseURL + "/" + model, Provider: providerOllama, UseNativeCaching: true}
 }
 
 func TestChatRetriesTransientFailures(t *testing.T) {
@@ -58,7 +58,7 @@ func TestChatRetriesTransientFailures(t *testing.T) {
 	t.Setenv("ASH_RETRY_BASE_DELAY", "0s")
 	t.Setenv("ASH_RETRY_MAX_DELAY", "0s")
 
-	cfg := aiConfig{BaseURL: srv.URL, Model: "test-model", HistoryKey: srv.URL + "/test-model", Provider: providerOllama}
+	cfg := aiConfig{BaseURL: srv.URL, Model: "test-model", HistoryKey: srv.URL + "/test-model", Provider: providerOllama, UseNativeCaching: true}
 	resp, err := chat(context.Background(), cfg, []message{{Role: "user", Content: "hi"}}, nil)
 	if err != nil {
 		t.Fatalf("chat returned error: %v", err)
@@ -104,6 +104,7 @@ func TestParseAIConfigFromEnv(t *testing.T) {
 		wantHistoryKey string
 		wantAuth       string
 		wantProvider   aiProvider
+		wantUseCache   bool
 		wantErr        string
 	}{
 		{
@@ -116,6 +117,7 @@ func TestParseAIConfigFromEnv(t *testing.T) {
 			wantModel:      "llama3.1",
 			wantHistoryKey: "http://localhost:11434/llama3.1",
 			wantProvider:   providerOllama,
+			wantUseCache:   true,
 		},
 		{
 			name: "cloud endpoint with bearer auth",
@@ -130,6 +132,7 @@ func TestParseAIConfigFromEnv(t *testing.T) {
 			wantHistoryKey: "https://api.example.com/ollama/mistral",
 			wantAuth:       "Bearer abc123",
 			wantProvider:   providerOllama,
+			wantUseCache:   true,
 		},
 		{
 			name: "auto-detect openai provider",
@@ -144,6 +147,7 @@ func TestParseAIConfigFromEnv(t *testing.T) {
 			wantHistoryKey: "https://api.openai.com/v1/gpt-4.1-mini",
 			wantAuth:       "Bearer openai-token",
 			wantProvider:   providerOpenAI,
+			wantUseCache:   true,
 		},
 		{
 			name: "optional provider override",
@@ -156,6 +160,20 @@ func TestParseAIConfigFromEnv(t *testing.T) {
 			wantModel:      "llama3.1",
 			wantHistoryKey: "http://localhost:11434/llama3.1",
 			wantProvider:   providerGoogle,
+			wantUseCache:   true,
+		},
+		{
+			name: "cache disabled optional override",
+			env: map[string]string{
+				"AI_ENDPOINT": "http://localhost:11434",
+				"AI_MODEL":    "llama3.1",
+				"AI_CACHE":    "off",
+			},
+			wantBaseURL:    "http://localhost:11434",
+			wantModel:      "llama3.1",
+			wantHistoryKey: "http://localhost:11434/llama3.1",
+			wantProvider:   providerOllama,
+			wantUseCache:   false,
 		},
 		{
 			name: "legacy AI env rejected",
@@ -219,6 +237,15 @@ func TestParseAIConfigFromEnv(t *testing.T) {
 			},
 			wantErr: "AI_PROVIDER must be one of",
 		},
+		{
+			name: "invalid cache override",
+			env: map[string]string{
+				"AI_ENDPOINT": "http://localhost:11434",
+				"AI_MODEL":    "llama3.1",
+				"AI_CACHE":    "sometimes",
+			},
+			wantErr: "AI_CACHE must be a boolean-like value",
+		},
 	}
 
 	for _, tt := range tests {
@@ -229,6 +256,7 @@ func TestParseAIConfigFromEnv(t *testing.T) {
 			t.Setenv("AI_AUTH_TYPE", "")
 			t.Setenv("AI_AUTH_TOKEN", "")
 			t.Setenv("AI_PROVIDER", "")
+			t.Setenv("AI_CACHE", "")
 			for k, v := range tt.env {
 				t.Setenv(k, v)
 			}
@@ -261,6 +289,9 @@ func TestParseAIConfigFromEnv(t *testing.T) {
 			}
 			if tt.wantProvider != "" && cfg.Provider != tt.wantProvider {
 				t.Fatalf("provider mismatch: got %q want %q", cfg.Provider, tt.wantProvider)
+			}
+			if cfg.UseNativeCaching != tt.wantUseCache {
+				t.Fatalf("useNativeCaching mismatch: got %v want %v", cfg.UseNativeCaching, tt.wantUseCache)
 			}
 		})
 	}
@@ -1072,6 +1103,150 @@ func TestChatAddsAuthorizationHeader(t *testing.T) {
 	_, err := chat(context.Background(), cfg, []message{{Role: "user", Content: "hi"}}, nil)
 	if err != nil {
 		t.Fatalf("chat returned error: %v", err)
+	}
+}
+
+func TestChatOpenAIResponsesAdapter(t *testing.T) {
+	var gotPath string
+	var gotAuth string
+	var gotBody string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotAuth = r.Header.Get("Authorization")
+		payload, _ := io.ReadAll(r.Body)
+		gotBody = string(payload)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"done"}]},{"type":"function_call","call_id":"call_test_1","name":"run_unix_command","arguments":"{\"command\":\"ls\"}"}]}`))
+	}))
+	defer srv.Close()
+
+	cfg := aiConfig{
+		BaseURL:          srv.URL + "/v1",
+		Model:            "gpt-4.1-mini",
+		Authorization:    "Bearer test-key",
+		Provider:         providerOpenAI,
+		UseNativeCaching: true,
+	}
+	resp, err := chat(context.Background(), cfg, []message{{Role: "user", Content: "list files"}}, nil)
+	if err != nil {
+		t.Fatalf("chat returned error: %v", err)
+	}
+
+	if gotPath != "/v1/responses" {
+		t.Fatalf("unexpected path: got %q", gotPath)
+	}
+	if gotAuth != "Bearer test-key" {
+		t.Fatalf("unexpected auth header: got %q", gotAuth)
+	}
+	if !strings.Contains(gotBody, `"cache_preference":"provider-default"`) {
+		t.Fatalf("expected default cache hint in payload, got %s", gotBody)
+	}
+	if resp.Message.Content != "done" {
+		t.Fatalf("unexpected content: got %q", resp.Message.Content)
+	}
+	if len(resp.Message.ToolCalls) != 1 {
+		t.Fatalf("expected one tool call, got %d", len(resp.Message.ToolCalls))
+	}
+	if resp.Message.ToolCalls[0].ID != "call_test_1" {
+		t.Fatalf("unexpected tool call id: got %q", resp.Message.ToolCalls[0].ID)
+	}
+	if resp.Message.ToolCalls[0].Function.Name != "run_unix_command" {
+		t.Fatalf("unexpected tool call name: got %q", resp.Message.ToolCalls[0].Function.Name)
+	}
+}
+
+func TestChatGoogleAdapter(t *testing.T) {
+	var gotPath string
+	var gotBody string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		payload, _ := io.ReadAll(r.Body)
+		gotBody = string(payload)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"role":"assistant","content":"ok","tool_calls":[{"id":"call_google_1","type":"function","function":{"name":"run_unix_command","arguments":"{\"command\":\"pwd\"}"}}]}}]}`))
+	}))
+	defer srv.Close()
+
+	cfg := aiConfig{
+		BaseURL:          srv.URL + "/v1beta/openai",
+		Model:            "gemini-2.5-flash",
+		Provider:         providerGoogle,
+		UseNativeCaching: true,
+	}
+	resp, err := chat(context.Background(), cfg, []message{{Role: "user", Content: "where am i"}}, nil)
+	if err != nil {
+		t.Fatalf("chat returned error: %v", err)
+	}
+
+	if gotPath != "/v1beta/openai/chat/completions" {
+		t.Fatalf("unexpected path: got %q", gotPath)
+	}
+	if !strings.Contains(gotBody, `"cache_preference":"provider-default"`) {
+		t.Fatalf("expected default cache hint in payload, got %s", gotBody)
+	}
+	if resp.Message.Content != "ok" {
+		t.Fatalf("unexpected content: got %q", resp.Message.Content)
+	}
+	if len(resp.Message.ToolCalls) != 1 {
+		t.Fatalf("expected one tool call, got %d", len(resp.Message.ToolCalls))
+	}
+	if resp.Message.ToolCalls[0].ID != "call_google_1" {
+		t.Fatalf("unexpected tool call id: got %q", resp.Message.ToolCalls[0].ID)
+	}
+}
+
+func TestChatAnthropicAdapter(t *testing.T) {
+	var gotPath string
+	var gotAPIKey string
+	var gotVersion string
+	var gotBody string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotPath = r.URL.Path
+		gotAPIKey = r.Header.Get("x-api-key")
+		gotVersion = r.Header.Get("anthropic-version")
+		payload, _ := io.ReadAll(r.Body)
+		gotBody = string(payload)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"content":[{"type":"text","text":"ready"},{"type":"tool_use","id":"toolu_1","name":"run_unix_command","input":{"command":"date"}}]}`))
+	}))
+	defer srv.Close()
+
+	cfg := aiConfig{
+		BaseURL:          srv.URL + "/v1",
+		Model:            "claude-sonnet-4-5",
+		Authorization:    "Bearer anth-token",
+		AuthToken:        "anth-token",
+		Provider:         providerAnthropic,
+		UseNativeCaching: true,
+	}
+	resp, err := chat(context.Background(), cfg, []message{{Role: "user", Content: "hello"}}, nil)
+	if err != nil {
+		t.Fatalf("chat returned error: %v", err)
+	}
+
+	if gotPath != "/v1/messages" {
+		t.Fatalf("unexpected path: got %q", gotPath)
+	}
+	if gotAPIKey != "anth-token" {
+		t.Fatalf("unexpected x-api-key: got %q", gotAPIKey)
+	}
+	if gotVersion != anthropicVersionHeaderValue {
+		t.Fatalf("unexpected anthropic-version: got %q", gotVersion)
+	}
+	if !strings.Contains(gotBody, `"cache_control":{"type":"ephemeral"}`) {
+		t.Fatalf("expected cache_control in anthropic payload, got %s", gotBody)
+	}
+	if resp.Message.Content != "ready" {
+		t.Fatalf("unexpected content: got %q", resp.Message.Content)
+	}
+	if len(resp.Message.ToolCalls) != 1 {
+		t.Fatalf("expected one tool call, got %d", len(resp.Message.ToolCalls))
+	}
+	if resp.Message.ToolCalls[0].ID != "toolu_1" {
+		t.Fatalf("unexpected tool call id: got %q", resp.Message.ToolCalls[0].ID)
 	}
 }
 

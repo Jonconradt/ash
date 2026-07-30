@@ -414,6 +414,8 @@ func schedulerEnvAllowlist() map[string]string {
 		aiEnvModel,
 		aiEnvAuthType,
 		aiEnvAuthToken,
+		aiEnvProvider,
+		aiEnvCache,
 		sessionIDEnvName,
 		scheduledTaskEnvName,
 		"HOME",

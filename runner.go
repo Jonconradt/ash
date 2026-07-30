@@ -64,6 +64,9 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 			assistant.Role = "assistant"
 		}
 		for j := range assistant.ToolCalls {
+			if strings.TrimSpace(assistant.ToolCalls[j].ID) == "" {
+				assistant.ToolCalls[j].ID = fmt.Sprintf("call_%d_%d", i+1, j+1)
+			}
 			if strings.TrimSpace(assistant.ToolCalls[j].Type) == "" {
 				assistant.ToolCalls[j].Type = "function"
 			}
@@ -121,9 +124,10 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 			observations = append(observations, observation)
 			applyToolObservationToTasks(tasks, observation)
 			messages = append(messages, message{
-				Role:     "tool",
-				Content:  toolResult,
-				ToolName: toolName,
+				Role:       "tool",
+				Content:    toolResult,
+				ToolName:   toolName,
+				ToolCallID: call.ID,
 			})
 		}
 	}

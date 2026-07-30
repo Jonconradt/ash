@@ -53,6 +53,26 @@ Optional. For cloud endpoints use
 .B AI_AUTH_TOKEN
 Optional bearer token for authenticated endpoints.
 .TP
+.B AI_PROVIDER
+Optional provider override. Supported values:
+.B ollama,
+.B openai,
+.B google,
+.B gemini,
+.B anthropic.
+When unset,
+.B ash
+auto-detects provider from the endpoint host/path.
+.TP
+.B AI_CACHE
+Optional provider-native cache toggle.
+Defaults to enabled when the active provider supports native caching.
+Set to a false-like value (for example,
+.B off
+or
+.B false)
+to disable.
+.TP
 .B AI
 Legacy setting that is no longer supported.
 Use

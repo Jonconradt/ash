@@ -13,10 +13,11 @@ import (
 )
 
 type message struct {
-	Role      string     `json:"role"`
-	Content   string     `json:"content"`
-	ToolCalls []toolCall `json:"tool_calls,omitempty"`
-	ToolName  string     `json:"tool_name,omitempty"`
+	Role       string     `json:"role"`
+	Content    string     `json:"content"`
+	ToolCalls  []toolCall `json:"tool_calls,omitempty"`
+	ToolName   string     `json:"tool_name,omitempty"`
+	ToolCallID string     `json:"tool_call_id,omitempty"`
 }
 
 type chatRequest struct {
@@ -54,6 +55,7 @@ type toolFunctionDefinition struct {
 }
 
 type toolCall struct {
+	ID       string           `json:"id,omitempty"`
 	Type     string           `json:"type,omitempty"`
 	Function toolFunctionCall `json:"function"`
 }

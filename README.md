@@ -1,20 +1,21 @@
 # ash
 
 `ash` is a small Go executable for shell `command_not_found_handle()` workflows.
-It sends the command text to an Ollama model using the Ollama Chat API and prints
-the assistant response.
+It sends command text to the configured AI provider and prints the assistant response.
 
 When invoked without positional arguments, `ash` reads prompt text from non-interactive
 stdin (for example, shell pipes or redirected files).
 
 ## Features
 
-- Uses `AI_ENDPOINT` and `AI_MODEL` to target local or cloud Ollama Chat API endpoints
+- Uses `AI_ENDPOINT` and `AI_MODEL` to target local or cloud provider endpoints
 - Supports bearer authentication with `AI_AUTH_TYPE=bearer` and `AI_AUTH_TOKEN`
-- Uses Ollama Chat API (`/api/chat`)
-- Supports Ollama native tool calling (`tools`, `tool_calls`, `role=tool` messages)
-- Shows an ANSI-friendly thinking indicator while waiting for Ollama
-- Supports `Ctrl-C` to abort an in-flight Ollama request
+- Auto-detects provider adapters (`ollama`, `openai`, `google`, `anthropic`) from endpoint
+- Supports optional `AI_PROVIDER` override for advanced routing control
+- Uses provider-native tool calling through per-provider adapters
+- Enables provider-native caching by default when supported
+- Shows an ANSI-friendly thinking indicator while waiting for the AI response
+- Supports `Ctrl-C` to abort an in-flight request
 - Keeps chat history across calls
 - Uses `~/.ash/.ash_system` as the canonical system prompt file when present
 - Always prepends current local date/time to the system prompt sent to the model
@@ -119,6 +120,13 @@ export AI_AUTH_TYPE="bearer"
 export AI_AUTH_TOKEN="<token>"
 ```
 
+Optional advanced overrides:
+
+```bash
+export AI_PROVIDER="openai"   # optional: ollama|openai|google|anthropic|gemini
+export AI_CACHE="off"         # optional: on by default when provider supports native caching
+```
+
 Pipeline examples:
 
 ```bash
@@ -138,6 +146,8 @@ Notes:
 
 - Cloud endpoints are inferred when the host is not `localhost` or `127.0.0.1`.
 - Cloud endpoints must use `https` and require bearer auth.
+- Provider detection is automatic by endpoint host/path; use `AI_PROVIDER` only when you need to override.
+- `AI_CACHE` defaults to enabled. Use `AI_CACHE=off` to disable provider-native caching.
 - Legacy `AI=ollama://...` configuration is no longer supported.
 
 ### Complete environment variable reference
@@ -146,6 +156,8 @@ Notes:
 - `AI_MODEL` (required): Model name sent to the endpoint.
 - `AI_AUTH_TYPE` (optional): Use `bearer` for authenticated cloud endpoints.
 - `AI_AUTH_TOKEN` (optional): Bearer token used when `AI_AUTH_TYPE=bearer`.
+- `AI_PROVIDER` (optional): Override auto-detected provider (`ollama`, `openai`, `google`, `gemini`, `anthropic`).
+- `AI_CACHE` (optional): Enable or disable provider-native caching (`true/false`). Default `true`.
 - `AI` (legacy, unsupported): Deprecated and rejected; use `AI_ENDPOINT` and `AI_MODEL`.
 - `AI_TIMEOUT` (optional): AI request timeout. Default `3m`.
 - `ASH_HISTORY_MAX` (optional): Max retained history messages per key. Default `40`.
@@ -235,8 +247,8 @@ by `ash`.
 
 When enabled, `ash` logs:
 
-- full JSON payload sent to Ollama `/api/chat`
-- Ollama response status and body
+- full JSON payload sent to the active provider endpoint
+- provider response status and body
 - tool loop iteration decisions
 - tool invocation name/arguments and returned result payload
 

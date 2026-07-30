@@ -161,7 +161,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 				return 1
 			}
 		}
-		slog.Error(fmt.Sprintf("ollama request failed: %v", err), "EID", "XflUmD5L")
+		slog.Error(fmt.Sprintf("%s request failed: %v", aiCfg.Provider, err), "EID", "XflUmD5L")
 		return 1
 	}
 
