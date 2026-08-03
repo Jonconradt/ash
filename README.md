@@ -231,7 +231,10 @@ Install shell integration (wrappers plus command-not-found hook):
 ```bash
 ash install --shell bash
 ash install --shell zsh
+ash install --shell pwsh
 ```
+
+On Windows 11, `ash install` defaults to `pwsh` when `--shell` is omitted.
 
 Preview without writing files:
 
@@ -241,9 +244,15 @@ ash install --shell bash --dry-run
 
 `ash install` is idempotent and appends a single managed block to your rc file.
 For bash it targets `~/.bashrc`; for zsh it targets `~/.zshrc`.
+For PowerShell 7 (`pwsh`) it targets `~/Documents/PowerShell/Microsoft.PowerShell_profile.ps1`.
 During install, if `./.ash_system` or `./.ash_tools` exist in your current
 directory, they are copied into `~/.ash/` and become the canonical files used
 by `ash`.
+
+Installer implementation is split per shell target for maintainability:
+- `bash_install.go`
+- `zsh_install.go`
+- `pwsh_install.go`
 
 When enabled, `ash` logs:
 

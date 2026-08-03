@@ -7,7 +7,7 @@ ash \- practical shell assistant for command-not-found workflows
 .br
 .B ash
 .B install
-.RI [ --shell " bash|zsh" ]
+.RI [ --shell " bash|zsh|pwsh" ]
 .RI [ --dry-run ]
 .SH DESCRIPTION
 .B ash
@@ -23,18 +23,24 @@ For bash, the target is
 .I ~/.bashrc
 and for zsh the target is
 .I ~/.zshrc.
+For PowerShell 7 (
+.BR pwsh ),
+the target is
+.IR ~/Documents/PowerShell/Microsoft.PowerShell_profile.ps1 .
 .SH COMMANDS
 .TP
 .B ash [text ...]
 Run a single assistant request.
 .TP
-.B ash install [--shell bash|zsh] [--dry-run]
+.B ash install [--shell bash|zsh|pwsh] [--dry-run]
 Install or update shell integration.
 .IP
 .B --shell
 Select a shell explicitly. When omitted,
 .B ash
-uses the current shell when possible.
+uses the current shell when possible and defaults to
+.B pwsh
+on Windows.
 .IP
 .B --dry-run
 Preview file changes without writing.
@@ -173,7 +179,11 @@ Install managed bash integration.
 .TP
 .B ash install --shell zsh --dry-run
 Preview zsh integration changes.
+.TP
+.B ash install --shell pwsh
+Install managed PowerShell 7 integration.
 .SH SEE ALSO
 .BR bash (1),
 .BR zsh (1),
+.BR pwsh (1),
 .BR man (1)
