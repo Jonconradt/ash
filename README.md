@@ -74,6 +74,7 @@ Canonical publishing is tag-driven in GitHub Actions.
   - `ash-v1.2.3-linux-arm64.rpm`
   - `ash-v1.2.3-<os>-<arch>.tar.gz`
   - matching `.sha256` files for each artifact
+5. The `apt-publish` workflow also generates a signed Debian repository on GitHub Pages from the Linux `.deb` artifacts so users can install and upgrade with `apt`.
 
 Installer man pages are included in release artifacts:
 
@@ -101,6 +102,19 @@ Requirements for local packaging:
 - Go toolchain installed
 
 The package is currently unsigned and not notarized by design.
+
+## Apt Repository Publishing
+
+Linux `.deb` releases can also be published to a static apt repository on GitHub Pages so users can install and upgrade with normal `apt` commands.
+
+The secure publishing model is documented in [docs/APT_REPOSITORY.md](docs/APT_REPOSITORY.md). In short:
+
+- GitHub Actions builds the `.deb` artifacts from tagged releases.
+- A dedicated publish job generates `Packages`, `Release`, `InRelease`, and `Release.gpg` metadata.
+- A private signing key is imported from GitHub Secrets into a temporary `GNUPGHOME` only for the duration of the publish job.
+- The published tree is pushed to a protected `gh-pages` branch and served as the public apt repository.
+
+Users add the repository with the public archive key and a `signed-by` apt source entry. The exact client setup and supported Ubuntu suites are in [docs/APT_REPOSITORY.md](docs/APT_REPOSITORY.md).
 
 ## Configure
 

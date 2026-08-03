@@ -28,3 +28,12 @@ The project is designed for local, user-driven shell assistance. Treat all model
 ## Release hygiene
 
 Releases should be built from a clean working tree and verified with the project quality gates before publication.
+
+## Repository signing
+
+If the project publishes Debian packages through a GitHub Pages apt repository, the repository signing key must remain in GitHub Secrets and should be a dedicated signing subkey, not a personal identity key.
+
+- Import the private key only inside the publish job.
+- Use a temporary `GNUPGHOME` and delete it before the job exits.
+- Publish only signed repository metadata (`InRelease` and `Release.gpg`), never the private key itself.
+- Protect the publish environment so only trusted tag releases can update the public apt tree.

@@ -1,0 +1,114 @@
+name: apt-publish
+
+on:
+  workflow_run:
+    workflows: [release]
+    types: [completed]
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    if: github.event.workflow_run.conclusion == 'success'
+    environment:
+      name: apt-publish
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install apt publishing tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev gnupg xz-utils
+
+      - name: Download Linux artifacts
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: release
+          workflow_conclusion: success
+          run_id: ${{ github.event.workflow_run.id }}
+          name: release-linux-amd64
+          path: dist/artifacts/amd64
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download arm64 artifacts
+        uses: dawidd6/action-download-artifact@v6
+        with:
+          workflow: release
+          workflow_conclusion: success
+          run_id: ${{ github.event.workflow_run.id }}
+          name: release-linux-arm64
+          path: dist/artifacts/arm64
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Stage package artifacts
+        run: |
+          mkdir -p dist/apt/artifacts
+          find dist/artifacts -type f -name '*.deb' -exec cp {} dist/apt/artifacts/ \;
+
+      - name: Generate apt repository metadata
+        env:
+          APT_RELEASE_VERSION: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          version="${APT_RELEASE_VERSION:-manual}"
+          if [[ ! "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
+            echo "release workflow run did not provide a tag-style version: $version" >&2
+            exit 1
+          fi
+          ./scripts/apt/generate_repo.sh \
+            --artifact-dir dist/apt/artifacts \
+            --repo-dir dist/apt/repo \
+            --version "$version" \
+            --suite jammy \
+            --suite noble \
+            --arch amd64 \
+            --arch arm64 \
+            --origin ash \
+            --label ash \
+            --description "ash apt repository"
+
+      - name: Import repository signing key
+        env:
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+          APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
+        run: |
+          test -n "$APT_GPG_PRIVATE_KEY"
+          export GNUPGHOME="$(mktemp -d)"
+          chmod 700 "$GNUPGHOME"
+          printf '%s' "$APT_GPG_PRIVATE_KEY" | gpg --batch --yes --import
+          fingerprint="$(gpg --batch --with-colons --list-secret-keys | awk -F: '/^fpr:/ {print $10; exit}')"
+          if [[ -z "$fingerprint" ]]; then
+            echo "failed to determine signing key fingerprint" >&2
+            exit 1
+          fi
+          printf '%s' "$GNUPGHOME" > dist/apt/gnupg-home
+          printf '%s' "$fingerprint" > dist/apt/signing-fingerprint
+          gpg --batch --yes --armor --export "$fingerprint" > dist/apt/repo/ash-archive-keyring.asc
+
+      - name: Sign repository metadata
+        env:
+          APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
+        run: |
+          export GNUPGHOME="$(cat dist/apt/gnupg-home)"
+          fingerprint="$(cat dist/apt/signing-fingerprint)"
+          for suite in jammy noble; do
+            ./scripts/apt/sign_release.sh \
+              --gnupg-home "$GNUPGHOME" \
+              --key-fingerprint "$fingerprint" \
+              --passphrase "$APT_GPG_PASSPHRASE" \
+              --release-file "dist/apt/repo/dists/$suite/Release"
+          done
+          gpgconf --kill all || true
+          rm -rf "$GNUPGHOME"
+
+      - name: Publish GitHub Pages repository
+        run: |
+          origin_url="$(git remote get-url origin)"
+          release_version="${{ github.event.workflow_run.head_branch }}"
+          ./scripts/apt/publish_repo.sh \
+            --repo-dir dist/apt/repo \
+            --origin-url "$origin_url" \
+            --branch gh-pages \
+            --commit-message "Publish apt repository for ${release_version:-manual}"
