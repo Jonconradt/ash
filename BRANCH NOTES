@@ -1,0 +1,86 @@
+I’m summarizing the exact GitHub settings for the current direct-push design, and I’m also calling out the safer alternative because strict branch protection and direct workflow pushes are in tension.
+
+
+
+With the current implementation in apt-publish.yml, the workflow pushes directly to `gh-pages`. That means you cannot make `gh-pages` fully PR-only and still expect the workflow to work. The cleanest answer is:
+
+- If you keep the current workflow, protect `gh-pages` but allow one automation identity to bypass that protection.
+- If you want the strongest setup, switch from direct branch pushes to the official GitHub Pages deployment flow and stop treating `gh-pages` as a normal branch.
+
+**Keep Current Workflow**
+Use this if you want the existing repo code to work without changing the workflow.
+
+For `gh-pages` protection, go to `Settings` → `Rules` → `Rulesets` and create a branch ruleset targeting `gh-pages`.
+
+Set it like this:
+
+1. Restrict branch name to `gh-pages`.
+2. Turn on `Block force pushes`.
+3. Turn on `Block deletions`.
+4. Do not require pull requests for this branch.
+5. Do not require signed commits for this branch.
+6. Do not require merge queue for this branch.
+7. If you enable status checks, be careful: this branch is generated output, so status checks usually add friction without much value.
+8. Add a bypass actor for the automation identity that will publish this branch.
+
+That last point is the important one. Your current workflow likely pushes with `GITHUB_TOKEN`. If your ruleset blocks that token, the publish step fails. In practice, you have two working choices:
+
+1. Allow the workflow identity to bypass the ruleset if your GitHub plan/settings support that.
+2. Use a dedicated deploy credential instead of `GITHUB_TOKEN`.
+
+The safer credential choice is a dedicated machine identity or deploy credential, not your own account.
+
+**Recommended Credential**
+For a locked-down `gh-pages` branch, prefer one of these:
+
+1. Fine-grained PAT from a dedicated bot account with access only to this repo and only `Contents: Read and write`.
+2. A deploy key with write access, if you want repo-scoped SSH auth instead of a token.
+
+With the workflow as written today, `actions/checkout` will usually persist `GITHUB_TOKEN` credentials. If you move to a PAT or deploy key, you should update the workflow so the final push uses that credential explicitly. Otherwise branch protection may still reject the push even if the secret exists.
+
+**Enable GitHub Pages From `gh-pages`**
+If you keep the current direct-push model, do this:
+
+1. Go to `Settings` → `Pages`.
+2. Under `Build and deployment`, set `Source` to `Deploy from a branch`.
+3. Choose branch `gh-pages`.
+4. Choose folder `/ (root)`.
+5. Save.
+
+After that, the published repository will be served from:
+
+- `https://<owner>.github.io/ash/`
+
+and your apt repo files will live under that URL.
+
+**Best-Practice Caveat**
+The strongest security model is not “protected branch plus workflow bypass.” The strongest model is:
+
+1. GitHub Actions builds the Pages artifact.
+2. GitHub Pages deploys it through the official Pages deployment mechanism.
+3. No workflow pushes directly to `gh-pages` at all.
+
+If you switch to that model:
+
+- In `Settings` → `Pages`, set `Source` to `GitHub Actions`, not `gh-pages`.
+- You can lock `gh-pages` down harder or stop using it as a publish target entirely.
+- You avoid the awkward exception where automation must bypass branch protection.
+
+That is the direction I would recommend if your goal is “not susceptible to malware or hacking,” because it reduces direct write access to the published branch.
+
+**Practical Recommendation**
+For now, if you want the least change:
+
+1. Create a `gh-pages` ruleset.
+2. Block force pushes and deletions.
+3. Do not require PRs or signed commits on `gh-pages`.
+4. Add one dedicated automation credential with bypass.
+5. Set Pages source to `gh-pages` → `/ (root)`.
+
+If you want the safer long-term setup:
+
+1. Change the workflow to deploy Pages via the official GitHub Pages actions.
+2. Set Pages source to `GitHub Actions`.
+3. Stop allowing direct workflow pushes to `gh-pages`.
+
+If you want, I can do the next step and modify the workflow so it uses the safer GitHub Pages deployment model instead of pushing directly to `gh-pages`.
