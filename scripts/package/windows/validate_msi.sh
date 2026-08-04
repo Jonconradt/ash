@@ -45,17 +45,31 @@ if [[ ! -f "$pkg_path" ]]; then
 fi
 
 find_executable() {
+  local prefix="$1"
   local candidate
-  for candidate in "$@"; do
+  local path_dir
+  local IFS=':'
+
+  for candidate in "$prefix" "$prefix"-0.20 "$prefix"-0.21 "$prefix"-0.22 "$prefix"-0.23; do
     if command -v "$candidate" >/dev/null 2>&1; then
       printf '%s\n' "$candidate"
       return 0
     fi
   done
+
+  for path_dir in $PATH; do
+    [[ -d "$path_dir" ]] || continue
+    for candidate in "$path_dir"/"$prefix"*; do
+      [[ -x "$candidate" ]] || continue
+      printf '%s\n' "$candidate"
+      return 0
+    done
+  done
+
   return 1
 }
 
-msiinfo_bin="$(find_executable msiinfo msiinfo-0.20 msiinfo-0.21 msiinfo-0.22 msiinfo-0.23 || true)"
+msiinfo_bin="$(find_executable msiinfo || true)"
 if [[ -z "$msiinfo_bin" ]]; then
   echo "msiinfo command not found. Install msitools: sudo apt-get install msitools" >&2
   exit 1

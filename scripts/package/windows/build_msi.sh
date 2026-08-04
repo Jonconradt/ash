@@ -60,17 +60,31 @@ if [[ ! -f "$binary_path" ]]; then
 fi
 
 find_executable() {
+  local prefix="$1"
   local candidate
-  for candidate in "$@"; do
+  local path_dir
+  local IFS=':'
+
+  for candidate in "$prefix" "$prefix"-0.20 "$prefix"-0.21 "$prefix"-0.22 "$prefix"-0.23; do
     if command -v "$candidate" >/dev/null 2>&1; then
       printf '%s\n' "$candidate"
       return 0
     fi
   done
+
+  for path_dir in $PATH; do
+    [[ -d "$path_dir" ]] || continue
+    for candidate in "$path_dir"/"$prefix"*; do
+      [[ -x "$candidate" ]] || continue
+      printf '%s\n' "$candidate"
+      return 0
+    done
+  done
+
   return 1
 }
 
-wixl_bin="$(find_executable wixl wixl-0.20 wixl-0.21 wixl-0.22 wixl-0.23 || true)"
+wixl_bin="$(find_executable wixl || true)"
 if [[ -z "$wixl_bin" ]]; then
   echo "wixl command not found. Install msitools: sudo apt-get install msitools" >&2
   exit 1
