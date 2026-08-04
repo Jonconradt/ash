@@ -175,6 +175,9 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 		if err != nil {
 			return chatResponse{}, err
 		}
+		if err := ctx.Err(); err != nil {
+			return chatResponse{}, err
+		}
 		slog.Debug("AI response", "request_id", requestIDGenerator(), "status", resp.StatusCode, "body", string(body), "EID", "2D1hx03p")
 
 		if resp.StatusCode < 200 || resp.StatusCode > 299 {
@@ -191,6 +194,9 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 
 		parsed, err := adapter.ParseResponse(body)
 		if err != nil {
+			if ctxErr := ctx.Err(); ctxErr != nil {
+				return chatResponse{}, ctxErr
+			}
 			return chatResponse{}, err
 		}
 

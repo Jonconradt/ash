@@ -129,6 +129,70 @@ get_release_assets_json() {
   gh release view "$tag" -R "$repo" --json assets 2>/dev/null || true
 }
 
+get_failure_summary() {
+  local run_json="$1"
+
+  python3 - "$tag" "$run_json" <<'PY'
+import json
+import sys
+
+tag = sys.argv[1]
+run_json = sys.argv[2]
+
+
+def parse_json(raw: str):
+  raw = raw.strip()
+  if not raw:
+    return None
+  return json.loads(raw)
+
+
+def first_failed_step(job: dict) -> str:
+  steps = job.get("steps") or []
+  for step in steps:
+    conclusion = (step.get("conclusion") or "").lower()
+    if conclusion and conclusion != "success" and conclusion != "skipped":
+      step_name = step.get("name") or "unnamed step"
+      return f"{step_name} ({conclusion})"
+  return "no failed step details available"
+
+
+run = parse_json(run_json)
+if not isinstance(run, dict):
+  print(f"Release {tag} failed, but no workflow details were available.")
+  sys.exit(0)
+
+jobs = run.get("jobs", []) or []
+failed_jobs = []
+for job in jobs:
+  status = (job.get("status") or "").lower()
+  conclusion = (job.get("conclusion") or "").lower()
+  if status == "completed" and conclusion and conclusion != "success":
+    failed_jobs.append(job)
+
+if not failed_jobs:
+  conclusion = run.get("conclusion") or "unknown"
+  print(f"Release {tag} workflow finished with conclusion={conclusion}.")
+  sys.exit(0)
+
+workflow_conclusion = run.get("conclusion") or "unknown"
+workflow_url = run.get("url") or ""
+print(f"Release {tag} failed with conclusion={workflow_conclusion}.")
+if workflow_url:
+  print(f"Workflow URL: {workflow_url}")
+print("Failed jobs:")
+for job in failed_jobs:
+  job_name = job.get("name") or "unnamed job"
+  job_conclusion = job.get("conclusion") or "unknown"
+  job_url = job.get("url") or ""
+  detail = first_failed_step(job)
+  if job_url:
+    print(f"- {job_name}: {job_conclusion}; first failed step: {detail}; job URL: {job_url}")
+  else:
+    print(f"- {job_name}: {job_conclusion}; first failed step: {detail}")
+PY
+}
+
 get_release_progress() {
   local run_json="$1"
   local assets_json="$2"
@@ -425,7 +489,7 @@ while true; do
         final_message="Release $tag is complete. All expected artifacts are published."
         ;;
       workflow_failed)
-        final_message="Release $tag workflow has completed with a non-success conclusion."
+        final_message="$(get_failure_summary "$run_json")"
         ;;
     esac
     break
