@@ -130,7 +130,6 @@ jobs:
     needs:
       - package-macos
       - package-linux
-      - package-windows
     steps:
       - name: Download packaged artifacts
         uses: actions/download-artifact@v5
