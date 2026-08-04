@@ -73,7 +73,6 @@ Canonical publishing is tag-driven in GitHub Actions.
   - `ash-v1.2.3-linux-amd64.rpm`
   - `ash-v1.2.3-linux-arm64.rpm`
   - `ash-v1.2.3-windows-amd64.msi`
-  - `ash-v1.2.3-windows-arm64.msi`
   - `ash-v1.2.3-<os>-<arch>.tar.gz`
   - matching `.sha256` files for each artifact
 

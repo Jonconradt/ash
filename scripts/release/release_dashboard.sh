@@ -100,8 +100,7 @@ for asset in \
   "ash-${tag}-linux-arm64.rpm" \
   "ash-${tag}-linux-amd64.tar.gz" \
   "ash-${tag}-linux-arm64.tar.gz" \
-  "ash-${tag}-windows-amd64.msi" \
-  "ash-${tag}-windows-arm64.msi"; do
+  "ash-${tag}-windows-amd64.msi"; do
   expected_assets+=("$asset")
 done
 
