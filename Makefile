@@ -28,7 +28,8 @@ MAN_INSTALL_PATH_LINUX ?= /usr/share/man/man1
 MAN_INSTALL_PATH_MACOS ?= /usr/local/share/man/man1
 TARBALL_MAN_PATH ?= usr/share/man/man1
 RELEASE_ARTIFACT_BASE ?= $(APP_NAME)-$(RELEASE_VERSION)-$(RELEASE_GOOS)-$(RELEASE_ARCH)
-RELEASE_BINARY_PATH ?= $(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)
+BINARY_EXT = $(if $(filter windows,$(RELEASE_GOOS)),.exe,)
+RELEASE_BINARY_PATH ?= $(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)$(BINARY_EXT)
 
 all: verify install
 
@@ -171,6 +172,18 @@ release-pkg-one:
 			install -m 0644 "$(MAN_PAGE_PATH)" "$$tmp_dir/$(TARBALL_MAN_PATH)/$(APP_NAME).1"; \
 			tar -C "$$tmp_dir" -czf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" "$(notdir $(RELEASE_BINARY_PATH))" "$(TARBALL_MAN_PATH)/$(APP_NAME).1"; \
 			;; \
+		msi) \
+			if [[ "$(RELEASE_GOOS)" != "windows" ]]; then \
+				echo "msi format requires RELEASE_GOOS=windows"; \
+				exit 1; \
+			fi; \
+			./scripts/package/windows/build_msi.sh \
+				--app-name "$(APP_NAME)" \
+				--version "$(RELEASE_VERSION)" \
+				--arch "$(RELEASE_ARCH)" \
+				--binary "$(RELEASE_BINARY_PATH)" \
+				--output "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).msi"; \
+			;; \
 		*) \
 			echo "unsupported RELEASE_FORMAT=$(RELEASE_FORMAT)"; \
 			exit 1; \
@@ -216,6 +229,12 @@ release-validate-one:
 			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^$(TARBALL_MAN_PATH)/$(APP_NAME)\.1$$"; \
 			shasum -a 256 "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" > "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz.sha256"; \
 			;; \
+		msi) \
+			./scripts/package/windows/validate_msi.sh \
+				--pkg "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).msi" \
+				--app-name "$(APP_NAME)"; \
+			shasum -a 256 "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).msi" > "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).msi.sha256"; \
+			;; \
 		*) \
 			echo "unsupported RELEASE_FORMAT=$(RELEASE_FORMAT)"; \
 			exit 1; \
@@ -251,6 +270,13 @@ release-artifacts:
 					$(MAKE) release-validate-one RELEASE_GOOS=linux RELEASE_ARCH=$$arch RELEASE_FORMAT=rpm RELEASE_VERSION=$(RELEASE_VERSION); \
 					$(MAKE) release-pkg-one RELEASE_GOOS=linux RELEASE_ARCH=$$arch RELEASE_FORMAT=tar.gz RELEASE_VERSION=$(RELEASE_VERSION); \
 					$(MAKE) release-validate-one RELEASE_GOOS=linux RELEASE_ARCH=$$arch RELEASE_FORMAT=tar.gz RELEASE_VERSION=$(RELEASE_VERSION); \
+				done; \
+				;; \
+			windows) \
+				for arch in $(RELEASE_TARGET_ARCHES); do \
+					$(MAKE) release-build-one RELEASE_GOOS=windows RELEASE_ARCH=$$arch RELEASE_VERSION=$(RELEASE_VERSION); \
+					$(MAKE) release-pkg-one RELEASE_GOOS=windows RELEASE_ARCH=$$arch RELEASE_FORMAT=msi RELEASE_VERSION=$(RELEASE_VERSION); \
+					$(MAKE) release-validate-one RELEASE_GOOS=windows RELEASE_ARCH=$$arch RELEASE_FORMAT=msi RELEASE_VERSION=$(RELEASE_VERSION); \
 				done; \
 				;; \
 			*) \
