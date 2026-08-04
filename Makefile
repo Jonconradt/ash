@@ -1,4 +1,4 @@
-.PHONY: all verify lint test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install setup-hooks version release release-check release-build release-pkg release-validate release-publish release-watch release-artifacts release-build-one release-pkg-one release-validate-one
+.PHONY: all verify lint test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install setup-hooks version release release-check release-build release-pkg release-validate release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one
 
 SHELL := /bin/bash
 
@@ -337,3 +337,7 @@ release-watch:
 		fi; \
 		echo "release workflow failed, but continuing because RELEASE_WATCH_STRICT=$(RELEASE_WATCH_STRICT)"; \
 	fi
+	@$(MAKE) release-dashboard RELEASE_VERSION=$(RELEASE_VERSION)
+
+release-dashboard:
+	@./scripts/release/release_dashboard.sh --tag "$(RELEASE_VERSION)"

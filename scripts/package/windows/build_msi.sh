@@ -59,7 +59,19 @@ if [[ ! -f "$binary_path" ]]; then
   exit 1
 fi
 
-if ! command -v wixl >/dev/null 2>&1; then
+find_executable() {
+  local candidate
+  for candidate in "$@"; do
+    if command -v "$candidate" >/dev/null 2>&1; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
+wixl_bin="$(find_executable wixl wixl-0.20 wixl-0.21 wixl-0.22 wixl-0.23 || true)"
+if [[ -z "$wixl_bin" ]]; then
   echo "wixl command not found. Install msitools: sudo apt-get install msitools" >&2
   exit 1
 fi
@@ -134,6 +146,6 @@ cat > "$wxs_path" <<WXSEOF
 </Wix>
 WXSEOF
 
-wixl -a "$platform" -o "$output_path" "$wxs_path"
+"$wixl_bin" -a "$platform" -o "$output_path" "$wxs_path"
 
 echo "created package: $output_path"
