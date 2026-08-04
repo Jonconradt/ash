@@ -292,7 +292,7 @@ release-publish:
 		echo "cannot publish release from detached HEAD"; \
 		exit 1; \
 	fi; \
-	GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="ssh -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=2" git push origin "$$current_branch" && \
+	./scripts/release/push_with_retry.sh "pushing branch $$current_branch to origin" git push origin "$$current_branch" && \
 	echo "pushed branch $$current_branch to origin"
 	@head_sha="$$(git rev-parse HEAD)"; \
 	local_sha="$$(git rev-parse -q --verify "refs/tags/$(RELEASE_VERSION)^{}" 2>/dev/null || true)"; \
@@ -307,7 +307,7 @@ release-publish:
 		echo "local tag $(RELEASE_VERSION) already exists at HEAD"; \
 	fi
 	@echo "pushing tag $(RELEASE_VERSION) to origin"; \
-	GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="ssh -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=2" git push origin "refs/tags/$(RELEASE_VERSION):refs/tags/$(RELEASE_VERSION)" && \
+	./scripts/release/push_with_retry.sh "pushing tag $(RELEASE_VERSION) to origin" git push origin "refs/tags/$(RELEASE_VERSION):refs/tags/$(RELEASE_VERSION)" && \
 	echo "pushed tag $(RELEASE_VERSION) to origin"
 
 release-watch:
