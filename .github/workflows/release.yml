@@ -1,39 +1,31 @@
 name: release
-
 on:
   push:
     tags:
       - 'v*'
-
 permissions:
   actions: read
   contents: write
-
 jobs:
   quality:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-
       - name: Run quality checks
         run: make lint test
-
       - name: Ensure dist directory exists
         run: mkdir -p dist
-
       - name: Generate SBOM
         uses: anchore/sbom-action@v0.24.0
         with:
           path: .
           format: spdx-json
           output-file: dist/sbom.spdx.json
-
   package-macos:
     runs-on: macos-14
     needs: quality
@@ -44,22 +36,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-
       - name: Build and package macOS artifacts
         run: |
           make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES=${{ matrix.arch }} RELEASE_VERSION="${GITHUB_REF_NAME}"
-
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v5
         with:
           name: release-macos-${{ matrix.arch }}
           path: dist/release/*darwin-${{ matrix.arch }}*
-
   package-linux:
     runs-on: ubuntu-latest
     needs: quality
@@ -70,28 +58,52 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-
       - name: Setup Go
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
-
       - name: Install packaging tools
         run: |
           sudo apt-get update
           sudo apt-get install -y ruby ruby-dev build-essential rpm
           sudo gem install --no-document fpm
-
       - name: Build and package Linux artifacts
         run: |
           make release-artifacts RELEASE_TARGET_OSES=linux RELEASE_TARGET_ARCHES=${{ matrix.arch }} RELEASE_VERSION="${GITHUB_REF_NAME}"
-
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v5
         with:
           name: release-linux-${{ matrix.arch }}
           path: dist/release/*linux-${{ matrix.arch }}*
-
+  package-windows:
+    if: false # Disabled until we want a working Windows build
+    runs-on: ubuntu-latest
+    needs: quality
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Install packaging tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y msitools wixl wixl-data
+          command -v wixl
+          command -v msiinfo
+      - name: Build and package Windows artifacts
+        run: |
+          make release-artifacts RELEASE_TARGET_OSES=windows RELEASE_TARGET_ARCHES=${{ matrix.arch }} RELEASE_VERSION="${GITHUB_REF_NAME}"
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: release-windows-${{ matrix.arch }}
+          path: dist/release/*windows-${{ matrix.arch }}*
   publish:
     runs-on: ubuntu-latest
     needs:
@@ -102,11 +114,9 @@ jobs:
         uses: actions/download-artifact@v5
         with:
           path: dist/release
-
       - name: Flatten artifact directories
         run: |
           find dist/release -mindepth 2 -type f -name '*' -exec mv {} dist/release/ \;
-
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v2
         with:

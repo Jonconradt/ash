@@ -72,6 +72,7 @@ Canonical publishing is tag-driven in GitHub Actions.
   - `ash-v1.2.3-linux-arm64.deb`
   - `ash-v1.2.3-linux-amd64.rpm`
   - `ash-v1.2.3-linux-arm64.rpm`
+  - `ash-v1.2.3-windows-amd64.msi`
   - `ash-v1.2.3-<os>-<arch>.tar.gz`
   - matching `.sha256` files for each artifact
 5. The `apt-publish` workflow also generates a signed Debian repository on GitHub Pages from the Linux `.deb` artifacts so users can install and upgrade with `apt`.
@@ -99,6 +100,7 @@ Requirements for local packaging:
 
 - macOS with `pkgbuild` and `pkgutil` available
 - Linux packaging requires `fpm` (for `.deb`/`.rpm`) plus `dpkg-deb`/`rpm` for validation
+- Windows packaging requires `msitools` (`wixl` and `msiinfo`) and `python3`
 - Go toolchain installed
 
 The package is currently unsigned and not notarized by design.
@@ -245,7 +247,10 @@ Install shell integration (wrappers plus command-not-found hook):
 ```bash
 ash install --shell bash
 ash install --shell zsh
+ash install --shell pwsh
 ```
+
+On Windows 11, `ash install` defaults to `pwsh` when `--shell` is omitted.
 
 Preview without writing files:
 
@@ -255,9 +260,15 @@ ash install --shell bash --dry-run
 
 `ash install` is idempotent and appends a single managed block to your rc file.
 For bash it targets `~/.bashrc`; for zsh it targets `~/.zshrc`.
+For PowerShell 7 (`pwsh`) it targets `~/Documents/PowerShell/Microsoft.PowerShell_profile.ps1`.
 During install, if `./.ash_system` or `./.ash_tools` exist in your current
 directory, they are copied into `~/.ash/` and become the canonical files used
 by `ash`.
+
+Installer implementation is split per shell target for maintainability:
+- `bash_install.go`
+- `zsh_install.go`
+- `pwsh_install.go`
 
 When enabled, `ash` logs:
 

@@ -45,10 +45,7 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 	}
 
 	if shellName == "" {
-		shellName = detectShellName(os.Getenv("SHELL"))
-		if shellName == "" {
-			shellName = "bash"
-		}
+		shellName = defaultInstallShell(os.Getenv("SHELL"), activeGOOS())
 	}
 
 	rcPath, err := rcPathForShell(shellName)
@@ -66,7 +63,7 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 		slog.Error(fmt.Sprintf("install error: %v", err), "EID", "RtRyQwEX")
 		return 1
 	}
-	if err := ensureBashProfileSourcing(shellName, dryRun, stdout); err != nil {
+	if err := ensureShellPostInstall(shellName, dryRun, stdout); err != nil {
 		slog.Error(fmt.Sprintf("install error: %v", err), "EID", "bnjrQttE")
 		return 1
 	}
@@ -108,6 +105,11 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 			return 0
 		}
 
+		if err := osMkdirAll(filepath.Dir(rcPath), 0o700); err != nil {
+			slog.Error(fmt.Sprintf("install error: failed to create parent directory for %s: %v", rcPath, err), "EID", "AB5qbz5c")
+			return 1
+		}
+
 		if err := osWriteFile(rcPath, []byte(updated), 0o600); err != nil {
 			slog.Error(fmt.Sprintf("install error: failed to write %s: %v", rcPath, err), "EID", "J3crjWvv")
 			return 1
@@ -135,6 +137,11 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 			fmt.Fprintln(stdout)
 		}
 		return 0
+	}
+
+	if err := osMkdirAll(filepath.Dir(rcPath), 0o700); err != nil {
+		slog.Error(fmt.Sprintf("install error: failed to create parent directory for %s: %v", rcPath, err), "EID", "G2nscOa7")
+		return 1
 	}
 
 	if err := osWriteFile(rcPath, []byte(updated), 0o600); err != nil {
@@ -504,30 +511,31 @@ func parseInstallArgs(args []string) (shellName string, dryRun bool, err error) 
 
 // detectShellName returns the canonical shell name for a shell executable path, or empty if unsupported.
 func detectShellName(shellPath string) string {
-	base := strings.TrimSpace(filepath.Base(shellPath))
-	switch base {
-	case "bash", "zsh":
-		return base
-	default:
-		return ""
+	base := strings.TrimSpace(shellPath)
+	base = strings.TrimRight(base, "\\/")
+	if idx := strings.LastIndexAny(base, "\\/"); idx >= 0 {
+		base = base[idx+1:]
 	}
+	canonical := normalizeShellName(base)
+	if _, ok := installShellTargets[canonical]; ok {
+		return canonical
+	}
+	return ""
 }
 
 // rcPathForShell returns the user rc file path for the supplied shell name.
 func rcPathForShell(shellName string) (string, error) {
+	target, err := resolveInstallShellTarget(shellName, activeGOOS())
+	if err != nil {
+		return "", err
+	}
+
 	home, err := osUserHomeDir()
 	if err != nil {
 		return "", err
 	}
 
-	switch shellName {
-	case "bash":
-		return filepath.Join(home, ".bashrc"), nil
-	case "zsh":
-		return filepath.Join(home, ".zshrc"), nil
-	default:
-		return "", fmt.Errorf("unsupported shell %q (supported: bash, zsh)", shellName)
-	}
+	return target.RCPath(home), nil
 }
 
 // readFileIfExists returns the contents of path when it exists, or an empty string when the file is absent.
@@ -604,6 +612,14 @@ func replaceManagedInstallBlock(existing, block string) (string, bool) {
 func installRecommendation() (string, error) {
 	shellName := detectShellName(os.Getenv("SHELL"))
 	if shellName == "" {
+		if activeGOOS() == "windows" {
+			shellName = shellPwsh
+		} else {
+			return "", nil
+		}
+	}
+
+	if _, err := resolveInstallShellTarget(shellName, activeGOOS()); err != nil {
 		return "", nil
 	}
 
@@ -670,50 +686,39 @@ func bashInstalledViaProfileSourcing() (bool, error) {
 
 // installSourceBlockForShell returns the shell snippet that sources ash for the supplied shell name.
 func installSourceBlockForShell(shellName string) string {
-	scriptName := ""
-	switch shellName {
-	case "bash":
-		scriptName = ".ash_bashrc"
-	case "zsh":
-		scriptName = ".ash_zshrc"
-	default:
+	target, err := resolveInstallShellTarget(shellName, activeGOOS())
+	if err != nil {
 		return ""
 	}
 
-	return strings.TrimSpace(`
-` + installStartMarker + `
-[ -f "$HOME/.ash/.ash_env" ] && . "$HOME/.ash/.ash_env"
-[ -f "$HOME/.ash/` + scriptName + `" ] && . "$HOME/.ash/` + scriptName + `"
-` + installEndMarker)
+	return target.SourceBlock()
 }
 
 // installShellWrapperPath returns the path to the shell wrapper file used by ash for the supplied shell.
 func installShellWrapperPath(shellName string) (string, error) {
+	target, err := resolveInstallShellTarget(shellName, activeGOOS())
+	if err != nil {
+		return "", err
+	}
+
 	root, err := ashWorkspaceDir()
 	if err != nil {
 		return "", err
 	}
 
-	fileName := ""
-	switch shellName {
-	case "bash":
-		fileName = ".ash_bashrc"
-	case "zsh":
-		fileName = ".ash_zshrc"
-	default:
-		return "", fmt.Errorf("unsupported shell %q", shellName)
-	}
-	return filepath.Join(root, fileName), nil
+	return filepath.Join(root, target.WrapperFile), nil
 }
 
 // ensureInstallShellWrapper ensures required state exists and is up to date.
 func ensureInstallShellWrapper(shellName string, dryRun bool, stdout io.Writer) error {
-	content := installBlockForShell(shellName)
-	if content == "" {
-		return fmt.Errorf("unsupported shell %q", shellName)
+	target, err := resolveInstallShellTarget(shellName, activeGOOS())
+	if err != nil {
+		return err
 	}
 
-	path, err := installShellWrapperPath(shellName)
+	content := target.WrapperContent()
+
+	path, err := installShellWrapperPath(target.Name)
 	if err != nil {
 		return err
 	}
@@ -728,395 +733,14 @@ func ensureInstallShellWrapper(shellName string, dryRun bool, stdout io.Writer) 
 	return osWriteFile(path, []byte(content+"\n"), 0o600)
 }
 
-// ensureBashProfileSourcing ensures required state exists and is up to date.
-func ensureBashProfileSourcing(shellName string, dryRun bool, stdout io.Writer) error {
-	if shellName != "bash" {
-		return nil
-	}
-	home, err := osUserHomeDir()
+// ensureShellPostInstall runs shell-specific post-install actions when needed.
+func ensureShellPostInstall(shellName string, dryRun bool, stdout io.Writer) error {
+	target, err := resolveInstallShellTarget(shellName, activeGOOS())
 	if err != nil {
 		return err
 	}
-	profilePath := filepath.Join(home, ".bash_profile")
-	line := `[ -f "$HOME/.ash/.ash_bashrc" ] && . "$HOME/.ash/.ash_bashrc"`
-
-	existing, err := readFileIfExists(profilePath)
-	if err != nil {
-		return err
-	}
-	if strings.Contains(existing, line) {
+	if target.PostInstall == nil {
 		return nil
 	}
-
-	if dryRun {
-		fmt.Fprintf(stdout, "[dry-run] would append ash source line to %s\n", profilePath)
-		return nil
-	}
-
-	updated := existing
-	if updated != "" && !strings.HasSuffix(updated, "\n") {
-		updated += "\n"
-	}
-	updated += line + "\n"
-	return osWriteFile(profilePath, []byte(updated), 0o600)
-}
-
-// installBlockForShell returns the computed value for this helper.
-func installBlockForShell(shellName string) string {
-	switch shellName {
-	case "bash":
-		return strings.TrimSpace(`
-` + installStartMarker + `
-[ -f "$HOME/.ash/.ash_env" ] && . "$HOME/.ash/.ash_env"
-case "$-" in
-	*i*) ;;
-	*) return ;;
-esac
-
-command_not_found_handle() {
-  ash "$@"
-  return $?
-}
-
-_ash_should_route() {
-  local cmd="$1"
-  shift
-  local args=("$@")
-  local argc=${#args[@]}
-	local cmd_lower
-	cmd_lower="$(printf '%s' "$cmd" | tr '[:upper:]' '[:lower:]')"
-	local natural_wrapper=0
-	case "$cmd_lower" in
-		what|which|who|where|at|in|for) natural_wrapper=1 ;;
-	esac
-
-  [[ $argc -eq 0 ]] && return 1
-
-  local a
-  for a in "${args[@]}"; do
-    [[ "$a" == -* ]] && return 1
-  done
-
-	local has_path_like=0
-	for a in "${args[@]}"; do
-		if [[ "$a" == */* || "$a" == ./* || "$a" == ../* ]]; then
-			has_path_like=1
-			break
-		fi
-	done
-	if [[ $has_path_like -eq 1 && ( $natural_wrapper -eq 0 || $argc -eq 1 ) ]]; then
-		return 1
-	fi
-
-	if [[ "$cmd_lower" == "at" ]]; then
-		local first_at
-		first_at="$(printf '%s' "${args[0]}" | tr '[:upper:]' '[:lower:]')"
-		first_at="${first_at%%[?!.,:;]}"
-		if [[ "$first_at" =~ [0-9:] ]]; then
-			return 1
-		fi
-		case "$first_at" in
-			now|today|tomorrow|teatime|midnight|noon)
-				return 1
-				;;
-			am|pm)
-				return 1
-				;;
-		esac
-	fi
-
-  if [[ "$cmd" == "Time" || "$cmd" == "test" || "$cmd" == "Test" || "$cmd" == "type" || "$cmd" == "Type" ]]; then
-    if [[ $argc -eq 1 && "${args[0]}" =~ ^[A-Za-z0-9_.-]+$ ]]; then
-      return 1
-    fi
-  fi
-
-  local full="$cmd"
-  for a in "${args[@]}"; do
-    full+=" $a"
-  done
-
-  [[ "$full" == *\? && $argc -ge 2 ]] && return 0
-
-  local first
-  first="$(printf '%s' "${args[0]}" | tr '[:upper:]' '[:lower:]')"
-  case "$first" in
-    is|are|am|do|does|did|can|could|should|would|will|why|how|when|where|who)
-			if [[ $argc -ge 2 ]]; then
-				if [[ $has_path_like -eq 0 || ( $natural_wrapper -eq 1 && $argc -ge 3 ) ]]; then
-					return 0
-				fi
-			fi
-      ;;
-  esac
-
-	case "$cmd_lower" in
-		what|which|who|where)
-			if [[ $argc -ge 3 ]]; then
-				local limit=4
-				(( argc < limit )) && limit=$argc
-				local i token raw
-				for (( i=1; i<limit; i++ )); do
-					raw="${args[$i]}"
-					token="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
-					token="${token%%[?!.,:;]}"
-					case "$token" in
-						is|are|am|do|does|did|can|could|should|would|will|why|how|when|where|who|if)
-							return 0
-							;;
-					esac
-				done
-			fi
-			;;
-		say)
-			if [[ $argc -ge 2 ]]; then
-				local first_token
-				first_token="$(printf '%s' "${args[0]}" | tr '[:upper:]' '[:lower:]')"
-				first_token="${first_token%%[?!.,:;]}"
-				case "$first_token" in
-					out|something|a|an|the|please|why|how|when|where|who|what|can|could|should|would)
-						return 0
-						;;
-				esac
-			fi
-			;;
-		in|for)
-			if [[ $argc -ge 2 ]]; then
-				local first_token
-				first_token="$(printf '%s' "${args[0]}" | tr '[:upper:]' '[:lower:]')"
-				first_token="${first_token%%[?!.,:;]}"
-				case "$first_token" in
-					this|that|these|those|the|a|an|my|our|your|please|what|when|how|why|who|where|is|are|do|can|should|would)
-						return 0
-						;;
-				esac
-			fi
-			;;
-		at)
-			if [[ $argc -ge 2 ]]; then
-				local first_token
-				first_token="$(printf '%s' "${args[0]}" | tr '[:upper:]' '[:lower:]')"
-				first_token="${first_token%%[?!.,:;]}"
-				case "$first_token" in
-					remind|tell|ask|message|note|please|what|when|how|why|who|where)
-						return 0
-						;;
-				esac
-			fi
-			;;
-	esac
-
-  return 1
-}
-
-_ash_route_or_delegate() {
-  local cmd="$1"
-  shift
-  if _ash_should_route "$cmd" "$@"; then
-    ash "$cmd" "$@"
-    return $?
-  fi
-  command "$cmd" "$@"
-}
-
-_ash_route_or_delegate_builtin() {
-  local builtin_name="$1"
-  shift
-  if _ash_should_route "$builtin_name" "$@"; then
-    ash "$builtin_name" "$@"
-    return $?
-  fi
-  builtin "$builtin_name" "$@"
-}
-
-what()  { _ash_route_or_delegate what  "$@"; }
-What()  { _ash_route_or_delegate What  "$@"; }
-which() { _ash_route_or_delegate which "$@"; }
-Which() { _ash_route_or_delegate Which "$@"; }
-who()   { _ash_route_or_delegate who   "$@"; }
-Who()   { _ash_route_or_delegate Who   "$@"; }
-say()   { _ash_route_or_delegate say   "$@"; }
-Say()   { _ash_route_or_delegate Say   "$@"; }
-at()    { _ash_route_or_delegate at    "$@"; }
-At()    { _ash_route_or_delegate At    "$@"; }
-In()    { _ash_route_or_delegate In    "$@"; }
-For()   { _ash_route_or_delegate For   "$@"; }
-
-test()  { _ash_route_or_delegate_builtin test "$@"; }
-Test()  { _ash_route_or_delegate_builtin test "$@"; }
-type()  { _ash_route_or_delegate_builtin type "$@"; }
-Type()  { _ash_route_or_delegate_builtin type "$@"; }
-Time()  { _ash_route_or_delegate Time "$@"; }
-` + installEndMarker)
-	case "zsh":
-		return strings.TrimSpace(`
-` + installStartMarker + `
-[ -f "$HOME/.ash/.ash_env" ] && . "$HOME/.ash/.ash_env"
-command_not_found_handler() {
-  ash "$@"
-  return $?
-}
-
-_ash_should_route() {
-  local cmd="$1"
-  shift
-  local -a args
-  args=("$@")
-  local argc=${#args}
-	local cmd_lower
-	cmd_lower="$(printf '%s' "$cmd" | tr '[:upper:]' '[:lower:]')"
-	local natural_wrapper=0
-	case "$cmd_lower" in
-		what|which|who|where|at|in|for) natural_wrapper=1 ;;
-	esac
-
-  [[ $argc -eq 0 ]] && return 1
-
-  local a
-  for a in "${args[@]}"; do
-    [[ "$a" == -* ]] && return 1
-  done
-
-	local has_path_like=0
-	for a in "${args[@]}"; do
-		if [[ "$a" == */* || "$a" == ./* || "$a" == ../* ]]; then
-			has_path_like=1
-			break
-		fi
-	done
-	if [[ $has_path_like -eq 1 && ( $natural_wrapper -eq 0 || $argc -eq 1 ) ]]; then
-		return 1
-	fi
-
-	if [[ "$cmd_lower" == "at" ]]; then
-		local first_at
-		first_at="$(printf '%s' "${args[1]}" | tr '[:upper:]' '[:lower:]')"
-		first_at="${first_at%%[?!.,:;]}"
-		if [[ "$first_at" =~ [0-9:] ]]; then
-			return 1
-		fi
-		case "$first_at" in
-			now|today|tomorrow|teatime|midnight|noon)
-				return 1
-				;;
-			am|pm)
-				return 1
-				;;
-		esac
-	fi
-
-  if [[ "$cmd" == "Time" || "$cmd" == "test" || "$cmd" == "Test" || "$cmd" == "type" || "$cmd" == "Type" ]]; then
-    if [[ $argc -eq 1 && "${args[1]}" =~ '^[A-Za-z0-9_.-]+$' ]]; then
-      return 1
-    fi
-  fi
-
-  local full="$cmd"
-  for a in "${args[@]}"; do
-    full+=" $a"
-  done
-
-  [[ "$full" == *\? && $argc -ge 2 ]] && return 0
-
-  local first
-  first="$(printf '%s' "${args[1]}" | tr '[:upper:]' '[:lower:]')"
-  case "$first" in
-    is|are|am|do|does|did|can|could|should|would|will|why|how|when|where|who)
-			if [[ $argc -ge 2 ]]; then
-				if [[ $has_path_like -eq 0 || ( $natural_wrapper -eq 1 && $argc -ge 3 ) ]]; then
-					return 0
-				fi
-			fi
-      ;;
-  esac
-
-	case "$cmd_lower" in
-		what|which|who|where)
-			if [[ $argc -ge 3 ]]; then
-				local limit=4
-				(( argc < limit )) && limit=$argc
-				local i token raw
-				for (( i=2; i<=limit; i++ )); do
-					raw="${args[$i]}"
-					token="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
-					token="${token%%[?!.,:;]}"
-					case "$token" in
-						is|are|am|do|does|did|can|could|should|would|will|why|how|when|where|who|if)
-							return 0
-							;;
-					esac
-				done
-			fi
-			;;
-		in|for)
-			if [[ $argc -ge 2 ]]; then
-				local first_token
-				first_token="$(printf '%s' "${args[1]}" | tr '[:upper:]' '[:lower:]')"
-				first_token="${first_token%%[?!.,:;]}"
-				case "$first_token" in
-					this|that|these|those|the|a|an|my|our|your|please|what|when|how|why|who|where|is|are|do|can|should|would)
-						return 0
-						;;
-				esac
-			fi
-			;;
-		at)
-			if [[ $argc -ge 2 ]]; then
-				local first_token
-				first_token="$(printf '%s' "${args[1]}" | tr '[:upper:]' '[:lower:]')"
-				first_token="${first_token%%[?!.,:;]}"
-				case "$first_token" in
-					remind|tell|ask|message|note|please|what|when|how|why|who|where)
-						return 0
-						;;
-				esac
-			fi
-			;;
-	esac
-
-  return 1
-}
-
-_ash_route_or_delegate() {
-  local cmd="$1"
-  shift
-  if _ash_should_route "$cmd" "$@"; then
-    ash "$cmd" "$@"
-    return $?
-  fi
-  command "$cmd" "$@"
-}
-
-_ash_route_or_delegate_builtin() {
-  local builtin_name="$1"
-  shift
-  if _ash_should_route "$builtin_name" "$@"; then
-    ash "$builtin_name" "$@"
-    return $?
-  fi
-  builtin "$builtin_name" "$@"
-}
-
-what()  { _ash_route_or_delegate what  "$@"; }
-What()  { _ash_route_or_delegate What  "$@"; }
-which() { _ash_route_or_delegate which "$@"; }
-Which() { _ash_route_or_delegate Which "$@"; }
-who()   { _ash_route_or_delegate who   "$@"; }
-Who()   { _ash_route_or_delegate Who   "$@"; }
-where() { _ash_route_or_delegate_builtin where "$@"; }
-Where() { _ash_route_or_delegate_builtin where "$@"; }
-at()    { _ash_route_or_delegate at    "$@"; }
-At()    { _ash_route_or_delegate At    "$@"; }
-In()    { _ash_route_or_delegate In    "$@"; }
-For()   { _ash_route_or_delegate For   "$@"; }
-
-test()  { _ash_route_or_delegate_builtin test "$@"; }
-Test()  { _ash_route_or_delegate_builtin test "$@"; }
-type()  { _ash_route_or_delegate_builtin type "$@"; }
-Type()  { _ash_route_or_delegate_builtin type "$@"; }
-Time()  { _ash_route_or_delegate Time "$@"; }
-` + installEndMarker)
-	default:
-		return ""
-	}
+	return target.PostInstall(dryRun, stdout)
 }

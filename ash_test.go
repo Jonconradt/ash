@@ -2171,6 +2171,101 @@ func TestParseInstallArgs(t *testing.T) {
 	})
 }
 
+func TestDetectShellName(t *testing.T) {
+	tests := []struct {
+		name      string
+		shellPath string
+		want      string
+	}{
+		{name: "bash path", shellPath: "/bin/bash", want: "bash"},
+		{name: "zsh path", shellPath: "/usr/bin/zsh", want: "zsh"},
+		{name: "pwsh exe", shellPath: `C:\Program Files\PowerShell\7\pwsh.exe`, want: "pwsh"},
+		{name: "powershell exe", shellPath: `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`, want: "pwsh"},
+		{name: "unknown", shellPath: "/bin/fish", want: ""},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := detectShellName(tt.shellPath); got != tt.want {
+				t.Fatalf("detectShellName(%q)=%q want %q", tt.shellPath, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestInstallTargetResolutionByOS(t *testing.T) {
+	originalGOOS := currentGOOS
+	t.Cleanup(func() { currentGOOS = originalGOOS })
+
+	t.Run("unix targets", func(t *testing.T) {
+		currentGOOS = "darwin"
+
+		if _, err := resolveInstallShellTarget("bash", activeGOOS()); err != nil {
+			t.Fatalf("expected bash target on darwin, got error: %v", err)
+		}
+		if _, err := resolveInstallShellTarget("zsh", activeGOOS()); err != nil {
+			t.Fatalf("expected zsh target on darwin, got error: %v", err)
+		}
+		if _, err := resolveInstallShellTarget("pwsh", activeGOOS()); err == nil {
+			t.Fatalf("expected pwsh to be unsupported on darwin")
+		}
+	})
+
+	t.Run("windows target", func(t *testing.T) {
+		currentGOOS = "windows"
+		home := t.TempDir()
+		t.Setenv("HOME", home)
+
+		target, err := resolveInstallShellTarget("powershell", activeGOOS())
+		if err != nil {
+			t.Fatalf("expected powershell alias to resolve on windows, got error: %v", err)
+		}
+		if target.Name != shellPwsh {
+			t.Fatalf("expected resolved target name %q, got %q", shellPwsh, target.Name)
+		}
+
+		rcPath, err := rcPathForShell("pwsh")
+		if err != nil {
+			t.Fatalf("rcPathForShell(pwsh) returned error: %v", err)
+		}
+		wantSuffix := filepath.Join("Documents", "PowerShell", "Microsoft.PowerShell_profile.ps1")
+		if !strings.HasSuffix(rcPath, wantSuffix) {
+			t.Fatalf("expected pwsh profile suffix %q, got %q", wantSuffix, rcPath)
+		}
+
+		if block := installSourceBlockForShell("pwsh"); !strings.Contains(block, ".ash_pwsh.ps1") {
+			t.Fatalf("expected pwsh source block to reference .ash_pwsh.ps1, got %q", block)
+		}
+
+		if _, err := resolveInstallShellTarget("bash", activeGOOS()); err == nil {
+			t.Fatalf("expected bash to be unsupported on windows")
+		}
+	})
+}
+
+func TestDefaultInstallShell(t *testing.T) {
+	t.Run("defaults to bash on unix when undetected", func(t *testing.T) {
+		got := defaultInstallShell("/bin/fish", "darwin")
+		if got != shellBash {
+			t.Fatalf("defaultInstallShell returned %q, want %q", got, shellBash)
+		}
+	})
+
+	t.Run("defaults to pwsh on windows when undetected", func(t *testing.T) {
+		got := defaultInstallShell(`C:\Windows\System32\cmd.exe`, "windows")
+		if got != shellPwsh {
+			t.Fatalf("defaultInstallShell returned %q, want %q", got, shellPwsh)
+		}
+	})
+
+	t.Run("keeps detected supported shell", func(t *testing.T) {
+		got := defaultInstallShell(`C:\Program Files\PowerShell\7\pwsh.exe`, "windows")
+		if got != shellPwsh {
+			t.Fatalf("defaultInstallShell returned %q, want %q", got, shellPwsh)
+		}
+	})
+}
+
 func TestInstallRecommendation(t *testing.T) {
 	originalCwd, err := os.Getwd()
 	if err != nil {
@@ -2404,6 +2499,133 @@ func TestRunInstallDryRun(t *testing.T) {
 	rcPath := filepath.Join(home, ".zshrc")
 	if _, err := os.Stat(rcPath); !errors.Is(err, os.ErrNotExist) {
 		t.Fatalf("expected no rc file write in dry-run, stat err=%v", err)
+	}
+}
+
+func TestRunInstallPwshDefaultOnWindows(t *testing.T) {
+	originalGOOS := currentGOOS
+	t.Cleanup(func() { currentGOOS = originalGOOS })
+	currentGOOS = "windows"
+
+	home := t.TempDir()
+	cwd := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SHELL", "")
+	originalCwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd failed: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(originalCwd)
+	})
+	if err := os.Chdir(cwd); err != nil {
+		t.Fatalf("Chdir failed: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run([]string{"install"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
+	}
+
+	profilePath := filepath.Join(home, "Documents", "PowerShell", "Microsoft.PowerShell_profile.ps1")
+	profileContent, err := os.ReadFile(profilePath)
+	if err != nil {
+		t.Fatalf("read pwsh profile: %v", err)
+	}
+	if !strings.Contains(string(profileContent), ".ash_pwsh.ps1") {
+		t.Fatalf("expected pwsh profile to source .ash_pwsh.ps1, got %q", string(profileContent))
+	}
+
+	wrapperPath := filepath.Join(home, ashWorkspaceDirName, ".ash_pwsh.ps1")
+	wrapperContent, err := os.ReadFile(wrapperPath)
+	if err != nil {
+		t.Fatalf("read pwsh wrapper: %v", err)
+	}
+	if !strings.Contains(string(wrapperContent), "function global:_ash_should_route") {
+		t.Fatalf("expected pwsh wrapper routing function, got %q", string(wrapperContent))
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{"install"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected second install to succeed, got %d stderr=%q", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "already present") {
+		t.Fatalf("expected idempotent install message, got %q", stdout.String())
+	}
+
+	profileContentAfter, err := os.ReadFile(profilePath)
+	if err != nil {
+		t.Fatalf("read pwsh profile after second install: %v", err)
+	}
+	if strings.Count(string(profileContentAfter), installStartMarker) != 1 {
+		t.Fatalf("expected one managed install block in pwsh profile")
+	}
+
+	stale := strings.Replace(installSourceBlockForShell("pwsh"), ".ash_pwsh.ps1", ".ash_old_pwsh.ps1", 1)
+	if err := os.WriteFile(profilePath, []byte(stale+"\n"), 0o600); err != nil {
+		t.Fatalf("write stale pwsh profile: %v", err)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{"install"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected stale pwsh profile update to succeed, got %d stderr=%q", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "updated wrappers") {
+		t.Fatalf("expected update install message, got %q", stdout.String())
+	}
+}
+
+func TestInstallRecommendationPwshOnWindows(t *testing.T) {
+	originalGOOS := currentGOOS
+	t.Cleanup(func() { currentGOOS = originalGOOS })
+	currentGOOS = "windows"
+
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SHELL", "")
+
+	reco, err := installRecommendation()
+	if err != nil {
+		t.Fatalf("installRecommendation returned error: %v", err)
+	}
+	if !strings.Contains(reco, "ash install --shell pwsh") {
+		t.Fatalf("expected pwsh recommendation, got %q", reco)
+	}
+
+	profilePath := filepath.Join(home, "Documents", "PowerShell", "Microsoft.PowerShell_profile.ps1")
+	if err := os.MkdirAll(filepath.Dir(profilePath), 0o700); err != nil {
+		t.Fatalf("mkdir pwsh profile dir: %v", err)
+	}
+	if err := os.WriteFile(profilePath, []byte(installSourceBlockForShell("pwsh")), 0o600); err != nil {
+		t.Fatalf("write pwsh profile: %v", err)
+	}
+
+	reco, err = installRecommendation()
+	if err != nil {
+		t.Fatalf("installRecommendation returned error: %v", err)
+	}
+	if reco != "" {
+		t.Fatalf("expected no recommendation when pwsh profile is installed, got %q", reco)
+	}
+
+	stale := strings.Replace(installSourceBlockForShell("pwsh"), ".ash_pwsh.ps1", ".ash_old_pwsh.ps1", 1)
+	if err := os.WriteFile(profilePath, []byte(stale), 0o600); err != nil {
+		t.Fatalf("write stale pwsh profile: %v", err)
+	}
+
+	reco, err = installRecommendation()
+	if err != nil {
+		t.Fatalf("installRecommendation returned error: %v", err)
+	}
+	if !strings.Contains(reco, "outdated") || !strings.Contains(reco, "ash install --shell pwsh") {
+		t.Fatalf("expected outdated pwsh recommendation, got %q", reco)
 	}
 }
 

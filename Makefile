@@ -1,4 +1,4 @@
-.PHONY: all verify lint test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install setup-hooks version release release-check release-build release-pkg release-validate release-publish release-watch release-artifacts release-build-one release-pkg-one release-validate-one
+.PHONY: all verify lint yaml-lint test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install setup-hooks version release release-check release-build release-pkg release-validate release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one
 
 SHELL := /bin/bash
 
@@ -28,14 +28,19 @@ MAN_INSTALL_PATH_LINUX ?= /usr/share/man/man1
 MAN_INSTALL_PATH_MACOS ?= /usr/local/share/man/man1
 TARBALL_MAN_PATH ?= usr/share/man/man1
 RELEASE_ARTIFACT_BASE ?= $(APP_NAME)-$(RELEASE_VERSION)-$(RELEASE_GOOS)-$(RELEASE_ARCH)
-RELEASE_BINARY_PATH ?= $(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)
+BINARY_EXT = $(if $(filter windows,$(RELEASE_GOOS)),.exe,)
+RELEASE_BINARY_PATH ?= $(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)$(BINARY_EXT)
 
 all: verify install
 
 verify: test test-race test-cover vet staticcheck security test-fuzz benchmark
 
-lint:
+lint: yaml-lint
 	go run github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run ./...
+
+yaml-lint:
+	@echo "Validating GitHub Actions workflows..."
+	go run github.com/google/yamlfmt/cmd/yamlfmt@latest -lint .github/workflows/*.yml
 
 security: gosec govulncheck
 
@@ -171,6 +176,18 @@ release-pkg-one:
 			install -m 0644 "$(MAN_PAGE_PATH)" "$$tmp_dir/$(TARBALL_MAN_PATH)/$(APP_NAME).1"; \
 			tar -C "$$tmp_dir" -czf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" "$(notdir $(RELEASE_BINARY_PATH))" "$(TARBALL_MAN_PATH)/$(APP_NAME).1"; \
 			;; \
+		msi) \
+			if [[ "$(RELEASE_GOOS)" != "windows" ]]; then \
+				echo "msi format requires RELEASE_GOOS=windows"; \
+				exit 1; \
+			fi; \
+			./scripts/package/windows/build_msi.sh \
+				--app-name "$(APP_NAME)" \
+				--version "$(RELEASE_VERSION)" \
+				--arch "$(RELEASE_ARCH)" \
+				--binary "$(RELEASE_BINARY_PATH)" \
+				--output "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).msi"; \
+			;; \
 		*) \
 			echo "unsupported RELEASE_FORMAT=$(RELEASE_FORMAT)"; \
 			exit 1; \
@@ -216,6 +233,12 @@ release-validate-one:
 			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^$(TARBALL_MAN_PATH)/$(APP_NAME)\.1$$"; \
 			shasum -a 256 "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" > "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz.sha256"; \
 			;; \
+		msi) \
+			./scripts/package/windows/validate_msi.sh \
+				--pkg "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).msi" \
+				--app-name "$(APP_NAME)"; \
+			shasum -a 256 "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).msi" > "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).msi.sha256"; \
+			;; \
 		*) \
 			echo "unsupported RELEASE_FORMAT=$(RELEASE_FORMAT)"; \
 			exit 1; \
@@ -253,6 +276,13 @@ release-artifacts:
 					$(MAKE) release-validate-one RELEASE_GOOS=linux RELEASE_ARCH=$$arch RELEASE_FORMAT=tar.gz RELEASE_VERSION=$(RELEASE_VERSION); \
 				done; \
 				;; \
+			windows) \
+				for arch in $(RELEASE_TARGET_ARCHES); do \
+					$(MAKE) release-build-one RELEASE_GOOS=windows RELEASE_ARCH=$$arch RELEASE_VERSION=$(RELEASE_VERSION); \
+					$(MAKE) release-pkg-one RELEASE_GOOS=windows RELEASE_ARCH=$$arch RELEASE_FORMAT=msi RELEASE_VERSION=$(RELEASE_VERSION); \
+					$(MAKE) release-validate-one RELEASE_GOOS=windows RELEASE_ARCH=$$arch RELEASE_FORMAT=msi RELEASE_VERSION=$(RELEASE_VERSION); \
+				done; \
+				;; \
 			*) \
 				echo "unsupported RELEASE_TARGET_OSES entry: $$os_name"; \
 				exit 1; \
@@ -266,7 +296,7 @@ release-publish:
 		echo "cannot publish release from detached HEAD"; \
 		exit 1; \
 	fi; \
-	git push origin "$$current_branch"; \
+	./scripts/release/push_with_retry.sh "pushing branch $$current_branch to origin" git push origin "$$current_branch" && \
 	echo "pushed branch $$current_branch to origin"
 	@head_sha="$$(git rev-parse HEAD)"; \
 	local_sha="$$(git rev-parse -q --verify "refs/tags/$(RELEASE_VERSION)^{}" 2>/dev/null || true)"; \
@@ -281,7 +311,7 @@ release-publish:
 		echo "local tag $(RELEASE_VERSION) already exists at HEAD"; \
 	fi
 	@echo "pushing tag $(RELEASE_VERSION) to origin"; \
-	git push origin "refs/tags/$(RELEASE_VERSION):refs/tags/$(RELEASE_VERSION)"; \
+	./scripts/release/push_with_retry.sh "pushing tag $(RELEASE_VERSION) to origin" git push origin "refs/tags/$(RELEASE_VERSION):refs/tags/$(RELEASE_VERSION)" && \
 	echo "pushed tag $(RELEASE_VERSION) to origin"
 
 release-watch:
@@ -298,16 +328,16 @@ release-watch:
 		echo "unable to resolve GitHub repository from gh; skipping remote release watch"; \
 		exit 0; \
 	fi; \
-	run_id="$$(GH_PAGER=cat gh run list -R "$$repo" --workflow release.yml --limit 20 --json databaseId,headBranch,event --jq 'map(select(.headBranch == "$(RELEASE_VERSION)" and .event == "push")) | first | .databaseId' 2>/dev/null || true)"; \
-	if [[ -z "$$run_id" || "$$run_id" == "null" ]]; then \
-		echo "release workflow run for tag $(RELEASE_VERSION) not visible yet; skipping watch"; \
-		echo "manual check: GH_PAGER=cat gh run list -R $$repo --workflow release.yml --limit 5"; \
-		exit 0; \
-	fi; \
-	echo "watching release workflow run $$run_id for tag $(RELEASE_VERSION)"; \
-	if ! GH_PAGER=cat gh run watch "$$run_id" -R "$$repo" --exit-status; then \
+	echo "launching release dashboard for tag $(RELEASE_VERSION)"; \
+	./scripts/release/release_dashboard.sh --tag "$(RELEASE_VERSION)" --repo "$$repo"; \
+	conclusion="$$(GH_PAGER=cat gh run list -R "$$repo" --workflow release.yml --limit 20 --json conclusion,headBranch,event --jq 'map(select(.headBranch == "$(RELEASE_VERSION)" and .event == "push")) | first | .conclusion' 2>/dev/null || true)"; \
+	if [[ "$$conclusion" != "success" ]]; then \
 		if [[ "$(RELEASE_WATCH_STRICT)" == "1" ]]; then \
+			echo "release workflow finished with conclusion=$${conclusion:-unknown}"; \
 			exit 1; \
 		fi; \
-		echo "release workflow failed, but continuing because RELEASE_WATCH_STRICT=$(RELEASE_WATCH_STRICT)"; \
+		echo "release workflow finished with conclusion=$${conclusion:-unknown}, but continuing because RELEASE_WATCH_STRICT=$(RELEASE_WATCH_STRICT)"; \
 	fi
+
+release-dashboard:
+	@./scripts/release/release_dashboard.sh --tag "$(RELEASE_VERSION)"
