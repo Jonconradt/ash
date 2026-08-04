@@ -1,4 +1,4 @@
-.PHONY: all verify lint test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install setup-hooks version release release-check release-build release-pkg release-validate release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one
+.PHONY: all verify lint yaml-lint test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install setup-hooks version release release-check release-build release-pkg release-validate release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one
 
 SHELL := /bin/bash
 
@@ -35,8 +35,12 @@ all: verify install
 
 verify: test test-race test-cover vet staticcheck security test-fuzz benchmark
 
-lint:
+lint: yaml-lint
 	go run github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run ./...
+
+yaml-lint:
+	@echo "Validating GitHub Actions workflows..."
+	go run github.com/google/yamlfmt/cmd/yamlfmt@latest -lint .github/workflows/*.yml
 
 security: gosec govulncheck
 
