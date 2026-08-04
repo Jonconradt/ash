@@ -52,6 +52,11 @@ if [[ -z "$tag" ]]; then
   exit 1
 fi
 
+if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
+  echo "tag must look like vX.Y.Z (optionally with suffix), got: $tag" >&2
+  exit 1
+fi
+
 if ! command -v gh >/dev/null 2>&1; then
   echo "gh CLI is required" >&2
   exit 1
@@ -123,6 +128,61 @@ get_run_json() {
 
 get_release_assets_json() {
   gh release view "$tag" -R "$repo" --json assets 2>/dev/null || true
+}
+
+get_release_progress() {
+  local run_json="$1"
+  local assets_json="$2"
+
+  python3 - "$run_json" "$assets_json" "${expected_assets[@]}" <<'PY'
+import json
+import sys
+
+run_json = sys.argv[1]
+assets_json = sys.argv[2]
+expected_assets = sys.argv[3:]
+
+
+def parse_json(raw: str):
+  raw = raw.strip()
+  if not raw:
+    return None
+  return json.loads(raw)
+
+
+run = parse_json(run_json)
+assets_doc = parse_json(assets_json)
+published_assets = set()
+if isinstance(assets_doc, dict):
+  for asset in assets_doc.get("assets", []):
+    name = asset.get("name")
+    if name:
+      published_assets.add(name)
+
+assets_completed = sum(1 for name in expected_assets if name in published_assets)
+assets_total = len(expected_assets)
+workflow_status = ""
+workflow_conclusion = ""
+if isinstance(run, dict):
+  workflow_status = (run.get("status") or "").lower()
+  workflow_conclusion = (run.get("conclusion") or "").lower()
+
+release_complete = assets_total > 0 and assets_completed == assets_total
+workflow_complete = workflow_status == "completed"
+
+if release_complete:
+  print("complete")
+  print("published")
+elif workflow_complete and workflow_conclusion and workflow_conclusion != "success":
+  print("complete")
+  print("workflow_failed")
+elif workflow_complete:
+  print("pending")
+  print("awaiting_assets")
+else:
+  print("pending")
+  print("active")
+PY
 }
 
 render_dashboard() {
@@ -336,6 +396,8 @@ PY
 trap cleanup_terminal EXIT
 enter_tui
 
+final_message=""
+
 while true; do
   run_id="$(find_run_id)"
   run_json=""
@@ -355,17 +417,19 @@ while true; do
     render_dashboard plain "$run_json" "$assets_json"
   fi
 
-  if [[ -n "$run_json" ]]; then
-    run_status="$(python3 - "$run_json" <<'PY'
-import json
-import sys
-run = json.loads(sys.argv[1])
-print(run.get("status", "unknown"))
-PY
-)"
-    if [[ "$run_status" == "completed" ]]; then
-      break
-    fi
+  mapfile -t release_progress < <(get_release_progress "$run_json" "$assets_json")
+  release_state="${release_progress[0]:-pending}"
+
+  if [[ "$release_state" == "complete" ]]; then
+    case "${release_progress[1]:-published}" in
+      published)
+        final_message="Release $tag is complete. All expected artifacts are published."
+        ;;
+      workflow_failed)
+        final_message="Release $tag workflow has completed with a non-success conclusion."
+        ;;
+    esac
+    break
   fi
 
   if [[ "$once" == "1" ]]; then
@@ -375,3 +439,12 @@ PY
   spinner_index=$(((spinner_index + 1) % 4))
   sleep "$interval"
 done
+
+if [[ "$use_tui" == "1" ]]; then
+  cleanup_terminal
+  trap - EXIT
+fi
+
+if [[ -n "$final_message" ]]; then
+  echo "$final_message"
+fi
