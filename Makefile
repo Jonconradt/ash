@@ -324,20 +324,16 @@ release-watch:
 		echo "unable to resolve GitHub repository from gh; skipping remote release watch"; \
 		exit 0; \
 	fi; \
-	run_id="$$(GH_PAGER=cat gh run list -R "$$repo" --workflow release.yml --limit 20 --json databaseId,headBranch,event --jq 'map(select(.headBranch == "$(RELEASE_VERSION)" and .event == "push")) | first | .databaseId' 2>/dev/null || true)"; \
-	if [[ -z "$$run_id" || "$$run_id" == "null" ]]; then \
-		echo "release workflow run for tag $(RELEASE_VERSION) not visible yet; skipping watch"; \
-		echo "manual check: GH_PAGER=cat gh run list -R $$repo --workflow release.yml --limit 5"; \
-		exit 0; \
-	fi; \
-	echo "watching release workflow run $$run_id for tag $(RELEASE_VERSION)"; \
-	if ! GH_PAGER=cat gh run watch "$$run_id" -R "$$repo" --exit-status; then \
+	echo "launching release dashboard for tag $(RELEASE_VERSION)"; \
+	./scripts/release/release_dashboard.sh --tag "$(RELEASE_VERSION)" --repo "$$repo"; \
+	conclusion="$$(GH_PAGER=cat gh run list -R "$$repo" --workflow release.yml --limit 20 --json conclusion,headBranch,event --jq 'map(select(.headBranch == "$(RELEASE_VERSION)" and .event == "push")) | first | .conclusion' 2>/dev/null || true)"; \
+	if [[ "$$conclusion" != "success" ]]; then \
 		if [[ "$(RELEASE_WATCH_STRICT)" == "1" ]]; then \
+			echo "release workflow finished with conclusion=$${conclusion:-unknown}"; \
 			exit 1; \
 		fi; \
-		echo "release workflow failed, but continuing because RELEASE_WATCH_STRICT=$(RELEASE_WATCH_STRICT)"; \
+		echo "release workflow finished with conclusion=$${conclusion:-unknown}, but continuing because RELEASE_WATCH_STRICT=$(RELEASE_WATCH_STRICT)"; \
 	fi
-	@$(MAKE) release-dashboard RELEASE_VERSION=$(RELEASE_VERSION)
 
 release-dashboard:
 	@./scripts/release/release_dashboard.sh --tag "$(RELEASE_VERSION)"
