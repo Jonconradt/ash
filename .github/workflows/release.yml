@@ -111,7 +111,7 @@ jobs:
       - name: Install packaging tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y msitools
+          sudo apt-get install -y msitools wixl wixl-data
           command -v wixl
           command -v msiinfo
 
