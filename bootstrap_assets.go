@@ -100,7 +100,7 @@ func bootstrapAssetContent(srcPath, dstPath string, overwrite bool) ([]byte, err
 }
 
 func preservedAshEnvValues(path string) (map[string]string, error) {
-	content, err := os.ReadFile(path)
+	content, err := osReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return map[string]string{}, nil
 	}
