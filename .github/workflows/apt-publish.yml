@@ -1,13 +1,10 @@
 name: apt-publish
-
 on:
   workflow_run:
     workflows: [release]
     types: [completed]
-
 permissions:
   contents: write
-
 jobs:
   publish:
     runs-on: ubuntu-latest
@@ -17,12 +14,10 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
-
       - name: Install apt publishing tools
         run: |
           sudo apt-get update
           sudo apt-get install -y dpkg-dev gnupg xz-utils
-
       - name: Download Linux artifacts
         uses: dawidd6/action-download-artifact@v6
         with:
@@ -32,7 +27,6 @@ jobs:
           name: release-linux-amd64
           path: dist/artifacts/amd64
           github_token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Download arm64 artifacts
         uses: dawidd6/action-download-artifact@v6
         with:
@@ -42,12 +36,10 @@ jobs:
           name: release-linux-arm64
           path: dist/artifacts/arm64
           github_token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Stage package artifacts
         run: |
           mkdir -p dist/apt/artifacts
           find dist/artifacts -type f -name '*.deb' -exec cp {} dist/apt/artifacts/ \;
-
       - name: Generate apt repository metadata
         env:
           APT_RELEASE_VERSION: ${{ github.event.workflow_run.head_branch }}
@@ -68,7 +60,6 @@ jobs:
             --origin ash \
             --label ash \
             --description "ash apt repository"
-
       - name: Import repository signing key
         env:
           APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
@@ -86,7 +77,6 @@ jobs:
           printf '%s' "$GNUPGHOME" > dist/apt/gnupg-home
           printf '%s' "$fingerprint" > dist/apt/signing-fingerprint
           gpg --batch --yes --armor --export "$fingerprint" > dist/apt/repo/ash-archive-keyring.asc
-
       - name: Sign repository metadata
         env:
           APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
@@ -102,9 +92,8 @@ jobs:
           done
           gpgconf --kill all || true
           rm -rf "$GNUPGHOME"
-
       - name: Publish GitHub Pages repository
-        run: |
+        run: |-
           origin_url="$(git remote get-url origin)"
           release_version="${{ github.event.workflow_run.head_branch }}"
           ./scripts/apt/publish_repo.sh \
