@@ -1,22 +1,31 @@
 #!/usr/bin/env python3
 import argparse
+import importlib
 import json
+import os
 import sys
 from datetime import datetime, timezone
 
-try:
-    import yfinance as yf
-except ImportError:
-    print(
-        json.dumps({
-            "status": "error",
-            "message": (
-                "Missing required library 'yfinance'. Install via: pip install"
-                " yfinance"
-            ),
-        })
-    )
-    sys.exit(1)
+def load_yfinance_module():
+    try:
+        # When this script is named yfinance.py, Python may import this file
+        # instead of the third-party package. Remove the script directory from
+        # sys.path before importing to avoid module shadowing.
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        if script_dir in sys.path:
+            sys.path.remove(script_dir)
+        return importlib.import_module("yfinance")
+    except ImportError:
+        print(
+            json.dumps({
+                "status": "error",
+                "message": (
+                    "Missing required library 'yfinance'. Install via: pip install"
+                    " yfinance"
+                ),
+            })
+        )
+        sys.exit(1)
 
 
 def build_ai_docs() -> str:
@@ -46,6 +55,7 @@ Usage guidance for the AI:
 
 
 def fetch_stock_data(tickers):
+    yf = load_yfinance_module()
     results = []
 
     for symbol in tickers:

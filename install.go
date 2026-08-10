@@ -402,6 +402,7 @@ func buildManagedAshEnv(values map[string]string) string {
 	var b strings.Builder
 	b.WriteString("# managed by ash install\n")
 	b.WriteString("export SESSION_ID=`head -c 100 /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1`\n")
+	b.WriteString("export PATH=\"$HOME/.ash/tools:$PATH\"\n")
 	for _, key := range keys {
 		b.WriteString(fmt.Sprintf("export %s=%s\n", key, shellQuote(values[key])))
 	}

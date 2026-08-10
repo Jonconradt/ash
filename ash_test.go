@@ -1506,6 +1506,9 @@ func TestBuildManagedAshEnvIncludesSessionIDLine(t *testing.T) {
 	if !strings.Contains(got, "export AI_MODEL='llama3.1'\n") {
 		t.Fatalf("expected managed ash env to include AI_MODEL export, got %q", got)
 	}
+	if !strings.Contains(got, "export PATH=\"$HOME/.ash/tools:$PATH\"\n") {
+		t.Fatalf("expected managed ash env to include tools PATH export, got %q", got)
+	}
 }
 
 func TestNormalizeFutureScheduleTime(t *testing.T) {
@@ -2431,7 +2434,18 @@ func TestInstallOverwriteMode(t *testing.T) {
 		t.Fatalf("mkdir workspace dir: %v", err)
 	}
 	workspaceEnvPath := filepath.Join(workspaceDir, ".ash_env")
-	if err := os.WriteFile(workspaceEnvPath, []byte("export ASH_OLD=1\n"), 0o600); err != nil {
+	existingEnv := strings.Join([]string{
+		"# managed by ash install",
+		"export ASH_OLD=1",
+		"export AI_ENDPOINT='https://api.openai.com/v1'",
+		"export AI_MODEL='gpt-4.1-mini'",
+		"export AI_AUTH_TYPE='bearer'",
+		"export AI_AUTH_TOKEN='secret-token'",
+		"export AI_PROVIDER='openai'",
+		"export AI_CACHE='off'",
+		"",
+	}, "\n")
+	if err := os.WriteFile(workspaceEnvPath, []byte(existingEnv), 0o600); err != nil {
 		t.Fatalf("write existing env file: %v", err)
 	}
 
@@ -2449,8 +2463,53 @@ func TestInstallOverwriteMode(t *testing.T) {
 	if strings.Contains(string(content), "ASH_OLD") {
 		t.Fatalf("expected overwrite mode to replace existing env file, got %q", string(content))
 	}
-	if !strings.Contains(string(content), "export") {
-		t.Fatalf("expected overwritten env file to contain exported settings, got %q", string(content))
+	for _, want := range []string{
+		`export PATH="$HOME/.ash/tools:$PATH"`,
+		"export AI_ENDPOINT='https://api.openai.com/v1'",
+		"export AI_MODEL='gpt-4.1-mini'",
+		"export AI_AUTH_TYPE='bearer'",
+		"export AI_AUTH_TOKEN='secret-token'",
+		"export AI_PROVIDER='openai'",
+		"export AI_CACHE='off'",
+	} {
+		if !strings.Contains(string(content), want) {
+			t.Fatalf("expected overwrite mode to preserve %q, got %q", want, string(content))
+		}
+	}
+	if !strings.Contains(string(content), "export SESSION_ID=") {
+		t.Fatalf("expected overwritten env file to keep SESSION_ID, got %q", string(content))
+	}
+}
+
+func TestInstallRemovesLegacyToolScripts(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SHELL", "/bin/bash")
+
+	toolsDir := filepath.Join(home, ashWorkspaceDirName, "tools")
+	if err := os.MkdirAll(toolsDir, 0o700); err != nil {
+		t.Fatalf("mkdir tools dir: %v", err)
+	}
+
+	legacyPath := filepath.Join(toolsDir, "yfinance")
+	if err := os.WriteFile(legacyPath, []byte("#!/usr/bin/env python3\n"), 0o600); err != nil {
+		t.Fatalf("write legacy tool script: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"install", "--shell", "bash", "--overwrite"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected overwrite install to succeed, got %d stderr=%q", code, stderr.String())
+	}
+
+	if _, err := os.Stat(legacyPath); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("expected legacy tool script to be removed, got err=%v", err)
+	}
+
+	modernPath := filepath.Join(toolsDir, "yfinance.py")
+	if _, err := os.Stat(modernPath); err != nil {
+		t.Fatalf("expected modern tool script to exist, err=%v", err)
 	}
 }
 
@@ -2519,8 +2578,8 @@ func TestRunInstall(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read bash_profile: %v", err)
 	}
-	if !strings.Contains(string(profileContent), ".ash/.ash_bashrc") {
-		t.Fatalf("expected bash_profile to source .ash/.ash_bashrc, got %q", string(profileContent))
+	if !strings.Contains(string(profileContent), ".bashrc") {
+		t.Fatalf("expected bash_profile to source .bashrc, got %q", string(profileContent))
 	}
 
 	canonicalSystemPath := filepath.Join(home, ashWorkspaceDirName, systemFileName)
@@ -2575,6 +2634,96 @@ func TestRunInstall(t *testing.T) {
 	}
 	if !strings.Contains(string(wrapperContent), "command_not_found_handle") {
 		t.Fatalf("expected wrapper file to include command_not_found_handle")
+	}
+}
+
+func TestRunInstallMigratesLegacyBashProfileSourcing(t *testing.T) {
+	home := t.TempDir()
+	cwd := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SHELL", "/bin/bash")
+
+	originalCwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd failed: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(originalCwd)
+	})
+	if err := os.Chdir(cwd); err != nil {
+		t.Fatalf("Chdir failed: %v", err)
+	}
+
+	profilePath := filepath.Join(home, ".bash_profile")
+	if err := os.WriteFile(profilePath, []byte(`[ -f "$HOME/.ash/.ash_bashrc" ] && . "$HOME/.ash/.ash_bashrc"`+"\n"), 0o600); err != nil {
+		t.Fatalf("write legacy bash_profile: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"install", "--shell", "bash"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected install to succeed, got %d stderr=%q", code, stderr.String())
+	}
+
+	profileContent, err := os.ReadFile(profilePath)
+	if err != nil {
+		t.Fatalf("read bash_profile: %v", err)
+	}
+	if strings.Contains(string(profileContent), ".ash/.ash_bashrc") {
+		t.Fatalf("expected legacy bash_profile source to be removed, got %q", string(profileContent))
+	}
+	if !strings.Contains(string(profileContent), ".bashrc") {
+		t.Fatalf("expected bash_profile to source .bashrc, got %q", string(profileContent))
+	}
+}
+
+func TestRunInstallCleansLegacyAshSourcingWhenBashRCAlreadyPresent(t *testing.T) {
+	home := t.TempDir()
+	cwd := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SHELL", "/bin/bash")
+
+	originalCwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd failed: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(originalCwd)
+	})
+	if err := os.Chdir(cwd); err != nil {
+		t.Fatalf("Chdir failed: %v", err)
+	}
+
+	profilePath := filepath.Join(home, ".bash_profile")
+	profileContent := strings.Join([]string{
+		`alias pip='python -m pip'`,
+		`[ -f ~/.bashrc ] && source ~/.bashrc`,
+		`[ -f ~/.ash/.ash_env ] && source ~/.ash/.ash_env`,
+		`[ -f "$HOME/.ash/.ash_bashrc" ] && . "$HOME/.ash/.ash_bashrc"`,
+		"",
+	}, "\n")
+	if err := os.WriteFile(profilePath, []byte(profileContent), 0o600); err != nil {
+		t.Fatalf("write mixed bash_profile: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"install", "--shell", "bash"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected install to succeed, got %d stderr=%q", code, stderr.String())
+	}
+
+	updatedProfileContent, err := os.ReadFile(profilePath)
+	if err != nil {
+		t.Fatalf("read bash_profile: %v", err)
+	}
+	updated := string(updatedProfileContent)
+	if strings.Contains(updated, ".ash/.ash_env") || strings.Contains(updated, ".ash/.ash_bashrc") {
+		t.Fatalf("expected direct ash sourcing to be removed from bash_profile, got %q", updated)
+	}
+	if strings.Count(updated, `[ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"`) != 1 {
+		t.Fatalf("expected a single bashrc source line in bash_profile, got %q", updated)
 	}
 }
 

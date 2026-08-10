@@ -10,6 +10,7 @@ import (
 	"os/user"
 	"path/filepath"
 	"strconv"
+	"strings"
 )
 
 //go:embed ash_bootstrap/.ash_env
@@ -43,9 +44,9 @@ func installEmbeddedBootstrapAssets(overwrite bool, stdout io.Writer) error {
 	}
 
 	for _, asset := range assetFiles {
-		content, err := readEmbeddedBootstrapAsset(asset.srcPath)
+		content, err := bootstrapAssetContent(asset.srcPath, asset.dstPath, overwrite)
 		if err != nil {
-			return fmt.Errorf("read %s: %w", asset.srcPath, err)
+			return err
 		}
 		if err := installManagedAssetFile(asset.dstPath, content, overwrite, asset.mode, stdout, false); err != nil {
 			return err
@@ -55,6 +56,9 @@ func installEmbeddedBootstrapAssets(overwrite bool, stdout io.Writer) error {
 	entries, err := fs.ReadDir(embeddedBootstrapAssets, "ash_bootstrap/tools")
 	if err != nil {
 		return fmt.Errorf("read embedded tools directory: %w", err)
+	}
+	if err := removeLegacyToolScripts(root, entries, stdout); err != nil {
+		return err
 	}
 	for _, entry := range entries {
 		if entry.IsDir() {
@@ -68,6 +72,146 @@ func installEmbeddedBootstrapAssets(overwrite bool, stdout io.Writer) error {
 		}
 		if err := installManagedAssetFile(dstPath, content, overwrite, 0o600, stdout, true); err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+func bootstrapAssetContent(srcPath, dstPath string, overwrite bool) ([]byte, error) {
+	if srcPath != "ash_bootstrap/.ash_env" {
+		content, err := readEmbeddedBootstrapAsset(srcPath)
+		if err != nil {
+			return nil, fmt.Errorf("read %s: %w", srcPath, err)
+		}
+		return content, nil
+	}
+
+	values := map[string]string{}
+	if overwrite {
+		preserved, err := preservedAshEnvValues(dstPath)
+		if err != nil {
+			return nil, err
+		}
+		values = preserved
+	}
+
+	return []byte(buildManagedAshEnv(values)), nil
+}
+
+func preservedAshEnvValues(path string) (map[string]string, error) {
+	content, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return map[string]string{}, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read existing ash env %s: %w", path, err)
+	}
+
+	preservedKeys := map[string]struct{}{
+		aiEnvEndpoint:  {},
+		aiEnvModel:     {},
+		aiEnvAuthType:  {},
+		aiEnvAuthToken: {},
+		aiEnvProvider:  {},
+		aiEnvCache:     {},
+	}
+
+	values := map[string]string{}
+	for _, line := range strings.Split(string(content), "\n") {
+		key, value, ok := parseExportAssignment(line)
+		if !ok {
+			continue
+		}
+		if _, keep := preservedKeys[key]; !keep {
+			continue
+		}
+		values[key] = value
+	}
+	return values, nil
+}
+
+func parseExportAssignment(line string) (string, string, bool) {
+	trimmed := strings.TrimSpace(line)
+	if !strings.HasPrefix(trimmed, "export ") {
+		return "", "", false
+	}
+	body := strings.TrimSpace(strings.TrimPrefix(trimmed, "export "))
+	parts := strings.SplitN(body, "=", 2)
+	if len(parts) != 2 {
+		return "", "", false
+	}
+	key := strings.TrimSpace(parts[0])
+	if key == "" {
+		return "", "", false
+	}
+	value, ok := parseShellExportValue(strings.TrimSpace(parts[1]))
+	if !ok {
+		return "", "", false
+	}
+	return key, value, true
+}
+
+func parseShellExportValue(raw string) (string, bool) {
+	if raw == "" {
+		return "", true
+	}
+	if len(raw) >= 2 && raw[0] == '\'' && raw[len(raw)-1] == '\'' {
+		inner := raw[1 : len(raw)-1]
+		return strings.ReplaceAll(inner, `'\''`, `'`), true
+	}
+	if len(raw) >= 2 && raw[0] == '"' && raw[len(raw)-1] == '"' {
+		unquoted, err := strconv.Unquote(raw)
+		if err != nil {
+			return "", false
+		}
+		return unquoted, true
+	}
+	return raw, true
+}
+
+func removeLegacyToolScripts(root string, embeddedEntries []fs.DirEntry, stdout io.Writer) error {
+	pyScriptNames := make(map[string]struct{})
+	for _, entry := range embeddedEntries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".py") {
+			continue
+		}
+		baseName := strings.TrimSuffix(name, ".py")
+		if baseName != "" {
+			pyScriptNames[baseName] = struct{}{}
+		}
+	}
+
+	toolsDir := filepath.Join(root, "tools")
+	entries, err := os.ReadDir(toolsDir)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read existing tools directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if strings.HasSuffix(name, ".py") {
+			continue
+		}
+		if _, ok := pyScriptNames[name]; !ok {
+			continue
+		}
+		legacyPath := filepath.Join(toolsDir, name)
+		if err := os.Remove(legacyPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("remove legacy tool script %s: %w", legacyPath, err)
+		}
+		if stdout != nil {
+			fmt.Fprintf(stdout, "removed legacy tool script %s\n", legacyPath)
 		}
 	}
 

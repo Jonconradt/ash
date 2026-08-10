@@ -223,13 +223,14 @@ func ensureBashProfileSourcingForInstall(dryRun bool, stdout io.Writer) error {
 		return err
 	}
 	profilePath := filepath.Join(home, ".bash_profile")
-	line := `[ -f "$HOME/.ash/.ash_bashrc" ] && . "$HOME/.ash/.ash_bashrc"`
+	line := `[ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"`
 
 	existing, err := readFileIfExists(profilePath)
 	if err != nil {
 		return err
 	}
-	if strings.Contains(existing, line) {
+	updated := normalizeBashProfileForInstall(existing, line)
+	if updated == existing {
 		return nil
 	}
 
@@ -237,11 +238,59 @@ func ensureBashProfileSourcingForInstall(dryRun bool, stdout io.Writer) error {
 		fmt.Fprintf(stdout, "[dry-run] would append ash source line to %s\n", profilePath)
 		return nil
 	}
+	return osWriteFile(profilePath, []byte(updated), 0o600)
+}
+func normalizeBashProfileForInstall(content, bashRCLine string) string {
+	lines := strings.Split(content, "\n")
+	filtered := make([]string, 0, len(lines)+1)
+	hasBashRC := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case trimmed == "":
+			filtered = append(filtered, line)
+		case strings.Contains(trimmed, ".ash/.ash_env") || strings.Contains(trimmed, ".ash/.ash_bashrc"):
+			continue
+		default:
+			if isBashRCSourceLine(trimmed) {
+				if hasBashRC {
+					continue
+				}
+				hasBashRC = true
+				filtered = append(filtered, bashRCLine)
+				continue
+			}
+			filtered = append(filtered, line)
+		}
+	}
 
-	updated := existing
-	if updated != "" && !strings.HasSuffix(updated, "\n") {
+	updated := strings.Join(filtered, "\n")
+	if !hasBashRC {
+		if updated != "" && !strings.HasSuffix(updated, "\n") {
+			updated += "\n"
+		}
+		updated += bashRCLine + "\n"
+	} else if content != "" && strings.HasSuffix(content, "\n") && !strings.HasSuffix(updated, "\n") {
 		updated += "\n"
 	}
-	updated += line + "\n"
-	return osWriteFile(profilePath, []byte(updated), 0o600)
+	return updated
+}
+
+func isBashRCSourceLine(line string) bool {
+	patterns := []string{
+		`[ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"`,
+		`[ -f ~/.bashrc ] && . ~/.bashrc`,
+		`[ -f "$HOME/.bashrc" ] && source "$HOME/.bashrc"`,
+		`[ -f ~/.bashrc ] && source ~/.bashrc`,
+		`. "$HOME/.bashrc"`,
+		`. ~/.bashrc`,
+		`source "$HOME/.bashrc"`,
+		`source ~/.bashrc`,
+	}
+	for _, pattern := range patterns {
+		if line == pattern {
+			return true
+		}
+	}
+	return false
 }

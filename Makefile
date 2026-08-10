@@ -83,7 +83,7 @@ staticcheck:
 
 install: test lint  gosec 
 	@go install ./...
-	@ash install --shell bash
+	@ash install --shell bash --overwrite
 
 version: release-check release-artifacts
 
