@@ -1490,6 +1490,24 @@ func TestBuildScheduledInvocationScript(t *testing.T) {
 	}
 }
 
+func TestBuildManagedAshEnvIncludesSessionIDLine(t *testing.T) {
+	got := buildManagedAshEnv(map[string]string{
+		"AI_ENDPOINT": "http://localhost:11434",
+		"AI_MODEL":    "llama3.1",
+	})
+
+	wantSessionLine := "export SESSION_ID=`head -c 100 /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1`\n"
+	if !strings.Contains(got, wantSessionLine) {
+		t.Fatalf("expected managed ash env to include SESSION_ID export line, got %q", got)
+	}
+	if !strings.Contains(got, "export AI_ENDPOINT='http://localhost:11434'\n") {
+		t.Fatalf("expected managed ash env to include AI_ENDPOINT export, got %q", got)
+	}
+	if !strings.Contains(got, "export AI_MODEL='llama3.1'\n") {
+		t.Fatalf("expected managed ash env to include AI_MODEL export, got %q", got)
+	}
+}
+
 func TestNormalizeFutureScheduleTime(t *testing.T) {
 	tests := []struct {
 		name  string
