@@ -37,7 +37,7 @@ var installEndpointPresets = []endpointPreset{
 func runInstall(args []string, stdout, stderr io.Writer) int {
 	configureDebugLogging(stderr)
 
-	shellName, dryRun, err := parseInstallArgs(args)
+	shellName, dryRun, overwrite, err := parseInstallArgs(args)
 	if err != nil {
 		slog.Error(fmt.Sprintf("install error: %v", err), "EID", "EpbG2YtZ")
 		printUsage(stderr)
@@ -65,6 +65,10 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 	}
 	if err := ensureShellPostInstall(shellName, dryRun, stdout); err != nil {
 		slog.Error(fmt.Sprintf("install error: %v", err), "EID", "bnjrQttE")
+		return 1
+	}
+	if err := installEmbeddedBootstrapAssets(overwrite, stdout); err != nil {
+		slog.Error(fmt.Sprintf("install error: %v", err), "EID", "Hrs2Jw5A")
 		return 1
 	}
 
@@ -492,22 +496,24 @@ func hardenAshWorkspacePermissions() error {
 }
 
 // parseInstallArgs validates command-line arguments for the install subcommand and returns the parsed options.
-func parseInstallArgs(args []string) (shellName string, dryRun bool, err error) {
+func parseInstallArgs(args []string) (shellName string, dryRun bool, overwrite bool, err error) {
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--dry-run":
 			dryRun = true
+		case "--overwrite":
+			overwrite = true
 		case "--shell":
 			i++
 			if i >= len(args) {
-				return "", false, errors.New("--shell requires a value")
+				return "", false, false, errors.New("--shell requires a value")
 			}
 			shellName = strings.TrimSpace(strings.ToLower(args[i]))
 		default:
-			return "", false, fmt.Errorf("unknown install argument: %s", args[i])
+			return "", false, false, fmt.Errorf("unknown install argument: %s", args[i])
 		}
 	}
-	return shellName, dryRun, nil
+	return shellName, dryRun, overwrite, nil
 }
 
 // detectShellName returns the canonical shell name for a shell executable path, or empty if unsupported.

@@ -1,39 +1,11 @@
-package main
-
-import (
-	"path/filepath"
-	"strings"
-)
-
-func zshRCPath(home string) string {
-	return filepath.Join(home, ".zshrc")
-}
-
-func zshWrapperFileName() string {
-	return ".ash_zshrc"
-}
-
-func zshInstallSourceBlock() string {
-	return strings.TrimSpace(`
-` + installStartMarker + `
+# >>> ash install >>>
 [ -f "$HOME/.ash/.ash_env" ] && . "$HOME/.ash/.ash_env"
-[ -f "$HOME/.ash/.ash_zshrc" ] && . "$HOME/.ash/.ash_zshrc"
-` + installEndMarker)
-}
+case "$-" in
+	*i*) ;;
+	*) return ;;
+esac
 
-func zshInstallWrapperContent() string {
-	content, err := readEmbeddedBootstrapAsset("ash_bootstrap/.ash_zshrc")
-	if err == nil {
-		return strings.TrimSpace(string(content))
-	}
-	return fallbackZshInstallWrapperContent()
-}
-
-func fallbackZshInstallWrapperContent() string {
-	return strings.TrimSpace(`
-` + installStartMarker + `
-[ -f "$HOME/.ash/.ash_env" ] && . "$HOME/.ash/.ash_env"
-command_not_found_handler() {
+command_not_found_handle() {
   ash "$@"
   return $?
 }
@@ -41,9 +13,8 @@ command_not_found_handler() {
 _ash_should_route() {
   local cmd="$1"
   shift
-  local -a args
-  args=("$@")
-  local argc=${#args}
+  local args=("$@")
+  local argc=${#args[@]}
 	local cmd_lower
 	cmd_lower="$(printf '%s' "$cmd" | tr '[:upper:]' '[:lower:]')"
 	local natural_wrapper=0
@@ -71,7 +42,7 @@ _ash_should_route() {
 
 	if [[ "$cmd_lower" == "at" ]]; then
 		local first_at
-		first_at="$(printf '%s' "${args[1]}" | tr '[:upper:]' '[:lower:]')"
+		first_at="$(printf '%s' "${args[0]}" | tr '[:upper:]' '[:lower:]')"
 		first_at="${first_at%%[?!.,:;]}"
 		if [[ "$first_at" =~ [0-9:] ]]; then
 			return 1
@@ -87,7 +58,7 @@ _ash_should_route() {
 	fi
 
   if [[ "$cmd" == "Time" || "$cmd" == "test" || "$cmd" == "Test" || "$cmd" == "type" || "$cmd" == "Type" ]]; then
-    if [[ $argc -eq 1 && "${args[1]}" =~ '^[A-Za-z0-9_.-]+$' ]]; then
+    if [[ $argc -eq 1 && "${args[0]}" =~ ^[A-Za-z0-9_.-]+$ ]]; then
       return 1
     fi
   fi
@@ -100,7 +71,7 @@ _ash_should_route() {
   [[ "$full" == *\? && $argc -ge 2 ]] && return 0
 
   local first
-  first="$(printf '%s' "${args[1]}" | tr '[:upper:]' '[:lower:]')"
+  first="$(printf '%s' "${args[0]}" | tr '[:upper:]' '[:lower:]')"
   case "$first" in
     is|are|am|do|does|did|can|could|should|would|will|why|how|when|where|who)
 			if [[ $argc -ge 2 ]]; then
@@ -117,7 +88,7 @@ _ash_should_route() {
 				local limit=4
 				(( argc < limit )) && limit=$argc
 				local i token raw
-				for (( i=2; i<=limit; i++ )); do
+				for (( i=1; i<limit; i++ )); do
 					raw="${args[$i]}"
 					token="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
 					token="${token%%[?!.,:;]}"
@@ -129,10 +100,22 @@ _ash_should_route() {
 				done
 			fi
 			;;
+		say)
+			if [[ $argc -ge 2 ]]; then
+				local first_token
+				first_token="$(printf '%s' "${args[0]}" | tr '[:upper:]' '[:lower:]')"
+				first_token="${first_token%%[?!.,:;]}"
+				case "$first_token" in
+					out|something|a|an|the|please|why|how|when|where|who|what|can|could|should|would)
+						return 0
+						;;
+				esac
+			fi
+			;;
 		in|for)
 			if [[ $argc -ge 2 ]]; then
 				local first_token
-				first_token="$(printf '%s' "${args[1]}" | tr '[:upper:]' '[:lower:]')"
+				first_token="$(printf '%s' "${args[0]}" | tr '[:upper:]' '[:lower:]')"
 				first_token="${first_token%%[?!.,:;]}"
 				case "$first_token" in
 					this|that|these|those|the|a|an|my|our|your|please|what|when|how|why|who|where|is|are|do|can|should|would)
@@ -144,7 +127,7 @@ _ash_should_route() {
 		at)
 			if [[ $argc -ge 2 ]]; then
 				local first_token
-				first_token="$(printf '%s' "${args[1]}" | tr '[:upper:]' '[:lower:]')"
+				first_token="$(printf '%s' "${args[0]}" | tr '[:upper:]' '[:lower:]')"
 				first_token="${first_token%%[?!.,:;]}"
 				case "$first_token" in
 					remind|tell|ask|message|note|please|what|when|how|why|who|where)
@@ -184,8 +167,8 @@ which() { _ash_route_or_delegate which "$@"; }
 Which() { _ash_route_or_delegate Which "$@"; }
 who()   { _ash_route_or_delegate who   "$@"; }
 Who()   { _ash_route_or_delegate Who   "$@"; }
-where() { _ash_route_or_delegate_builtin where "$@"; }
-Where() { _ash_route_or_delegate_builtin where "$@"; }
+say()   { _ash_route_or_delegate say   "$@"; }
+Say()   { _ash_route_or_delegate Say   "$@"; }
 at()    { _ash_route_or_delegate at    "$@"; }
 At()    { _ash_route_or_delegate At    "$@"; }
 In()    { _ash_route_or_delegate In    "$@"; }
@@ -196,5 +179,4 @@ Test()  { _ash_route_or_delegate_builtin test "$@"; }
 type()  { _ash_route_or_delegate_builtin type "$@"; }
 Type()  { _ash_route_or_delegate_builtin type "$@"; }
 Time()  { _ash_route_or_delegate Time "$@"; }
-` + installEndMarker)
-}
+# <<< ash install <<<

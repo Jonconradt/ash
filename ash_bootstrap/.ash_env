@@ -1,0 +1,3 @@
+# managed by ash install
+export SESSION_ID=`head -c 100 /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1`
+export PATH="$HOME/.ash/tools:$PATH"

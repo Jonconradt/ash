@@ -182,5 +182,5 @@ func run(args []string, stdout, stderr io.Writer) int {
 // printUsage writes the CLI usage text for the ash command to w.
 func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "usage: ash <text>")
-	fmt.Fprintln(w, "       ash install [--shell bash|zsh] [--dry-run]")
+	fmt.Fprintln(w, "       ash install [--shell bash|zsh] [--dry-run] [--overwrite]")
 }

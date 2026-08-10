@@ -2155,34 +2155,34 @@ func TestRenderMarkdownWithGlamourFactoryError(t *testing.T) {
 
 func TestParseInstallArgs(t *testing.T) {
 	t.Run("empty args", func(t *testing.T) {
-		shellName, dryRun, err := parseInstallArgs(nil)
+		shellName, dryRun, overwrite, err := parseInstallArgs(nil)
 		if err != nil {
 			t.Fatalf("parseInstallArgs returned error: %v", err)
 		}
-		if shellName != "" || dryRun {
-			t.Fatalf("unexpected parse result: shell=%q dryRun=%v", shellName, dryRun)
+		if shellName != "" || dryRun || overwrite {
+			t.Fatalf("unexpected parse result: shell=%q dryRun=%v overwrite=%v", shellName, dryRun, overwrite)
 		}
 	})
 
 	t.Run("shell and dry run", func(t *testing.T) {
-		shellName, dryRun, err := parseInstallArgs([]string{"--shell", "zsh", "--dry-run"})
+		shellName, dryRun, overwrite, err := parseInstallArgs([]string{"--shell", "zsh", "--dry-run", "--overwrite"})
 		if err != nil {
 			t.Fatalf("parseInstallArgs returned error: %v", err)
 		}
-		if shellName != "zsh" || !dryRun {
-			t.Fatalf("unexpected parse result: shell=%q dryRun=%v", shellName, dryRun)
+		if shellName != "zsh" || !dryRun || !overwrite {
+			t.Fatalf("unexpected parse result: shell=%q dryRun=%v overwrite=%v", shellName, dryRun, overwrite)
 		}
 	})
 
 	t.Run("missing shell value", func(t *testing.T) {
-		_, _, err := parseInstallArgs([]string{"--shell"})
+		_, _, _, err := parseInstallArgs([]string{"--shell"})
 		if err == nil || !strings.Contains(err.Error(), "--shell requires a value") {
 			t.Fatalf("expected missing value error, got %v", err)
 		}
 	})
 
 	t.Run("unknown arg", func(t *testing.T) {
-		_, _, err := parseInstallArgs([]string{"--wat"})
+		_, _, _, err := parseInstallArgs([]string{"--wat"})
 		if err == nil || !strings.Contains(err.Error(), "unknown install argument") {
 			t.Fatalf("expected unknown argument error, got %v", err)
 		}
@@ -2367,6 +2367,90 @@ func TestInstallRecommendation(t *testing.T) {
 	}
 	if !strings.Contains(reco, "ash install --shell bash") {
 		t.Fatalf("expected recommendation when bash wrapper file is missing, got %q", reco)
+	}
+}
+
+func TestInstallUsesEmbeddedBootstrapAssets(t *testing.T) {
+	originalCwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd failed: %v", err)
+	}
+	t.Cleanup(func() {
+		_ = os.Chdir(originalCwd)
+	})
+
+	home := t.TempDir()
+	cwd := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SHELL", "/bin/bash")
+	if err := os.Chdir(cwd); err != nil {
+		t.Fatalf("Chdir failed: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"install", "--shell", "bash"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
+	}
+
+	assetSystem, err := os.ReadFile(filepath.Join(originalCwd, "ash_bootstrap", ".ash_system"))
+	if err != nil {
+		t.Fatalf("read embedded system asset: %v", err)
+	}
+	if err != nil {
+		t.Fatalf("read embedded system asset: %v", err)
+	}
+	workspaceSystemPath := filepath.Join(home, ashWorkspaceDirName, systemFileName)
+	workspaceSystem, err := os.ReadFile(workspaceSystemPath)
+	if err != nil {
+		t.Fatalf("read workspace system file: %v", err)
+	}
+	if string(workspaceSystem) != string(assetSystem) {
+		t.Fatalf("expected workspace system file from embedded asset, got %q want %q", string(workspaceSystem), string(assetSystem))
+	}
+
+	workspaceEnvPath := filepath.Join(home, ashWorkspaceDirName, ".ash_env")
+	if _, err := os.Stat(workspaceEnvPath); err != nil {
+		t.Fatalf("expected workspace env file to be created: %v", err)
+	}
+
+	workspaceToolsPath := filepath.Join(home, ashWorkspaceDirName, "tools", "wikipedia_search.py")
+	if _, err := os.Stat(workspaceToolsPath); err != nil {
+		t.Fatalf("expected tool script to be installed: %v", err)
+	}
+}
+
+func TestInstallOverwriteMode(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SHELL", "/bin/bash")
+
+	workspaceDir := filepath.Join(home, ashWorkspaceDirName)
+	if err := os.MkdirAll(workspaceDir, 0o700); err != nil {
+		t.Fatalf("mkdir workspace dir: %v", err)
+	}
+	workspaceEnvPath := filepath.Join(workspaceDir, ".ash_env")
+	if err := os.WriteFile(workspaceEnvPath, []byte("export ASH_OLD=1\n"), 0o600); err != nil {
+		t.Fatalf("write existing env file: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"install", "--shell", "bash", "--overwrite"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected overwrite install to succeed, got %d stderr=%q", code, stderr.String())
+	}
+
+	content, err := os.ReadFile(workspaceEnvPath)
+	if err != nil {
+		t.Fatalf("read workspace env after overwrite: %v", err)
+	}
+	if strings.Contains(string(content), "ASH_OLD") {
+		t.Fatalf("expected overwrite mode to replace existing env file, got %q", string(content))
+	}
+	if !strings.Contains(string(content), "export") {
+		t.Fatalf("expected overwritten env file to contain exported settings, got %q", string(content))
 	}
 }
 

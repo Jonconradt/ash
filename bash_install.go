@@ -24,6 +24,14 @@ func bashInstallSourceBlock() string {
 }
 
 func bashInstallWrapperContent() string {
+	content, err := readEmbeddedBootstrapAsset("ash_bootstrap/.ash_bashrc")
+	if err == nil {
+		return strings.TrimSpace(string(content))
+	}
+	return fallbackBashInstallWrapperContent()
+}
+
+func fallbackBashInstallWrapperContent() string {
 	return strings.TrimSpace(`
 ` + installStartMarker + `
 [ -f "$HOME/.ash/.ash_env" ] && . "$HOME/.ash/.ash_env"
