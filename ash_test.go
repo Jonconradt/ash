@@ -2415,7 +2415,7 @@ func TestInstallUsesEmbeddedBootstrapAssets(t *testing.T) {
 		t.Fatalf("expected workspace env file to be created: %v", err)
 	}
 
-	workspaceToolsPath := filepath.Join(home, ashWorkspaceDirName, "tools", "wikipedia_search.py")
+	workspaceToolsPath := filepath.Join(home, ashWorkspaceDirName, "tools", "wikipedia.py")
 	if _, err := os.Stat(workspaceToolsPath); err != nil {
 		t.Fatalf("expected tool script to be installed: %v", err)
 	}
