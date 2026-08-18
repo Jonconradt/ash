@@ -2401,9 +2401,6 @@ func TestInstallUsesEmbeddedBootstrapAssets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read embedded system asset: %v", err)
 	}
-	if err != nil {
-		t.Fatalf("read embedded system asset: %v", err)
-	}
 	workspaceSystemPath := filepath.Join(home, ashWorkspaceDirName, systemFileName)
 	workspaceSystem, err := os.ReadFile(workspaceSystemPath)
 	if err != nil {
