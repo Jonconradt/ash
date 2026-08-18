@@ -4,3 +4,4 @@
 # Build artifacts
 dist/
 coverage.out
+.DS_Store
