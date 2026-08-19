@@ -93,35 +93,94 @@ func init() {
 	}
 }
 
-// runToolPipeline executes two commands without a shell, connecting the first stdout to the second stdin.
-func runToolPipeline(ctx context.Context, first, second []string, display string, timeout time.Duration, outputMax int) toolCommandResult {
-	if len(first) == 0 || len(second) == 0 {
+// runToolPipeline executes commands without a shell, connecting each stdout to the next stdin.
+func runToolPipeline(ctx context.Context, commands [][]string, display string, timeout time.Duration, outputMax int) toolCommandResult {
+	if len(commands) < 2 {
 		return toolCommandResult{OK: false, Command: display, ExitCode: -1, Error: "pipeline commands must not be empty", EID: "8Q8QmB9t"}
+	}
+	if len(commands) > 16 {
+		return toolCommandResult{OK: false, Command: display, ExitCode: -1, Error: "pipeline cannot contain more than 16 commands", EID: "8Q8QmB9t"}
+	}
+
+	sanitized := make([][]string, len(commands))
+	for i, command := range commands {
+		var err error
+		sanitized[i], err = sanitizeCommandArgs(command)
+		if err != nil {
+			return toolCommandResult{OK: false, Command: display, ExitCode: -1, Error: err.Error(), EID: "nnbIek1C"}
+		}
 	}
 
 	commandCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	producer := exec.CommandContext(commandCtx, first[0], first[1:]...)
-	consumer := exec.CommandContext(commandCtx, second[0], second[1:]...)
-	pipe, err := producer.StdoutPipe()
-	if err != nil {
-		return toolCommandResult{OK: false, Command: display, ExitCode: -1, Error: err.Error(), EID: "qQ4x4j9M"}
+	pipes := make([]struct{ reader, writer *os.File }, len(sanitized)-1)
+	for i := range pipes {
+		reader, writer, err := os.Pipe()
+		if err != nil {
+			return toolCommandResult{OK: false, Command: display, ExitCode: -1, Error: err.Error(), EID: "qQ4x4j9M"}
+		}
+		pipes[i] = struct{ reader, writer *os.File }{reader: reader, writer: writer}
 	}
-	consumer.Stdin = pipe
-	if err := producer.Start(); err != nil {
-		return toolCommandResult{OK: false, Command: display, ExitCode: -1, Error: err.Error(), EID: "j7qQm8vN"}
+	defer func() {
+		for _, pipe := range pipes {
+			_ = pipe.reader.Close()
+			_ = pipe.writer.Close()
+		}
+	}()
+
+	processes := make([]*exec.Cmd, len(sanitized))
+	for i, command := range sanitized {
+		// #nosec G204 -- command has passed sanitizeCommandArgs and executes without a shell.
+		process := exec.CommandContext(commandCtx, command[0], command[1:]...)
+		if i > 0 {
+			process.Stdin = pipes[i-1].reader
+		}
+		if i < len(pipes) {
+			process.Stdout = pipes[i].writer
+		}
+		processes[i] = process
 	}
-	consumerOutput, err := consumer.Output()
-	if err != nil {
-		_ = producer.Process.Kill()
-		_ = producer.Wait()
-		return toolCommandResult{OK: false, Command: display, ExitCode: pipelineExitCode(err), Stderr: truncateForToolOutput(err.Error(), outputMax), Error: err.Error(), EID: "j7qQm8vN"}
-	}
-	if err := producer.Wait(); err != nil {
-		return toolCommandResult{OK: false, Command: display, ExitCode: pipelineExitCode(err), Stderr: truncateForToolOutput(err.Error(), outputMax), Error: err.Error(), EID: "j7qQm8vN"}
+	var consumerOutput bytes.Buffer
+	processes[len(processes)-1].Stdout = &consumerOutput
+	started := make([]*exec.Cmd, 0, len(processes))
+	for _, process := range processes {
+		if err := process.Start(); err != nil {
+			for _, startedProcess := range started {
+				_ = startedProcess.Process.Kill()
+			}
+			for _, startedProcess := range started {
+				_ = startedProcess.Wait()
+			}
+			return toolCommandResult{OK: false, Command: display, ExitCode: -1, Error: err.Error(), EID: "j7qQm8vN"}
+		}
+		started = append(started, process)
 	}
 
-	return toolCommandResult{OK: true, Command: display, ExitCode: 0, Stdout: truncateForToolOutput(string(consumerOutput), outputMax)}
+	var waitErr error
+	for _, process := range processes {
+		if err := process.Wait(); err != nil && waitErr == nil {
+			waitErr = err
+		}
+	}
+	if waitErr != nil {
+		return toolCommandResult{OK: false, Command: display, ExitCode: pipelineExitCode(waitErr), Stderr: truncateForToolOutput(waitErr.Error(), outputMax), Error: waitErr.Error(), EID: "j7qQm8vN"}
+	}
+
+	return toolCommandResult{OK: true, Command: display, ExitCode: 0, Stdout: truncateForToolOutput(consumerOutput.String(), outputMax)}
+}
+
+func sanitizeCommandArgs(command []string) ([]string, error) {
+	if len(command) == 0 || strings.TrimSpace(command[0]) == "" {
+		return nil, errors.New("pipeline command must have a non-empty executable")
+	}
+
+	sanitized := append([]string(nil), command...)
+	for _, arg := range sanitized {
+		if isBlockedArgument(arg) {
+			return nil, errors.New("argument contains blocked shell control pattern")
+		}
+	}
+	return sanitized, nil
 }
 
 func pipelineExitCode(err error) int {

@@ -16,4 +16,8 @@ Guidance:
   - python3 tools/wikipedia.py --ai-docs
   - python3 tools/yfinance.py --ai-docs
 - For standard Unix commands, use --help or man <command> when available to confirm syntax and behavior.
+- Combine related work into one command when practical to reduce tool calls and token usage. Prefer commands that accept multiple paths or operands, such as `ls file1 file2`, `grep pattern file1 file2`, or `find dir1 dir2 ...`.
+- Use `run_unix_pipeline` when one command's output should feed another command. It supports 2 to 16 allowlisted commands separated by `|`, for example `ls | grep pattern | pbcopy`.
+- Do not use shell chaining or expansion such as `&&`, `;`, `||`, nested pipes, backticks, `$()`, redirection, or newlines inside command arguments. These are rejected, and the tools execute directly without a shell.
+- Keep every executable in a command or pipeline on the configured allowlist, and pass arguments as direct values. If more than 16 stages are needed, make separate tool calls or combine the task using one command's built-in options.
 - Be concise, safe, and useful. If the request is ambiguous, ask a brief clarifying question rather than guessing.

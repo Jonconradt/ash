@@ -1429,9 +1429,9 @@ func TestLocalToolShimRunUnixCommandPolicy(t *testing.T) {
 
 	t.Run("supports safe clipboard pipeline", func(t *testing.T) {
 		pipelineShim := localToolShim{allowlist: map[string]struct{}{"ls": {}, "pbcopy": {}}}
-		toolPipelineRunner = func(ctx context.Context, first, second []string, display string, timeout time.Duration, outputMax int) toolCommandResult {
-			if !reflect.DeepEqual(first, []string{"ls"}) || !reflect.DeepEqual(second, []string{"pbcopy"}) {
-				t.Fatalf("unexpected pipeline commands: %#v | %#v", first, second)
+		toolPipelineRunner = func(ctx context.Context, commands [][]string, display string, timeout time.Duration, outputMax int) toolCommandResult {
+			if !reflect.DeepEqual(commands, [][]string{{"ls"}, {"pbcopy"}}) {
+				t.Fatalf("unexpected pipeline commands: %#v", commands)
 			}
 			if display != "ls | pbcopy" {
 				t.Fatalf("unexpected pipeline display %q", display)
@@ -1446,6 +1446,73 @@ func TestLocalToolShimRunUnixCommandPolicy(t *testing.T) {
 			t.Fatalf("expected pipeline success, got %s", resultJSON)
 		}
 	})
+
+	t.Run("supports sixteen command pipeline", func(t *testing.T) {
+		pipelineShim := localToolShim{allowlist: map[string]struct{}{"cat": {}}}
+		toolPipelineRunner = func(ctx context.Context, commands [][]string, display string, timeout time.Duration, outputMax int) toolCommandResult {
+			if len(commands) != 16 {
+				t.Fatalf("expected 16 pipeline commands, got %d", len(commands))
+			}
+			return toolCommandResult{OK: true, Command: display, ExitCode: 0}
+		}
+
+		stages := make([]string, 16)
+		for i := range stages {
+			stages[i] = "cat"
+		}
+		resultJSON := pipelineShim.CallTool(context.Background(), "run_unix_pipeline", map[string]any{
+			"pipeline": strings.Join(stages, " | "),
+		})
+		if !strings.Contains(resultJSON, `"ok":true`) {
+			t.Fatalf("expected pipeline success, got %s", resultJSON)
+		}
+	})
+
+	t.Run("rejects seventeen command pipeline", func(t *testing.T) {
+		stages := make([]string, 17)
+		for i := range stages {
+			stages[i] = "ls"
+		}
+		resultJSON := shim.CallTool(context.Background(), "run_unix_pipeline", map[string]any{
+			"pipeline": strings.Join(stages, " | "),
+		})
+		if !strings.Contains(resultJSON, "between 2 and 16") {
+			t.Fatalf("expected pipeline length failure, got %s", resultJSON)
+		}
+	})
+}
+
+func TestSanitizeCommandArgs(t *testing.T) {
+	t.Run("copies safe command", func(t *testing.T) {
+		input := []string{"ls", "-l"}
+		got, err := sanitizeCommandArgs(input)
+		if err != nil {
+			t.Fatalf("sanitizeCommandArgs returned error: %v", err)
+		}
+		if !reflect.DeepEqual(got, input) {
+			t.Fatalf("unexpected sanitized command: %#v", got)
+		}
+		got[0] = "changed"
+		if input[0] != "ls" {
+			t.Fatalf("sanitizer mutated input: %#v", input)
+		}
+	})
+
+	tests := []struct {
+		name    string
+		command []string
+	}{
+		{name: "empty command", command: nil},
+		{name: "empty executable", command: []string{""}},
+		{name: "blocked argument", command: []string{"ls", "x;echo unsafe"}},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := sanitizeCommandArgs(test.command); err == nil {
+				t.Fatal("sanitizeCommandArgs accepted unsafe command")
+			}
+		})
+	}
 }
 
 func TestLocalToolShimIncludesSchedulingAndWorkspaceTools(t *testing.T) {

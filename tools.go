@@ -56,13 +56,13 @@ func (s localToolShim) ListTools() []toolDefinition {
 			Type: "function",
 			Function: toolFunctionDefinition{
 				Name:        "run_unix_pipeline",
-				Description: "Run a two-command pipeline of allowlisted Unix executables without a shell; use this for operations such as ls | pbcopy",
+				Description: "Run a pipeline of 2 to 16 allowlisted Unix executables without a shell; use this for operations such as ls | grep pattern | pbcopy",
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
 						"pipeline": map[string]any{
 							"type":        "string",
-							"description": "Exactly two allowlisted commands separated by |, for example ls | pbcopy",
+							"description": "Two to sixteen allowlisted commands separated by |, for example ls | grep pattern | pbcopy",
 						},
 					},
 					"required": []string{"pipeline"},
@@ -238,7 +238,7 @@ func (s localToolShim) CallTool(ctx context.Context, name string, args map[strin
 	return string(encoded)
 }
 
-// callUnixPipeline executes a validated two-command pipeline without invoking a shell.
+// callUnixPipeline executes a validated pipeline without invoking a shell.
 func (s localToolShim) callUnixPipeline(ctx context.Context, args map[string]any) toolCommandResult {
 	pipeline, ok := toStringArg(args["pipeline"])
 	if !ok {
@@ -246,8 +246,8 @@ func (s localToolShim) callUnixPipeline(ctx context.Context, args map[string]any
 	}
 
 	parts := strings.Split(pipeline, "|")
-	if len(parts) != 2 {
-		return toolCommandResult{OK: false, Command: pipeline, Error: "pipeline must contain exactly two commands separated by |", EID: "8Q8QmB9t"}
+	if len(parts) < 2 || len(parts) > 16 {
+		return toolCommandResult{OK: false, Command: pipeline, Error: "pipeline must contain between 2 and 16 commands separated by |", EID: "8Q8QmB9t"}
 	}
 
 	commands := make([][]string, 0, len(parts))
@@ -271,7 +271,7 @@ func (s localToolShim) callUnixPipeline(ctx context.Context, args map[string]any
 		commands = append(commands, fields)
 	}
 
-	return toolPipelineRunner(ctx, commands[0], commands[1], pipeline, toolTimeout(), toolOutputLimit())
+	return toolPipelineRunner(ctx, commands, pipeline, toolTimeout(), toolOutputLimit())
 }
 
 // callUnixCommand executes an allowlisted Unix command with the provided arguments and validates safety constraints.
