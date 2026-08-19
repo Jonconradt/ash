@@ -23,6 +23,19 @@ if (Test-Path "$HOME/.ash/.ash_pwsh.ps1") { . "$HOME/.ash/.ash_pwsh.ps1" }
 func pwshInstallWrapperContent() string {
 	return strings.TrimSpace(`
 ` + installStartMarker + `
+function global:_ash_prompt_processing_enabled {
+  $snoozeFile = Join-Path $HOME ".ash/.ash_snooze_until"
+  if (-not (Test-Path $snoozeFile -PathType Leaf)) {
+    return $true
+  }
+  $content = (Get-Content -Raw -ErrorAction SilentlyContinue $snoozeFile).Trim()
+  $expiresAt = 0L
+  if (-not [long]::TryParse($content, [ref]$expiresAt)) {
+    return $true
+  }
+  return $expiresAt -le [DateTimeOffset]::UtcNow.ToUnixTimeSeconds()
+}
+
 function global:_ash_should_route {
   param(
     [string]$Cmd,
@@ -74,7 +87,7 @@ function global:_ash_route_or_delegate {
     [string[]]$Args
   )
 
-  if (_ash_should_route -Cmd $Cmd -Args $Args) {
+  if (_ash_prompt_processing_enabled -and _ash_should_route -Cmd $Cmd -Args $Args) {
     ash $Cmd @Args
     return
   }

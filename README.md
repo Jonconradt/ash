@@ -251,6 +251,24 @@ During install, if `./.ash_system` or `./.ash_tools` exist in your current
 directory, they are copied into `~/.ash/` and become the canonical files used
 by `ash`.
 
+Pause automatic shell prompt processing when you need a quiet period:
+
+```bash
+ash snooze
+ash snooze 30s
+ash snooze 10m
+ash snooze off
+```
+
+`ash snooze` pauses processing for five minutes by default. Custom durations use
+Go duration syntax, such as `30s`, `10m`, or `1h`. The snooze is shared by the
+installed shell integrations and affects automatic routing only; explicit
+`ash ...` commands continue to work. The expiry is stored in
+`~/.ash/.ash_snooze_until`.
+After updating an existing installation, reload the shell startup file once
+(`source ~/.bashrc` or `source ~/.zshrc`) so the current shell loads the
+snooze-aware integration.
+
 Installer implementation is split per shell target for maintainability:
 - `bash_install.go`
 - `zsh_install.go`

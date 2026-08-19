@@ -9,6 +9,10 @@ ash \- practical shell assistant for command-not-found workflows
 .B install
 .RI [ --shell " bash|zsh|pwsh" ]
 .RI [ --dry-run ]
+.br
+.B ash
+.B snooze
+.RI [ duration|off ]
 .SH DESCRIPTION
 .B ash
 sends prompt text to the configured AI endpoint and prints the assistant response.
@@ -44,6 +48,23 @@ on Windows.
 .IP
 .B --dry-run
 Preview file changes without writing.
+.TP
+.B ash snooze [duration|off]
+Pause automatic shell prompt processing. The default duration is five minutes.
+Durations use Go duration syntax, such as
+.BR 30s ,
+.BR 5m ,
+or
+.BR 1h .
+Use
+.B off
+to resume processing immediately. The snooze is shared by installed shell
+integrations and does not disable explicit
+.B ash
+commands. Its expiry is stored in
+.IR ~/.ash/.ash_snooze_until .
+After updating an existing installation, reload the shell startup file once so
+the current shell loads the snooze-aware integration.
 .SH ENVIRONMENT
 .TP
 .B AI_ENDPOINT

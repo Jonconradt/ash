@@ -15,9 +15,11 @@ The CLI entry point in [ash.go](ash.go) initializes configuration, loads the sys
 - [tools.go](tools.go): tool definitions and local tool execution shim.
 - [support.go](support.go): logging, history lifecycle, file-system helpers, and debug output.
 - [install.go](install.go): shell wrapper installation and workspace initialization.
+- [snooze.go](snooze.go): persistent expiry state for pausing automatic shell routing.
 
 ## Operational notes
 
 - History is stored under the user workspace directory and is retained with a bounded cleanup policy.
+- Shell integrations check `~/.ash/.ash_snooze_until` before automatic wrapper and command-not-found routing. Direct `ash` invocations bypass this check.
 - Debug logging can be enabled with ASH_VERBOSE and optionally written to a rotating log file.
 - Tool execution is restricted by allowlist and path containment rules.

@@ -40,9 +40,26 @@ case "$-" in
 	*) return ;;
 esac
 
+_ash_prompt_processing_enabled() {
+	local snooze_file="$HOME/.ash/.ash_snooze_until"
+	local expires_at now
+	if [[ ! -r "$snooze_file" ]]; then
+		return 0
+	fi
+	expires_at="$(<"$snooze_file")"
+	if [[ ! "$expires_at" =~ ^[0-9]+$ ]]; then
+		return 0
+	fi
+	now="$(date +%s)"
+	(( expires_at <= now ))
+}
+
 command_not_found_handle() {
-  ash "$@"
-  return $?
+	if _ash_prompt_processing_enabled; then
+		ash "$@"
+		return $?
+	fi
+	return 127
 }
 
 _ash_should_route() {
@@ -179,6 +196,10 @@ _ash_should_route() {
 _ash_route_or_delegate() {
   local cmd="$1"
   shift
+	if ! _ash_prompt_processing_enabled; then
+		command "$cmd" "$@"
+		return $?
+	fi
   if _ash_should_route "$cmd" "$@"; then
     ash "$cmd" "$@"
     return $?
@@ -189,6 +210,10 @@ _ash_route_or_delegate() {
 _ash_route_or_delegate_builtin() {
   local builtin_name="$1"
   shift
+	if ! _ash_prompt_processing_enabled; then
+		builtin "$builtin_name" "$@"
+		return $?
+	fi
   if _ash_should_route "$builtin_name" "$@"; then
     ash "$builtin_name" "$@"
     return $?

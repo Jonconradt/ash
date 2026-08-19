@@ -72,6 +72,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if args[0] == "install" {
 		return runInstall(args[1:], stdout, stderr)
 	}
+	if args[0] == "snooze" {
+		return runSnooze(args[1:], stdout, stderr)
+	}
 
 	if _, err := ensureSessionID(); err != nil {
 		slog.Error("failed to initialize SESSION_ID", "error", err, "EID", "xYQ5IJX7")
