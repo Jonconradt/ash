@@ -115,6 +115,7 @@ say
 mdfind
 mdls
 sw_vers
+pbcopy
 
 # -----------------------------------------------------------------------------
 # scheduling utilities
@@ -128,7 +129,7 @@ launchctl
 # Optional additions (uncomment only if desired)
 # -----------------------------------------------------------------------------
 # git
-# make
-# go
-# curl
-# wget
+make
+go
+curl
+wget
