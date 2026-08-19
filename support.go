@@ -78,6 +78,7 @@ var (
 	}
 	argumentBlockPattern                = regexp.MustCompile(`(;|\|\||&&|\||` + "`" + `|\$\(|>|<|\x00|\n|\r)`)
 	toolCommandRunner                   = runToolCommand
+	toolPipelineRunner                  = runToolPipeline
 	pickCloudBusy503Message             = randomCloudBusy503Message
 	pickCloudServer500Message           = randomCloudServer500Message
 	debugWriter               io.Writer = os.Stderr
@@ -90,6 +91,45 @@ func init() {
 	requestIDGenerator = func() string {
 		return hex.EncodeToString(make([]byte, 8))
 	}
+}
+
+// runToolPipeline executes two commands without a shell, connecting the first stdout to the second stdin.
+func runToolPipeline(ctx context.Context, first, second []string, display string, timeout time.Duration, outputMax int) toolCommandResult {
+	if len(first) == 0 || len(second) == 0 {
+		return toolCommandResult{OK: false, Command: display, ExitCode: -1, Error: "pipeline commands must not be empty", EID: "8Q8QmB9t"}
+	}
+
+	commandCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	producer := exec.CommandContext(commandCtx, first[0], first[1:]...)
+	consumer := exec.CommandContext(commandCtx, second[0], second[1:]...)
+	pipe, err := producer.StdoutPipe()
+	if err != nil {
+		return toolCommandResult{OK: false, Command: display, ExitCode: -1, Error: err.Error(), EID: "qQ4x4j9M"}
+	}
+	consumer.Stdin = pipe
+	if err := producer.Start(); err != nil {
+		return toolCommandResult{OK: false, Command: display, ExitCode: -1, Error: err.Error(), EID: "j7qQm8vN"}
+	}
+	consumerOutput, err := consumer.Output()
+	if err != nil {
+		_ = producer.Process.Kill()
+		_ = producer.Wait()
+		return toolCommandResult{OK: false, Command: display, ExitCode: pipelineExitCode(err), Stderr: truncateForToolOutput(err.Error(), outputMax), Error: err.Error(), EID: "j7qQm8vN"}
+	}
+	if err := producer.Wait(); err != nil {
+		return toolCommandResult{OK: false, Command: display, ExitCode: pipelineExitCode(err), Stderr: truncateForToolOutput(err.Error(), outputMax), Error: err.Error(), EID: "j7qQm8vN"}
+	}
+
+	return toolCommandResult{OK: true, Command: display, ExitCode: 0, Stdout: truncateForToolOutput(string(consumerOutput), outputMax)}
+}
+
+func pipelineExitCode(err error) int {
+	var exitErr *exec.ExitError
+	if errors.As(err, &exitErr) {
+		return exitErr.ExitCode()
+	}
+	return -1
 }
 
 // isInteractiveStdin reports whether stdin is connected to a terminal device.

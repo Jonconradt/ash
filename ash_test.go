@@ -1341,7 +1341,11 @@ func TestLoadAllowlistedCommands(t *testing.T) {
 
 func TestLocalToolShimRunUnixCommandPolicy(t *testing.T) {
 	originalRunner := toolCommandRunner
-	t.Cleanup(func() { toolCommandRunner = originalRunner })
+	originalPipelineRunner := toolPipelineRunner
+	t.Cleanup(func() {
+		toolCommandRunner = originalRunner
+		toolPipelineRunner = originalPipelineRunner
+	})
 
 	shim := localToolShim{allowlist: map[string]struct{}{"ls": {}}}
 
@@ -1422,6 +1426,26 @@ func TestLocalToolShimRunUnixCommandPolicy(t *testing.T) {
 			t.Fatalf("expected success, got %s", resultJSON)
 		}
 	})
+
+	t.Run("supports safe clipboard pipeline", func(t *testing.T) {
+		pipelineShim := localToolShim{allowlist: map[string]struct{}{"ls": {}, "pbcopy": {}}}
+		toolPipelineRunner = func(ctx context.Context, first, second []string, display string, timeout time.Duration, outputMax int) toolCommandResult {
+			if !reflect.DeepEqual(first, []string{"ls"}) || !reflect.DeepEqual(second, []string{"pbcopy"}) {
+				t.Fatalf("unexpected pipeline commands: %#v | %#v", first, second)
+			}
+			if display != "ls | pbcopy" {
+				t.Fatalf("unexpected pipeline display %q", display)
+			}
+			return toolCommandResult{OK: true, Command: display, ExitCode: 0}
+		}
+
+		resultJSON := pipelineShim.CallTool(context.Background(), "run_unix_pipeline", map[string]any{
+			"pipeline": "ls | pbcopy",
+		})
+		if !strings.Contains(resultJSON, `"ok":true`) {
+			t.Fatalf("expected pipeline success, got %s", resultJSON)
+		}
+	})
 }
 
 func TestLocalToolShimIncludesSchedulingAndWorkspaceTools(t *testing.T) {
@@ -1432,6 +1456,7 @@ func TestLocalToolShimIncludesSchedulingAndWorkspaceTools(t *testing.T) {
 		names[tool.Function.Name] = struct{}{}
 	}
 	for _, required := range []string{
+		"run_unix_pipeline",
 		"schedule_future_prompt",
 		"schedule_recurring_prompt",
 		"manage_recurring_jobs",

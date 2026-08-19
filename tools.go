@@ -21,7 +21,7 @@ type localToolShim struct {
 
 // ListTools returns the tool definitions exposed to the AI client by the local shim.
 func (s localToolShim) ListTools() []toolDefinition {
-	runUnixDescription := "Run a single allowlisted Unix executable with direct args and no shell expansion"
+	runUnixDescription := "Run a single allowlisted Unix executable with direct args and no shell expansion. For pipelines such as copying ls output to the clipboard, use run_unix_pipeline"
 	allowed := sortedAllowlist(s.allowlist)
 	if len(allowed) > 0 {
 		runUnixDescription += ". Allowlisted executables: " + strings.Join(allowed, ", ")
@@ -49,6 +49,23 @@ func (s localToolShim) ListTools() []toolDefinition {
 						},
 					},
 					"required": []string{"command"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: toolFunctionDefinition{
+				Name:        "run_unix_pipeline",
+				Description: "Run a two-command pipeline of allowlisted Unix executables without a shell; use this for operations such as ls | pbcopy",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"pipeline": map[string]any{
+							"type":        "string",
+							"description": "Exactly two allowlisted commands separated by |, for example ls | pbcopy",
+						},
+					},
+					"required": []string{"pipeline"},
 				},
 			},
 		},
@@ -195,6 +212,8 @@ func (s localToolShim) CallTool(ctx context.Context, name string, args map[strin
 	switch name {
 	case "run_unix_command":
 		result = s.callUnixCommand(ctx, args)
+	case "run_unix_pipeline":
+		result = s.callUnixPipeline(ctx, args)
 	case "run_python3", "python3":
 		result = s.callPython3(ctx, args)
 	case "schedule_future_prompt":
@@ -217,6 +236,42 @@ func (s localToolShim) CallTool(ctx context.Context, name string, args map[strin
 	}
 
 	return string(encoded)
+}
+
+// callUnixPipeline executes a validated two-command pipeline without invoking a shell.
+func (s localToolShim) callUnixPipeline(ctx context.Context, args map[string]any) toolCommandResult {
+	pipeline, ok := toStringArg(args["pipeline"])
+	if !ok {
+		return toolCommandResult{OK: false, Error: "pipeline must be a string", EID: "jGDQaWr5"}
+	}
+
+	parts := strings.Split(pipeline, "|")
+	if len(parts) != 2 {
+		return toolCommandResult{OK: false, Command: pipeline, Error: "pipeline must contain exactly two commands separated by |", EID: "8Q8QmB9t"}
+	}
+
+	commands := make([][]string, 0, len(parts))
+	for _, part := range parts {
+		fields := strings.Fields(part)
+		if len(fields) == 0 {
+			return toolCommandResult{OK: false, Command: pipeline, Error: "pipeline commands must not be empty", EID: "o3UdEAP7"}
+		}
+		commandName := normalizeToolName(fields[0])
+		if commandName == "" {
+			return toolCommandResult{OK: false, Command: pipeline, Error: "pipeline command must be a bare executable name", EID: "o3UdEAP7"}
+		}
+		if _, allowed := s.allowlist[commandName]; !allowed {
+			return toolCommandResult{OK: false, Command: commandName, Error: "command is not allowlisted", EID: "ABLaPipP"}
+		}
+		for _, arg := range fields[1:] {
+			if isBlockedArgument(arg) {
+				return toolCommandResult{OK: false, Command: pipeline, Error: "argument contains blocked shell control pattern", EID: "nnbIek1C"}
+			}
+		}
+		commands = append(commands, fields)
+	}
+
+	return toolPipelineRunner(ctx, commands[0], commands[1], pipeline, toolTimeout(), toolOutputLimit())
 }
 
 // callUnixCommand executes an allowlisted Unix command with the provided arguments and validates safety constraints.
