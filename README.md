@@ -1,10 +1,32 @@
 # ash
 
-`ash` is a small Go executable for shell `command_not_found_handle()` workflows.
-It sends command text to the configured AI provider and prints the assistant response.
+Ever wanted to ask an AI a question in the middle of working in a terminal? Don't want to launch another app just to ask one question? ASH extends the bash and zsh shells to support in-line AI prompting. When the shell does not understand your command it passes it to the AI as a prompt. 
 
-When invoked without positional arguments, `ash` reads prompt text from non-interactive
-stdin (for example, shell pipes or redirected files).
+```ash
+$:~ jon$ whoami
+jon
+$:~ jon$ When is the next full moon?
+
+  The current moon phase is a first quarter moon (represented as 🌓 with an illumination of 8%).
+
+  Based on the lunar cycle, a full moon occurs approximately 14-15 days after the first quarter. Given today's date is August 20, 2026, the next full moon is expected to occur around September 3-4, 2026.
+```
+
+What if you want the AI to investigate a problem? The .ash_tools file is an allow list of unix commands the AI can use (and pipe together) to accomplish investigations. 
+
+What if you have a more complex question, something that needs to be computed? If you allow ash to expose Python the AI can write temporary scripts, or use scripts in the ~/.ash/tools directory to run complex processes.
+
+What if you want something to happen on a schedule or in the future? Ash can create systems jobs that run once or recur.
+
+What if I want to run a unix command that looks like a prompt, e.g. which ash? You can snooze ash with "ash snooze 5m" and it will not interpret your command line as a prompt. 
+
+What if I am on MacOS and I want the results in my clipboard? Add pbcopy to .ash_tools. If you forget, ask the AI because it knows what to do.
+
+Where is the system prompt? Put your system prompt in ~/.ash/.ash_system. It supports replacement of environment variables.
+
+Does this support Ollama, OpenAI, Google, Anthropic? Yes, during install provide the URL of your provider, and your app key. The app key will be added to ~/.ash/.ash_env 
+
+Is this thing secure and safe? It really depends on how bold you are. It runs as your user so it can read your files, but it is limited in the commands it can execute, but it can execute python (if you allow it). If you allow curl or wget and are running a naive model you could end up executing more than you wanted. 
 
 ## Features
 
