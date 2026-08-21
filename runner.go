@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 )
 
 var chatExecutor = chat
@@ -115,7 +116,11 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 		for _, call := range assistant.ToolCalls {
 			toolName := strings.TrimSpace(call.Function.Name)
 			slog.Debug("Tool invocation requested", "request_id", requestIDGenerator(), "name", toolName, "args", marshalForDebug(call.Function.Arguments), "EID", "iYWCHf8N")
+			toolStarted := time.Now()
 			toolResult := shim.CallTool(ctx, toolName, call.Function.Arguments)
+			if metrics := executionMetricsFromContext(ctx); metrics != nil {
+				metrics.addToolCall(time.Since(toolStarted))
+			}
 			slog.Debug("Tool invocation result", "request_id", requestIDGenerator(), "name", toolName, "result", toolResult, "EID", "L6UuVgEs")
 			observation := parseToolObservation(toolResult)
 			if observation.Command == "" {

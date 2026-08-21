@@ -213,7 +213,7 @@ func readAllPromptFromStdin() (string, error) {
 func verboseLoggingEnabled() bool {
 	raw := strings.ToLower(strings.TrimSpace(os.Getenv("ASH_VERBOSE")))
 	switch raw {
-	case "1", "true", "yes", "on", "debug":
+	case "1", "true", "yes", "y", "on", "debug":
 		return true
 	default:
 		return false

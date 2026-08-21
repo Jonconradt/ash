@@ -49,6 +49,12 @@ type cacheControl struct {
 type anthropicMessagesResponse struct {
 	Content []anthropicContentBlock `json:"content"`
 	Error   *anthropicErrorBody     `json:"error,omitempty"`
+	Usage   *anthropicUsage         `json:"usage,omitempty"`
+}
+
+type anthropicUsage struct {
+	InputTokens  int `json:"input_tokens"`
+	OutputTokens int `json:"output_tokens"`
 }
 
 type anthropicErrorBody struct {
@@ -194,5 +200,13 @@ func (a anthropicAdapter) ParseResponse(body []byte) (chatResponse, error) {
 		}
 	}
 	assistant.Content = strings.TrimSpace(strings.Join(textParts, "\n"))
-	return chatResponse{Message: assistant}, nil
+	result := chatResponse{Message: assistant}
+	if parsed.Usage != nil {
+		result.Usage = chatUsage{
+			InputTokens:  parsed.Usage.InputTokens,
+			OutputTokens: parsed.Usage.OutputTokens,
+			Available:    true,
+		}
+	}
+	return result, nil
 }

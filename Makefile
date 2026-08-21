@@ -1,4 +1,4 @@
-.PHONY: all verify lint yaml-lint test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install setup-hooks version release release-check release-build release-pkg release-validate release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one
+.PHONY: all verify build lint yaml-lint test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install setup-hooks version release release-check release-build release-pkg release-validate release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one
 
 SHELL := /bin/bash
 
@@ -34,6 +34,9 @@ RELEASE_BINARY_PATH ?= $(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)$(BINARY_EX
 all: verify install
 
 verify: test test-race test-cover vet staticcheck security test-fuzz benchmark
+
+build: lint test
+	@go install .
 
 lint: yaml-lint
 	@go run github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run ./...

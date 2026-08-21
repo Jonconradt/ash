@@ -33,6 +33,13 @@ type ollamaChatRequest struct {
 	Stream     bool             `json:"stream"`
 }
 
+type ollamaChatResponse struct {
+	Message         message `json:"message"`
+	Error           string  `json:"error"`
+	PromptEvalCount int     `json:"prompt_eval_count"`
+	EvalCount       int     `json:"eval_count"`
+}
+
 func (a ollamaAdapter) Name() aiProvider {
 	return providerOllama
 }
@@ -86,9 +93,17 @@ func (a ollamaAdapter) ApplyHeaders(req *http.Request, aiCfg aiConfig) {
 }
 
 func (a ollamaAdapter) ParseResponse(body []byte) (chatResponse, error) {
-	var parsed chatResponse
+	var parsed ollamaChatResponse
 	if err := json.Unmarshal(body, &parsed); err != nil {
 		return chatResponse{}, err
 	}
-	return parsed, nil
+	return chatResponse{
+		Message: parsed.Message,
+		Error:   parsed.Error,
+		Usage: chatUsage{
+			InputTokens:  parsed.PromptEvalCount,
+			OutputTokens: parsed.EvalCount,
+			Available:    parsed.PromptEvalCount > 0 || parsed.EvalCount > 0,
+		},
+	}, nil
 }

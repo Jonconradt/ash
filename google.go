@@ -49,8 +49,20 @@ type googleToolFunctionWire struct {
 }
 
 type googleChatCompletionsResponse struct {
-	Choices []googleChoice  `json:"choices"`
-	Error   *googleAPIError `json:"error,omitempty"`
+	Choices       []googleChoice       `json:"choices"`
+	Error         *googleAPIError      `json:"error,omitempty"`
+	Usage         *googleUsage         `json:"usage,omitempty"`
+	UsageMetadata *googleUsageMetadata `json:"usageMetadata,omitempty"`
+}
+
+type googleUsage struct {
+	PromptTokens     int `json:"prompt_tokens"`
+	CompletionTokens int `json:"completion_tokens"`
+}
+
+type googleUsageMetadata struct {
+	PromptTokenCount     int `json:"promptTokenCount"`
+	CandidatesTokenCount int `json:"candidatesTokenCount"`
 }
 
 type googleChoice struct {
@@ -166,5 +178,19 @@ func (a googleAdapter) ParseResponse(body []byte) (chatResponse, error) {
 		}
 	}
 
-	return chatResponse{Message: out}, nil
+	result := chatResponse{Message: out}
+	if parsed.Usage != nil {
+		result.Usage = chatUsage{
+			InputTokens:  parsed.Usage.PromptTokens,
+			OutputTokens: parsed.Usage.CompletionTokens,
+			Available:    true,
+		}
+	} else if parsed.UsageMetadata != nil {
+		result.Usage = chatUsage{
+			InputTokens:  parsed.UsageMetadata.PromptTokenCount,
+			OutputTokens: parsed.UsageMetadata.CandidatesTokenCount,
+			Available:    true,
+		}
+	}
+	return result, nil
 }

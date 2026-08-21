@@ -29,8 +29,9 @@ type chatRequest struct {
 }
 
 type chatResponse struct {
-	Message message `json:"message"`
-	Error   string  `json:"error"`
+	Message message   `json:"message"`
+	Error   string    `json:"error"`
+	Usage   chatUsage `json:"-"`
 }
 
 type chatStatusError struct {
@@ -158,7 +159,11 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 		adapter.ApplyHeaders(req, aiCfg)
 
 		client := newHTTPClient(aiTimeout())
+		connectStarted := time.Now()
 		resp, err := client.Do(req)
+		if metrics := executionMetricsFromContext(ctx); metrics != nil {
+			metrics.addStageDuration(metricsStageConnect, time.Since(connectStarted))
+		}
 		if err != nil {
 			if !shouldRetryAIError(err, attempt, attempts) {
 				return chatResponse{}, err
@@ -170,12 +175,25 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 			continue
 		}
 		defer resp.Body.Close()
+		processingStarted := time.Now()
+		processingRecorded := false
+		recordProcessing := func() {
+			if processingRecorded {
+				return
+			}
+			processingRecorded = true
+			if metrics := executionMetricsFromContext(ctx); metrics != nil {
+				metrics.addStageDuration(metricsStageAIProcessing, time.Since(processingStarted))
+			}
+		}
 
 		body, err := io.ReadAll(resp.Body)
 		if err != nil {
+			recordProcessing()
 			return chatResponse{}, err
 		}
 		if err := ctx.Err(); err != nil {
+			recordProcessing()
 			return chatResponse{}, err
 		}
 		slog.Debug("AI response", "request_id", requestIDGenerator(), "status", resp.StatusCode, "body", string(body), "EID", "2D1hx03p")
@@ -183,9 +201,11 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 		if resp.StatusCode < 200 || resp.StatusCode > 299 {
 			statusErr := chatStatusError{StatusCode: resp.StatusCode, Body: string(body)}
 			if !shouldRetryStatusCode(resp.StatusCode, attempt, attempts) {
+				recordProcessing()
 				return chatResponse{}, statusErr
 			}
 			slog.Debug("AI request attempt status", "request_id", requestIDGenerator(), "attempt", attempt, "max_attempts", attempts, "status", resp.StatusCode, "EID", "VUGCSB86")
+			recordProcessing()
 			if err := sleepWithContext(ctx, backoffDelay(attempt, baseDelay, maxDelay)); err != nil {
 				return chatResponse{}, err
 			}
@@ -195,21 +215,32 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 		parsed, err := adapter.ParseResponse(body)
 		if err != nil {
 			if ctxErr := ctx.Err(); ctxErr != nil {
+				recordProcessing()
 				return chatResponse{}, ctxErr
 			}
+			recordProcessing()
 			return chatResponse{}, err
 		}
 
 		if parsed.Error != "" {
+			if metrics := executionMetricsFromContext(ctx); metrics != nil {
+				metrics.addTokenUsage(parsed.Usage.InputTokens, parsed.Usage.OutputTokens, parsed.Usage.Available)
+			}
 			if !shouldRetryAIError(errors.New(parsed.Error), attempt, attempts) {
+				recordProcessing()
 				return chatResponse{}, errors.New(parsed.Error)
 			}
 			slog.Debug("AI request attempt model error", "request_id", requestIDGenerator(), "attempt", attempt, "max_attempts", attempts, "error", parsed.Error, "EID", "wnrl8LcI")
+			recordProcessing()
 			if err := sleepWithContext(ctx, backoffDelay(attempt, baseDelay, maxDelay)); err != nil {
 				return chatResponse{}, err
 			}
 			continue
 		}
+		if metrics := executionMetricsFromContext(ctx); metrics != nil {
+			metrics.addTokenUsage(parsed.Usage.InputTokens, parsed.Usage.OutputTokens, parsed.Usage.Available)
+		}
+		recordProcessing()
 
 		return parsed, nil
 	}

@@ -27,6 +27,12 @@ type openAIFunctionTool struct {
 type openAIResponsesResponse struct {
 	Output []openAIOutputItem `json:"output"`
 	Error  *openAIErrorBody   `json:"error,omitempty"`
+	Usage  *openAIUsage       `json:"usage,omitempty"`
+}
+
+type openAIUsage struct {
+	InputTokens  int `json:"input_tokens"`
+	OutputTokens int `json:"output_tokens"`
 }
 
 type openAIOutputItem struct {
@@ -169,5 +175,13 @@ func (a openAIAdapter) ParseResponse(body []byte) (chatResponse, error) {
 	}
 	assistant.Content = strings.TrimSpace(strings.Join(textParts, "\n"))
 
-	return chatResponse{Message: assistant}, nil
+	result := chatResponse{Message: assistant}
+	if parsed.Usage != nil {
+		result.Usage = chatUsage{
+			InputTokens:  parsed.Usage.InputTokens,
+			OutputTokens: parsed.Usage.OutputTokens,
+			Available:    true,
+		}
+	}
+	return result, nil
 }

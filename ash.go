@@ -53,6 +53,14 @@ func main() {
 
 // run runs the requested operation.
 func run(args []string, stdout, stderr io.Writer) int {
+	metrics := newExecutionMetrics(timeNow())
+	defer func() {
+		metrics.finish(timeNow())
+		if verboseLoggingEnabled() {
+			_, _ = io.WriteString(stdout, renderExecutionDashboard(metrics, writerIsTerminal(stdout)))
+		}
+	}()
+
 	if len(args) < 1 {
 		if stdinIsInteractive() {
 			printUsage(stderr)
@@ -76,6 +84,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runSnooze(args[1:], stdout, stderr)
 	}
 
+	defaultsStarted := timeNow()
 	if _, err := ensureSessionID(); err != nil {
 		slog.Error("failed to initialize SESSION_ID", "error", err, "EID", "xYQ5IJX7")
 		return 1
@@ -124,6 +133,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		slog.Error(fmt.Sprintf("failed to read %s: %v", toolsFileName, err), "EID", "f6qdSTFE")
 		return 1
 	}
+	metrics.addStageDuration(metricsStageDefaults, timeNow().Sub(defaultsStarted))
 	slog.Debug("Allowlist loaded", "request_id", requestIDGenerator(), "allowlist", strings.Join(sortedAllowlist(allowlist), ","), "EID", "oYccBW9V")
 
 	toolShim := localToolShim{allowlist: allowlist}
@@ -139,6 +149,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	defer stop()
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
+	ctx = withExecutionMetrics(ctx, metrics)
 
 	stopSpinner := startThinkingIndicator(stderr)
 	assistantReply, updatedMessages, err := runToolLoop(ctx, aiCfg, userInput, messages, toolShim)
