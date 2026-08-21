@@ -135,6 +135,14 @@ export AI_ENDPOINT="http://localhost:11434"
 export AI_MODEL="llama3.1:latest"
 ```
 
+For Ollama, keep the model loaded after `ash` exits to avoid the next invocation paying the model-load cost:
+
+```bash
+export OLLAMA_KEEP_ALIVE=-1
+```
+
+Restart Ollama after changing this setting. Keeping a model resident uses its memory between invocations; use a duration such as `30m` instead of `-1` when that tradeoff is preferable.
+
 Cloud example (authenticated):
 
 ```bash

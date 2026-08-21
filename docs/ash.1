@@ -73,6 +73,18 @@ Required. Base URL for the chat API endpoint.
 .B AI_MODEL
 Required. Model name sent to the endpoint.
 .TP
+.B OLLAMA_KEEP_ALIVE
+Ollama server setting, not read by
+.B ash.
+Set it to
+.B -1
+to keep the model loaded after
+.B ash
+exits and avoid model-load latency on the next invocation. Restart Ollama after
+changing it. A duration such as
+.B 30m
+keeps the model warm for a bounded period.
+.TP
 .B AI_AUTH_TYPE
 Optional. For cloud endpoints use
 .B bearer.
