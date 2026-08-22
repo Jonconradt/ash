@@ -19,7 +19,7 @@ _ash_ensure_broker() {
 	if [[ -z "$token" ]]; then
 		return 1
 	fi
-	env ASH_BROKER_TOKEN="$token" command ash broker --socket "$socket_path" --lease "$lease_path" </dev/null >/dev/null 2>&1 &
+	ASH_BROKER_TOKEN="$token" command ash broker --socket "$socket_path" --lease "$lease_path" </dev/null >/dev/null 2>&1 &
 	local broker_pid=$!
 	local attempt
 	for attempt in {1..40}; do
