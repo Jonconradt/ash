@@ -52,6 +52,8 @@ _ash_prompt_processing_enabled() {
 
 command_not_found_handler() {
 	if _ash_prompt_processing_enabled; then
+		_ash_ensure_broker >/dev/null 2>&1
+		[[ -n "${ASH_BROKER_LEASE:-}" ]] && touch "$ASH_BROKER_LEASE"
 		ash "$@"
 	else
 		return 127
