@@ -1,6 +1,41 @@
 # >>> ash install >>>
 [ -f "$HOME/.ash/.ash_env" ] && . "$HOME/.ash/.ash_env"
 
+_ash_ensure_broker() {
+	if [[ -n "${ASH_BROKER_SOCKET:-}" && -n "${ASH_BROKER_TOKEN:-}" && -S "$ASH_BROKER_SOCKET" && -n "${ASH_BROKER_PID:-}" ]] && kill -0 "$ASH_BROKER_PID" 2>/dev/null; then
+		return 0
+	fi
+	local runtime_dir="$HOME/.ash/runtime"
+	local socket_path="$runtime_dir/${SESSION_ID:-shell}.sock"
+	local lease_path="$runtime_dir/${SESSION_ID:-shell}.lease"
+	local token
+	if ! mkdir -p -m 700 "$runtime_dir"; then
+		return 1
+	fi
+	if ! touch "$lease_path"; then
+		return 1
+	fi
+	token="$(head -c 32 /dev/urandom | LC_ALL=C od -An -tx1 | tr -d ' \n')"
+	if [[ -z "$token" ]]; then
+		return 1
+	fi
+	env ASH_BROKER_TOKEN="$token" command ash broker --socket "$socket_path" --lease "$lease_path" </dev/null >/dev/null 2>&1 &
+	local broker_pid=$!
+	local attempt
+	for attempt in {1..40}; do
+		if [[ -S "$socket_path" ]]; then
+			touch "$lease_path"
+			export ASH_BROKER_SOCKET="$socket_path" ASH_BROKER_TOKEN="$token" ASH_BROKER_PID="$broker_pid" ASH_BROKER_LEASE="$lease_path"
+			return 0
+		fi
+		if ! kill -0 "$broker_pid" 2>/dev/null; then
+			return 1
+		fi
+		sleep 0.01
+	done
+	return 1
+}
+
 _ash_prompt_processing_enabled() {
 	local snooze_file="$HOME/.ash/.ash_snooze_until"
 	local expires_at now
@@ -152,6 +187,8 @@ _ash_route_or_delegate() {
 		return $?
 	fi
   if _ash_should_route "$cmd" "$@"; then
+	_ash_ensure_broker >/dev/null 2>&1
+		[[ -n "${ASH_BROKER_LEASE:-}" ]] && touch "$ASH_BROKER_LEASE"
     ash "$cmd" "$@"
     return $?
   fi
@@ -166,6 +203,8 @@ _ash_route_or_delegate_builtin() {
 		return $?
 	fi
   if _ash_should_route "$builtin_name" "$@"; then
+	_ash_ensure_broker >/dev/null 2>&1
+		[[ -n "${ASH_BROKER_LEASE:-}" ]] && touch "$ASH_BROKER_LEASE"
     ash "$builtin_name" "$@"
     return $?
   fi

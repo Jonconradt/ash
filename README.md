@@ -208,12 +208,19 @@ Notes:
 - `ASH_LOG_FILE` (optional): File path for verbose debug logs.
 - `ASH_LOG_MAX_BYTES` (optional): Max log size before rotation when `ASH_LOG_FILE` is used. Default `1048576` (1 MiB).
 - `ASH_LOG_FORMAT` (scheduler/internal): Log format set to `json` for scheduled invocations.
+- `ASH_BROKER_SOCKET`, `ASH_BROKER_TOKEN`, and `ASH_BROKER_LEASE` (internal): Ephemeral per-shell broker settings. They are created by the installed Bash/zsh wrappers and should not be persisted or copied into scheduled jobs. The lease is non-secret and expires when shell activity stops.
 - `SESSION_ID`: Session identifier used for history and scheduled log naming (generated when missing in interactive runs).
 - `ASH_SCHEDULED_TASK` (internal): Set by scheduled invocations to mark task execution context.
 - `ASH_CHILD_AGENT` (internal): Marks a one-level child agent; child agents cannot create or schedule ash agents.
 - `SHELL`: Used by `ash install` and install recommendations to detect bash/zsh.
 - `HOME`: Determines ash workspace root under `$HOME/.ash`.
 - `PATH`: Used to locate executables for tool commands and helper utilities.
+
+### Connection reuse
+
+On macOS and Linux, the installed Bash and zsh wrappers lazily start one unprivileged broker per interactive shell. The broker keeps a bounded HTTPS connection pool alive across separate `ash` processes and communicates over a private Unix socket. Subshells reuse their parent shell's broker; independent shells have independent brokers.
+
+Broker use is transparent and has a direct HTTPS fallback. The broker uses an idle timeout and ephemeral shell credentials, so its socket and capability are not written to cron, launchd, or other persistent scheduler configuration. Scheduled invocations therefore use direct HTTPS unless they are explicitly running with live, inherited broker state.
 
 Optional canonical system prompt file:
 

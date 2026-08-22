@@ -160,7 +160,21 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 		adapter.ApplyHeaders(req, aiCfg)
 
 		connectStarted := time.Now()
-		resp, err := client.Do(req)
+		var resp *http.Response
+		if brokerConfigured() {
+			resp, err = brokerDo(ctx, req)
+			if err != nil {
+				fallbackReq, fallbackErr := http.NewRequestWithContext(ctx, http.MethodPost, endpointURL, bytes.NewReader(payload))
+				if fallbackErr != nil {
+					err = fallbackErr
+				} else {
+					adapter.ApplyHeaders(fallbackReq, aiCfg)
+					resp, err = client.Do(fallbackReq)
+				}
+			}
+		} else {
+			resp, err = client.Do(req)
+		}
 		if metrics := executionMetricsFromContext(ctx); metrics != nil {
 			metrics.addStageDuration(metricsStageConnect, time.Since(connectStarted))
 		}
@@ -174,7 +188,6 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 			}
 			continue
 		}
-		defer resp.Body.Close()
 		processingStarted := time.Now()
 		processingRecorded := false
 		recordProcessing := func() {
@@ -188,9 +201,14 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 		}
 
 		body, err := io.ReadAll(resp.Body)
+		closeErr := resp.Body.Close()
 		if err != nil {
 			recordProcessing()
 			return chatResponse{}, err
+		}
+		if closeErr != nil {
+			recordProcessing()
+			return chatResponse{}, closeErr
 		}
 		if err := ctx.Err(); err != nil {
 			recordProcessing()

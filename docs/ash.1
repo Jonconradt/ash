@@ -193,9 +193,13 @@ execution is enabled. On Unix, timeout and Control-C terminate the child
 process group; on Windows, immediate child cancellation is supported but
 descendant cleanup is not guaranteed.
 .PP
-Each ash process maintains its own HTTPS connection pool. Child processes cannot
-reuse the parent's live TLS connection, while retries within one process reuse
-that process's HTTP client and transport.
+On macOS and Linux, installed Bash and zsh wrappers lazily start one unprivileged
+broker per interactive shell. The broker keeps a bounded HTTPS connection pool
+alive across separate ash processes over a private Unix socket. Subshells reuse
+their parent shell's broker; independent shells use independent brokers. Broker
+failure falls back to direct HTTPS. Broker credentials are ephemeral and are not
+written to scheduler configuration; a non-secret lease expires after shell
+activity stops. Scheduled jobs use direct HTTPS by default.
 .TP
 .B SHELL
 Shell detection input for
