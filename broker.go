@@ -117,10 +117,11 @@ func brokerURLAllowed(rawURL string) bool {
 }
 
 func writeBrokerFrame(w io.Writer, payload []byte) error {
-	if len(payload) > brokerMaxFrame {
+	if len(payload) > brokerMaxFrame || uint64(len(payload)) > uint64(^uint32(0)) {
 		return errors.New("broker frame exceeds limit")
 	}
 	var size [4]byte
+	// #nosec G115 -- payload length is bounded by brokerMaxFrame and uint32 maximum above.
 	binary.BigEndian.PutUint32(size[:], uint32(len(payload)))
 	if _, err := w.Write(size[:]); err != nil {
 		return err

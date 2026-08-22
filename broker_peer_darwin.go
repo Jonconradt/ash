@@ -21,7 +21,8 @@ func brokerPeerAllowed(connection net.Conn) bool {
 	allowed := false
 	_ = raw.Control(func(fd uintptr) {
 		credential, credentialErr := unix.GetsockoptXucred(int(fd), unix.SOL_LOCAL, unix.LOCAL_PEERCRED)
-		allowed = credentialErr == nil && uint32(os.Getuid()) == credential.Uid
+		uid := os.Getuid()
+		allowed = credentialErr == nil && uid >= 0 && uint64(uid) == uint64(credential.Uid)
 	})
 	return allowed
 }
