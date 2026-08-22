@@ -41,6 +41,8 @@ _ash_ensure_broker() {
 	return 1
 }
 
+_ash_ensure_broker >/dev/null 2>&1
+
 _ash_prompt_processing_enabled() {
 	local snooze_file="$HOME/.ash/.ash_snooze_until"
 	local expires_at now
