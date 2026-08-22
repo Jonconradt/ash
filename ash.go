@@ -94,6 +94,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if args[0] == "snooze" {
 		return runSnooze(args[1:], stdout, stderr)
 	}
+	if args[0] == "broker" {
+		return runBroker(args[1:], stdout, stderr)
+	}
 
 	defaultsStarted := timeNow()
 	if _, err := ensureSessionID(); err != nil {
@@ -208,4 +211,5 @@ func run(args []string, stdout, stderr io.Writer) int {
 func printUsage(w io.Writer) {
 	fmt.Fprintln(w, "usage: ash <text>")
 	fmt.Fprintln(w, "       ash install [--shell bash|zsh] [--dry-run] [--overwrite]")
+	fmt.Fprintln(w, "       ash broker --socket <path>")
 }
