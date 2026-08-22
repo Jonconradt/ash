@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -86,6 +87,26 @@ func TestExecutionMetricsMissingUsageRemainsUnavailable(t *testing.T) {
 	}
 	if strings.Contains(renderExecutionDashboard(metrics, false), "10") {
 		t.Fatalf("dashboard should not report unavailable token values")
+	}
+}
+
+func TestExecutionMetricsConcurrentUpdates(t *testing.T) {
+	metrics := newExecutionMetrics(time.Now())
+	var group sync.WaitGroup
+	for i := 0; i < 32; i++ {
+		group.Add(1)
+		go func() {
+			defer group.Done()
+			metrics.addStageDuration(metricsStageAIProcessing, time.Millisecond)
+			metrics.addToolCall(time.Millisecond)
+			metrics.addSubAgent(time.Millisecond, toolCommandResult{OK: true})
+			metrics.addTokenUsage(1, 1, true)
+		}()
+	}
+	group.Wait()
+	toolCalls, _, subAgents, _, _, _, _, inputTokens, outputTokens, _, _ := metrics.snapshot()
+	if toolCalls != 32 || subAgents != 32 || inputTokens != 32 || outputTokens != 32 {
+		t.Fatalf("unexpected concurrent metrics: tools=%d agents=%d input=%d output=%d", toolCalls, subAgents, inputTokens, outputTokens)
 	}
 }
 

@@ -146,11 +146,12 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 	}
 	endpointURL := adapter.Endpoint(aiCfg.BaseURL)
 	slog.Debug("AI request", "request_id", requestIDGenerator(), "url", endpointURL, "provider", adapter.Name(), "EID", "UqNZjp9I")
-	slog.Debug("AI request payload", "request_id", requestIDGenerator(), "payload", string(payload), "EID", "aPkzWTCJ")
+	slog.Debug("AI request payload", "request_id", requestIDGenerator(), "bytes", len(payload), "sha256", hashForLog(payload), "EID", "aPkzWTCJ")
 
 	attempts := retryMaxAttempts()
 	baseDelay := retryBaseDelay()
 	maxDelay := retryMaxDelay()
+	client := newHTTPClient(aiTimeout())
 	for attempt := 1; attempt <= attempts; attempt++ {
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpointURL, bytes.NewReader(payload))
 		if err != nil {
@@ -158,7 +159,6 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 		}
 		adapter.ApplyHeaders(req, aiCfg)
 
-		client := newHTTPClient(aiTimeout())
 		connectStarted := time.Now()
 		resp, err := client.Do(req)
 		if metrics := executionMetricsFromContext(ctx); metrics != nil {
@@ -196,7 +196,7 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 			recordProcessing()
 			return chatResponse{}, err
 		}
-		slog.Debug("AI response", "request_id", requestIDGenerator(), "status", resp.StatusCode, "body", string(body), "EID", "2D1hx03p")
+		slog.Debug("AI response", "request_id", requestIDGenerator(), "status", resp.StatusCode, "bytes", len(body), "sha256", hashForLog(body), "EID", "2D1hx03p")
 
 		if resp.StatusCode < 200 || resp.StatusCode > 299 {
 			statusErr := chatStatusError{StatusCode: resp.StatusCode, Body: string(body)}
@@ -230,7 +230,7 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 				recordProcessing()
 				return chatResponse{}, errors.New(parsed.Error)
 			}
-			slog.Debug("AI request attempt model error", "request_id", requestIDGenerator(), "attempt", attempt, "max_attempts", attempts, "error", parsed.Error, "EID", "wnrl8LcI")
+			slog.Debug("AI request attempt model error", "request_id", requestIDGenerator(), "attempt", attempt, "max_attempts", attempts, "error_bytes", len(parsed.Error), "error_sha256", hashForLog([]byte(parsed.Error)), "EID", "wnrl8LcI")
 			recordProcessing()
 			if err := sleepWithContext(ctx, backoffDelay(attempt, baseDelay, maxDelay)); err != nil {
 				return chatResponse{}, err

@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -24,11 +25,17 @@ type chatUsage struct {
 }
 
 type executionMetrics struct {
+	mu                    sync.RWMutex
 	startedAt             time.Time
 	finishedAt            time.Time
 	stages                map[metricsStage]time.Duration
 	toolCalls             int
 	toolDuration          time.Duration
+	subAgentCalls         int
+	subAgentDuration      time.Duration
+	subAgentCanceled      int
+	subAgentTimedOut      int
+	subAgentFailed        int
 	inputTokens           int
 	outputTokens          int
 	inputTokensAvailable  bool
@@ -48,6 +55,8 @@ func (m *executionMetrics) addStageDuration(stage metricsStage, duration time.Du
 	if m == nil || duration < 0 {
 		return
 	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.stages[stage] += duration
 }
 
@@ -55,6 +64,8 @@ func (m *executionMetrics) stageDuration(stage metricsStage) time.Duration {
 	if m == nil {
 		return 0
 	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return m.stages[stage]
 }
 
@@ -62,9 +73,31 @@ func (m *executionMetrics) addToolCall(duration time.Duration) {
 	if m == nil {
 		return
 	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.toolCalls++
 	if duration > 0 {
 		m.toolDuration += duration
+	}
+}
+
+func (m *executionMetrics) addSubAgent(duration time.Duration, result toolCommandResult) {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.subAgentCalls++
+	if duration > 0 {
+		m.subAgentDuration += duration
+	}
+	switch {
+	case strings.Contains(result.Error, "canceled"):
+		m.subAgentCanceled++
+	case strings.Contains(result.Error, "timed out"):
+		m.subAgentTimedOut++
+	case !result.OK:
+		m.subAgentFailed++
 	}
 }
 
@@ -72,6 +105,8 @@ func (m *executionMetrics) addTokenUsage(inputTokens, outputTokens int, availabl
 	if m == nil || !available {
 		return
 	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.inputTokens += inputTokens
 	m.outputTokens += outputTokens
 	m.inputTokensAvailable = true
@@ -80,6 +115,8 @@ func (m *executionMetrics) addTokenUsage(inputTokens, outputTokens int, availabl
 
 func (m *executionMetrics) finish(finishedAt time.Time) {
 	if m != nil {
+		m.mu.Lock()
+		defer m.mu.Unlock()
 		m.finishedAt = finishedAt
 	}
 }
@@ -104,17 +141,32 @@ func formatMetricDuration(duration time.Duration) string {
 }
 
 func (m *executionMetrics) totalDuration() time.Duration {
-	if m == nil || m.startedAt.IsZero() {
+	if m == nil {
 		return 0
 	}
+	m.mu.RLock()
+	startedAt := m.startedAt
 	finishedAt := m.finishedAt
+	m.mu.RUnlock()
+	if startedAt.IsZero() {
+		return 0
+	}
 	if finishedAt.IsZero() {
 		finishedAt = time.Now()
 	}
-	if finishedAt.Before(m.startedAt) {
+	if finishedAt.Before(startedAt) {
 		return 0
 	}
-	return finishedAt.Sub(m.startedAt)
+	return finishedAt.Sub(startedAt)
+}
+
+func (m *executionMetrics) snapshot() (toolCalls int, toolDuration time.Duration, subAgentCalls int, subAgentDuration time.Duration, subAgentCanceled int, subAgentTimedOut int, subAgentFailed int, inputTokens int, outputTokens int, inputAvailable bool, outputAvailable bool) {
+	if m == nil {
+		return 0, 0, 0, 0, 0, 0, 0, 0, 0, false, false
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.toolCalls, m.toolDuration, m.subAgentCalls, m.subAgentDuration, m.subAgentCanceled, m.subAgentTimedOut, m.subAgentFailed, m.inputTokens, m.outputTokens, m.inputTokensAvailable, m.outputTokensAvailable
 }
 
 func renderExecutionDashboard(metrics *executionMetrics, ansi bool) string {
@@ -136,20 +188,22 @@ func renderExecutionDashboard(metrics *executionMetrics, ansi bool) string {
 	if ansi {
 		header = bold + header + reset
 	}
+	toolCalls, toolDuration, subAgentCalls, subAgentDuration, subAgentCanceled, subAgentTimedOut, subAgentFailed, inputTokenCount, outputTokenCount, inputAvailable, outputAvailable := metrics.snapshot()
 	inputTokens := "N/A"
-	if metrics.inputTokensAvailable {
-		inputTokens = fmt.Sprintf("%d", metrics.inputTokens)
+	if inputAvailable {
+		inputTokens = fmt.Sprintf("%d", inputTokenCount)
 	}
 	outputTokens := "N/A"
-	if metrics.outputTokensAvailable {
-		outputTokens = fmt.Sprintf("%d", metrics.outputTokens)
+	if outputAvailable {
+		outputTokens = fmt.Sprintf("%d", outputTokenCount)
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "\n%s\n", header)
 	fmt.Fprintf(&b, "%-20s %s\n", style("Loading defaults"), formatMetricDuration(metrics.stageDuration(metricsStageDefaults)))
 	fmt.Fprintf(&b, "%-20s %s\n", style("Connecting to AI server"), formatMetricDuration(metrics.stageDuration(metricsStageConnect)))
 	fmt.Fprintf(&b, "%-20s %s\n", style("AI processing"), formatMetricDuration(metrics.stageDuration(metricsStageAIProcessing)))
-	fmt.Fprintf(&b, "%-20s %d tools (%s)\n", style("Tool calls"), metrics.toolCalls, formatMetricDuration(metrics.toolDuration))
+	fmt.Fprintf(&b, "%-20s %d tools (%s)\n", style("Tool calls"), toolCalls, formatMetricDuration(toolDuration))
+	fmt.Fprintf(&b, "%-20s %d (%s), canceled %d, timed out %d, failed %d\n", style("Sub-agents"), subAgentCalls, formatMetricDuration(subAgentDuration), subAgentCanceled, subAgentTimedOut, subAgentFailed)
 	fmt.Fprintf(&b, "%-20s %s\n", style("Input tokens"), inputTokens)
 	fmt.Fprintf(&b, "%-20s %s\n", style("Output tokens"), outputTokens)
 	fmt.Fprintf(&b, "%-20s %s\n", style("Total realtime"), formatMetricDuration(metrics.totalDuration()))

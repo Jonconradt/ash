@@ -415,6 +415,16 @@ func maxToolIterations() int {
 	return defaultMaxToolIters
 }
 
+// maxAgents returns the configured maximum number of child agents for this parent process.
+func maxAgents() int {
+	if raw := strings.TrimSpace(os.Getenv(maxAgentsEnvName)); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			return parsed
+		}
+	}
+	return defaultMaxAgents
+}
+
 // keepRecentMessages returns the most recent messages up to max, preserving their existing order.
 func keepRecentMessages(messages []message, max int) []message {
 	if len(messages) <= max {

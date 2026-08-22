@@ -115,13 +115,13 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 		promoteNextPendingTask(tasks)
 		for _, call := range assistant.ToolCalls {
 			toolName := strings.TrimSpace(call.Function.Name)
-			slog.Debug("Tool invocation requested", "request_id", requestIDGenerator(), "name", toolName, "args", marshalForDebug(call.Function.Arguments), "EID", "iYWCHf8N")
+			slog.Debug("Tool invocation requested", "request_id", requestIDGenerator(), "name", toolName, "arg_count", len(call.Function.Arguments), "EID", "iYWCHf8N")
 			toolStarted := time.Now()
 			toolResult := shim.CallTool(ctx, toolName, call.Function.Arguments)
 			if metrics := executionMetricsFromContext(ctx); metrics != nil {
 				metrics.addToolCall(time.Since(toolStarted))
 			}
-			slog.Debug("Tool invocation result", "request_id", requestIDGenerator(), "name", toolName, "result", toolResult, "EID", "L6UuVgEs")
+			slog.Debug("Tool invocation result", "request_id", requestIDGenerator(), "name", toolName, "bytes", len(toolResult), "sha256", hashForLog([]byte(toolResult)), "EID", "L6UuVgEs")
 			observation := parseToolObservation(toolResult)
 			if observation.Command == "" {
 				observation.Command = toolName

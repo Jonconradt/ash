@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 type mcpToolShim interface {
@@ -17,6 +19,7 @@ type mcpToolShim interface {
 
 type localToolShim struct {
 	allowlist map[string]struct{}
+	agents    *agentBudget
 }
 
 // ListTools returns the tool definitions exposed to the AI client by the local shim.
@@ -27,7 +30,7 @@ func (s localToolShim) ListTools() []toolDefinition {
 		runUnixDescription += ". Allowlisted executables: " + strings.Join(allowed, ", ")
 	}
 
-	return []toolDefinition{
+	tools := []toolDefinition{
 		{
 			Type: "function",
 			Function: toolFunctionDefinition{
@@ -203,6 +206,29 @@ func (s localToolShim) ListTools() []toolDefinition {
 			},
 		},
 	}
+	if !isChildAgent() {
+		tools = append(tools, toolDefinition{
+			Type: "function",
+			Function: toolFunctionDefinition{
+				Name:        "run_sub_agent",
+				Description: "Delegate one focused, independent task to a child ash agent. The child has the same working directory, configuration, tools, and OS permissions, returns a bounded result, and cannot delegate again. Use only when the task is worth the delegation overhead; do not include the parent conversation or secrets in the prompt.",
+				Parameters: map[string]any{
+					"type":                 "object",
+					"additionalProperties": false,
+					"properties": map[string]any{
+						"prompt": map[string]any{
+							"type":        "string",
+							"minLength":   1,
+							"maxLength":   maxAgentPromptBytes,
+							"description": "Concise objective with only essential constraints, relevant paths, and expected compact result.",
+						},
+					},
+					"required": []string{"prompt"},
+				},
+			},
+		})
+	}
+	return tools
 }
 
 // CallTool dispatches a tool call to the matching local shim handler and returns the serialized result.
@@ -210,6 +236,8 @@ func (s localToolShim) CallTool(ctx context.Context, name string, args map[strin
 	var result toolCommandResult
 
 	switch name {
+	case "run_sub_agent":
+		result = s.callSubAgent(ctx, args)
 	case "run_unix_command":
 		result = s.callUnixCommand(ctx, args)
 	case "run_unix_pipeline":
@@ -229,6 +257,7 @@ func (s localToolShim) CallTool(ctx context.Context, name string, args map[strin
 	default:
 		result = toolCommandResult{OK: false, Error: fmt.Sprintf("unknown tool: %s", name), EID: "Ryr9hU7l"}
 	}
+	result.Untrusted = true
 
 	encoded, err := json.Marshal(result)
 	if err != nil {
@@ -238,8 +267,53 @@ func (s localToolShim) CallTool(ctx context.Context, name string, args map[strin
 	return string(encoded)
 }
 
+func (s localToolShim) callSubAgent(ctx context.Context, args map[string]any) toolCommandResult {
+	if isChildAgent() {
+		return toolCommandResult{OK: false, Command: "run_sub_agent", Error: "child agents cannot create sub-agents", EID: "J9QJ8y8p"}
+	}
+	prompt, ok := toStringArg(args["prompt"])
+	if !ok || strings.TrimSpace(prompt) == "" {
+		return toolCommandResult{OK: false, Command: "run_sub_agent", Error: "prompt must be a non-empty string", EID: "J9QJ8y8p"}
+	}
+	if !utf8.ValidString(prompt) {
+		return toolCommandResult{OK: false, Command: "run_sub_agent", Error: "prompt must be valid UTF-8", EID: "J9QJ8y8p"}
+	}
+	if len(prompt) > maxAgentPromptBytes {
+		return toolCommandResult{OK: false, Command: "run_sub_agent", Error: fmt.Sprintf("prompt exceeds %d bytes", maxAgentPromptBytes), EID: "J9QJ8y8p"}
+	}
+	for key := range args {
+		if key != "prompt" {
+			return toolCommandResult{OK: false, Command: "run_sub_agent", Error: "unsupported sub-agent argument", EID: "J9QJ8y8p"}
+		}
+	}
+	if s.agents == nil || !s.agents.reserve() {
+		return toolCommandResult{OK: false, Command: "run_sub_agent", Error: "maximum sub-agent count reached", EID: "J9QJ8y8p"}
+	}
+
+	parentID, err := sanitizedSessionIDForLogFile()
+	if err != nil {
+		s.agents.release()
+		return toolCommandResult{OK: false, Command: "run_sub_agent", Error: err.Error(), EID: "J9QJ8y8p"}
+	}
+	childID, err := generateChildSessionID(parentID)
+	if err != nil {
+		s.agents.release()
+		return toolCommandResult{OK: false, Command: "run_sub_agent", Error: err.Error(), EID: "J9QJ8y8p"}
+	}
+	started := time.Now()
+	result := runSubAgentCommand(ctx, prompt, childID)
+	slog.Debug("sub-agent completed", "request_id", requestIDGenerator(), "parent_session_id", parentID, "child_session_id", childID, "ok", result.OK, "exit_code", result.ExitCode, "stdout_bytes", len(result.Stdout), "stderr_bytes", len(result.Stderr), "EID", "QeR8y5aL")
+	if metrics := executionMetricsFromContext(ctx); metrics != nil {
+		metrics.addSubAgent(time.Since(started), result)
+	}
+	return result
+}
+
 // callUnixPipeline executes a validated pipeline without invoking a shell.
 func (s localToolShim) callUnixPipeline(ctx context.Context, args map[string]any) toolCommandResult {
+	if isChildAgent() && pipelineContainsAsh(args) {
+		return toolCommandResult{OK: false, Command: "run_unix_pipeline", Error: "child agents cannot invoke ash", EID: "J9QJ8y8p"}
+	}
 	pipeline, ok := toStringArg(args["pipeline"])
 	if !ok {
 		return toolCommandResult{OK: false, Error: "pipeline must be a string", EID: "jGDQaWr5"}
@@ -293,6 +367,9 @@ func (s localToolShim) callUnixCommand(ctx context.Context, args map[string]any)
 	if commandName == "" {
 		return toolCommandResult{OK: false, Error: "command must be a bare executable name", EID: "o3UdEAP7"}
 	}
+	if isChildAgent() && isAshExecutableName(commandName) {
+		return toolCommandResult{OK: false, Command: commandName, Error: "child agents cannot invoke ash", EID: "J9QJ8y8p"}
+	}
 
 	if _, allowed := s.allowlist[commandName]; !allowed {
 		return toolCommandResult{OK: false, Command: commandName, Error: "command is not allowlisted", EID: "ABLaPipP"}
@@ -337,6 +414,9 @@ func (s localToolShim) callPython3(ctx context.Context, args map[string]any) too
 
 // callScheduleFuturePrompt schedules a future ash prompt using launchd and returns the resulting execution status.
 func (s localToolShim) callScheduleFuturePrompt(ctx context.Context, args map[string]any) toolCommandResult {
+	if isChildAgent() {
+		return toolCommandResult{OK: false, Command: "launchctl", Error: "child agents cannot schedule ash invocations", EID: "J9QJ8y8p"}
+	}
 	prompt, ok := toStringArg(args["prompt"])
 	if !ok || strings.TrimSpace(prompt) == "" {
 		return toolCommandResult{OK: false, Command: "launchctl", Error: "prompt must be a non-empty string", EID: "PLVMuQid"}
@@ -378,6 +458,9 @@ func (s localToolShim) callScheduleFuturePrompt(ctx context.Context, args map[st
 
 // callScheduleRecurringPrompt creates a recurring crontab entry that re-invokes ash on the supplied schedule.
 func (s localToolShim) callScheduleRecurringPrompt(ctx context.Context, args map[string]any) toolCommandResult {
+	if isChildAgent() {
+		return toolCommandResult{OK: false, Command: "crontab", Error: "child agents cannot schedule ash invocations", EID: "J9QJ8y8p"}
+	}
 	prompt, ok := toStringArg(args["prompt"])
 	if !ok || strings.TrimSpace(prompt) == "" {
 		return toolCommandResult{OK: false, Command: "crontab", Error: "prompt must be a non-empty string", EID: "isM7Rvej"}
@@ -421,6 +504,9 @@ func (s localToolShim) callScheduleRecurringPrompt(ctx context.Context, args map
 
 // callManageRecurringJobs lists, explains, cancels, or modifies recurring ash jobs stored in the user's crontab.
 func (s localToolShim) callManageRecurringJobs(ctx context.Context, args map[string]any) toolCommandResult {
+	if isChildAgent() {
+		return toolCommandResult{OK: false, Command: "crontab", Error: "child agents cannot manage ash invocations", EID: "J9QJ8y8p"}
+	}
 	actionRaw, ok := toStringArg(args["action"])
 	if !ok {
 		return toolCommandResult{OK: false, Command: "crontab", Error: "action must be a string", EID: "hFDmBJwy"}
