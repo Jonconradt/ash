@@ -40,6 +40,8 @@ type executionMetrics struct {
 	outputTokens          int
 	inputTokensAvailable  bool
 	outputTokensAvailable bool
+	connectionReused      bool
+	connectionObserved    bool
 }
 
 type metricsContextKey struct{}
@@ -111,6 +113,16 @@ func (m *executionMetrics) addTokenUsage(inputTokens, outputTokens int, availabl
 	m.outputTokens += outputTokens
 	m.inputTokensAvailable = true
 	m.outputTokensAvailable = true
+}
+
+func (m *executionMetrics) setConnectionReused(reused bool) {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.connectionObserved = true
+	m.connectionReused = m.connectionReused || reused
 }
 
 func (m *executionMetrics) finish(finishedAt time.Time) {
@@ -201,6 +213,13 @@ func renderExecutionDashboard(metrics *executionMetrics, ansi bool) string {
 	fmt.Fprintf(&b, "\n%s\n", header)
 	fmt.Fprintf(&b, "%-20s %s\n", style("Loading defaults"), formatMetricDuration(metrics.stageDuration(metricsStageDefaults)))
 	fmt.Fprintf(&b, "%-20s %s\n", style("Connecting to AI server"), formatMetricDuration(metrics.stageDuration(metricsStageConnect)))
+	connectionStatus := "no"
+	metrics.mu.RLock()
+	if metrics.connectionObserved && metrics.connectionReused {
+		connectionStatus = "yes"
+	}
+	metrics.mu.RUnlock()
+	fmt.Fprintf(&b, "%-20s %s\n", style("Connection reused"), connectionStatus)
 	fmt.Fprintf(&b, "%-20s %s\n", style("AI processing"), formatMetricDuration(metrics.stageDuration(metricsStageAIProcessing)))
 	fmt.Fprintf(&b, "%-20s %d tools (%s)\n", style("Tool calls"), toolCalls, formatMetricDuration(toolDuration))
 	fmt.Fprintf(&b, "%-20s %d (%s), canceled %d, timed out %d, failed %d\n", style("Sub-agents"), subAgentCalls, formatMetricDuration(subAgentDuration), subAgentCanceled, subAgentTimedOut, subAgentFailed)

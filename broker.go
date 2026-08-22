@@ -13,6 +13,7 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptrace"
 	"os"
 	"path/filepath"
 	"strings"
@@ -42,6 +43,7 @@ type brokerRequest struct {
 type brokerResponse struct {
 	Version uint16 `json:"version"`
 	Status  int    `json:"status"`
+	Reused  bool   `json:"reused,omitempty"`
 	Body    []byte `json:"body,omitempty"`
 	Error   string `json:"error,omitempty"`
 }
@@ -50,56 +52,56 @@ func brokerConfigured() bool {
 	return strings.TrimSpace(os.Getenv(brokerSocketEnv)) != "" && strings.TrimSpace(os.Getenv(brokerTokenEnv)) != ""
 }
 
-func brokerDo(ctx context.Context, req *http.Request) (*http.Response, error) {
+func brokerDo(ctx context.Context, req *http.Request) (*http.Response, bool, error) {
 	socket := strings.TrimSpace(os.Getenv(brokerSocketEnv))
 	token := strings.TrimSpace(os.Getenv(brokerTokenEnv))
 	if socket == "" || token == "" {
-		return nil, errors.New("broker is not configured")
+		return nil, false, errors.New("broker is not configured")
 	}
 	body, err := io.ReadAll(io.LimitReader(req.Body, brokerMaxBody+1))
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if len(body) > brokerMaxBody {
-		return nil, errors.New("broker request body exceeds limit")
+		return nil, false, errors.New("broker request body exceeds limit")
 	}
 	headers := make(map[string]string, len(req.Header))
 	for name, values := range req.Header {
 		if len(values) != 1 || !brokerHeaderAllowed(name) {
-			return nil, fmt.Errorf("broker header %q is not allowed", name)
+			return nil, false, fmt.Errorf("broker header %q is not allowed", name)
 		}
 		headers[name] = values[0]
 	}
 	payload, err := json.Marshal(brokerRequest{Version: brokerVersion, Token: token, URL: req.URL.String(), Headers: headers, Body: body})
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	conn, err := (&net.Dialer{}).DialContext(ctx, "unix", socket)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	defer conn.Close()
 	if deadline, ok := ctx.Deadline(); ok {
 		_ = conn.SetDeadline(deadline)
 	}
 	if err := writeBrokerFrame(conn, payload); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	responsePayload, err := readBrokerFrame(conn)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	var response brokerResponse
 	if err := json.Unmarshal(responsePayload, &response); err != nil {
-		return nil, err
+		return nil, false, err
 	}
 	if response.Version != brokerVersion {
-		return nil, errors.New("broker protocol version mismatch")
+		return nil, false, errors.New("broker protocol version mismatch")
 	}
 	if response.Error != "" {
-		return nil, errors.New(response.Error)
+		return nil, false, errors.New(response.Error)
 	}
-	return &http.Response{StatusCode: response.Status, Status: fmt.Sprintf("%d", response.Status), Body: io.NopCloser(strings.NewReader(string(response.Body))), Header: make(http.Header), Request: req}, nil
+	return &http.Response{StatusCode: response.Status, Status: fmt.Sprintf("%d", response.Status), Body: io.NopCloser(strings.NewReader(string(response.Body))), Header: make(http.Header), Request: req}, response.Reused, nil
 }
 
 func brokerHeaderAllowed(name string) bool {
@@ -251,6 +253,11 @@ func handleBrokerConn(conn net.Conn, token string, client *http.Client) {
 		return
 	}
 	httpRequest, err := http.NewRequest(http.MethodPost, request.URL, strings.NewReader(string(request.Body)))
+	requestReused := false
+	requestTrace := &httptrace.ClientTrace{GotConn: func(info httptrace.GotConnInfo) { requestReused = info.Reused }}
+	if err == nil {
+		httpRequest = httpRequest.WithContext(httptrace.WithClientTrace(httpRequest.Context(), requestTrace))
+	}
 	if err == nil {
 		headerBytes := 0
 		for name, value := range request.Headers {
@@ -280,7 +287,7 @@ func handleBrokerConn(conn net.Conn, token string, client *http.Client) {
 			} else if len(body) > brokerMaxBody {
 				err = errors.New("broker response exceeds limit")
 			} else {
-				err = writeBrokerFrame(conn, mustBrokerJSON(brokerResponse{Version: brokerVersion, Status: httpResponse.StatusCode, Body: body}))
+				err = writeBrokerFrame(conn, mustBrokerJSON(brokerResponse{Version: brokerVersion, Status: httpResponse.StatusCode, Reused: requestReused, Body: body}))
 			}
 		}
 	}

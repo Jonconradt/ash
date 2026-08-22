@@ -63,6 +63,7 @@ func TestRenderExecutionDashboard(t *testing.T) {
 		"ASH EXECUTION SUMMARY",
 		"Loading defaults",
 		"Connecting to AI server",
+		"Connection reused    no",
 		"AI processing",
 		"Tool calls",
 		"Total realtime",

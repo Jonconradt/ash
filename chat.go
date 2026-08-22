@@ -8,6 +8,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/http/httptrace"
 	"strings"
 	"time"
 )
@@ -161,19 +162,23 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 
 		connectStarted := time.Now()
 		var resp *http.Response
+		connectionReused := false
 		if brokerConfigured() {
-			resp, err = brokerDo(ctx, req)
+			resp, connectionReused, err = brokerDo(ctx, req)
 			if err != nil {
 				fallbackReq, fallbackErr := http.NewRequestWithContext(ctx, http.MethodPost, endpointURL, bytes.NewReader(payload))
 				if fallbackErr != nil {
 					err = fallbackErr
 				} else {
 					adapter.ApplyHeaders(fallbackReq, aiCfg)
-					resp, err = client.Do(fallbackReq)
+					resp, connectionReused, err = httpClientDoWithReuse(ctx, client, fallbackReq)
 				}
 			}
 		} else {
-			resp, err = client.Do(req)
+			resp, connectionReused, err = httpClientDoWithReuse(ctx, client, req)
+		}
+		if metrics := executionMetricsFromContext(ctx); metrics != nil {
+			metrics.setConnectionReused(connectionReused)
 		}
 		if metrics := executionMetricsFromContext(ctx); metrics != nil {
 			metrics.addStageDuration(metricsStageConnect, time.Since(connectStarted))
@@ -264,6 +269,13 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 	}
 
 	return chatResponse{}, errors.New("AI request failed after retries")
+}
+
+func httpClientDoWithReuse(ctx context.Context, client *http.Client, req *http.Request) (*http.Response, bool, error) {
+	reused := false
+	trace := &httptrace.ClientTrace{GotConn: func(info httptrace.GotConnInfo) { reused = info.Reused }}
+	response, err := client.Do(req.WithContext(httptrace.WithClientTrace(ctx, trace)))
+	return response, reused, err
 }
 
 func shouldRetryAIError(err error, attempt, maxAttempts int) bool {

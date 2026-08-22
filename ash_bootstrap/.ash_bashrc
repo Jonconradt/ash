@@ -36,7 +36,7 @@ _ash_ensure_broker() {
 		if ! kill -0 "$broker_pid" 2>/dev/null; then
 			return 1
 		fi
-		builtin sleep 0.01
+		sleep 0.01
 	done
 	return 1
 }

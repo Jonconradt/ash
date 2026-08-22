@@ -56,7 +56,7 @@ func TestBrokerRoundTripReusesConfiguredTransport(t *testing.T) {
 		t.Fatal(err)
 	}
 	request.Header.Set("Authorization", "Bearer test")
-	response, err := brokerDo(context.Background(), request)
+	response, _, err := brokerDo(context.Background(), request)
 	if err != nil {
 		t.Fatal(err)
 	}
