@@ -77,10 +77,14 @@ make release RELEASE_VERSION=v1.2.3
 - `make verify` runs strict checks (tests, race, coverage gate, vet, staticcheck, gosec, govulncheck)
 - `make version` runs quality checks and builds installer artifacts for the selected host/targets
 - `make release` runs quality checks, builds an arm64 macOS `.pkg`, validates it,
-  writes a SHA-256 checksum to `dist/release/`, creates the release tag, and pushes
-  it to `origin`
-- If `RELEASE_VERSION` is omitted, the latest stable tag (`v<major>.<minor>.<patch>`)
-  is used as the source and the next version is derived as `v<major>.<minor+1>.0`
+  writes a SHA-256 checksum to `dist/release/`, generates release notes from the
+  Git history through `ash`, creates an annotated release tag containing those
+  notes, and pushes it to `origin`
+- Release-note generation requires `AI_ENDPOINT` and `AI_MODEL`. Make supplies
+  the Git history to `ash`; `ash` does not invoke Git. The tagged notes are
+  published as the GitHub Release body.
+- If `RELEASE_VERSION` is omitted, the latest stable tag is used as the source
+  and the next version is derived as `v<major>.<minor+1>.0`.
 
 Contributor note: run `make lint test` before submitting changes.
 

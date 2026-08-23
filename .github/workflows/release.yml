@@ -118,6 +118,10 @@ jobs:
       - package-macos
       - package-linux
     steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
       - name: Download packaged artifacts
         uses: actions/download-artifact@v5
         with:
@@ -125,9 +129,13 @@ jobs:
       - name: Flatten artifact directories
         run: |
           find dist/release -mindepth 2 -type f -name '*' -exec mv {} dist/release/ \;
+      - name: Extract release notes
+        run: |
+          git for-each-ref --format='%(contents)' "refs/tags/${GITHUB_REF_NAME}" > release-notes.md
+          test -s release-notes.md
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v3
         with:
-          generate_release_notes: true
+          body_path: release-notes.md
           files: |
             dist/release/*

@@ -1,4 +1,4 @@
-.PHONY: all verify build lint yaml-lint python-lint markdown-lint test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install setup-hooks version release release-check release-build release-pkg release-validate release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one
+.PHONY: all verify build lint yaml-lint python-lint markdown-lint test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install setup-hooks version release release-check release-build release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one
 
 SHELL := /bin/bash
 
@@ -29,6 +29,7 @@ MAN_PAGE_PATH ?= docs/ash.1
 MAN_INSTALL_PATH_LINUX ?= /usr/share/man/man1
 MAN_INSTALL_PATH_MACOS ?= /usr/local/share/man/man1
 TARBALL_MAN_PATH ?= usr/share/man/man1
+RELEASE_NOTES_PATH ?= $(RELEASE_OUTPUT_DIR)/release-notes.md
 RELEASE_ARTIFACT_BASE ?= $(APP_NAME)-$(RELEASE_VERSION)-$(RELEASE_GOOS)-$(RELEASE_ARCH)
 BINARY_EXT = $(if $(filter windows,$(RELEASE_GOOS)),.exe,)
 RELEASE_BINARY_PATH ?= $(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)$(BINARY_EXT)
@@ -99,7 +100,7 @@ install: test lint  gosec
 
 version: release-check release-artifacts
 
-release: release-check release-build release-pkg release-validate release-publish release-watch
+release: release-check release-build release-pkg release-validate release-notes release-publish release-watch
 
 release-check: lint test gosec govulncheck
 	@if [[ -n "$$(git status --porcelain)" ]]; then \
@@ -257,6 +258,39 @@ release-validate-one:
 			;; \
 	esac
 
+release-notes:
+	@mkdir -p "$(RELEASE_OUTPUT_DIR)"
+	@set -o pipefail; \
+	previous_tag="$(LATEST_RELEASE_TAG)"; \
+	if [[ -n "$$previous_tag" ]]; then \
+		git_log="$$(git log "$$previous_tag..HEAD" --oneline --no-decorate --max-count=200)"; \
+	else \
+		git_log="$$(git log --oneline --no-decorate --max-count=200)"; \
+	fi; \
+	if [[ -z "$$git_log" ]]; then \
+		echo "cannot generate release notes: git history is empty" >&2; \
+		exit 1; \
+	fi; \
+	tmp_path="$(RELEASE_NOTES_PATH).tmp"; \
+	trap 'rm -f "$$tmp_path"' EXIT; \
+	{ \
+		printf '%s\n\n' 'You are preparing release notes for ASH $(RELEASE_VERSION).'; \
+		printf '%s\n' 'Summarize the supplied commits into concise, accurate Markdown for a GitHub Release.'; \
+		printf '%s\n' 'Group changes by user-facing theme. Highlight important features and fixes.'; \
+		printf '%s\n' 'Call out breaking changes and required configuration migrations.'; \
+		printf '%s\n' 'Omit routine dependency, test, formatting, and internal-only commits unless they affect users.'; \
+		printf '%s\n' 'Do not invent details that are not supported by the supplied history. Start directly with the release notes.'; \
+		printf '%s\n\n' 'The release includes multi-provider support, stricter prompt-injection defenses, broker connection reuse, session-scoped scratch workspaces, execution metrics, snooze support, safer pipelines and tool execution, and improved shell and terminal output. Mention the migration from legacy AI configuration to AI_ENDPOINT and AI_MODEL when supported by the history.'; \
+		printf '%s\n' 'Commit history:'; \
+		printf '%s\n' "$$git_log"; \
+	} | NO_COLOR=1 "$(RELEASE_OUTPUT_DIR)/$(APP_NAME)" > "$$tmp_path"; \
+	if [[ ! -s "$$tmp_path" ]]; then \
+		echo "cannot generate release notes: ash produced empty output" >&2; \
+		exit 1; \
+	fi; \
+	mv "$$tmp_path" "$(RELEASE_NOTES_PATH)"; \
+	echo "generated release notes: $(RELEASE_NOTES_PATH)"
+
 release-artifacts:
 	@target_oses="$(RELEASE_TARGET_OSES)"; \
 	if [[ "$$target_oses" == "auto" ]]; then \
@@ -317,7 +351,7 @@ release-publish:
 		exit 1; \
 	fi; \
 	if [[ -z "$$local_sha" ]]; then \
-		git tag -a "$(RELEASE_VERSION)" -m "release $(RELEASE_VERSION)"; \
+		git tag -a "$(RELEASE_VERSION)" -F "$(RELEASE_NOTES_PATH)"; \
 		echo "created local tag $(RELEASE_VERSION)"; \
 	else \
 		echo "local tag $(RELEASE_VERSION) already exists at HEAD"; \
