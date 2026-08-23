@@ -56,7 +56,7 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 
 	block := installSourceBlockForShell(shellName)
 	if block == "" {
-		slog.Error(fmt.Sprintf("install error: unsupported shell %q", shellName), "EID", "ZIw1nK74")
+		slog.Error("install error: unsupported shell", "shell", shellName, "EID", "ZIw1nK74")
 		return 1
 	}
 	if err := ensureInstallShellWrapper(shellName, dryRun, stdout); err != nil {
@@ -74,7 +74,7 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 
 	existing, err := readFileIfExists(rcPath)
 	if err != nil {
-		slog.Error(fmt.Sprintf("install error: failed to read %s: %v", rcPath, err), "EID", "uUVX5Blo")
+		slog.Error("install error: failed to read rc file", "path", rcPath, "error", err, "EID", "uUVX5Blo")
 		return 1
 	}
 
@@ -96,7 +96,7 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 
 		updated, replaced := replaceManagedInstallBlock(existing, block)
 		if !replaced {
-			slog.Error(fmt.Sprintf("install error: failed to update managed block in %s", rcPath), "EID", "qNtX7PSU")
+			slog.Error("install error: failed to update managed block", "path", rcPath, "EID", "qNtX7PSU")
 			return 1
 		}
 
@@ -110,12 +110,12 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 		}
 
 		if err := osMkdirAll(filepath.Dir(rcPath), 0o700); err != nil {
-			slog.Error(fmt.Sprintf("install error: failed to create parent directory for %s: %v", rcPath, err), "EID", "AB5qbz5c")
+			slog.Error("install error: failed to create rc parent directory", "path", rcPath, "error", err, "EID", "AB5qbz5c")
 			return 1
 		}
 
 		if err := osWriteFile(rcPath, []byte(updated), 0o600); err != nil {
-			slog.Error(fmt.Sprintf("install error: failed to write %s: %v", rcPath, err), "EID", "J3crjWvv")
+			slog.Error("install error: failed to write rc file", "path", rcPath, "error", err, "EID", "J3crjWvv")
 			return 1
 		}
 		if err := finalizeInstallWorkspace(); err != nil {
@@ -144,12 +144,12 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 	}
 
 	if err := osMkdirAll(filepath.Dir(rcPath), 0o700); err != nil {
-		slog.Error(fmt.Sprintf("install error: failed to create parent directory for %s: %v", rcPath, err), "EID", "G2nscOa7")
+		slog.Error("install error: failed to create rc parent directory", "path", rcPath, "error", err, "EID", "G2nscOa7")
 		return 1
 	}
 
 	if err := osWriteFile(rcPath, []byte(updated), 0o600); err != nil {
-		slog.Error(fmt.Sprintf("install error: failed to write %s: %v", rcPath, err), "EID", "juoFEIwD")
+		slog.Error("install error: failed to write rc file", "path", rcPath, "error", err, "EID", "juoFEIwD")
 		return 1
 	}
 	if err := finalizeInstallWorkspace(); err != nil {
@@ -466,6 +466,11 @@ func hardenAshWorkspacePermissions() error {
 	if err := os.Chmod(root, 0o700); err != nil {
 		return err
 	}
+	rootDir, err := os.OpenRoot(root)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rootDir.Close() }()
 
 	return filepath.WalkDir(root, func(path string, d fs.DirEntry, walkErr error) error {
 		if walkErr != nil {
@@ -486,11 +491,18 @@ func hardenAshWorkspacePermissions() error {
 
 		if d.IsDir() {
 			// #nosec G302 -- directories in the workspace need restricted access for the current user only.
-			return os.Chmod(path, 0o700)
+			relativePath, err := filepath.Rel(root, path)
+			if err != nil {
+				return err
+			}
+			return rootDir.Chmod(relativePath, 0o700)
 		}
 		if mode.IsRegular() {
-			//nolint:gosec // Regular files in the workspace need restricted access for the current user only.
-			return os.Chmod(path, 0o600)
+			relativePath, err := filepath.Rel(root, path)
+			if err != nil {
+				return err
+			}
+			return rootDir.Chmod(relativePath, 0o600)
 		}
 		return nil
 	})

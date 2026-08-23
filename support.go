@@ -68,6 +68,7 @@ var (
 	stdinIsInteractive  = isInteractiveStdin
 	readPromptFromStdin = readAllPromptFromStdin
 	execLookPath        = exec.LookPath
+	// #nosec G204 -- callers use this hook only for fixed diagnostic commands.
 	execCommandOutput   = func(name string, args ...string) ([]byte, error) { return exec.Command(name, args...).Output() }
 	execCommandContext  = exec.CommandContext
 	osMkdirAll          = os.MkdirAll

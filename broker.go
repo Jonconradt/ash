@@ -179,6 +179,7 @@ func runBroker(args []string, stdout, stderr io.Writer) int {
 		_, _ = fmt.Fprintln(stderr, "broker requires --socket and ASH_BROKER_TOKEN")
 		return 2
 	}
+	// #nosec G703 -- the broker socket path is supplied by the same-user shell setup.
 	if err := os.MkdirAll(filepath.Dir(socket), 0o700); err != nil {
 		_, _ = fmt.Fprintln(stderr, err)
 		return 1
@@ -190,6 +191,7 @@ func runBroker(args []string, stdout, stderr io.Writer) int {
 		_, _ = fmt.Fprintln(stderr, "broker socket is already in use")
 		return 1
 	}
+	// #nosec G703 -- the broker socket path is supplied by the same-user shell setup.
 	_ = os.Remove(socket)
 	listener, err := (&net.ListenConfig{}).Listen(ctx, "unix", socket)
 	if err != nil {
@@ -198,8 +200,10 @@ func runBroker(args []string, stdout, stderr io.Writer) int {
 	}
 	defer func() {
 		_ = listener.Close()
+		// #nosec G703 -- the broker socket path is supplied by the same-user shell setup.
 		_ = os.Remove(socket)
 	}()
+	// #nosec G703 -- the broker socket path is supplied by the same-user shell setup.
 	if err := os.Chmod(socket, 0o600); err != nil {
 		_, _ = fmt.Fprintln(stderr, err)
 		return 1
@@ -216,6 +220,7 @@ func runBroker(args []string, stdout, stderr io.Writer) int {
 			idle := time.Since(lastActivity) >= brokerIdle
 			activityMu.Unlock()
 			if lease != "" {
+				// #nosec G703 -- the lease path is supplied by the same-user shell setup.
 				if info, statErr := os.Stat(lease); statErr != nil || time.Since(info.ModTime()) >= brokerIdle {
 					idle = true
 				}
