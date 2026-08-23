@@ -341,6 +341,7 @@ func installUpgradeArchive(content []byte, version string, options upgradeOption
 		return fmt.Errorf("create %s: %w", destinationDir, err)
 	}
 	destination := filepath.Join(destinationDir, "ash")
+	// #nosec G304 -- destination is the fixed user-local ~/go/bin/ash path.
 	previousBinary, previousErr := os.ReadFile(destination)
 	if previousErr != nil && !errors.Is(previousErr, os.ErrNotExist) {
 		return previousErr
@@ -392,6 +393,7 @@ func exportUpgradeAssets(binaryPath, destination string) error {
 		{source: "ash_bootstrap/.ash_zshrc", name: ".ash_zshrc"},
 		{source: "ash_bootstrap/.ash_system", name: ".ash_system"},
 	}
+	// #nosec G703 -- destination is supplied only by the private internal export path.
 	if err := os.MkdirAll(destination, 0o700); err != nil {
 		return err
 	}
@@ -400,6 +402,7 @@ func exportUpgradeAssets(binaryPath, destination string) error {
 		if err != nil {
 			return err
 		}
+		// #nosec G703 -- asset names are fixed constants and destination is private staging.
 		if err := os.WriteFile(filepath.Join(destination, asset.name), content, 0o600); err != nil {
 			return err
 		}
@@ -425,6 +428,7 @@ func syncUpgradeAssets(candidateRoot string, options upgradeOptions, stdout io.W
 	for _, name := range assets {
 		source := filepath.Join(candidateRoot, name)
 		target := filepath.Join(destinationRoot, name)
+		// #nosec G304 -- source is inside private staging and uses fixed asset names.
 		candidate, err := os.ReadFile(source)
 		if err != nil {
 			return fmt.Errorf("read candidate %s: %w", name, err)
@@ -436,6 +440,7 @@ func syncUpgradeAssets(candidateRoot string, options upgradeOptions, stdout io.W
 			}
 			candidate = []byte(buildManagedAshEnv(values))
 		}
+		// #nosec G304 -- target is derived from the fixed ~/.ash asset names.
 		current, readErr := os.ReadFile(target)
 		if errors.Is(readErr, os.ErrNotExist) {
 			changes = append(changes, upgradeAssetChange{target: target, content: candidate})
@@ -465,6 +470,7 @@ func syncUpgradeAssets(candidateRoot string, options upgradeOptions, stdout io.W
 		case 'r':
 			changes = append(changes, upgradeAssetChange{target: target, content: candidate, previous: current, hadPrevious: true})
 		case 'b':
+			// #nosec G304 -- target is derived from the fixed ~/.ash asset names.
 			previousBackup, backupErr := os.ReadFile(target + ".bak")
 			if backupErr != nil && !errors.Is(backupErr, os.ErrNotExist) {
 				return backupErr
@@ -586,6 +592,7 @@ func extractUpgradeArchive(content []byte, destination string) error {
 		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 			return err
 		}
+		// #nosec G304 -- path is normalized and rejected unless contained by the staging root.
 		file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 		if err != nil {
 			return err
@@ -599,6 +606,7 @@ func extractUpgradeArchive(content []byte, destination string) error {
 			return closeErr
 		}
 		if header.Mode&0o111 != 0 {
+			// #nosec G302 -- the extracted ash executable must retain execute permission.
 			if err := os.Chmod(path, 0o700); err != nil {
 				return err
 			}
@@ -629,6 +637,7 @@ func findUpgradeBinary(root, expectedName string) (string, error) {
 }
 
 func replaceUpgradeFile(source, destination string, mode os.FileMode) error {
+	// #nosec G304 -- source is the validated executable from private staging.
 	data, err := os.ReadFile(source)
 	if err != nil {
 		return err
