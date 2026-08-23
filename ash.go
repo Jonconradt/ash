@@ -14,7 +14,10 @@ import (
 	"time"
 )
 
-var ashVersion = "dev"
+var (
+	ashVersion = "dev"
+	ashCommit  = "unknown"
+)
 
 const (
 	defaultHistoryMax                 = 40
@@ -105,6 +108,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	if args[0] == "update" {
 		return runUpgrade(args[1:], stdout, stderr)
+	}
+	if args[0] == "--internal-export-assets" {
+		return runUpgradeAssetExport(args[1:], stdout, stderr)
 	}
 
 	defaultsStarted := timeNow()

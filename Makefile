@@ -1,4 +1,4 @@
-.PHONY: all verify build lint yaml-lint python-lint markdown-lint test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install setup-hooks version release release-check release-build release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one
+.PHONY: all verify build lint yaml-lint python-lint markdown-lint test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install setup-hooks version release release-check release-build release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one release-checksums
 
 SHELL := /bin/bash
 
@@ -19,6 +19,9 @@ RELEASE_GOOS ?= darwin
 RELEASE_FORMAT ?= pkg
 RELEASE_WATCH ?= 1
 RELEASE_WATCH_STRICT ?= 1
+BUILD_VERSION ?= dev
+BUILD_COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null || printf 'unknown')
+RELEASE_COMMIT ?= $(BUILD_COMMIT)
 LATEST_RELEASE_TAG ?= $(shell git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$$' | head -n1)
 AUTO_RELEASE_VERSION ?= $(shell ./scripts/release/next_version.sh)
 RELEASE_VERSION ?= $(AUTO_RELEASE_VERSION)
@@ -39,7 +42,7 @@ all: verify install
 verify: test test-race test-cover vet staticcheck security test-fuzz benchmark
 
 build: lint test
-	@go install .
+	@go install -ldflags "-X main.ashVersion=$(BUILD_VERSION) -X main.ashCommit=$(BUILD_COMMIT)" .
 
 lint: yaml-lint python-lint markdown-lint
 	@go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run ./...
@@ -121,11 +124,11 @@ release-check: lint test gosec govulncheck
 
 release-build:
 	@mkdir -p "$(RELEASE_OUTPUT_DIR)"
-	GOOS=darwin GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "$(RELEASE_OUTPUT_DIR)/$(APP_NAME)" .
+	GOOS=darwin GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.ashVersion=$(RELEASE_VERSION) -X main.ashCommit=$(RELEASE_COMMIT)" -o "$(RELEASE_OUTPUT_DIR)/$(APP_NAME)" .
 
 release-build-one:
 	@mkdir -p "$(RELEASE_OUTPUT_DIR)"
-	GOOS=$(RELEASE_GOOS) GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "$(RELEASE_BINARY_PATH)" .
+	GOOS=$(RELEASE_GOOS) GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.ashVersion=$(RELEASE_VERSION) -X main.ashCommit=$(RELEASE_COMMIT)" -o "$(RELEASE_BINARY_PATH)" .
 
 release-pkg:
 	@mkdir -p "$(RELEASE_PACKAGE_DIR)"
@@ -257,6 +260,17 @@ release-validate-one:
 			exit 1; \
 			;; \
 	esac
+
+release-checksums:
+	@set -euo pipefail; \
+	manifest="$(RELEASE_PACKAGE_DIR)/SHA256SUMS"; \
+	test -s "$$manifest"; \
+	for artifact in "$(RELEASE_PACKAGE_DIR)"/ash-*.tar.gz; do \
+		test -f "$$artifact"; \
+		name="$$(basename "$$artifact")"; \
+		count="$$(grep -Ec "^[0-9a-fA-F]{64}[[:space:]]+$$name$$" "$$manifest")"; \
+		test "$$count" -eq 1; \
+	done
 
 release-notes:
 	@mkdir -p "$(RELEASE_OUTPUT_DIR)"

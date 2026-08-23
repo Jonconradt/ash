@@ -1,8 +1,13 @@
 package main
 
 import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -126,5 +131,112 @@ func TestSelectUpgradeAssets(t *testing.T) {
 	}
 	if _, _, _, err := selectUpgradeAssets(release, "windows", "amd64"); err == nil {
 		t.Fatal("selectUpgradeAssets() accepted unsupported OS")
+	}
+	duplicate := release
+	duplicate.Assets = append(duplicate.Assets, duplicate.Assets[0])
+	if _, _, _, err := selectUpgradeAssets(duplicate, "darwin", "arm64"); err == nil {
+		t.Fatal("selectUpgradeAssets() accepted duplicate asset")
+	}
+}
+
+func TestVerifyUpgradeManifestSignatureRejectsMalformedBundle(t *testing.T) {
+	if err := verifyUpgradeManifestSignature([]byte("manifest"), []byte("not-json"), "v1.2.3"); err == nil {
+		t.Fatal("verifyUpgradeManifestSignature() accepted malformed bundle")
+	}
+}
+
+func TestExtractUpgradeArchiveAndReplace(t *testing.T) {
+	var archive bytes.Buffer
+	gzipWriter := gzip.NewWriter(&archive)
+	tarWriter := tar.NewWriter(gzipWriter)
+	content := []byte("new ash binary")
+	if err := tarWriter.WriteHeader(&tar.Header{Name: "ash-v1.2.3-darwin-arm64", Mode: 0o755, Size: int64(len(content))}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tarWriter.Write(content); err != nil {
+		t.Fatal(err)
+	}
+	if err := tarWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gzipWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	root := t.TempDir()
+	if err := extractUpgradeArchive(archive.Bytes(), root); err != nil {
+		t.Fatalf("extractUpgradeArchive() error = %v", err)
+	}
+	source := filepath.Join(root, "ash-v1.2.3-darwin-arm64")
+	if err := os.Chmod(source, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	destination := filepath.Join(root, "installed-ash")
+	if err := os.WriteFile(destination, []byte("old ash binary"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := replaceUpgradeFile(source, destination, 0o755); err != nil {
+		t.Fatalf("replaceUpgradeFile() error = %v", err)
+	}
+	got, err := os.ReadFile(destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != string(content) {
+		t.Fatalf("installed content = %q, want %q", got, content)
+	}
+	info, err := os.Stat(destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o755 {
+		t.Fatalf("installed mode = %o, want 755", info.Mode().Perm())
+	}
+}
+
+func TestExtractUpgradeArchiveRejectsUnsafeEntries(t *testing.T) {
+	var archive bytes.Buffer
+	gzipWriter := gzip.NewWriter(&archive)
+	tarWriter := tar.NewWriter(gzipWriter)
+	if err := tarWriter.WriteHeader(&tar.Header{Name: "../ash", Mode: 0o755, Size: 0}); err != nil {
+		t.Fatal(err)
+	}
+	if err := tarWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gzipWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := extractUpgradeArchive(archive.Bytes(), t.TempDir()); err == nil {
+		t.Fatal("extractUpgradeArchive() accepted traversal entry")
+	}
+}
+
+func TestSyncUpgradeAssetsPreservesEnvironmentValues(t *testing.T) {
+	home := t.TempDir()
+	originalHome := osUserHomeDir
+	osUserHomeDir = func() (string, error) { return home, nil }
+	t.Cleanup(func() { osUserHomeDir = originalHome })
+
+	workspace := filepath.Join(home, ashWorkspaceDirName)
+	if err := os.MkdirAll(workspace, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workspace, ".ash_env"), []byte("export AI_MODEL='keep-me'\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	candidate := filepath.Join(home, "candidate-assets")
+	if err := exportUpgradeAssets("", candidate); err != nil {
+		t.Fatal(err)
+	}
+	if err := syncUpgradeAssets(candidate, upgradeOptions{replace: true}, &bytes.Buffer{}); err != nil {
+		t.Fatalf("syncUpgradeAssets() error = %v", err)
+	}
+	content, err := os.ReadFile(filepath.Join(workspace, ".ash_env"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(content), "AI_MODEL='keep-me'") {
+		t.Fatalf(".ash_env lost configured value: %q", content)
 	}
 }

@@ -57,8 +57,12 @@ Is this thing secure and safe? It really depends on how bold you are. It runs as
 ## Build
 
 ```bash
-go build -o ash ash.go
+go build -ldflags "-X main.ashVersion=dev -X main.ashCommit=$(git rev-parse HEAD)" -o ash .
 ```
+
+Build metadata is injected through linker flags. `main.ashVersion` defaults to
+`dev` and `main.ashCommit` defaults to `unknown`; release builds pass the tag
+version and Git HEAD automatically.
 
 ## Make Targets
 
@@ -82,6 +86,8 @@ make release RELEASE_VERSION=v1.2.3
   writes a SHA-256 checksum to `dist/release/`, generates release notes from the
   Git history through `ash`, creates an annotated release tag containing those
   notes, and pushes it to `origin`
+- Release publishing also creates `SHA256SUMS` and a Sigstore bundle. The
+  updater requires both the signed manifest and the matching SHA-256 digest.
 - Release-note generation requires `AI_ENDPOINT` and `AI_MODEL`. Make supplies
   the Git history to `ash`; `ash` does not invoke Git. The tagged notes are
   published as the GitHub Release body.
@@ -105,9 +111,9 @@ Canonical publishing is tag-driven in GitHub Actions.
 - `ash-v1.2.3-linux-arm64.deb`
 - `ash-v1.2.3-linux-amd64.rpm`
 - `ash-v1.2.3-linux-arm64.rpm`
-- `ash-v1.2.3-windows-amd64.msi`
 - `ash-v1.2.3-<os>-<arch>.tar.gz`
 - matching `.sha256` files for each artifact
+- `SHA256SUMS` and `SHA256SUMS.sigstore.json`
 
 Installer man pages are included in release artifacts:
 
@@ -309,6 +315,27 @@ ash snooze 30s
 ash snooze 10m
 ash snooze off
 ```
+
+Update a user-local installation from the latest stable GitHub release:
+
+```bash
+ash update
+ash update --version v1.2.3
+ash update --yes
+ash update --skip-customized
+```
+
+The updater supports macOS and Linux on amd64 and arm64 and installs to
+`~/go/bin/ash`. It verifies the Sigstore keyless signature for `SHA256SUMS`
+against the `Jonconradt/ash` release workflow, then verifies the selected
+archive's SHA-256 digest. A missing or mismatched signature or digest is a hard
+failure and leaves the existing installation unchanged. Windows updates are not
+currently supported.
+
+Customized files under `~/.ash` are skipped by default. Use `--yes` to replace
+them, or `--skip-customized` to make the default explicit. The updater never
+overwrites system-managed installations and reports when `~/go/bin` must be
+placed earlier on `PATH`.
 
 `ash snooze` pauses processing for five minutes by default. Custom durations use
 Go duration syntax, such as `30s`, `10m`, or `1h`. The snooze is shared by the
