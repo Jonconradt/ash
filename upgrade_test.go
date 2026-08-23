@@ -145,6 +145,24 @@ func TestVerifyUpgradeManifestSignatureRejectsMalformedBundle(t *testing.T) {
 	}
 }
 
+func TestIsUpgradeGitHubHost(t *testing.T) {
+	for _, host := range []string{
+		"api.github.com",
+		"github.com",
+		"objects.githubusercontent.com",
+		"release-assets.githubusercontent.com",
+	} {
+		if !isUpgradeGitHubHost(host) {
+			t.Errorf("isUpgradeGitHubHost(%q) = false, want true", host)
+		}
+	}
+	for _, host := range []string{"example.com", "attacker.githubusercontent.com"} {
+		if isUpgradeGitHubHost(host) {
+			t.Errorf("isUpgradeGitHubHost(%q) = true, want false", host)
+		}
+	}
+}
+
 func TestExtractUpgradeArchiveAndReplace(t *testing.T) {
 	var archive bytes.Buffer
 	gzipWriter := gzip.NewWriter(&archive)

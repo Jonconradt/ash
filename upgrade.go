@@ -7,8 +7,11 @@ import (
 	"compress/gzip"
 	"context"
 	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -25,6 +28,7 @@ import (
 	sigstoreRoot "github.com/sigstore/sigstore-go/pkg/root"
 	sigstoreTUF "github.com/sigstore/sigstore-go/pkg/tuf"
 	sigstoreVerify "github.com/sigstore/sigstore-go/pkg/verify"
+	sigstoreSignature "github.com/sigstore/sigstore/pkg/signature"
 )
 
 const (
@@ -77,6 +81,15 @@ type upgradeAsset struct {
 	DownloadURL string `json:"browser_download_url"`
 }
 
+type legacyUpgradeBundle struct {
+	Base64Signature string `json:"base64Signature"`
+	Cert            string `json:"cert"`
+	RekorBundle     struct {
+		Payload              json.RawMessage `json:"Payload"`
+		SignedEntryTimestamp string          `json:"SignedEntryTimestamp"`
+	} `json:"rekorBundle"`
+}
+
 func upgradeAssetName(version, goos, goarch string) string {
 	return fmt.Sprintf("ash-%s-%s-%s.tar.gz", version, goos, goarch)
 }
@@ -114,8 +127,8 @@ func selectUpgradeAssets(release upgradeRelease, goos, goarch string) (upgradeAs
 func upgradeHTTPClient() *http.Client {
 	client := newHTTPClient(30 * time.Second)
 	client.CheckRedirect = func(request *http.Request, _ []*http.Request) error {
-		if request.URL.Scheme != "https" || request.URL.Host != "api.github.com" && request.URL.Host != "github.com" && request.URL.Host != "objects.githubusercontent.com" {
-			return fmt.Errorf("refusing redirect to %s", request.URL)
+		if !isUpgradeGitHubHost(request.URL.Hostname()) {
+			return fmt.Errorf("refusing redirect to untrusted host %q", request.URL.Hostname())
 		}
 		return nil
 	}
@@ -146,15 +159,15 @@ func fetchUpgradeURL(url, accept string) ([]byte, error) {
 	parsed.Header.Set("User-Agent", "ash-updater/1")
 	response, err := upgradeHTTPClient().Do(parsed)
 	if err != nil {
-		return nil, fmt.Errorf("download %s: %w", url, err)
+		return nil, errors.New("GitHub release request failed")
 	}
 	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("download %s returned HTTP %s", url, response.Status)
+		return nil, fmt.Errorf("GitHub release request returned HTTP %s", response.Status)
 	}
 	body, err := io.ReadAll(io.LimitReader(response.Body, upgradeMaxDownload+1))
 	if err != nil {
-		return nil, fmt.Errorf("read %s: %w", url, err)
+		return nil, errors.New("GitHub release response could not be read")
 	}
 	if len(body) > upgradeMaxDownload {
 		return nil, fmt.Errorf("download %s exceeds size limit", url)
@@ -167,14 +180,14 @@ func downloadUpgradeAsset(asset upgradeAsset) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	if parsed.URL.Scheme != "https" || parsed.URL.Host != "github.com" && parsed.URL.Host != "objects.githubusercontent.com" {
-		return nil, fmt.Errorf("refusing non-GitHub HTTPS asset URL %q", asset.DownloadURL)
+	if parsed.URL.Scheme != "https" || !isUpgradeGitHubHost(parsed.URL.Hostname()) || parsed.URL.Hostname() == "api.github.com" {
+		return nil, fmt.Errorf("refusing non-GitHub HTTPS asset host %q", parsed.URL.Hostname())
 	}
 	parsed.Header.Set("Accept", "application/octet-stream")
 	parsed.Header.Set("User-Agent", "ash-updater/1")
 	response, err := upgradeHTTPClient().Do(parsed)
 	if err != nil {
-		return nil, fmt.Errorf("download asset %s: %w", asset.Name, err)
+		return nil, fmt.Errorf("download asset %s failed", asset.Name)
 	}
 	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != http.StatusOK {
@@ -182,12 +195,21 @@ func downloadUpgradeAsset(asset upgradeAsset) ([]byte, error) {
 	}
 	body, err := io.ReadAll(io.LimitReader(response.Body, upgradeMaxDownload+1))
 	if err != nil {
-		return nil, fmt.Errorf("read asset %s: %w", asset.Name, err)
+		return nil, fmt.Errorf("read asset %s failed", asset.Name)
 	}
 	if len(body) > upgradeMaxDownload {
 		return nil, fmt.Errorf("asset %s exceeds size limit", asset.Name)
 	}
 	return body, nil
+}
+
+func isUpgradeGitHubHost(host string) bool {
+	switch strings.ToLower(strings.TrimSuffix(host, ".")) {
+	case "api.github.com", "github.com", "objects.githubusercontent.com", "release-assets.githubusercontent.com":
+		return true
+	default:
+		return false
+	}
 }
 
 func decodeUpgradeRelease(body []byte) (upgradeRelease, error) {
@@ -285,6 +307,10 @@ func verifyUpgradeManifestSignature(manifest, bundle []byte, version string) err
 	if err := os.WriteFile(bundlePath, bundle, 0o600); err != nil {
 		return err
 	}
+	var legacy legacyUpgradeBundle
+	if err := json.Unmarshal(bundle, &legacy); err == nil && legacy.Base64Signature != "" {
+		return verifyLegacyUpgradeBundle(manifest, legacy, version)
+	}
 	signedBundle, err := sigstoreBundle.LoadJSONFromPath(bundlePath, sigstoreBundle.AllowCertificateChain())
 	if err != nil {
 		return fmt.Errorf("load Sigstore bundle: %w", err)
@@ -311,6 +337,61 @@ func verifyUpgradeManifestSignature(manifest, bundle []byte, version string) err
 		sigstoreVerify.WithCertificateIdentity(identity),
 	)); err != nil {
 		return fmt.Errorf("verify Sigstore bundle: %w", err)
+	}
+	return nil
+}
+
+func verifyLegacyUpgradeBundle(manifest []byte, bundle legacyUpgradeBundle, version string) error {
+	certificatePEM, err := base64.StdEncoding.DecodeString(bundle.Cert)
+	if err != nil {
+		return fmt.Errorf("decode legacy certificate: %w", err)
+	}
+	certificate, _ := pem.Decode(certificatePEM)
+	if certificate == nil {
+		return errors.New("legacy bundle has no certificate")
+	}
+	leaf, err := x509.ParseCertificate(certificate.Bytes)
+	if err != nil {
+		return fmt.Errorf("parse legacy certificate: %w", err)
+	}
+	identity := "https://github.com/" + upgradeRepository + "/.github/workflows/release.yml@refs/tags/" + version
+	matchedIdentity := false
+	for _, uri := range leaf.URIs {
+		if uri.String() == identity {
+			matchedIdentity = true
+			break
+		}
+	}
+	if !matchedIdentity || leaf.Issuer.CommonName != "sigstore-intermediate" || len(leaf.Issuer.Organization) != 1 || leaf.Issuer.Organization[0] != "sigstore.dev" {
+		return errors.New("legacy certificate identity does not match the ash release workflow")
+	}
+	trustedRoot, err := sigstoreRoot.NewLiveTrustedRoot(sigstoreTUF.DefaultOptions())
+	if err != nil {
+		return fmt.Errorf("load Sigstore trusted root: %w", err)
+	}
+	verified := false
+	for _, authority := range trustedRoot.FulcioCertificateAuthorities() {
+		if _, err := authority.Verify(leaf, time.Now()); err == nil {
+			verified = true
+			break
+		}
+	}
+	if !verified {
+		return errors.New("legacy certificate is not trusted by Sigstore")
+	}
+	signatureBytes, err := base64.StdEncoding.DecodeString(bundle.Base64Signature)
+	if err != nil {
+		return fmt.Errorf("decode legacy signature: %w", err)
+	}
+	verifier, err := sigstoreSignature.LoadDefaultVerifier(leaf.PublicKey)
+	if err != nil {
+		return fmt.Errorf("load legacy signature verifier: %w", err)
+	}
+	if err := verifier.VerifySignature(bytes.NewReader(signatureBytes), bytes.NewReader(manifest)); err != nil {
+		return fmt.Errorf("verify legacy manifest signature: %w", err)
+	}
+	if len(bundle.RekorBundle.Payload) == 0 || bundle.RekorBundle.SignedEntryTimestamp == "" {
+		return errors.New("legacy bundle is missing Rekor evidence")
 	}
 	return nil
 }
@@ -582,7 +663,7 @@ func extractUpgradeArchive(content []byte, destination string) error {
 			return fmt.Errorf("duplicate archive entry %q", header.Name)
 		}
 		seen[name] = struct{}{}
-		if header.Typeflag != tar.TypeReg {
+		if header.Typeflag != 0 && header.Typeflag != tar.TypeReg {
 			return fmt.Errorf("unsupported archive entry %q", header.Name)
 		}
 		if header.Size < 0 || header.Size > upgradeMaxEntry {
@@ -622,7 +703,7 @@ func findUpgradeBinary(root, expectedName string) (string, error) {
 			return err
 		}
 		name := filepath.Base(path)
-		if info.Mode().IsRegular() && (name == expectedName || name == "ash") && info.Mode()&0o111 != 0 {
+		if info.Mode().IsRegular() && (name == expectedName || name == "ash" || strings.HasPrefix(name, "ash-v")) {
 			matches = append(matches, path)
 		}
 		return nil
