@@ -358,7 +358,7 @@ func installUpgradeArchive(content []byte, version string, options upgradeOption
 		}
 		return err
 	}
-	_, _ = fmt.Fprintf(stdout, "updated ash to %s at %s\n", version, destination)
+	_, _ = fmt.Fprintf(stdout, "updated ash to %s at %s (commit %s)\n", version, destination, ashCommit)
 	return nil
 }
 
