@@ -1,5 +1,7 @@
 # ash
 
+**[Visit the ash website](https://jonconradt.github.io/ash/)** for a quick introduction and installation links.
+
 Ever wanted to ask an AI a question in the middle of working in a terminal? Don't want to launch another app just to ask one question? ASH extends the bash and zsh shells to support in-line AI prompting. When the shell does not understand your command it passes it to the AI as a prompt.
 
 ```ash
