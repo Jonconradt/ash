@@ -14,6 +14,8 @@ import (
 	"time"
 )
 
+var ashVersion = "dev"
+
 const (
 	defaultHistoryMax                 = 40
 	defaultAITimeout                  = 3 * time.Minute
@@ -100,6 +102,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	if args[0] == "broker" {
 		return runBroker(args[1:], stdout, stderr)
+	}
+	if args[0] == "update" {
+		return runUpgrade(args[1:], stdout, stderr)
 	}
 
 	defaultsStarted := timeNow()
@@ -222,5 +227,6 @@ func run(args []string, stdout, stderr io.Writer) int {
 func printUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "usage: ash <text>")
 	_, _ = fmt.Fprintln(w, "       ash install [--shell bash|zsh] [--dry-run] [--overwrite]")
+	_, _ = fmt.Fprintln(w, "       ash update [--version vX.Y.Z] [--yes|--skip-customized]")
 	_, _ = fmt.Fprintln(w, "       ash broker --socket <path>")
 }
