@@ -20,10 +20,17 @@ RELEASE_FORMAT ?= pkg
 RELEASE_WATCH ?= 1
 RELEASE_WATCH_STRICT ?= 1
 BUILD_VERSION ?= dev
-BUILD_COMMIT ?= $(shell git rev-parse HEAD 2>/dev/null || printf 'unknown')
+# Resolved once at parse time; recursive expansion would re-run git after release-publish tags HEAD.
+ifeq ($(origin BUILD_COMMIT),undefined)
+BUILD_COMMIT := $(shell git rev-parse HEAD 2>/dev/null || printf 'unknown')
+endif
 RELEASE_COMMIT ?= $(BUILD_COMMIT)
-LATEST_RELEASE_TAG ?= $(shell git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$$' | head -n1)
-AUTO_RELEASE_VERSION ?= $(shell ./scripts/release/next_version.sh)
+ifeq ($(origin LATEST_RELEASE_TAG),undefined)
+LATEST_RELEASE_TAG := $(shell git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$$' | head -n1)
+endif
+ifeq ($(origin AUTO_RELEASE_VERSION),undefined)
+AUTO_RELEASE_VERSION := $(shell ./scripts/release/next_version.sh)
+endif
 RELEASE_VERSION ?= $(AUTO_RELEASE_VERSION)
 RELEASE_PKG_NAME ?= $(APP_NAME)-$(RELEASE_VERSION)-darwin-$(RELEASE_ARCH).pkg
 RELEASE_PKG_PATH ?= $(RELEASE_PACKAGE_DIR)/$(RELEASE_PKG_NAME)
