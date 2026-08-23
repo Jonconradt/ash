@@ -108,12 +108,9 @@ changing it. A duration such as
 .B 30m
 keeps the model warm for a bounded period.
 .TP
-.B AI_AUTH_TYPE
-Optional. For cloud endpoints use
-.B bearer.
-.TP
 .B AI_AUTH_TOKEN
-Optional bearer token for authenticated endpoints.
+Optional bearer token for authenticated endpoints. When set, it is sent as
+bearer authentication and is required for cloud endpoints.
 .TP
 .B AI_PROVIDER
 Optional provider override. Supported values:

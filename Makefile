@@ -1,4 +1,4 @@
-.PHONY: all verify build lint yaml-lint python-lint markdown-lint test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install setup-hooks version release release-check release-build release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one release-checksums
+.PHONY: all verify build lint site-lint yaml-lint python-lint markdown-lint test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install setup-hooks version release release-check release-build release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one release-checksums
 
 SHELL := /bin/bash
 
@@ -44,8 +44,11 @@ verify: test test-race test-cover vet staticcheck security test-fuzz benchmark
 build: lint test
 	@go install -ldflags "-X main.ashVersion=$(BUILD_VERSION) -X main.ashCommit=$(BUILD_COMMIT)" .
 
-lint: yaml-lint python-lint markdown-lint
+lint: site-lint yaml-lint python-lint markdown-lint
 	@go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run ./...
+
+site-lint:
+	@sh -n site/install.sh
 
 yaml-lint:
 	@echo "Validating GitHub Actions workflows..."

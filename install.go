@@ -182,7 +182,7 @@ func maybeConfigureInstallEnv(stdout, stderr io.Writer, dryRun bool) error {
 	}
 
 	reader := bufio.NewReader(os.Stdin)
-	values, err := promptInstallEnvValues(reader, stdout, stderr)
+	values, err := promptInstallEnvValues(reader, stdout)
 	if err != nil {
 		return err
 	}
@@ -246,9 +246,8 @@ func hasRequiredInstallEnvValues() bool {
 		return true
 	}
 
-	authType := strings.ToLower(strings.TrimSpace(os.Getenv(aiEnvAuthType)))
 	authToken := strings.TrimSpace(os.Getenv(aiEnvAuthToken))
-	return authType == "bearer" && authToken != ""
+	return authToken != ""
 }
 
 // shouldPromptInstallEnv reports whether the condition is true.
@@ -287,7 +286,7 @@ func ashEnvFilePath() (string, error) {
 }
 
 // promptInstallEnvValues collects the AI endpoint and authentication values needed to create a managed ash environment file.
-func promptInstallEnvValues(reader *bufio.Reader, stdout, stderr io.Writer) (map[string]string, error) {
+func promptInstallEnvValues(reader *bufio.Reader, stdout io.Writer) (map[string]string, error) {
 	_, _ = fmt.Fprintln(stdout, "Configure ash environment values")
 	endpoint, err := promptEndpointWithPresets(reader, stdout)
 	if err != nil {
@@ -304,22 +303,18 @@ func promptInstallEnvValues(reader *bufio.Reader, stdout, stderr io.Writer) (map
 	}
 	cloud := isCloudAIHost(host)
 
-	authType := ""
 	authToken := ""
 	if cloud {
-		authType = "bearer"
 		authToken, err = promptNonEmpty(reader, stdout, aiEnvAuthToken)
 		if err != nil {
 			return nil, err
 		}
-		_, _ = fmt.Fprintln(stderr, "selected cloud endpoint; using AI_AUTH_TYPE=bearer")
 	} else {
 		optionalToken, promptErr := promptOptional(reader, stdout, aiEnvAuthToken+" (optional for localhost)")
 		if promptErr != nil {
 			return nil, promptErr
 		}
 		if optionalToken != "" {
-			authType = "bearer"
 			authToken = optionalToken
 		}
 	}
@@ -327,9 +322,6 @@ func promptInstallEnvValues(reader *bufio.Reader, stdout, stderr io.Writer) (map
 	values := map[string]string{
 		aiEnvEndpoint: endpoint,
 		aiEnvModel:    model,
-	}
-	if authType != "" {
-		values[aiEnvAuthType] = authType
 	}
 	if authToken != "" {
 		values[aiEnvAuthToken] = authToken

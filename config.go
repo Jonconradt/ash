@@ -68,24 +68,14 @@ func parseAIConfigFromEnv() (aiConfig, error) {
 		return aiConfig{}, err
 	}
 
-	authType := strings.ToLower(strings.TrimSpace(os.Getenv(aiEnvAuthType)))
 	authToken := strings.TrimSpace(os.Getenv(aiEnvAuthToken))
-	if authToken != "" && authType == "" {
-		return aiConfig{}, fmt.Errorf("%s is required when %s is set", aiEnvAuthType, aiEnvAuthToken)
-	}
-	if authType != "" && authType != "bearer" {
-		return aiConfig{}, fmt.Errorf("%s must be bearer when set", aiEnvAuthType)
-	}
-	if authType == "bearer" && authToken == "" {
-		return aiConfig{}, fmt.Errorf("%s is required when %s=bearer", aiEnvAuthToken, aiEnvAuthType)
-	}
 
 	if isCloudAIHost(host) {
 		if scheme != "https" {
 			return aiConfig{}, errors.New("AI_ENDPOINT must use https for cloud endpoints")
 		}
-		if authType != "bearer" || authToken == "" {
-			return aiConfig{}, errors.New("cloud endpoints require AI_AUTH_TYPE=bearer and AI_AUTH_TOKEN")
+		if authToken == "" {
+			return aiConfig{}, errors.New("cloud endpoints require AI_AUTH_TOKEN")
 		}
 	}
 
@@ -96,7 +86,7 @@ func parseAIConfigFromEnv() (aiConfig, error) {
 		Provider:         provider,
 		UseNativeCaching: useCaching,
 	}
-	if authType == "bearer" {
+	if authToken != "" {
 		cfg.Authorization = "Bearer " + authToken
 		cfg.AuthToken = authToken
 	}

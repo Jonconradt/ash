@@ -35,7 +35,7 @@ Is this thing secure and safe? It really depends on how bold you are. It runs as
 ## Features
 
 - Uses `AI_ENDPOINT` and `AI_MODEL` to target local or cloud provider endpoints
-- Supports bearer authentication with `AI_AUTH_TYPE=bearer` and `AI_AUTH_TOKEN`
+- Uses bearer authentication automatically when `AI_AUTH_TOKEN` is set
 - Auto-detects provider adapters (`ollama`, `openai`, `google`, `anthropic`) from endpoint
 - Supports optional `AI_PROVIDER` override for advanced routing control
 - Uses provider-native tool calling through per-provider adapters
@@ -95,6 +95,31 @@ make release RELEASE_VERSION=v1.2.3
   and the next version is derived as `v<major>.<minor+1>.0`.
 
 Contributor note: run `make lint test` before submitting changes.
+
+## Install on Linux or macOS
+
+Install the latest release with the verified one-liner:
+
+```bash
+curl -fsSL https://jonconradt.github.io/ash/install.sh | sh
+```
+
+The installer supports Linux and macOS on `amd64` and `arm64`. It verifies the
+download against the release `SHA256SUMS` manifest and installs `ash` to
+`~/.local/bin` without requiring `sudo`. Set `ASH_INSTALL_DIR` to choose a
+different destination when needed.
+
+The installer runs `ash install` for the detected shell. Unknown shells default
+to bash. Restart the shell or source its rc file afterward. If `~/.local/bin`
+is not already on `PATH`, add it before using `ash`:
+
+```bash
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Native packages remain available from the [latest GitHub release](https://github.com/Jonconradt/ash/releases/latest): macOS `.pkg`, and Linux `.deb`
+or `.rpm` packages. Configure `AI_ENDPOINT` and `AI_MODEL` after installation
+as described below.
 
 ## Release Process
 
@@ -165,7 +190,6 @@ Cloud example (authenticated):
 ```bash
 export AI_ENDPOINT="https://ollama.example.com"
 export AI_MODEL="llama3.1:latest"
-export AI_AUTH_TYPE="bearer"
 export AI_AUTH_TOKEN="<token>"
 ```
 
@@ -194,7 +218,7 @@ Common `AI_ENDPOINT` values:
 Notes:
 
 - Cloud endpoints are inferred when the host is not `localhost` or `127.0.0.1`.
-- Cloud endpoints must use `https` and require bearer auth.
+- Cloud endpoints must use `https` and require `AI_AUTH_TOKEN`; tokens are sent as bearer auth.
 - Provider detection is automatic by endpoint host/path; use `AI_PROVIDER` only when you need to override.
 - `AI_CACHE` defaults to enabled. Use `AI_CACHE=off` to disable provider-native caching.
 - Legacy `AI=ollama://...` configuration is no longer supported.
@@ -203,8 +227,7 @@ Notes:
 
 - `AI_ENDPOINT` (required): Base URL for the chat API endpoint.
 - `AI_MODEL` (required): Model name sent to the endpoint.
-- `AI_AUTH_TYPE` (optional): Use `bearer` for authenticated cloud endpoints.
-- `AI_AUTH_TOKEN` (optional): Bearer token used when `AI_AUTH_TYPE=bearer`.
+- `AI_AUTH_TOKEN` (optional): When set, sent as a bearer token. Required for cloud endpoints.
 - `AI_PROVIDER` (optional): Override auto-detected provider (`ollama`, `openai`, `google`, `gemini`, `anthropic`).
 - `AI_CACHE` (optional): Enable or disable provider-native caching (`true/false`). Default `true`.
 - `AI` (legacy, unsupported): Deprecated and rejected; use `AI_ENDPOINT` and `AI_MODEL`.
