@@ -1739,9 +1739,25 @@ func TestRunSubAgentCommandTimeoutKillsProcessGroup(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse child pid: %v", err)
 	}
-	if err := syscall.Kill(pid, 0); err == nil {
+	deadline := time.Now().Add(time.Second)
+	for processIsRunning(pid) && time.Now().Before(deadline) {
+		time.Sleep(10 * time.Millisecond)
+	}
+	if processIsRunning(pid) {
 		t.Fatalf("child process %d survived process-group termination", pid)
 	}
+}
+
+func processIsRunning(pid int) bool {
+	if runtime.GOOS == "linux" {
+		data, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
+		if err != nil {
+			return false
+		}
+		fields := strings.Fields(string(data))
+		return len(fields) > 2 && fields[2] != "Z"
+	}
+	return syscall.Kill(pid, 0) == nil
 }
 
 func toolNames(tools []toolDefinition) map[string]struct{} {
