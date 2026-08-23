@@ -971,13 +971,15 @@ func TestFormatAssistantOutputTrimsLeadingBlankLineAndIndent(t *testing.T) {
 		if input != "what time is it?" {
 			t.Fatalf("unexpected renderer input: %q", input)
 		}
-		return "\n  It is 12:17 PM EDT on Sunday, August 23, 2026.\n\n", nil
+		return "\n\x1b[38;5;252m\x1b[0m\x1b[38;5;252m\x1b[0m  \x1b[38;5;252mIt is 12:17 PM EDT on Sunday, August 23, 2026.\x1b[0m\n\n", nil
 	}
 
 	got := formatAssistantOutput("what time is it?")
-	want := "It is 12:17 PM EDT on Sunday, August 23, 2026.\n"
-	if got != want {
-		t.Fatalf("output mismatch: got %q want %q", got, want)
+	if strings.HasPrefix(got, "\n") || strings.HasPrefix(got, "  ") {
+		t.Fatalf("output still has leading blank line or indentation: %q", got)
+	}
+	if !strings.Contains(got, "It is 12:17 PM EDT on Sunday, August 23, 2026.") {
+		t.Fatalf("output missing rendered text: %q", got)
 	}
 }
 

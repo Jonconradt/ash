@@ -1654,9 +1654,38 @@ func formatAssistantOutput(raw string) string {
 
 func trimLeadingOutputPadding(value string) string {
 	value = strings.TrimLeft(value, "\r\n")
-	value = strings.TrimPrefix(value, "  ")
-	value = strings.TrimPrefix(value, "\t")
-	return value
+	if value == "" {
+		return value
+	}
+
+	firstPrintable := -1
+	lastStyleStart := -1
+	for i := 0; i < len(value); i++ {
+		if value[i] == '\x1b' && i+1 < len(value) && value[i+1] == '[' {
+			j := i + 2
+			for j < len(value) && value[j] != 'm' {
+				j++
+			}
+			if j < len(value) {
+				lastStyleStart = i
+				i = j
+				continue
+			}
+		}
+		if value[i] == ' ' || value[i] == '\t' || value[i] == '\r' || value[i] == '\n' {
+			continue
+		}
+		firstPrintable = i
+		break
+	}
+
+	if firstPrintable == -1 {
+		return ""
+	}
+	if lastStyleStart >= 0 && lastStyleStart < firstPrintable {
+		value = value[lastStyleStart:]
+	}
+	return strings.TrimLeft(value, " \t\r\n")
 }
 
 // ensureSingleTrailingNewline ensures required state exists and is up to date.
