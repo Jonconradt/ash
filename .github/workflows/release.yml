@@ -52,7 +52,7 @@ jobs:
         run: |
           make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES=${{ matrix.arch }} RELEASE_VERSION="${GITHUB_REF_NAME}"
       - name: Upload macOS artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: release-macos-${{ matrix.arch }}
           path: dist/release/*darwin-${{ matrix.arch }}*
@@ -79,7 +79,7 @@ jobs:
         run: |
           make release-artifacts RELEASE_TARGET_OSES=linux RELEASE_TARGET_ARCHES=${{ matrix.arch }} RELEASE_VERSION="${GITHUB_REF_NAME}"
       - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: release-linux-${{ matrix.arch }}
           path: dist/release/*linux-${{ matrix.arch }}*
@@ -108,7 +108,7 @@ jobs:
         run: |
           make release-artifacts RELEASE_TARGET_OSES=windows RELEASE_TARGET_ARCHES=${{ matrix.arch }} RELEASE_VERSION="${GITHUB_REF_NAME}"
       - name: Upload Windows artifacts
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: release-windows-${{ matrix.arch }}
           path: dist/release/*windows-${{ matrix.arch }}*
@@ -127,7 +127,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Download packaged artifacts
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           path: dist/release
       - name: Flatten artifact directories
