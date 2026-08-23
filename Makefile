@@ -387,14 +387,11 @@ release-watch:
 		exit 0; \
 	fi; \
 	echo "launching release dashboard for tag $(RELEASE_VERSION)"; \
-	./scripts/release/release_dashboard.sh --tag "$(RELEASE_VERSION)" --repo "$$repo"; \
-	conclusion="$$(GH_PAGER=cat gh run list -R "$$repo" --workflow release.yml --limit 20 --json conclusion,headBranch,event --jq 'map(select(.headBranch == "$(RELEASE_VERSION)" and .event == "push")) | first | .conclusion' 2>/dev/null || true)"; \
-	if [[ "$$conclusion" != "success" ]]; then \
+	if ! ./scripts/release/release_dashboard.sh --tag "$(RELEASE_VERSION)" --repo "$$repo"; then \
 		if [[ "$(RELEASE_WATCH_STRICT)" == "1" ]]; then \
-			echo "release workflow finished with conclusion=$${conclusion:-unknown}"; \
 			exit 1; \
 		fi; \
-		echo "release workflow finished with conclusion=$${conclusion:-unknown}, but continuing because RELEASE_WATCH_STRICT=$(RELEASE_WATCH_STRICT)"; \
+		echo "release workflow reported failure, but continuing because RELEASE_WATCH_STRICT=$(RELEASE_WATCH_STRICT)"; \
 	fi
 
 release-dashboard:

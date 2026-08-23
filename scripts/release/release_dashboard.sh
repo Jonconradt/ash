@@ -459,6 +459,7 @@ trap cleanup_terminal EXIT
 enter_tui
 
 final_message=""
+final_status=0
 
 while true; do
   run_id="$(find_run_id)"
@@ -489,6 +490,7 @@ while true; do
         ;;
       workflow_failed)
         final_message="$(get_failure_summary "$run_json")"
+        final_status=1
         ;;
     esac
     break
@@ -510,3 +512,4 @@ fi
 if [[ -n "$final_message" ]]; then
   echo "$final_message"
 fi
+exit "$final_status"
