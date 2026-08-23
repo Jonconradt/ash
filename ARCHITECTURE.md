@@ -3,6 +3,7 @@
 ## Runtime overview
 
 The CLI entry point in [ash.go](ash.go) initializes configuration, loads the system prompt, resolves history, and runs the tool loop. The main control flow is:
+
 1. parse environment-based configuration
 2. load prompt/history/allowlist state
 3. run the chat/tool loop

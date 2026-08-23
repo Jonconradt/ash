@@ -16,6 +16,14 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.5"
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
       - name: Run quality checks
         run: make lint test
       - name: Ensure dist directory exists

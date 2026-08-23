@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -203,11 +204,11 @@ func renderExecutionDashboard(metrics *executionMetrics, ansi bool) string {
 	toolCalls, toolDuration, subAgentCalls, subAgentDuration, subAgentCanceled, subAgentTimedOut, subAgentFailed, inputTokenCount, outputTokenCount, inputAvailable, outputAvailable := metrics.snapshot()
 	inputTokens := "N/A"
 	if inputAvailable {
-		inputTokens = fmt.Sprintf("%d", inputTokenCount)
+		inputTokens = strconv.Itoa(inputTokenCount)
 	}
 	outputTokens := "N/A"
 	if outputAvailable {
-		outputTokens = fmt.Sprintf("%d", outputTokenCount)
+		outputTokens = strconv.Itoa(outputTokenCount)
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "\n%s\n", header)

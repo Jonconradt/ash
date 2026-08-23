@@ -32,11 +32,11 @@ func TestBrokerRoundTripReusesConfiguredTransport(t *testing.T) {
 	socket := "/tmp/ash-broker-test-" + strconv.Itoa(os.Getpid()) + ".sock"
 	_ = os.Remove(socket)
 	t.Cleanup(func() { _ = os.Remove(socket) })
-	listener, err := net.Listen("unix", socket)
+	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "unix", socket)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer listener.Close()
+	defer func() { _ = listener.Close() }()
 	token := "test-token"
 	client := newBrokerHTTPClient()
 	go func() {
@@ -45,7 +45,7 @@ func TestBrokerRoundTripReusesConfiguredTransport(t *testing.T) {
 			if acceptErr != nil {
 				return
 			}
-			go handleBrokerConn(connection, token, client)
+			go handleBrokerConn(context.Background(), connection, token, client)
 		}
 	}()
 
@@ -60,7 +60,7 @@ func TestBrokerRoundTripReusesConfiguredTransport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want 200", response.StatusCode)
 	}

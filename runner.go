@@ -223,7 +223,7 @@ func buildExecutionStateMessage(userInput string, tasks []executionTask, observa
 		b.WriteString("- (no explicit tasks)\n")
 	} else {
 		for _, task := range tasks {
-			b.WriteString(fmt.Sprintf("- [%s] #%d %s", task.Status, task.ID, task.Goal))
+			fmt.Fprintf(&b, "- [%s] #%d %s", task.Status, task.ID, task.Goal)
 			if strings.TrimSpace(task.Detail) != "" {
 				b.WriteString(": ")
 				b.WriteString(strings.TrimSpace(task.Detail))
@@ -245,7 +245,7 @@ func buildExecutionStateMessage(userInput string, tasks []executionTask, observa
 			if !obs.OK {
 				status = "error"
 			}
-			b.WriteString(fmt.Sprintf("- [%s] %s: %s\n", status, strings.TrimSpace(obs.Command), strings.TrimSpace(obs.Summary)))
+			fmt.Fprintf(&b, "- [%s] %s: %s\n", status, strings.TrimSpace(obs.Command), strings.TrimSpace(obs.Summary))
 		}
 	}
 

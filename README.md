@@ -1,6 +1,6 @@
 # ash
 
-Ever wanted to ask an AI a question in the middle of working in a terminal? Don't want to launch another app just to ask one question? ASH extends the bash and zsh shells to support in-line AI prompting. When the shell does not understand your command it passes it to the AI as a prompt. 
+Ever wanted to ask an AI a question in the middle of working in a terminal? Don't want to launch another app just to ask one question? ASH extends the bash and zsh shells to support in-line AI prompting. When the shell does not understand your command it passes it to the AI as a prompt.
 
 ```ash
 $:~ jon$ whoami
@@ -12,7 +12,7 @@ $:~ jon$ When is the next full moon?
   Based on the lunar cycle, a full moon occurs approximately 14-15 days after the first quarter. Given today's date is August 20, 2026, the next full moon is expected to occur around September 3-4, 2026.
 ```
 
-What if you want the AI to investigate a problem? The .ash_tools file is an allow list of unix commands the AI can use (and pipe together) to accomplish investigations. 
+What if you want the AI to investigate a problem? The .ash_tools file is an allow list of unix commands the AI can use (and pipe together) to accomplish investigations.
 
 What if you have a more complex question, something that needs to be computed? If you allow ash to expose Python the AI can write temporary scripts, or use scripts in the ~/.ash/tools directory to run complex processes.
 
@@ -20,15 +20,15 @@ What if the AI needs temporary notes, plans, script fragments, or small working 
 
 What if you want something to happen on a schedule or in the future? Ash can create systems jobs that run once or recur.
 
-What if I want to run a unix command that looks like a prompt, e.g. which ash? You can snooze ash with "ash snooze 5m" and it will not interpret your command line as a prompt. 
+What if I want to run a unix command that looks like a prompt, e.g. which ash? You can snooze ash with "ash snooze 5m" and it will not interpret your command line as a prompt.
 
 What if I am on MacOS and I want the results in my clipboard? Add pbcopy to .ash_tools. If you forget, ask the AI because it knows what to do.
 
 Where is the system prompt? Put your system prompt in ~/.ash/.ash_system. It supports replacement of environment variables.
 
-Does this support Ollama, OpenAI, Google, Anthropic? Yes, during install provide the URL of your provider, and your app key. The app key will be added to ~/.ash/.ash_env 
+Does this support Ollama, OpenAI, Google, Anthropic? Yes, during install provide the URL of your provider, and your app key. The app key will be added to ~/.ash/.ash_env
 
-Is this thing secure and safe? It really depends on how bold you are. It runs as your user so it can read your files, but it is limited in the commands it can execute, but it can execute python (if you allow it). If you allow curl or wget and are running a naive model you could end up executing more than you wanted. 
+Is this thing secure and safe? It really depends on how bold you are. It runs as your user so it can read your files, but it is limited in the commands it can execute, but it can execute python (if you allow it). If you allow curl or wget and are running a naive model you could end up executing more than you wanted.
 
 ## Features
 
@@ -92,15 +92,16 @@ Canonical publishing is tag-driven in GitHub Actions.
 2. `make release` creates and pushes the release tag to `origin`.
 3. The `release` workflow runs `make version` in macOS and Linux packaging jobs.
 4. GitHub Release assets are published automatically:
-  - `ash-v1.2.3-darwin-amd64.pkg`
-  - `ash-v1.2.3-darwin-arm64.pkg`
-  - `ash-v1.2.3-linux-amd64.deb`
-  - `ash-v1.2.3-linux-arm64.deb`
-  - `ash-v1.2.3-linux-amd64.rpm`
-  - `ash-v1.2.3-linux-arm64.rpm`
-  - `ash-v1.2.3-windows-amd64.msi`
-  - `ash-v1.2.3-<os>-<arch>.tar.gz`
-  - matching `.sha256` files for each artifact
+
+- `ash-v1.2.3-darwin-amd64.pkg`
+- `ash-v1.2.3-darwin-arm64.pkg`
+- `ash-v1.2.3-linux-amd64.deb`
+- `ash-v1.2.3-linux-arm64.deb`
+- `ash-v1.2.3-linux-amd64.rpm`
+- `ash-v1.2.3-linux-arm64.rpm`
+- `ash-v1.2.3-windows-amd64.msi`
+- `ash-v1.2.3-<os>-<arch>.tar.gz`
+- matching `.sha256` files for each artifact
 
 Installer man pages are included in release artifacts:
 
@@ -313,6 +314,7 @@ After updating an existing installation, reload the shell startup file once
 snooze-aware integration.
 
 Installer implementation is split per shell target for maintainability:
+
 - `bash_install.go`
 - `zsh_install.go`
 - `pwsh_install.go`
@@ -350,7 +352,7 @@ Set allowlisted Unix executables with one of these methods:
 export ASH_TOOL_ALLOWLIST="ls,ps,man,osascript"
 ```
 
-2. Canonical config file `$HOME/.ash/.ash_tools`:
+1. Canonical config file `$HOME/.ash/.ash_tools`:
 
 ```text
 # one per line or comma-separated
@@ -403,7 +405,7 @@ osascript -e 'say "Good day!" using "Karen"'
 
 Your Ollama model must support tool calling. See Ollama models with tools:
 
-https://ollama.com/search?c=tool
+<https://ollama.com/search?c=tool>
 
 ## Use with `command_not_found_handle`
 

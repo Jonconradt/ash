@@ -2771,7 +2771,7 @@ func TestRenderMarkdownWithGlamourFactoryError(t *testing.T) {
 	t.Cleanup(func() { newTermRenderer = originalFactory })
 
 	newTermRenderer = func(...glamour.TermRendererOption) (*glamour.TermRenderer, error) {
-		return nil, fmt.Errorf("factory failed")
+		return nil, errors.New("factory failed")
 	}
 
 	_, err := renderMarkdownWithGlamour("x")
@@ -3971,7 +3971,7 @@ func runShellCollisionFixture(t *testing.T, shell, fixture, invocation string) s
 
 	fixturePath := filepath.Join("testdata", fixture)
 	command := fmt.Sprintf("source %q; %s", fixturePath, invocation)
-	execCmd := exec.Command(shellPath, "-c", command)
+	execCmd := exec.CommandContext(context.Background(), shellPath, "-c", command)
 	output, err := execCmd.CombinedOutput()
 	if err != nil {
 		t.Fatalf("%s fixture invocation failed: %v\noutput=%s", shell, err, output)
@@ -4568,7 +4568,7 @@ func TestMainEntrypoint(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	cmd := exec.Command(os.Args[0], "-test.run=TestMainHelperProcess")
+	cmd := exec.CommandContext(context.Background(), os.Args[0], "-test.run=TestMainHelperProcess")
 	cmd.Dir = cwd
 	cmd.Env = append(os.Environ(),
 		"ASH_MAIN_HELPER=1",

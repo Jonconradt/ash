@@ -18,16 +18,16 @@ const (
 
 func runSnooze(args []string, stdout, stderr io.Writer) int {
 	if len(args) > 1 {
-		fmt.Fprintln(stderr, "usage: ash snooze [duration|off]")
+		_, _ = fmt.Fprintln(stderr, "usage: ash snooze [duration|off]")
 		return 1
 	}
 
 	if len(args) == 1 && strings.EqualFold(strings.TrimSpace(args[0]), "off") {
 		if err := clearSnooze(); err != nil {
-			fmt.Fprintf(stderr, "failed to clear snooze: %v\n", err)
+			_, _ = fmt.Fprintf(stderr, "failed to clear snooze: %v\n", err)
 			return 1
 		}
-		fmt.Fprintln(stdout, "ash prompt processing resumed")
+		_, _ = fmt.Fprintln(stdout, "ash prompt processing resumed")
 		return 0
 	}
 
@@ -35,7 +35,7 @@ func runSnooze(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 {
 		parsed, err := time.ParseDuration(strings.TrimSpace(args[0]))
 		if err != nil || parsed <= 0 {
-			fmt.Fprintln(stderr, "duration must be a positive value such as 30s, 5m, or 1h")
+			_, _ = fmt.Fprintln(stderr, "duration must be a positive value such as 30s, 5m, or 1h")
 			return 1
 		}
 		duration = parsed
@@ -43,10 +43,10 @@ func runSnooze(args []string, stdout, stderr io.Writer) int {
 
 	expiresAt := timeNow().Add(duration)
 	if err := writeSnoozeExpiry(expiresAt); err != nil {
-		fmt.Fprintf(stderr, "failed to start snooze: %v\n", err)
+		_, _ = fmt.Fprintf(stderr, "failed to start snooze: %v\n", err)
 		return 1
 	}
-	fmt.Fprintf(stdout, "ash prompt processing snoozed until %s\n", expiresAt.Format(time.RFC3339))
+	_, _ = fmt.Fprintf(stdout, "ash prompt processing snoozed until %s\n", expiresAt.Format(time.RFC3339))
 	return 0
 }
 

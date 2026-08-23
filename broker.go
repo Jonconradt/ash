@@ -16,6 +16,7 @@ import (
 	"net/http/httptrace"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -80,7 +81,7 @@ func brokerDo(ctx context.Context, req *http.Request) (*http.Response, bool, err
 	if err != nil {
 		return nil, false, err
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	if deadline, ok := ctx.Deadline(); ok {
 		_ = conn.SetDeadline(deadline)
 	}
@@ -101,7 +102,7 @@ func brokerDo(ctx context.Context, req *http.Request) (*http.Response, bool, err
 	if response.Error != "" {
 		return nil, false, errors.New(response.Error)
 	}
-	return &http.Response{StatusCode: response.Status, Status: fmt.Sprintf("%d", response.Status), Body: io.NopCloser(strings.NewReader(string(response.Body))), Header: make(http.Header), Request: req}, response.Reused, nil
+	return &http.Response{StatusCode: response.Status, Status: strconv.Itoa(response.Status), Body: io.NopCloser(strings.NewReader(string(response.Body))), Header: make(http.Header), Request: req}, response.Reused, nil
 }
 
 func brokerHeaderAllowed(name string) bool {
@@ -114,7 +115,7 @@ func brokerHeaderAllowed(name string) bool {
 }
 
 func brokerURLAllowed(rawURL string) bool {
-	request, err := http.NewRequest(http.MethodPost, rawURL, nil)
+	request, err := http.NewRequestWithContext(context.Background(), http.MethodPost, rawURL, nil)
 	return err == nil && request.URL.User == nil && request.URL.Host != "" && (request.URL.Scheme == "http" || request.URL.Scheme == "https")
 }
 
@@ -147,25 +148,26 @@ func readBrokerFrame(r io.Reader) ([]byte, error) {
 }
 
 func runBroker(args []string, stdout, stderr io.Writer) int {
+	ctx := context.Background()
 	var socket, lease string
 	for index := 0; index < len(args); index++ {
 		switch args[index] {
 		case "--socket":
 			index++
 			if index >= len(args) {
-				fmt.Fprintln(stderr, "--socket requires a value")
+				_, _ = fmt.Fprintln(stderr, "--socket requires a value")
 				return 2
 			}
 			socket = args[index]
 		case "--lease":
 			index++
 			if index >= len(args) {
-				fmt.Fprintln(stderr, "--lease requires a value")
+				_, _ = fmt.Fprintln(stderr, "--lease requires a value")
 				return 2
 			}
 			lease = args[index]
 		default:
-			fmt.Fprintf(stderr, "unknown broker option %q\n", args[index])
+			_, _ = fmt.Fprintf(stderr, "unknown broker option %q\n", args[index])
 			return 2
 		}
 	}
@@ -174,22 +176,24 @@ func runBroker(args []string, stdout, stderr io.Writer) int {
 		lease = strings.TrimSpace(os.Getenv(brokerLeaseEnv))
 	}
 	if socket == "" || token == "" {
-		fmt.Fprintln(stderr, "broker requires --socket and ASH_BROKER_TOKEN")
+		_, _ = fmt.Fprintln(stderr, "broker requires --socket and ASH_BROKER_TOKEN")
 		return 2
 	}
 	if err := os.MkdirAll(filepath.Dir(socket), 0o700); err != nil {
-		fmt.Fprintln(stderr, err)
+		_, _ = fmt.Fprintln(stderr, err)
 		return 1
 	}
-	if existing, dialErr := net.DialTimeout("unix", socket, 50*time.Millisecond); dialErr == nil {
+	dialCtx, cancelDial := context.WithTimeout(ctx, 50*time.Millisecond)
+	defer cancelDial()
+	if existing, dialErr := (&net.Dialer{}).DialContext(dialCtx, "unix", socket); dialErr == nil {
 		_ = existing.Close()
-		fmt.Fprintln(stderr, "broker socket is already in use")
+		_, _ = fmt.Fprintln(stderr, "broker socket is already in use")
 		return 1
 	}
 	_ = os.Remove(socket)
-	listener, err := net.Listen("unix", socket)
+	listener, err := (&net.ListenConfig{}).Listen(ctx, "unix", socket)
 	if err != nil {
-		fmt.Fprintln(stderr, err)
+		_, _ = fmt.Fprintln(stderr, err)
 		return 1
 	}
 	defer func() {
@@ -197,7 +201,7 @@ func runBroker(args []string, stdout, stderr io.Writer) int {
 		_ = os.Remove(socket)
 	}()
 	if err := os.Chmod(socket, 0o600); err != nil {
-		fmt.Fprintln(stderr, err)
+		_, _ = fmt.Fprintln(stderr, err)
 		return 1
 	}
 	client := newBrokerHTTPClient()
@@ -231,14 +235,14 @@ func runBroker(args []string, stdout, stderr io.Writer) int {
 		lastActivity = time.Now()
 		activityMu.Unlock()
 		active.Add(1)
-		go func() { defer active.Done(); handleBrokerConn(conn, token, client) }()
+		go func() { defer active.Done(); handleBrokerConn(ctx, conn, token, client) }()
 	}
 	active.Wait()
 	return 0
 }
 
-func handleBrokerConn(conn net.Conn, token string, client *http.Client) {
-	defer conn.Close()
+func handleBrokerConn(ctx context.Context, conn net.Conn, token string, client *http.Client) {
+	defer func() { _ = conn.Close() }()
 	if !brokerPeerAllowed(conn) {
 		return
 	}
@@ -252,7 +256,7 @@ func handleBrokerConn(conn net.Conn, token string, client *http.Client) {
 		_ = writeBrokerFrame(conn, mustBrokerJSON(brokerResponse{Version: brokerVersion, Error: "broker request rejected"}))
 		return
 	}
-	httpRequest, err := http.NewRequest(http.MethodPost, request.URL, strings.NewReader(string(request.Body)))
+	httpRequest, err := http.NewRequestWithContext(ctx, http.MethodPost, request.URL, strings.NewReader(string(request.Body)))
 	requestReused := false
 	requestTrace := &httptrace.ClientTrace{GotConn: func(info httptrace.GotConnInfo) { requestReused = info.Reused }}
 	if err == nil {
@@ -280,13 +284,14 @@ func handleBrokerConn(conn net.Conn, token string, client *http.Client) {
 		} else {
 			body, readErr := io.ReadAll(io.LimitReader(httpResponse.Body, brokerMaxBody+1))
 			closeErr := httpResponse.Body.Close()
-			if readErr != nil {
+			switch {
+			case readErr != nil:
 				err = readErr
-			} else if closeErr != nil {
+			case closeErr != nil:
 				err = closeErr
-			} else if len(body) > brokerMaxBody {
+			case len(body) > brokerMaxBody:
 				err = errors.New("broker response exceeds limit")
-			} else {
+			default:
 				err = writeBrokerFrame(conn, mustBrokerJSON(brokerResponse{Version: brokerVersion, Status: httpResponse.StatusCode, Reused: requestReused, Body: body}))
 			}
 		}

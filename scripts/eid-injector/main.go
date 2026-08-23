@@ -165,7 +165,7 @@ func resolveFiles(allMode bool, args []string) ([]string, error) {
 
 func constrainToRoot(path string, root string) (string, error) {
 	if path == "" {
-		return "", fmt.Errorf("empty path")
+		return "", errors.New("empty path")
 	}
 
 	absPath, err := filepath.Abs(path)
@@ -199,7 +199,7 @@ func constrainToRoot(path string, root string) (string, error) {
 
 func resolveInputFilePath(path string) (string, error) {
 	if strings.TrimSpace(path) == "" {
-		return "", fmt.Errorf("empty path")
+		return "", errors.New("empty path")
 	}
 
 	absPath, err := filepath.Abs(path)

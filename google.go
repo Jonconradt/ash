@@ -2,7 +2,7 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
+	"errors"
 	"net/http"
 	"strings"
 )
@@ -156,7 +156,7 @@ func (a googleAdapter) ParseResponse(body []byte) (chatResponse, error) {
 		return chatResponse{Error: parsed.Error.Message}, nil
 	}
 	if len(parsed.Choices) == 0 {
-		return chatResponse{}, fmt.Errorf("google response missing choices")
+		return chatResponse{}, errors.New("google response missing choices")
 	}
 
 	msg := parsed.Choices[0].Message

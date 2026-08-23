@@ -4,7 +4,8 @@ import importlib
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 
 def load_yfinance_module():
     try:
@@ -17,13 +18,14 @@ def load_yfinance_module():
         return importlib.import_module("yfinance")
     except ImportError:
         print(
-            json.dumps({
-                "status": "error",
-                "message": (
-                    "Missing required library 'yfinance'. Install via: pip install"
-                    " yfinance"
-                ),
-            })
+            json.dumps(
+                {
+                    "status": "error",
+                    "message": (
+                        "Missing required library 'yfinance'. Install via: pip install yfinance"
+                    ),
+                }
+            )
         )
         sys.exit(1)
 
@@ -69,46 +71,42 @@ def fetch_stock_data(tickers):
             currency = fast_info.currency
 
             if current_price is None:
-                results.append({
-                    "symbol": clean_symbol,
-                    "status": "error",
-                    "error": (
-                        "Invalid symbol or price data unavailable."
-                    ),
-                })
+                results.append(
+                    {
+                        "symbol": clean_symbol,
+                        "status": "error",
+                        "error": ("Invalid symbol or price data unavailable."),
+                    }
+                )
                 continue
 
-            change = (
-                round(current_price - prev_close, 4)
-                if prev_close is not None
-                else None
-            )
+            change = round(current_price - prev_close, 4) if prev_close is not None else None
             change_percent = (
-                round((change / prev_close) * 100, 2)
-                if change is not None and prev_close
-                else None
+                round((change / prev_close) * 100, 2) if change is not None and prev_close else None
             )
 
-            results.append({
-                "symbol": clean_symbol,
-                "status": "success",
-                "price": round(current_price, 2),
-                "currency": currency or "USD",
-                "previous_close": (
-                    round(prev_close, 2) if prev_close else None
-                ),
-                "change": change,
-                "change_percent": change_percent,
-            })
+            results.append(
+                {
+                    "symbol": clean_symbol,
+                    "status": "success",
+                    "price": round(current_price, 2),
+                    "currency": currency or "USD",
+                    "previous_close": (round(prev_close, 2) if prev_close else None),
+                    "change": change,
+                    "change_percent": change_percent,
+                }
+            )
         except Exception as e:
-            results.append({
-                "symbol": clean_symbol,
-                "status": "error",
-                "error": str(e),
-            })
+            results.append(
+                {
+                    "symbol": clean_symbol,
+                    "status": "error",
+                    "error": str(e),
+                }
+            )
 
     return {
-        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "timestamp_utc": datetime.now(UTC).isoformat(),
         "total_requested": len(tickers),
         "data": results,
     }
@@ -116,9 +114,7 @@ def fetch_stock_data(tickers):
 
 def main():
     parser = argparse.ArgumentParser(
-        description=(
-            "Fetch real-time stock prices formatted for AI tool responses."
-        )
+        description=("Fetch real-time stock prices formatted for AI tool responses.")
     )
     parser.add_argument(
         "tickers",

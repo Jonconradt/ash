@@ -89,8 +89,8 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 				slog.Error(fmt.Sprintf("install error: %v", err), "EID", "j6SE1V4c")
 				return 1
 			}
-			fmt.Fprintf(stdout, "ash install already present in %s\n", rcPath)
-			fmt.Fprintln(stdout, "synced .ash_system/.ash_tools to ~/.ash when present")
+			_, _ = fmt.Fprintf(stdout, "ash install already present in %s\n", rcPath)
+			_, _ = fmt.Fprintln(stdout, "synced .ash_system/.ash_tools to ~/.ash when present")
 			return 0
 		}
 
@@ -101,10 +101,10 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 		}
 
 		if dryRun {
-			fmt.Fprintf(stdout, "[dry-run] would update install block in %s\n", rcPath)
-			fmt.Fprint(stdout, block)
+			_, _ = fmt.Fprintf(stdout, "[dry-run] would update install block in %s\n", rcPath)
+			_, _ = fmt.Fprint(stdout, block)
 			if !strings.HasSuffix(block, "\n") {
-				fmt.Fprintln(stdout)
+				_, _ = fmt.Fprintln(stdout)
 			}
 			return 0
 		}
@@ -127,18 +127,18 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 			return 1
 		}
 
-		fmt.Fprintf(stdout, "ash install updated wrappers in %s\n", rcPath)
-		fmt.Fprintln(stdout, "synced .ash_system/.ash_tools to ~/.ash when present")
-		fmt.Fprintln(stdout, "restart your shell or source your rc file to activate wrappers")
+		_, _ = fmt.Fprintf(stdout, "ash install updated wrappers in %s\n", rcPath)
+		_, _ = fmt.Fprintln(stdout, "synced .ash_system/.ash_tools to ~/.ash when present")
+		_, _ = fmt.Fprintln(stdout, "restart your shell or source your rc file to activate wrappers")
 		return 0
 	}
 
 	updated := appendInstallBlock(existing, block)
 	if dryRun {
-		fmt.Fprintf(stdout, "[dry-run] would append install block to %s\n", rcPath)
-		fmt.Fprint(stdout, block)
+		_, _ = fmt.Fprintf(stdout, "[dry-run] would append install block to %s\n", rcPath)
+		_, _ = fmt.Fprint(stdout, block)
 		if !strings.HasSuffix(block, "\n") {
-			fmt.Fprintln(stdout)
+			_, _ = fmt.Fprintln(stdout)
 		}
 		return 0
 	}
@@ -161,9 +161,9 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	fmt.Fprintf(stdout, "ash install appended wrappers to %s\n", rcPath)
-	fmt.Fprintln(stdout, "synced .ash_system/.ash_tools to ~/.ash when present")
-	fmt.Fprintln(stdout, "restart your shell or source your rc file to activate wrappers")
+	_, _ = fmt.Fprintf(stdout, "ash install appended wrappers to %s\n", rcPath)
+	_, _ = fmt.Fprintln(stdout, "synced .ash_system/.ash_tools to ~/.ash when present")
+	_, _ = fmt.Fprintln(stdout, "restart your shell or source your rc file to activate wrappers")
 	return 0
 }
 
@@ -201,7 +201,7 @@ func maybeConfigureInstallEnv(stdout, stderr io.Writer, dryRun bool) error {
 	if err := osWriteFile(path, []byte(buildManagedAshEnv(values)), 0o600); err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "updated %s\n", path)
+	_, _ = fmt.Fprintf(stdout, "updated %s\n", path)
 	return nil
 }
 
@@ -288,7 +288,7 @@ func ashEnvFilePath() (string, error) {
 
 // promptInstallEnvValues collects the AI endpoint and authentication values needed to create a managed ash environment file.
 func promptInstallEnvValues(reader *bufio.Reader, stdout, stderr io.Writer) (map[string]string, error) {
-	fmt.Fprintln(stdout, "Configure ash environment values")
+	_, _ = fmt.Fprintln(stdout, "Configure ash environment values")
 	endpoint, err := promptEndpointWithPresets(reader, stdout)
 	if err != nil {
 		return nil, err
@@ -312,7 +312,7 @@ func promptInstallEnvValues(reader *bufio.Reader, stdout, stderr io.Writer) (map
 		if err != nil {
 			return nil, err
 		}
-		fmt.Fprintln(stderr, "selected cloud endpoint; using AI_AUTH_TYPE=bearer")
+		_, _ = fmt.Fprintln(stderr, "selected cloud endpoint; using AI_AUTH_TYPE=bearer")
 	} else {
 		optionalToken, promptErr := promptOptional(reader, stdout, aiEnvAuthToken+" (optional for localhost)")
 		if promptErr != nil {
@@ -339,13 +339,13 @@ func promptInstallEnvValues(reader *bufio.Reader, stdout, stderr io.Writer) (map
 
 // promptEndpointWithPresets prompts for an AI endpoint, accepting either a preset choice or a custom URL.
 func promptEndpointWithPresets(reader *bufio.Reader, stdout io.Writer) (string, error) {
-	fmt.Fprintln(stdout, "Select AI endpoint preset or enter a custom URL:")
+	_, _ = fmt.Fprintln(stdout, "Select AI endpoint preset or enter a custom URL:")
 	for i, preset := range installEndpointPresets {
-		fmt.Fprintf(stdout, "  %d) %s - %s\n", i+1, preset.Name, preset.URL)
+		_, _ = fmt.Fprintf(stdout, "  %d) %s - %s\n", i+1, preset.Name, preset.URL)
 	}
 
 	for {
-		fmt.Fprintf(stdout, "%s:  ", aiEnvEndpoint)
+		_, _ = fmt.Fprintf(stdout, "%s:  ", aiEnvEndpoint)
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			return "", err
@@ -362,14 +362,14 @@ func promptEndpointWithPresets(reader *bufio.Reader, stdout io.Writer) (string, 
 		if _, _, _, parseErr := parseAIEndpoint(input); parseErr == nil {
 			return strings.TrimRight(input, "/"), nil
 		}
-		fmt.Fprintln(stdout, "invalid endpoint, enter a preset number or full http(s) URL")
+		_, _ = fmt.Fprintln(stdout, "invalid endpoint, enter a preset number or full http(s) URL")
 	}
 }
 
 // promptNonEmpty reads a non-empty value from the user for the provided prompt key.
 func promptNonEmpty(reader *bufio.Reader, stdout io.Writer, key string) (string, error) {
 	for {
-		fmt.Fprintf(stdout, "%s:  ", key)
+		_, _ = fmt.Fprintf(stdout, "%s:  ", key)
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			return "", err
@@ -383,7 +383,7 @@ func promptNonEmpty(reader *bufio.Reader, stdout io.Writer, key string) (string,
 
 // promptOptional reads an optional value from the user for the provided prompt key.
 func promptOptional(reader *bufio.Reader, stdout io.Writer, key string) (string, error) {
-	fmt.Fprintf(stdout, "%s:  ", key)
+	_, _ = fmt.Fprintf(stdout, "%s:  ", key)
 	line, err := reader.ReadString('\n')
 	if err != nil {
 		return "", err
@@ -404,7 +404,7 @@ func buildManagedAshEnv(values map[string]string) string {
 	b.WriteString("export SESSION_ID=`head -c 100 /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1`\n")
 	b.WriteString("export PATH=\"$HOME/.ash/tools:$PATH\"\n")
 	for _, key := range keys {
-		b.WriteString(fmt.Sprintf("export %s=%s\n", key, shellQuote(values[key])))
+		fmt.Fprintf(&b, "export %s=%s\n", key, shellQuote(values[key]))
 	}
 	return b.String()
 }
@@ -627,7 +627,8 @@ func installRecommendation() (string, error) {
 		}
 	}
 
-	if _, err := resolveInstallShellTarget(shellName, activeGOOS()); err != nil {
+	target, ok := installShellTargets[shellName]
+	if !ok || !target.SupportedOnOS(activeGOOS()) {
 		return "", nil
 	}
 
@@ -731,7 +732,7 @@ func ensureInstallShellWrapper(shellName string, dryRun bool, stdout io.Writer) 
 		return err
 	}
 	if dryRun {
-		fmt.Fprintf(stdout, "[dry-run] would write shell wrapper file %s\n", path)
+		_, _ = fmt.Fprintf(stdout, "[dry-run] would write shell wrapper file %s\n", path)
 		return nil
 	}
 

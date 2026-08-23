@@ -205,7 +205,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 
 	slog.Debug("assistant final reply", "request_id", requestIDGenerator(), "bytes", len(assistantReply), "sha256", hashForLog([]byte(assistantReply)), "EID", "jzszDMVF")
-	fmt.Fprint(stdout, formatAssistantOutput(assistantReply))
+	_, _ = fmt.Fprint(stdout, formatAssistantOutput(assistantReply))
 
 	conversation = stripSystemMessage(updatedMessages)
 	conversation = keepRecentMessages(conversation, historyLimit())
@@ -220,7 +220,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 // printUsage writes the CLI usage text for the ash command to w.
 func printUsage(w io.Writer) {
-	fmt.Fprintln(w, "usage: ash <text>")
-	fmt.Fprintln(w, "       ash install [--shell bash|zsh] [--dry-run] [--overwrite]")
-	fmt.Fprintln(w, "       ash broker --socket <path>")
+	_, _ = fmt.Fprintln(w, "usage: ash <text>")
+	_, _ = fmt.Fprintln(w, "       ash install [--shell bash|zsh] [--dry-run] [--overwrite]")
+	_, _ = fmt.Fprintln(w, "       ash broker --socket <path>")
 }

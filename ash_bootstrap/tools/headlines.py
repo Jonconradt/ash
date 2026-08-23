@@ -4,7 +4,7 @@ import json
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
-from typing import Dict, Any, List, Optional
+from typing import Any
 
 
 def build_ai_docs() -> str:
@@ -36,11 +36,8 @@ Usage guidance for the AI:
 
 
 def fetch_latest_news(
-    query: Optional[str] = None,
-    limit: int = 5,
-    language: str = "en",
-    country: str = "US"
-) -> Dict[str, Any]:
+    query: str | None = None, limit: int = 5, language: str = "en", country: str = "US"
+) -> dict[str, Any]:
     """
     Fetches latest news headlines via RSS and returns a structured dictionary
     tailored for LLM / AI tool consumption.
@@ -57,16 +54,14 @@ def fetch_latest_news(
     """
     base_url = "https://news.google.com/rss"
     params = f"hl={language}-{country}&gl={country}&ceid={country}:{language}"
-    
+
     if query:
         encoded_query = urllib.parse.quote(query)
         url = f"{base_url}/search?q={encoded_query}&{params}"
     else:
         url = f"{base_url}?{params}"
 
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-    }
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
     try:
         req = urllib.request.Request(url, headers=headers)
@@ -76,14 +71,14 @@ def fetch_latest_news(
         root = ET.fromstring(xml_data)
         channel = root.find("channel")
 
-        articles: List[Dict[str, str]] = []
+        articles: list[dict[str, str]] = []
 
         if channel is not None:
             for item in channel.findall("item")[:limit]:
                 full_title = item.findtext("title", "No Title")
                 link = item.findtext("link", "")
                 pub_date = item.findtext("pubDate", "")
-                
+
                 source_elem = item.find("source")
                 if source_elem is not None and source_elem.text:
                     source_name = source_elem.text
@@ -94,26 +89,24 @@ def fetch_latest_news(
 
                 headline = full_title.rsplit(" - ", 1)[0] if " - " in full_title else full_title
 
-                articles.append({
-                    "headline": headline,
-                    "source": source_name,
-                    "published_at": pub_date,
-                    "url": link
-                })
+                articles.append(
+                    {
+                        "headline": headline,
+                        "source": source_name,
+                        "published_at": pub_date,
+                        "url": link,
+                    }
+                )
 
         return {
             "status": "success",
             "query": query or "Top Headlines",
             "count": len(articles),
-            "articles": articles
+            "articles": articles,
         }
 
     except Exception as err:
-        return {
-            "status": "error",
-            "error_message": str(err),
-            "articles": []
-        }
+        return {"status": "error", "error_message": str(err), "articles": []}
 
 
 def main() -> None:

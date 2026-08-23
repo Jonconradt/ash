@@ -9,6 +9,7 @@ Security fixes are applied to the latest release line. Older release branches ar
 Please report suspected vulnerabilities privately by emailing the maintainer or by opening a security advisory through GitHub.
 
 Do not create public issues for security problems. Include:
+
 - a concise description of the issue
 - affected version or commit
 - steps to reproduce
@@ -21,6 +22,7 @@ The tool execution subsystem is intentionally constrained to a local allowlist o
 ## Prompt injection and tool safety
 
 The project is designed for local, user-driven shell assistance. Treat all model-generated command requests as untrusted input. Users should:
+
 - keep the tool allowlist as narrow as practical
 - avoid granting access to sensitive commands unless absolutely necessary
 - review tool output before acting on it

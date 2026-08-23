@@ -3,7 +3,6 @@ import subprocess
 import sys
 import unittest
 
-
 ROOT = os.path.dirname(os.path.abspath(__file__))
 
 

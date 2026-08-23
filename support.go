@@ -765,7 +765,7 @@ func schedulerInvocationEnv() map[string]string {
 		if logFile, err := schedulerLogFilePathForSession(env[sessionIDEnvName], true); err == nil {
 			env["ASH_LOG_FILE"] = logFile
 		} else {
-			fmt.Fprintln(os.Stderr, err)
+			_, _ = fmt.Fprintln(os.Stderr, err)
 		}
 	}
 	if strings.TrimSpace(env["ASH_LOG_FORMAT"]) == "" {
@@ -941,31 +941,31 @@ func buildLaunchAgentPlist(label string, programArgs []string, env map[string]st
 	b.WriteString("<plist version=\"1.0\">\n")
 	b.WriteString("<dict>\n")
 	b.WriteString("    <key>Label</key>\n")
-	b.WriteString(fmt.Sprintf("    <string>%s</string>\n", xmlEscape(label)))
+	fmt.Fprintf(&b, "    <string>%s</string>\n", xmlEscape(label))
 	b.WriteString("    <key>ProgramArguments</key>\n")
 	b.WriteString("    <array>\n")
 	for _, arg := range programArgs {
-		b.WriteString(fmt.Sprintf("        <string>%s</string>\n", xmlEscape(arg)))
+		fmt.Fprintf(&b, "        <string>%s</string>\n", xmlEscape(arg))
 	}
 	b.WriteString("    </array>\n")
 	b.WriteString("    <key>EnvironmentVariables</key>\n")
 	b.WriteString("    <dict>\n")
 	for _, key := range envKeys {
-		b.WriteString(fmt.Sprintf("        <key>%s</key>\n", xmlEscape(key)))
-		b.WriteString(fmt.Sprintf("        <string>%s</string>\n", xmlEscape(env[key])))
+		fmt.Fprintf(&b, "        <key>%s</key>\n", xmlEscape(key))
+		fmt.Fprintf(&b, "        <string>%s</string>\n", xmlEscape(env[key]))
 	}
 	b.WriteString("    </dict>\n")
 	b.WriteString("    <key>WorkingDirectory</key>\n")
-	b.WriteString(fmt.Sprintf("    <string>%s</string>\n", xmlEscape(cwd)))
+	fmt.Fprintf(&b, "    <string>%s</string>\n", xmlEscape(cwd))
 	b.WriteString("    <key>RunAtLoad</key>\n")
 	b.WriteString("    <false/>\n")
 	b.WriteString("    <key>StartCalendarInterval</key>\n")
 	b.WriteString("    <dict>\n")
-	b.WriteString(fmt.Sprintf("        <key>Year</key>\n        <integer>%d</integer>\n", scheduledAt.Year()))
-	b.WriteString(fmt.Sprintf("        <key>Month</key>\n        <integer>%d</integer>\n", int(scheduledAt.Month())))
-	b.WriteString(fmt.Sprintf("        <key>Day</key>\n        <integer>%d</integer>\n", scheduledAt.Day()))
-	b.WriteString(fmt.Sprintf("        <key>Hour</key>\n        <integer>%d</integer>\n", scheduledAt.Hour()))
-	b.WriteString(fmt.Sprintf("        <key>Minute</key>\n        <integer>%d</integer>\n", scheduledAt.Minute()))
+	fmt.Fprintf(&b, "        <key>Year</key>\n        <integer>%d</integer>\n", scheduledAt.Year())
+	fmt.Fprintf(&b, "        <key>Month</key>\n        <integer>%d</integer>\n", int(scheduledAt.Month()))
+	fmt.Fprintf(&b, "        <key>Day</key>\n        <integer>%d</integer>\n", scheduledAt.Day())
+	fmt.Fprintf(&b, "        <key>Hour</key>\n        <integer>%d</integer>\n", scheduledAt.Hour())
+	fmt.Fprintf(&b, "        <key>Minute</key>\n        <integer>%d</integer>\n", scheduledAt.Minute())
 	b.WriteString("    </dict>\n")
 	b.WriteString("</dict>\n")
 	b.WriteString("</plist>\n")
@@ -1582,12 +1582,12 @@ func startThinkingIndicator(w io.Writer) func() {
 
 		frame := 0
 		for {
-			fmt.Fprintf(w, "\rThinking... %s", frames[frame])
+			_, _ = fmt.Fprintf(w, "\rThinking... %s", frames[frame])
 			frame = (frame + 1) % len(frames)
 
 			select {
 			case <-done:
-				fmt.Fprint(w, "\r                \r")
+				_, _ = fmt.Fprint(w, "\r                \r")
 				return
 			case <-ticker.C:
 			}

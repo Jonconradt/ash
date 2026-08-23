@@ -628,7 +628,7 @@ func (s localToolShim) callManageRecurringJobs(ctx context.Context, args map[str
 				b.WriteString("no recurring ash jobs found")
 			} else {
 				for _, rec := range records {
-					b.WriteString(fmt.Sprintf("id=%s cron=%s cwd=%s purpose=%s\n", rec.Meta.ID, rec.Meta.Cron, rec.Meta.Cwd, strings.TrimSpace(rec.Meta.Purpose)))
+					fmt.Fprintf(&b, "id=%s cron=%s cwd=%s purpose=%s\n", rec.Meta.ID, rec.Meta.Cron, rec.Meta.Cwd, strings.TrimSpace(rec.Meta.Purpose))
 				}
 			}
 			return toolCommandResult{OK: true, Command: "crontab -l", ExitCode: 0, Stdout: strings.TrimSpace(b.String())}

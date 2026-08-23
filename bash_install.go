@@ -262,7 +262,7 @@ func ensureBashProfileSourcingForInstall(dryRun bool, stdout io.Writer) error {
 	}
 
 	if dryRun {
-		fmt.Fprintf(stdout, "[dry-run] would append ash source line to %s\n", profilePath)
+		_, _ = fmt.Fprintf(stdout, "[dry-run] would append ash source line to %s\n", profilePath)
 		return nil
 	}
 	return osWriteFile(profilePath, []byte(updated), 0o600)

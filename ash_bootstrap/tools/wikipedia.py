@@ -2,9 +2,9 @@
 import argparse
 import json
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
-import urllib.error
 
 
 def build_ai_docs() -> str:
@@ -44,39 +44,42 @@ def make_request_with_backoff(url: str, headers: dict, max_retries: int = 3) -> 
             if e.code == 429:
                 if attempt == max_retries:
                     raise e
-                
+
                 retry_after = e.headers.get("Retry-After")
-                wait_time = int(retry_after) if retry_after and retry_after.isdigit() else (2 ** (attempt + 1))
+                wait_time = (
+                    int(retry_after)
+                    if retry_after and retry_after.isdigit()
+                    else (2 ** (attempt + 1))
+                )
                 time.sleep(wait_time)
             else:
                 raise e
     raise Exception("Max retries exceeded")
 
 
-def wikipedia_search_tool(query: str, user_agent: str = "MyAIAgent/1.0 (contact@example.com)") -> str:
+def wikipedia_search_tool(
+    query: str, user_agent: str = "MyAIAgent/1.0 (contact@example.com)"
+) -> str:
     """Searches Wikipedia and returns the first result in a clean AI-friendly JSON format."""
-    headers = {
-        "User-Agent": user_agent
-    }
+    headers = {"User-Agent": user_agent}
 
     try:
-        search_params = urllib.parse.urlencode({
-            "action": "query",
-            "list": "search",
-            "srsearch": query,
-            "format": "json",
-            "srlimit": 1
-        })
+        search_params = urllib.parse.urlencode(
+            {"action": "query", "list": "search", "srsearch": query, "format": "json", "srlimit": 1}
+        )
         search_url = f"https://en.wikipedia.org/w/api.php?{search_params}"
         search_data = make_request_with_backoff(search_url, headers)
 
         search_results = search_data.get("query", {}).get("search", [])
         if not search_results:
-            return json.dumps({
-                "status": "not_found",
-                "query": query,
-                "message": f"No Wikipedia pages found matching '{query}'."
-            }, indent=2)
+            return json.dumps(
+                {
+                    "status": "not_found",
+                    "query": query,
+                    "message": f"No Wikipedia pages found matching '{query}'.",
+                },
+                indent=2,
+            )
 
         top_title = search_results[0]["title"]
 
@@ -90,23 +93,22 @@ def wikipedia_search_tool(query: str, user_agent: str = "MyAIAgent/1.0 (contact@
             "title": summary_data.get("title", top_title),
             "description": summary_data.get("description", ""),
             "summary": summary_data.get("extract", ""),
-            "url": summary_data.get("content_urls", {}).get("desktop", {}).get("page", "")
+            "url": summary_data.get("content_urls", {}).get("desktop", {}).get("page", ""),
         }
         return json.dumps(tool_output, indent=2, ensure_ascii=False)
 
     except urllib.error.HTTPError as e:
-        return json.dumps({
-            "status": "error",
-            "query": query,
-            "error_code": e.code,
-            "message": f"HTTP {e.code}: Rate limit or request failure ({e.reason})"
-        }, indent=2)
+        return json.dumps(
+            {
+                "status": "error",
+                "query": query,
+                "error_code": e.code,
+                "message": f"HTTP {e.code}: Rate limit or request failure ({e.reason})",
+            },
+            indent=2,
+        )
     except Exception as e:
-        return json.dumps({
-            "status": "error",
-            "query": query,
-            "message": str(e)
-        }, indent=2)
+        return json.dumps({"status": "error", "query": query, "message": str(e)}, indent=2)
 
 
 def main() -> None:

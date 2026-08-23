@@ -211,7 +211,7 @@ func removeLegacyToolScripts(root string, embeddedEntries []fs.DirEntry, stdout 
 			return fmt.Errorf("remove legacy tool script %s: %w", legacyPath, err)
 		}
 		if stdout != nil {
-			fmt.Fprintf(stdout, "removed legacy tool script %s\n", legacyPath)
+			_, _ = fmt.Fprintf(stdout, "removed legacy tool script %s\n", legacyPath)
 		}
 	}
 
@@ -227,7 +227,7 @@ func installManagedAssetFile(dstPath string, content []byte, overwrite bool, mod
 	if err == nil {
 		if !overwrite {
 			if stdout != nil {
-				fmt.Fprintf(stdout, "kept existing %s\n", dstPath)
+				_, _ = fmt.Fprintf(stdout, "kept existing %s\n", dstPath)
 			}
 			return applyAssetFilePermissions(dstPath, mode, isScript)
 		}

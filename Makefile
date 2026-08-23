@@ -1,10 +1,12 @@
-.PHONY: all verify build lint yaml-lint test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install setup-hooks version release release-check release-build release-pkg release-validate release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one
+.PHONY: all verify build lint yaml-lint python-lint markdown-lint test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install setup-hooks version release release-check release-build release-pkg release-validate release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one
 
 SHELL := /bin/bash
 
 COVERAGE_MIN ?= 60
 FUZZ_TIME ?= 10s
-GOLANGCI_LINT_VERSION ?= v1.64.8
+GOLANGCI_LINT_VERSION ?= v2.13.1
+RUFF_VERSION ?= 0.12.10
+MARKDOWNLINT_CLI2_VERSION ?= 0.23.2
 GOSEC_VERSION ?= v2.22.1
 GOVULNCHECK_VERSION ?= v1.1.4
 APP_NAME ?= ash
@@ -38,12 +40,19 @@ verify: test test-race test-cover vet staticcheck security test-fuzz benchmark
 build: lint test
 	@go install .
 
-lint: yaml-lint
-	@go run github.com/golangci/golangci-lint/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run ./...
+lint: yaml-lint python-lint markdown-lint
+	@go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run ./...
 
 yaml-lint:
 	@echo "Validating GitHub Actions workflows..."
 	@go run github.com/google/yamlfmt/cmd/yamlfmt@latest -lint .github/workflows/*.yml
+
+python-lint:
+	@uvx ruff@$(RUFF_VERSION) check ash_bootstrap/tools
+	@uvx ruff@$(RUFF_VERSION) format --check ash_bootstrap/tools
+
+markdown-lint:
+	@npx --yes markdownlint-cli2@$(MARKDOWNLINT_CLI2_VERSION) README.md ARCHITECTURE.md CONTRIBUTING.md SECURITY.md AGENTS.md scripts/eid-injector/README.md
 
 security: gosec govulncheck
 
