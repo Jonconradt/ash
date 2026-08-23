@@ -742,8 +742,16 @@ func (s localToolShim) callReadWorkspaceFile(args map[string]any) toolCommandRes
 	if err != nil {
 		return toolCommandResult{OK: false, Command: "ash_read_workspace_file", Error: err.Error(), EID: "j2lS5Gcq"}
 	}
+	payload := string(content)
+	if strictSecurityModeEnabled() {
+		sanitized, blocked := sanitizeUntrustedTextForModel(payload)
+		if blocked {
+			sanitized = "[blocked potential prompt-injection content from untrusted source]"
+		}
+		payload = formatUntrustedEvidenceBlock("file_content", relPath, sanitized)
+	}
 
-	return toolCommandResult{OK: true, Command: "ash_read_workspace_file", ExitCode: 0, Stdout: fmt.Sprintf("path=%s\n%s", relPath, string(content))}
+	return toolCommandResult{OK: true, Command: "ash_read_workspace_file", ExitCode: 0, Stdout: fmt.Sprintf("path=%s\n%s", relPath, payload)}
 }
 
 // callWriteWorkspaceFile writes a file into the canonical ash workspace and records its purpose in the workspace inventory.
@@ -803,10 +811,18 @@ func (s localToolShim) callReadScratchFile(args map[string]any) toolCommandResul
 	if err != nil {
 		return toolCommandResult{OK: false, Command: "ash_read_scratch_file", Error: err.Error(), EID: "yh6bZ1NG"}
 	}
+	payload := string(content)
+	if strictSecurityModeEnabled() {
+		sanitized, blocked := sanitizeUntrustedTextForModel(payload)
+		if blocked {
+			sanitized = "[blocked potential prompt-injection content from untrusted source]"
+		}
+		payload = formatUntrustedEvidenceBlock("file_content", relPath, sanitized)
+	}
 	if err := updateScratchAccessMarker(root); err != nil {
 		return toolCommandResult{OK: false, Command: "ash_read_scratch_file", Error: err.Error(), EID: "G4rQePRH"}
 	}
-	return toolCommandResult{OK: true, Command: "ash_read_scratch_file", ExitCode: 0, Stdout: fmt.Sprintf("path=%s\n%s", relPath, string(content))}
+	return toolCommandResult{OK: true, Command: "ash_read_scratch_file", ExitCode: 0, Stdout: fmt.Sprintf("path=%s\n%s", relPath, payload)}
 }
 
 func (s localToolShim) callWriteScratchFile(args map[string]any) toolCommandResult {

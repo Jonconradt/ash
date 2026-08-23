@@ -79,6 +79,7 @@ var (
 		return &http.Client{Timeout: timeout}
 	}
 	argumentBlockPattern                = regexp.MustCompile(`(;|\|\||&&|\||` + "`" + `|\$\(|>|<|\x00|\n|\r)`)
+	promptInjectionPattern              = regexp.MustCompile(`(?i)(ignore\s+(all\s+)?previous\s+instructions|disregard\s+previous\s+instructions|system\s+prompt|developer\s+message|you\s+are\s+now|jailbreak|override\s+instructions|follow\s+these\s+instructions\s+instead)`)
 	toolCommandRunner                   = runToolCommand
 	toolPipelineRunner                  = runToolPipeline
 	pickCloudBusy503Message             = randomCloudBusy503Message
@@ -388,6 +389,43 @@ func verboseLoggingEnabled() bool {
 	default:
 		return false
 	}
+}
+
+// strictSecurityModeEnabled reports whether strict prompt-injection hardening is enabled.
+func strictSecurityModeEnabled() bool {
+	raw := strings.ToLower(strings.TrimSpace(os.Getenv("ASH_STRICT")))
+	switch raw {
+	case "1", "true", "yes", "y", "on", "strict":
+		return true
+	default:
+		return false
+	}
+}
+
+func containsPromptInjectionPattern(value string) bool {
+	return promptInjectionPattern.MatchString(value)
+}
+
+func sanitizeUntrustedTextForModel(value string) (string, bool) {
+	trimmed := strings.TrimSpace(value)
+	if !strictSecurityModeEnabled() {
+		return trimmed, false
+	}
+	if containsPromptInjectionPattern(trimmed) {
+		return "[blocked potential prompt-injection content from untrusted source]", true
+	}
+	return trimmed, false
+}
+
+func formatUntrustedEvidenceBlock(kind, source, content string) string {
+	quoted := strconv.QuoteToASCII(content)
+	return fmt.Sprintf(
+		"UNTRUSTED_%s_BEGIN source=%s\n%s\nUNTRUSTED_%s_END",
+		strings.ToUpper(strings.TrimSpace(kind)),
+		strings.TrimSpace(source),
+		quoted,
+		strings.ToUpper(strings.TrimSpace(kind)),
+	)
 }
 
 func newStructuredLogger(w io.Writer, level slog.Level) *slog.Logger {
