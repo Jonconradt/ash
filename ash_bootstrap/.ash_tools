@@ -107,6 +107,34 @@ jq
 python3
 
 # -----------------------------------------------------------------------------
+# Additional read-only diagnostics (safe and useful for Linux/macOS)
+# -----------------------------------------------------------------------------
+lsblk
+lscpu
+free
+who
+w
+groups
+ss
+ip
+route
+arp
+lsmod
+locale
+sha256sum
+mount
+timeout
+
+diskutil
+system_profiler
+ioreg
+networksetup
+defaults
+airport
+dscacheutil
+xattr
+
+# -----------------------------------------------------------------------------
 # macOS-specific utilities
 # -----------------------------------------------------------------------------
 osascript
@@ -129,7 +157,7 @@ launchctl
 # Optional additions (uncomment only if desired)
 # -----------------------------------------------------------------------------
 # git
-make
-go
-curl
-wget
+# make
+# go
+# curl
+# wget
