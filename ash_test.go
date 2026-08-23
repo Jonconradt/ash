@@ -2053,6 +2053,102 @@ func TestWorkspaceReadWriteTools(t *testing.T) {
 	}
 }
 
+func TestScratchReadWriteAppendAndEditTools(t *testing.T) {
+	shim := localToolShim{}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SESSION_ID", "session_123")
+
+	writeResult := shim.CallTool(context.Background(), "ash_write_scratch_file", map[string]any{
+		"path":    "plan/notes.txt",
+		"content": "alpha",
+		"purpose": "scratch planning",
+	})
+	if !strings.Contains(writeResult, `"ok":true`) {
+		t.Fatalf("expected successful scratch write, got %s", writeResult)
+	}
+
+	appendResult := shim.CallTool(context.Background(), "ash_append_scratch_file", map[string]any{
+		"path":    "plan/notes.txt",
+		"content": " beta",
+	})
+	if !strings.Contains(appendResult, `"ok":true`) {
+		t.Fatalf("expected successful scratch append, got %s", appendResult)
+	}
+
+	editResult := shim.CallTool(context.Background(), "ash_edit_scratch_file", map[string]any{
+		"path":    "plan/notes.txt",
+		"content": "gamma",
+	})
+	if !strings.Contains(editResult, `"ok":true`) {
+		t.Fatalf("expected successful scratch edit, got %s", editResult)
+	}
+
+	content, err := os.ReadFile(filepath.Join(home, ".ash", "scratch", "session_123", "plan", "notes.txt"))
+	if err != nil {
+		t.Fatalf("read scratch file: %v", err)
+	}
+	if string(content) != "gamma" {
+		t.Fatalf("unexpected scratch content: %q", string(content))
+	}
+
+	readResult := shim.CallTool(context.Background(), "ash_read_scratch_file", map[string]any{"path": "plan/notes.txt"})
+	if !strings.Contains(readResult, `"ok":true`) || !strings.Contains(readResult, "gamma") {
+		t.Fatalf("expected successful scratch read, got %s", readResult)
+	}
+}
+
+func TestCleanupStaleScratchDirs(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	base := filepath.Join(home, ".ash", "scratch")
+	if err := os.MkdirAll(base, 0o700); err != nil {
+		t.Fatalf("mkdir scratch root: %v", err)
+	}
+
+	activeDir := filepath.Join(base, "active-session")
+	staleDir := filepath.Join(base, "stale-session")
+	for _, dir := range []string{activeDir, staleDir} {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatalf("mkdir scratch dir %s: %v", dir, err)
+		}
+		if err := os.WriteFile(filepath.Join(dir, scratchAccessFileName), []byte("touch"), 0o600); err != nil {
+			t.Fatalf("write access marker in %s: %v", dir, err)
+		}
+	}
+
+	now := time.Now()
+	old := now.Add(-50 * time.Hour)
+	if err := os.Chtimes(filepath.Join(staleDir, scratchAccessFileName), old, old); err != nil {
+		t.Fatalf("touch stale access marker: %v", err)
+	}
+	if err := os.Chtimes(staleDir, old, old); err != nil {
+		t.Fatalf("touch stale dir: %v", err)
+	}
+
+	recent := now.Add(-2 * time.Hour)
+	if err := os.Chtimes(filepath.Join(activeDir, scratchAccessFileName), recent, recent); err != nil {
+		t.Fatalf("touch active access marker: %v", err)
+	}
+	if err := os.Chtimes(activeDir, recent, recent); err != nil {
+		t.Fatalf("touch active dir: %v", err)
+	}
+
+	deleted, err := cleanupStaleScratchDirs(base, now)
+	if err != nil {
+		t.Fatalf("cleanup stale scratch dirs: %v", err)
+	}
+	if len(deleted) != 1 || !strings.HasSuffix(filepath.ToSlash(deleted[0]), "/stale-session") {
+		t.Fatalf("expected stale session dir to be deleted, got %#v", deleted)
+	}
+	if _, err := os.Stat(activeDir); err != nil {
+		t.Fatalf("expected active scratch dir to remain, got %v", err)
+	}
+	if _, err := os.Stat(staleDir); !os.IsNotExist(err) {
+		t.Fatalf("expected stale scratch dir to be removed, got err=%v", err)
+	}
+}
+
 func TestWorkspaceWriteRejectsPathTraversal(t *testing.T) {
 	shim := localToolShim{}
 	home := t.TempDir()

@@ -21,3 +21,6 @@ Guidance:
 - Do not use shell chaining or expansion such as `&&`, `;`, `||`, nested pipes, backticks, `$()`, redirection, or newlines inside command arguments. These are rejected, and the tools execute directly without a shell.
 - Keep every executable in a command or pipeline on the configured allowlist, and pass arguments as direct values. If more than 16 stages are needed, make separate tool calls or combine the task using one command's built-in options.
 - Be concise, safe, and useful. If the request is ambiguous, ask a brief clarifying question rather than guessing.
+- Use the managed scratch workspace under ~/.ash/scratch/<session-id>/ for temporary notes, planning lists, intermediate state, and helper scripts. The session ID is managed automatically by ash; do not pass or remember it.
+- Keep scratch files confined to the managed scratch area; do not write temporary artifacts into arbitrary directories like /tmp or project workspaces unless the user explicitly requests it.
+- Prefer scratch files for transient planning and one-off scripts, and keep them short-lived; stale scratch directories are cleaned up automatically when older than 48 hours and not accessed for 24 hours.

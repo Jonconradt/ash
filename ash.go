@@ -34,6 +34,10 @@ const (
 	defaultRetryMaxAttempts           = 3
 	defaultRetryBaseDelay             = 250 * time.Millisecond
 	defaultRetryMaxDelay              = 2 * time.Second
+	scratchDirName                    = "scratch"
+	scratchAccessFileName             = ".ash_scratch_access"
+	scratchCleanupMaxAge              = 48 * time.Hour
+	scratchCleanupIdleAge             = 24 * time.Hour
 	sessionIDEnvName                  = "SESSION_ID"
 	scheduledTaskEnvName              = "ASH_SCHEDULED_TASK"
 	historyDirName                    = "history"
@@ -106,6 +110,13 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 	configureDebugLogging()
 	defer cleanupHistoryRetention(defaultHistoryRetention, defaultHistoryCleanupBudget)
+	defer func() {
+		if root, err := ashScratchRoot(); err == nil {
+			if _, err := cleanupStaleScratchDirs(root, timeNow()); err != nil {
+				slog.Debug("scratch cleanup failed", "error", err, "EID", "uRkD7M7F")
+			}
+		}
+	}()
 
 	if recommendation, err := installRecommendation(); err == nil && recommendation != "" {
 		slog.Info(recommendation, "EID", "Ss6EkIfE")

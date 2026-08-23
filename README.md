@@ -16,6 +16,8 @@ What if you want the AI to investigate a problem? The .ash_tools file is an allo
 
 What if you have a more complex question, something that needs to be computed? If you allow ash to expose Python the AI can write temporary scripts, or use scripts in the ~/.ash/tools directory to run complex processes.
 
+What if the AI needs temporary notes, plans, script fragments, or small working files? Ash includes a managed scratch workspace under `~/.ash/scratch/<session-id>/` that is automatically scoped to the current session. The AI never needs to remember or pass the session ID; ash resolves it automatically. Scratch files are kept inside the managed workspace and are cleaned up on exit when a directory is older than 48 hours and has not been accessed in the last 24 hours.
+
 What if you want something to happen on a schedule or in the future? Ash can create systems jobs that run once or recur.
 
 What if I want to run a unix command that looks like a prompt, e.g. which ash? You can snooze ash with "ash snooze 5m" and it will not interpret your command line as a prompt. 
@@ -47,6 +49,8 @@ Is this thing secure and safe? It really depends on how bold you are. It runs as
 - Can schedule one-off and recurring prompt invocations via `at` and `crontab`
 - Maintains recurring-job inventory and management through AI tools
 - Provides persistent AI workspace file access under `~/.ash`
+- Provides a session-scoped scratch workspace under `~/.ash/scratch/<session-id>/` for temporary notes, plans, and helper files
+- Automatically cleans stale scratch directories older than 48 hours with no access in the last 24 hours
 
 ## Build
 

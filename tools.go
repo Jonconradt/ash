@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -205,6 +206,90 @@ func (s localToolShim) ListTools() []toolDefinition {
 				},
 			},
 		},
+		{
+			Type: "function",
+			Function: toolFunctionDefinition{
+				Name:        "ash_read_scratch_file",
+				Description: "Read a file in the current session's managed scratch directory under ~/.ash/scratch",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"path": map[string]any{
+							"type":        "string",
+							"description": "Path relative to the current session scratch root",
+						},
+					},
+					"required": []string{"path"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: toolFunctionDefinition{
+				Name:        "ash_write_scratch_file",
+				Description: "Write a file in the current session's managed scratch directory under ~/.ash/scratch",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"path": map[string]any{
+							"type":        "string",
+							"description": "Path relative to the current session scratch root",
+						},
+						"content": map[string]any{
+							"type":        "string",
+							"description": "File contents to write",
+						},
+						"purpose": map[string]any{
+							"type":        "string",
+							"description": "Optional purpose text for scratch tracking",
+						},
+					},
+					"required": []string{"path", "content"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: toolFunctionDefinition{
+				Name:        "ash_append_scratch_file",
+				Description: "Append content to a file in the current session's managed scratch directory under ~/.ash/scratch",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"path": map[string]any{
+							"type":        "string",
+							"description": "Path relative to the current session scratch root",
+						},
+						"content": map[string]any{
+							"type":        "string",
+							"description": "Content to append",
+						},
+					},
+					"required": []string{"path", "content"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: toolFunctionDefinition{
+				Name:        "ash_edit_scratch_file",
+				Description: "Replace a file in the current session's managed scratch directory under ~/.ash/scratch",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"path": map[string]any{
+							"type":        "string",
+							"description": "Path relative to the current session scratch root",
+						},
+						"content": map[string]any{
+							"type":        "string",
+							"description": "Replacement file contents",
+						},
+					},
+					"required": []string{"path", "content"},
+				},
+			},
+		},
 	}
 	if !isChildAgent() {
 		tools = append(tools, toolDefinition{
@@ -254,6 +339,14 @@ func (s localToolShim) CallTool(ctx context.Context, name string, args map[strin
 		result = s.callReadWorkspaceFile(args)
 	case "ash_write_workspace_file":
 		result = s.callWriteWorkspaceFile(args)
+	case "ash_read_scratch_file":
+		result = s.callReadScratchFile(args)
+	case "ash_write_scratch_file":
+		result = s.callWriteScratchFile(args)
+	case "ash_append_scratch_file":
+		result = s.callAppendScratchFile(args)
+	case "ash_edit_scratch_file":
+		result = s.callEditScratchFile(args)
 	default:
 		result = toolCommandResult{OK: false, Error: fmt.Sprintf("unknown tool: %s", name), EID: "Ryr9hU7l"}
 	}
@@ -691,4 +784,118 @@ func (s localToolShim) callWriteWorkspaceFile(args map[string]any) toolCommandRe
 	}
 
 	return toolCommandResult{OK: true, Command: "ash_write_workspace_file", ExitCode: 0, Stdout: fmt.Sprintf("wrote %s", relPath)}
+}
+
+func (s localToolShim) callReadScratchFile(args map[string]any) toolCommandResult {
+	rel, ok := toStringArg(args["path"])
+	if !ok || strings.TrimSpace(rel) == "" {
+		return toolCommandResult{OK: false, Command: "ash_read_scratch_file", Error: "path must be a non-empty string", EID: "uVm1k7c0"}
+	}
+	root, err := ashScratchSessionRoot()
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "ash_read_scratch_file", Error: err.Error(), EID: "nZM5YQn7"}
+	}
+	absolutePath, relPath, err := resolveScratchPath(root, rel)
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "ash_read_scratch_file", Error: err.Error(), EID: "h2XPvVtL"}
+	}
+	content, err := osReadFile(absolutePath)
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "ash_read_scratch_file", Error: err.Error(), EID: "yh6bZ1NG"}
+	}
+	if err := updateScratchAccessMarker(root); err != nil {
+		return toolCommandResult{OK: false, Command: "ash_read_scratch_file", Error: err.Error(), EID: "G4rQePRH"}
+	}
+	return toolCommandResult{OK: true, Command: "ash_read_scratch_file", ExitCode: 0, Stdout: fmt.Sprintf("path=%s\n%s", relPath, string(content))}
+}
+
+func (s localToolShim) callWriteScratchFile(args map[string]any) toolCommandResult {
+	rel, ok := toStringArg(args["path"])
+	if !ok || strings.TrimSpace(rel) == "" {
+		return toolCommandResult{OK: false, Command: "ash_write_scratch_file", Error: "path must be a non-empty string", EID: "Sz2W91zM"}
+	}
+	content, ok := toStringArg(args["content"])
+	if !ok {
+		return toolCommandResult{OK: false, Command: "ash_write_scratch_file", Error: "content must be a string", EID: "ke8gAfiS"}
+	}
+	root, err := ashScratchSessionRoot()
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "ash_write_scratch_file", Error: err.Error(), EID: "fL3MHcQP"}
+	}
+	absolutePath, relPath, err := resolveScratchPath(root, rel)
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "ash_write_scratch_file", Error: err.Error(), EID: "Q6k2ud7x"}
+	}
+	if err := osMkdirAll(filepath.Dir(absolutePath), 0o700); err != nil {
+		return toolCommandResult{OK: false, Command: "ash_write_scratch_file", Error: err.Error(), EID: "d6pJYDoL"}
+	}
+	if err := osWriteFile(absolutePath, []byte(content), 0o600); err != nil {
+		return toolCommandResult{OK: false, Command: "ash_write_scratch_file", Error: err.Error(), EID: "T2f1nJqH"}
+	}
+	if err := updateScratchAccessMarker(root); err != nil {
+		return toolCommandResult{OK: false, Command: "ash_write_scratch_file", Error: err.Error(), EID: "P9U2vU7Q"}
+	}
+	return toolCommandResult{OK: true, Command: "ash_write_scratch_file", ExitCode: 0, Stdout: fmt.Sprintf("wrote %s", relPath)}
+}
+
+func (s localToolShim) callAppendScratchFile(args map[string]any) toolCommandResult {
+	rel, ok := toStringArg(args["path"])
+	if !ok || strings.TrimSpace(rel) == "" {
+		return toolCommandResult{OK: false, Command: "ash_append_scratch_file", Error: "path must be a non-empty string", EID: "AvW1nY6Q"}
+	}
+	content, ok := toStringArg(args["content"])
+	if !ok {
+		return toolCommandResult{OK: false, Command: "ash_append_scratch_file", Error: "content must be a string", EID: "r2Hk1HeP"}
+	}
+	root, err := ashScratchSessionRoot()
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "ash_append_scratch_file", Error: err.Error(), EID: "HnD2J7oW"}
+	}
+	absolutePath, relPath, err := resolveScratchPath(root, rel)
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "ash_append_scratch_file", Error: err.Error(), EID: "v1sK2d5J"}
+	}
+	if err := osMkdirAll(filepath.Dir(absolutePath), 0o700); err != nil {
+		return toolCommandResult{OK: false, Command: "ash_append_scratch_file", Error: err.Error(), EID: "kC2tD5cY"}
+	}
+	current, err := osReadFile(absolutePath)
+	if err != nil && !errors.Is(err, os.ErrNotExist) {
+		return toolCommandResult{OK: false, Command: "ash_append_scratch_file", Error: err.Error(), EID: "bD2M3w4w"}
+	}
+	if err := osWriteFile(absolutePath, append(current, []byte(content)...), 0o600); err != nil {
+		return toolCommandResult{OK: false, Command: "ash_append_scratch_file", Error: err.Error(), EID: "yM2Se3E9"}
+	}
+	if err := updateScratchAccessMarker(root); err != nil {
+		return toolCommandResult{OK: false, Command: "ash_append_scratch_file", Error: err.Error(), EID: "sR5qCdHV"}
+	}
+	return toolCommandResult{OK: true, Command: "ash_append_scratch_file", ExitCode: 0, Stdout: fmt.Sprintf("appended %s", relPath)}
+}
+
+func (s localToolShim) callEditScratchFile(args map[string]any) toolCommandResult {
+	rel, ok := toStringArg(args["path"])
+	if !ok || strings.TrimSpace(rel) == "" {
+		return toolCommandResult{OK: false, Command: "ash_edit_scratch_file", Error: "path must be a non-empty string", EID: "jW1Vw7Xb"}
+	}
+	content, ok := toStringArg(args["content"])
+	if !ok {
+		return toolCommandResult{OK: false, Command: "ash_edit_scratch_file", Error: "content must be a string", EID: "eh8Kf1eU"}
+	}
+	root, err := ashScratchSessionRoot()
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "ash_edit_scratch_file", Error: err.Error(), EID: "R7w7fY5L"}
+	}
+	absolutePath, relPath, err := resolveScratchPath(root, rel)
+	if err != nil {
+		return toolCommandResult{OK: false, Command: "ash_edit_scratch_file", Error: err.Error(), EID: "v6Qc7T9b"}
+	}
+	if err := osMkdirAll(filepath.Dir(absolutePath), 0o700); err != nil {
+		return toolCommandResult{OK: false, Command: "ash_edit_scratch_file", Error: err.Error(), EID: "tE7Kf1Vv"}
+	}
+	if err := osWriteFile(absolutePath, []byte(content), 0o600); err != nil {
+		return toolCommandResult{OK: false, Command: "ash_edit_scratch_file", Error: err.Error(), EID: "Y3M8prKJ"}
+	}
+	if err := updateScratchAccessMarker(root); err != nil {
+		return toolCommandResult{OK: false, Command: "ash_edit_scratch_file", Error: err.Error(), EID: "gN8F6LqP"}
+	}
+	return toolCommandResult{OK: true, Command: "ash_edit_scratch_file", ExitCode: 0, Stdout: fmt.Sprintf("updated %s", relPath)}
 }

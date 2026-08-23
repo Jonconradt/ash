@@ -1269,6 +1269,96 @@ func ashWorkspaceDir() (string, error) {
 	return filepath.Join(home, ashWorkspaceDirName), nil
 }
 
+// ashScratchRoot returns the canonical scratch directory under the user's ash workspace.
+func ashScratchRoot() (string, error) {
+	workspace, err := ashWorkspaceDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(workspace, scratchDirName), nil
+}
+
+func ashScratchSessionRoot() (string, error) {
+	root, err := ashScratchRoot()
+	if err != nil {
+		return "", err
+	}
+	sessionID, err := ensureSessionID()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(root, sessionID), nil
+}
+
+func updateScratchAccessMarker(dir string) error {
+	if dir == "" {
+		return errors.New("scratch directory is required")
+	}
+	if err := osMkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	marker := filepath.Join(dir, scratchAccessFileName)
+	content := []byte(timeNow().UTC().Format(time.RFC3339Nano))
+	return osWriteFile(marker, content, 0o600)
+}
+
+func resolveScratchPath(root, userPath string) (absolute string, rel string, err error) {
+	return resolveWorkspacePath(root, userPath)
+}
+
+func cleanupStaleScratchDirs(root string, now time.Time) ([]string, error) {
+	if root == "" {
+		return nil, errors.New("scratch root is required")
+	}
+	if err := osMkdirAll(root, 0o700); err != nil {
+		return nil, err
+	}
+
+	currentSessionDir, err := ashScratchSessionRoot()
+	if err != nil {
+		return nil, err
+	}
+
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return nil, err
+	}
+
+	deleted := make([]string, 0)
+	cutoffAge := now.Add(-scratchCleanupMaxAge)
+	cutoffIdle := now.Add(-scratchCleanupIdleAge)
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		dirPath := filepath.Join(root, entry.Name())
+		if dirPath == currentSessionDir {
+			continue
+		}
+		info, err := os.Stat(dirPath)
+		if err != nil {
+			continue
+		}
+		if info.ModTime().After(cutoffAge) {
+			continue
+		}
+		accessPath := filepath.Join(dirPath, scratchAccessFileName)
+		accessInfo, err := os.Stat(accessPath)
+		if err == nil {
+			if accessInfo.ModTime().After(cutoffIdle) {
+				continue
+			}
+		} else if !errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err := os.RemoveAll(dirPath); err != nil {
+			continue
+		}
+		deleted = append(deleted, dirPath)
+	}
+	return deleted, nil
+}
+
 // resolveWorkspacePath converts a user-supplied workspace path into a canonical absolute path and a relative workspace path.
 func resolveWorkspacePath(root, userPath string) (absolute string, rel string, err error) {
 	cleanInput := strings.TrimSpace(userPath)

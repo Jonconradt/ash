@@ -193,6 +193,16 @@ execution is enabled. On Unix, timeout and Control-C terminate the child
 process group; on Windows, immediate child cancellation is supported but
 descendant cleanup is not guaranteed.
 .PP
+Ash also maintains a session-scoped scratch workspace under
+.IR ~/.ash/scratch/<session-id>/ .
+This scratch area is for temporary notes, plans, helper files, and one-off script
+fragments. The session ID is resolved automatically from the active ash session;
+AI callers do not need to remember or provide it. Scratch files are kept within
+the managed Ash workspace and are not written to arbitrary directories such as
+.IR /tmp .
+When ash exits, it checks for stale scratch directories older than 48 hours that
+have not been accessed in the last 24 hours and removes the entire directory.
+.PP
 On macOS and Linux, installed Bash and zsh wrappers lazily start one unprivileged
 broker per interactive shell. The broker keeps a bounded HTTPS connection pool
 alive across separate ash processes over a private Unix socket. Subshells reuse
@@ -225,6 +235,11 @@ Canonical tool allowlist file.
 .TP
 .I ~/.ash/history/
 Conversation history files.
+.TP
+.I ~/.ash/scratch/
+Session-scoped scratch directory for temporary notes, plans, and helper files. The
+directory is keyed by the active SESSION_ID and is cleaned up automatically when
+it is stale and idle beyond the configured retention window.
 .SH EXIT STATUS
 .B ash
 returns 0 on success.
