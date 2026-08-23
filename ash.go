@@ -21,7 +21,7 @@ const (
 	defaultToolOutputMax              = 8192
 	maxAgentPromptBytes               = 4096
 	maxSessionIDLength                = 128
-	defaultMaxToolIters               = 4
+	defaultMaxToolIters               = 16
 	defaultMaxAgents                  = 6
 	defaultTaskMax                    = 6
 	defaultRelevanceWin               = 4
