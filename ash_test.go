@@ -43,6 +43,9 @@ func testAIConfig(baseURL, model string) aiConfig {
 }
 
 func TestChatRetriesTransientFailures(t *testing.T) {
+	t.Setenv(brokerSocketEnv, "")
+	t.Setenv(brokerTokenEnv, "")
+
 	var attempts atomic.Int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch attempts.Add(1) {
@@ -961,6 +964,9 @@ func TestFormatAssistantOutputFallbackOnRendererError(t *testing.T) {
 }
 
 func TestChat(t *testing.T) {
+	t.Setenv(brokerSocketEnv, "")
+	t.Setenv(brokerTokenEnv, "")
+
 	origClientFactory := newHTTPClient
 	t.Cleanup(func() { newHTTPClient = origClientFactory })
 
@@ -2352,6 +2358,9 @@ func TestChatVerboseLogsPayload(t *testing.T) {
 }
 
 func TestChatReusesHTTPClientAcrossRetries(t *testing.T) {
+	t.Setenv(brokerSocketEnv, "")
+	t.Setenv(brokerTokenEnv, "")
+
 	origClient := newHTTPClient
 	t.Cleanup(func() { newHTTPClient = origClient })
 	t.Setenv("ASH_RETRY_MAX_ATTEMPTS", "3")
