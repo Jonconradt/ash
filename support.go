@@ -1570,10 +1570,11 @@ func sanitizeJSONError(value string) string {
 
 // startThinkingIndicator starts a spinner-like indicator on w and returns a function that stops it.
 func startThinkingIndicator(w io.Writer) func() {
-	frames := []string{"|", "/", "-", "\\"}
+	frames := []string{"⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇"}
 	done := make(chan struct{})
 	stopped := make(chan struct{})
 	var once sync.Once
+	color := terminalSpinnerColor()
 
 	go func() {
 		defer close(stopped)
@@ -1582,12 +1583,12 @@ func startThinkingIndicator(w io.Writer) func() {
 
 		frame := 0
 		for {
-			_, _ = fmt.Fprintf(w, "\rThinking... %s", frames[frame])
+			_, _ = fmt.Fprintf(w, "\r%s%s\033[0m", color, frames[frame])
 			frame = (frame + 1) % len(frames)
 
 			select {
 			case <-done:
-				_, _ = fmt.Fprint(w, "\r                \r")
+				_, _ = fmt.Fprint(w, "\r\033[0m\033[2K\r")
 				return
 			case <-ticker.C:
 			}
@@ -1600,6 +1601,32 @@ func startThinkingIndicator(w io.Writer) func() {
 			<-stopped
 		})
 	}
+}
+
+func terminalSpinnerColor() string {
+	if os.Getenv("NO_COLOR") != "" {
+		return ""
+	}
+
+	bg := strings.TrimSpace(os.Getenv("COLORFGBG"))
+	if bg == "" {
+		bg = strings.TrimSpace(os.Getenv("COLOR_BG"))
+	}
+	if bg == "" {
+		return "\033[97m"
+	}
+	parts := strings.Split(bg, ";")
+	if len(parts) < 2 {
+		return "\033[97m"
+	}
+	bgIndex, err := strconv.Atoi(parts[len(parts)-1])
+	if err != nil || bgIndex == 0 {
+		return "\033[97m"
+	}
+	if bgIndex >= 8 && bgIndex <= 15 {
+		return "\033[30m"
+	}
+	return "\033[97m"
 }
 
 // renderMarkdownWithGlamour renders markdown using terminal styling for display in the CLI.
@@ -1619,10 +1646,17 @@ func renderMarkdownWithGlamour(markdown string) (string, error) {
 func formatAssistantOutput(raw string) string {
 	rendered, err := markdownRenderer(raw)
 	if err != nil {
-		return ensureSingleTrailingNewline(raw)
+		rendered = raw
 	}
 
-	return ensureSingleTrailingNewline(rendered)
+	return ensureSingleTrailingNewline(trimLeadingOutputPadding(rendered))
+}
+
+func trimLeadingOutputPadding(value string) string {
+	value = strings.TrimLeft(value, "\r\n")
+	value = strings.TrimPrefix(value, "  ")
+	value = strings.TrimPrefix(value, "\t")
+	return value
 }
 
 // ensureSingleTrailingNewline ensures required state exists and is up to date.

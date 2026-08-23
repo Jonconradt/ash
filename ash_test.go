@@ -963,6 +963,24 @@ func TestFormatAssistantOutputFallbackOnRendererError(t *testing.T) {
 	}
 }
 
+func TestFormatAssistantOutputTrimsLeadingBlankLineAndIndent(t *testing.T) {
+	original := markdownRenderer
+	t.Cleanup(func() { markdownRenderer = original })
+
+	markdownRenderer = func(input string) (string, error) {
+		if input != "what time is it?" {
+			t.Fatalf("unexpected renderer input: %q", input)
+		}
+		return "\n  It is 12:17 PM EDT on Sunday, August 23, 2026.\n\n", nil
+	}
+
+	got := formatAssistantOutput("what time is it?")
+	want := "It is 12:17 PM EDT on Sunday, August 23, 2026.\n"
+	if got != want {
+		t.Fatalf("output mismatch: got %q want %q", got, want)
+	}
+}
+
 func TestChat(t *testing.T) {
 	t.Setenv(brokerSocketEnv, "")
 	t.Setenv(brokerTokenEnv, "")
@@ -2742,8 +2760,11 @@ func TestStartThinkingIndicator(t *testing.T) {
 	stop()
 
 	got := output.String()
-	if !strings.Contains(got, "Thinking...") {
-		t.Fatalf("expected thinking indicator output, got %q", got)
+	if strings.Contains(got, "Thinking...") {
+		t.Fatalf("expected spinner without text label, got %q", got)
+	}
+	if !strings.ContainsAny(got, "⠋⠙⠹⠸⠼⠴⠦⠧⠇") {
+		t.Fatalf("expected braille spinner output, got %q", got)
 	}
 	if !strings.Contains(got, "\r") {
 		t.Fatalf("expected carriage return output, got %q", got)
@@ -2751,6 +2772,31 @@ func TestStartThinkingIndicator(t *testing.T) {
 	if strings.Contains(got, "[EID=") {
 		t.Fatalf("expected thinking indicator to omit EIDs, got %q", got)
 	}
+}
+
+func TestTerminalSpinnerColor(t *testing.T) {
+	t.Run("dark terminal", func(t *testing.T) {
+		t.Setenv("COLORFGBG", "15;0")
+		t.Setenv("NO_COLOR", "")
+		if got := terminalSpinnerColor(); got != "\033[97m" {
+			t.Fatalf("unexpected dark-terminal color: %q", got)
+		}
+	})
+
+	t.Run("light terminal", func(t *testing.T) {
+		t.Setenv("COLORFGBG", "0;15")
+		t.Setenv("NO_COLOR", "")
+		if got := terminalSpinnerColor(); got != "\033[30m" {
+			t.Fatalf("unexpected light-terminal color: %q", got)
+		}
+	})
+
+	t.Run("no color disabled", func(t *testing.T) {
+		t.Setenv("NO_COLOR", "1")
+		if got := terminalSpinnerColor(); got != "" {
+			t.Fatalf("expected empty color when NO_COLOR is set, got %q", got)
+		}
+	})
 }
 
 func TestRenderMarkdownWithGlamourEmojiPassthrough(t *testing.T) {
