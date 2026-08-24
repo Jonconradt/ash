@@ -4066,6 +4066,8 @@ func TestBashCollisionWrappers(t *testing.T) {
 	}{
 		{name: "title case what routed", invocation: "What time is it?", want: "ASH:What time is it?"},
 		{name: "lower case what routed", invocation: "what time is it?", want: "ASH:what time is it?"},
+		{name: "write natural language routed", invocation: "write a poem using the following as inspiration love.txt", want: "ASH:write a poem using the following as inspiration love.txt"},
+		{name: "write command form delegates", invocation: "write user", want: "DELEGATE:write:user"},
 		{name: "what interrogative routed", invocation: "what is awk", want: "ASH:what is awk"},
 		{name: "what mid auxiliary routed", invocation: "What directory am I in and are there any executeable files Run multiple tools if necessary", want: "ASH:What directory am I in and are there any executeable files Run multiple tools if necessary"},
 		{name: "what sentence with path routed", invocation: "what time is it and list all of the files in the ~/.ash/logs", want: "ASH:what time is it and list all of the files in the " + filepath.Join(homeDir, ".ash", "logs")},
@@ -4111,6 +4113,8 @@ func TestZshCollisionWrappers(t *testing.T) {
 	}{
 		{name: "title case what routed", invocation: "What time is it?", want: "ASH:What time is it?"},
 		{name: "lower case what routed", invocation: "what time is it?", want: "ASH:what time is it?"},
+		{name: "write natural language routed", invocation: "write a poem using the following as inspiration love.txt", want: "ASH:write a poem using the following as inspiration love.txt"},
+		{name: "write command form delegates", invocation: "write user", want: "DELEGATE:write:user"},
 		{name: "what mid auxiliary routed", invocation: "What directory am I in and are there any executeable files Run multiple tools if necessary", want: "ASH:What directory am I in and are there any executeable files Run multiple tools if necessary"},
 		{name: "what sentence with path routed", invocation: "what time is it and list all of the files in the ~/.ash/logs", want: "ASH:what time is it and list all of the files in the " + filepath.Join(homeDir, ".ash", "logs")},
 		{name: "what path delegates", invocation: "what /usr/bin/what", want: "DELEGATE:what:/usr/bin/what"},
