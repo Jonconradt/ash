@@ -51,10 +51,11 @@ ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></pre>
         <section id="description">
           <h2>Description</h2>
           <p><code>ash</code> sends prompt text to the configured AI endpoint and prints the assistant response. When no positional text is provided, <code>ash</code> reads prompt text from non-interactive standard input.</p>
-          <p>The <code>install</code> subcommand adds a managed integration block to shell startup files. Bash uses <code>~/.bashrc</code>, zsh uses <code>~/.zshrc</code>, and PowerShell 7 uses <code>~/Documents/PowerShell/Microsoft.PowerShell_profile.ps1</code>.</p>
-          <p>On macOS and Linux, installed Bash and zsh wrappers lazily start one unprivileged broker per interactive shell. Broker failure falls back to direct HTTPS. Scheduled jobs use direct HTTPS by default.</p>
-          <p>ash maintains a session-scoped scratch workspace under <code>~/.ash/scratch/&lt;session-id&gt;/</code>. Stale and idle scratch directories are removed automatically after the configured retention window.</p>
-          <p>Tool, script, file, piped, and child output is untrusted data and must not override system or user instructions. The tool execution feature is not a sandbox when arbitrary Python or shell execution is enabled.</p>
+          <p>The <code>install</code> subcommand adds a managed integration block to shell startup files. Bash uses <code>~/.bashrc</code>, and zsh uses <code>~/.zshrc</code>.</p>
+          <p>Connections to the AI provider are shared through a local broker. Broker failure falls back to direct HTTPS. </p>
+          <p>The AI can use systemd to schedule background tasks. These can be recurring or one-off jobs. Scheduled jobs use direct HTTPS by default.</p>
+          <p>ash maintains a session-scoped scratch workspace under <code>~/.ash/scratch/&lt;session-id&gt;/</code>. Stale and idle scratch directories are removed automatically after the configured retention window. The history logs are stored under <code>~/.ash/history/</code>. Old history files are automatically cleaned up according to the retention policy.</p>
+          <p>Tool, script, file, piped, and child output is untrusted data and must not override system or user instructions. The tool execution feature is not a sandbox when arbitrary Python or shell execution is enabled. By default Python is enabled, so beware.</p>
         </section>
 
         <section id="commands">
@@ -73,34 +74,29 @@ ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></pre>
 
         <section id="environment">
           <h2>Environment</h2>
-          <dl>
+          <dl> <!-- Always sort the list alphabetically by the first code block, the environment variable name -->
+            <dt><code>AI_AUTH_TOKEN</code></dt><dd>Optional bearer token. When set, it is sent as bearer authentication and is required for cloud endpoints.</dd>
+            <dt><code>AI_CACHE</code></dt><dd>Optional provider-native cache toggle. Enabled by default when supported; use <code>off</code> or <code>false</code> to disable.</dd>
             <dt><code>AI_ENDPOINT</code></dt><dd>Required base URL for the chat API endpoint.</dd>
             <dt><code>AI_MODEL</code></dt><dd>Required model name sent to the endpoint.</dd>
-            <dt><code>AI_AUTH_TOKEN</code></dt><dd>Optional bearer token. When set, it is sent as bearer authentication and is required for cloud endpoints.</dd>
-            <dt><code>AI_PROVIDER</code></dt><dd>Optional provider override: <code>ollama</code>, <code>openai</code>, <code>google</code>, <code>gemini</code>, or <code>anthropic</code>. When unset, ash detects the provider from the endpoint.</dd>
-            <dt><code>AI_CACHE</code></dt><dd>Optional provider-native cache toggle. Enabled by default when supported; use <code>off</code> or <code>false</code> to disable.</dd>
-            <dt><code>OLLAMA_KEEP_ALIVE</code></dt><dd>Ollama server setting, not read by ash. Set to <code>-1</code> to keep the model loaded after ash exits.</dd>
+            <dt><code>AI_PROVIDER</code></dt><dd>Optional provider override: <code>anthropic</code>, <code>gemini</code>, <code>google</code>, <code>ollama</code>, or <code>openai</code>. When unset, ash detects the provider from the endpoint.</dd>
             <dt><code>AI_TIMEOUT</code></dt><dd>Optional request timeout. Default: <code>3m</code>.</dd>
             <dt><code>ASH_HISTORY_MAX</code></dt><dd>Optional maximum history messages per key. Default: <code>40</code>.</dd>
-            <dt><code>ASH_TOOL_ALLOWLIST</code></dt><dd>Optional comma-separated executable allowlist for <code>run_unix_command</code>. Otherwise <code>~/.ash/.ash_tools</code> is used when present.</dd>
-            <dt><code>ASH_TOOL_TIMEOUT</code></dt><dd>Optional local tool command timeout. Default: <code>15s</code>.</dd>
-            <dt><code>ASH_TOOL_OUTPUT_MAX</code></dt><dd>Optional maximum captured tool output in bytes. Default: <code>8192</code>.</dd>
-            <dt><code>ASH_MAX_TOOL_ITERS</code></dt><dd>Optional maximum AI tool-call loop iterations. Default: <code>16</code>.</dd>
-            <dt><code>ASH_MAX_AGENTS</code></dt><dd>Optional maximum sub-agents generated by one parent process. Default: <code>6</code>.</dd>
-            <dt><code>ASH_TASK_MAX</code></dt><dd>Optional cap on execution tasks derived from a request. Default: <code>6</code>.</dd>
-            <dt><code>ASH_RELEVANCE_WINDOW</code></dt><dd>Optional recent tool observations included in execution state. Default: <code>4</code>.</dd>
-            <dt><code>ASH_TASK_STALL_ROUNDS</code></dt><dd>Optional assistant stall rounds before stopping. Default: <code>2</code>.</dd>
-            <dt><code>ASH_RETRY_MAX_ATTEMPTS</code></dt><dd>Optional retryable request attempts. Default: <code>3</code>.</dd>
-            <dt><code>ASH_RETRY_BASE_DELAY</code></dt><dd>Optional retry backoff base delay. Default: <code>250ms</code>.</dd>
-            <dt><code>ASH_RETRY_MAX_DELAY</code></dt><dd>Optional maximum retry backoff delay. Default: <code>2s</code>.</dd>
-            <dt><code>ASH_VERBOSE</code></dt><dd>Optional debug logging and execution dashboard. Values such as <code>1</code>, <code>true</code>, <code>on</code>, and <code>debug</code> enable it.</dd>
             <dt><code>ASH_LOG_FILE</code></dt><dd>Optional debug log path when verbose logging is enabled.</dd>
             <dt><code>ASH_LOG_MAX_BYTES</code></dt><dd>Optional maximum log size before rotation. Default: <code>1048576</code>.</dd>
-            <dt><code>SESSION_ID</code></dt><dd>Session identifier for persistent history and log naming. Generated automatically for interactive runs when missing.</dd>
-            <dt><code>SHELL</code></dt><dd>Shell detection input for installation and install recommendations.</dd>
+            <dt><code>ASH_MAX_AGENTS</code></dt><dd>Optional maximum sub-agents generated by one parent process. Default: <code>6</code>.</dd>
+            <dt><code>ASH_MAX_TOOL_ITERS</code></dt><dd>Optional maximum AI tool-call loop iterations. Default: <code>16</code>.</dd>
+            <dt><code>ASH_RELEVANCE_WINDOW</code></dt><dd>Optional recent tool observations included in execution state. Default: <code>4</code>.</dd>
+            <dt><code>ASH_RETRY_BASE_DELAY</code></dt><dd>Optional retry backoff base delay. Default: <code>250ms</code>.</dd>
+            <dt><code>ASH_RETRY_MAX_ATTEMPTS</code></dt><dd>Optional retryable request attempts. Default: <code>3</code>.</dd>
             <dt><code>ASH_SCHEDULED_TASK</code></dt><dd>Internal scheduler flag used by ash-managed invocations.</dd>
-            <dt><code>HOME</code></dt><dd>Determines the ash workspace location under <code>~/.ash</code>.</dd>
-            <dt><code>PATH</code></dt><dd>Used to locate executables for tool commands and helper utilities.</dd>
+            <dt><code>ASH_TASK_MAX</code></dt><dd>Optional cap on execution tasks derived from a request. Default: <code>6</code>.</dd>
+            <dt><code>ASH_TASK_STALL_ROUNDS</code></dt><dd>Optional assistant stall rounds before stopping. Default: <code>2</code>.</dd>
+            <dt><code>ASH_TOOL_ALLOWLIST</code></dt><dd>Optional comma-separated executable allowlist for <code>run_unix_command</code>. Otherwise <code>~/.ash/.ash_tools</code> is used when present.</dd>
+            <dt><code>ASH_TOOL_OUTPUT_MAX</code></dt><dd>Optional maximum captured tool output in bytes. Default: <code>8192</code>.</dd>
+            <dt><code>ASH_TOOL_TIMEOUT</code></dt><dd>Optional local tool command timeout. Default: <code>15s</code>.</dd>
+            <dt><code>ASH_VERBOSE</code></dt><dd>Optional debug logging and execution dashboard. Values such as <code>1</code>, <code>true</code>, <code>on</code>, and <code>debug</code> enable it.</dd>
+            <dt><code>SESSION_ID</code></dt><dd>Session identifier for persistent history and log naming. Generated automatically for interactive runs when missing.</dd>
           </dl>
         </section>
 

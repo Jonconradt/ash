@@ -51,16 +51,14 @@
           <a class="button button-primary" href="#install">Install ash <span aria-hidden="true">&#8595;</span></a>
           <a class="text-link" href="https://github.com/Jonconradt/ash#configure">Read the setup guide <span aria-hidden="true">&#8594;</span></a>
         </div>
-        <p class="compatibility"><span class="status-dot"></span> macOS &middot; Linux &middot; Windows 11 &middot; Open source</p>
+        <p class="compatibility"><span class="status-dot"></span> macOS &middot; Linux &middot; Open source</p>
       </div>
       <div class="terminal-window" aria-label="Example ash terminal session">
         <div class="terminal-bar"><span></span><span></span><span></span><b>ash &mdash; session 04</b></div>
         <div class="terminal-body">
           <p><span class="prompt">$</span> <span class="command">summarize this project</span></p>
-          <p class="muted">ash is thinking<span class="blink">...</span></p>
-          <p class="answer">This is a shell-integrated AI assistant.<br>It can inspect files, run allowlisted tools,<br>and keep notes for the current session.</p>
-          <p><span class="prompt">$</span> <span class="command">find the biggest files here</span></p>
-          <p class="muted">Using: find &middot; sort &middot; awk</p>
+          <p class="answer">ASH is a shell-integrated AI assistant.<br>It can inspect files, run allowlisted tools, schedule tasks, author and execute python, and keep session-scoped notes for sub-agent execution.</p>
+          <p><span class="prompt">$</span> <span class="command">list the biggest files here</span></p>
           <p class="answer table">1.2M&nbsp;&nbsp; ./README.md<br>842K&nbsp;&nbsp; ./ash_test.go<br>312K&nbsp;&nbsp; ./docs/ash.1</p>
           <p><span class="cursor">&#9608;</span></p>
         </div>
@@ -71,7 +69,7 @@
       <div class="page-width signal-grid">
         <div><strong>01</strong><span>Ask in place</span><p>No context switching. Prompt from the command line you already use.</p></div>
         <div><strong>02</strong><span>Investigate together</span><p>Give AI a deliberate allowlist of commands it can use to explore.</p></div>
-        <div><strong>03</strong><span>Make it repeatable</span><p>Keep history, write scratch notes, and schedule useful work for later.</p></div>
+        <div><strong>03</strong><span>Local control</span><p>Use locally hosted models, or a cloud provider, while keeping execution under your control.</p></div>
       </div>
     </section>
 
@@ -81,9 +79,9 @@
         <h2>The terminal stays<br><em>the center of gravity.</em></h2>
       </div>
       <div class="how-grid">
-        <div class="numbered"><span>01</span><h3>Install the shell integration</h3><p>ash works with bash, and zsh. Unknown commands can become prompts without changing your normal command habits.</p></div>
-        <div class="numbered"><span>02</span><h3>Ask for the next useful step</h3><p>Use plain language for explanations, file investigations, summaries, or computations. Pipe text in when that is more natural.</p></div>
-        <div class="numbered"><span>03</span><h3>Stay in control</h3><p>Tool execution is constrained by an explicit allowlist and runs as your user. You decide what ash is allowed to touch.</p></div>
+        <div class="numbered"><span>01</span><h3>Install the shell integration</h3><p>ash works with bash, and zsh. Unknown commands become prompts without changing your normal command habits. Snooze when you need a break from automatic prompt processing.</p></div>
+        <div class="numbered"><span>02</span><h3>Easy updates</h3><p><code>ash update</code> keeps your installation up to date with the latest release. The command handles version checks, downloads, and verification automatically. No background or surprise updates.</p></div>
+        <div class="numbered"><span>03</span><h3>Stay in control</h3><p>Tool execution is constrained by an explicit allowlist and runs as your user. You decide what ash is allowed to touch. Add your own python scripts to the ~/.ash/tools directory.</p></div>
       </div>
     </section>
 
@@ -91,7 +89,7 @@
       <div class="page-width install-content">
         <div><p class="eyebrow">Start small</p><h2>Give your shell<br><em>some company.</em></h2></div>
         <div class="install-details">
-          <p>Linux and macOS users can install the latest release in one step. The installer verifies the download, installs to <code>~/.local/bin</code>, and configures the detected zsh or bash integration, defaulting to bash.</p>
+          <p>Linux and macOS users can install the latest release in one step. The installer verifies the download, installs to <code>~/.local/bin</code>, and configures the detected zsh or bash integration, fallback to bash.</p>
           <p>Set the following environment variables after running the installer. The website now has a one-line installer, but you still have to set:
 
 <pre><code>export AI_AUTH_TOKEN='84…89'
@@ -99,7 +97,7 @@ export AI_ENDPOINT='https://ollama.com'
 export AI_MODEL='gemma4:31b-cloud'
 </code></pre>
 
-OpenAI, Google, Anthropic, and any other provider with an OpenAI compatible API are supported.</p>
+Local, OpenAI, Google, Anthropic, and any other provider with an OpenAI compatible API are supported.</p>
           <pre class="code-block"><code><span class="code-command">curl -fsSL https://jonconradt.github.io/ash/install.sh | sh</span></code></pre>
           <div class="install-links"><a class="button button-light" href="https://github.com/Jonconradt/ash/releases/latest">View packages <span aria-hidden="true">&#8599;</span></a><a class="text-link light-link" href="https://github.com/Jonconradt/ash#configure">Full configuration <span aria-hidden="true">&#8594;</span></a></div>
         </div>
