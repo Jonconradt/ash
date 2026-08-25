@@ -60,9 +60,11 @@ update_macos() {
 update_linux() {
 	if command -v apt-get >/dev/null 2>&1; then
 		log "installing Debian/Ubuntu updates"
-		run_privileged env DEBIAN_FRONTEND=noninteractive apt-get update
-		command -v unattended-upgrade >/dev/null 2>&1 || fail "unattended-upgrade is required for security-only Debian/Ubuntu updates"
-		run_privileged env DEBIAN_FRONTEND=noninteractive unattended-upgrade --non-interactive
+		# sudoers NOPASSWD rules match full binary paths literally; PATH-relative names bypass them.
+		run_privileged env DEBIAN_FRONTEND=noninteractive "$(command -v apt-get)" update
+		local unattended_upgrade_bin
+		unattended_upgrade_bin="$(command -v unattended-upgrade)" || fail "unattended-upgrade is required for security-only Debian/Ubuntu updates"
+		run_privileged env DEBIAN_FRONTEND=noninteractive "$unattended_upgrade_bin"
 	elif command -v dnf >/dev/null 2>&1; then
 		log "installing Fedora/RHEL updates"
 		run_privileged dnf upgrade --security --refresh --assumeyes
