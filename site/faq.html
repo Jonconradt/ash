@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -30,6 +30,7 @@
     <div class="docs-layout">
       <nav class="docs-contents" aria-label="FAQ contents">
         <strong>Topics</strong>
+        <a href="#getting-started">Getting started</a>
         <a href="#installing">Installing and updating</a>
         <a href="#ai">AI and connections</a>
         <a href="#safety">Safety and control</a>
@@ -38,6 +39,21 @@
         <a href="#support">Support and community</a>
       </nav>
       <article class="docs-content">
+        <section id="getting-started">
+          <h2>Getting Started</h2>
+          <h3>What do I need before I can use ash?</h3>
+          <p>You need the <code>ash</code> executable, an AI endpoint, and a model name. Set <code>AI_ENDPOINT</code> and <code>AI_MODEL</code>. A local endpoint such as Ollama can use <code>http://localhost:11434</code>; cloud endpoints must use HTTPS and also require <code>AI_AUTH_TOKEN</code>. Shell integration is optional: you can always run <code>ash "your question"</code> directly.</p>
+
+          <h3>Where does ash install, and how do I check that my shell can find it?</h3>
+          <p>The verified installer places ash in <code>~/.local/bin/ash</code>. Run <code>command -v ash</code> to check whether it is on your <code>PATH</code>. If it is not found, run <code>export PATH="$HOME/.local/bin:$PATH"</code> and add that line to your shell startup file before opening a new terminal. The self-updater is different: it installs its replacement binary in <code>~/go/bin/ash</code>.</p>
+
+          <h3>How do I use ash without changing my shell?</h3>
+          <p>Pass a quoted prompt directly: <code>ash "how do I find large files?"</code>. With no arguments, ash also accepts a non-interactive standard-input prompt, such as <code>git diff | ash</code>. Direct use is the least surprising option when you are learning ash or writing a script.</p>
+
+          <h3>Why does ash say my AI configuration is incomplete?</h3>
+          <p>Check that <code>AI_ENDPOINT</code> and <code>AI_MODEL</code> are non-empty in the environment where ash runs. For a cloud hostname, also set <code>AI_AUTH_TOKEN</code>. Run <code>printf '%s\n' "$AI_ENDPOINT" "$AI_MODEL"</code> to confirm the first two values are present, but do not print an authentication token into a terminal recording or shared log.</p>
+        </section>
+
         <section id="installing">
           <h2>Installing and Updating</h2>
           <h3>Does ash work on Windows 11?</h3>
@@ -48,6 +64,15 @@
 
           <h3>How do I update ash to the latest release version?</h3>
           <p>Run <code>ash update</code> on macOS or Linux. It downloads the latest stable matching archive, verifies the release manifest with its Sigstore bundle and SHA-256 digest, then installs to <code>~/go/bin/ash</code>. Use <code>ash update --version vX.Y.Z</code> for a specific version; use <code>--yes</code> only when you want customized managed files replaced.</p>
+
+          <h3>I ran <code>ash install</code>. Why does nothing change in this terminal?</h3>
+          <p>Installation updates a startup file; it does not rewrite the shell process already running. Open a new terminal, or reload the file for your shell: <code>source ~/.bashrc</code> for Bash, <code>source ~/.zshrc</code> for zsh, or <code>source ~/.config/fish/config.fish</code> for Fish unless you use a custom <code>XDG_CONFIG_HOME</code>.</p>
+
+          <h3>Unknown commands still say “not found.” How do I troubleshoot shell integration?</h3>
+          <p>First run <code>command -v ash</code>; the wrapper cannot invoke a binary your shell cannot find. Then reload or restart the shell and check that its startup file contains the <code>&gt;&gt;&gt; ash install &gt;&gt;&gt;</code> managed block. Finally run <code>ash snooze off</code>, because a snooze intentionally leaves unknown commands as normal “not found” failures.</p>
+
+          <h3>What files does <code>ash install</code> change, and can I preview it?</h3>
+          <p>It adds or updates one marked ash block in the selected shell startup file and manages files under <code>~/.ash</code>, including configuration, wrappers, and bundled tools. Run <code>ash install --shell bash --dry-run</code> to preview the startup-file change without writing it. Re-running install is idempotent; use <code>--overwrite</code> only when you want managed bootstrap files refreshed.</p>
 
           <h3>Does ash support Fish?</h3>
           <p>Yes. Run <code>ash install --shell fish</code>. ash adds a managed block to <code>$XDG_CONFIG_HOME/fish/config.fish</code>, or <code>~/.config/fish/config.fish</code> when XDG_CONFIG_HOME is unset. Fish uses <code>fish_command_not_found</code>, so an unresolved command reaches ash with its original arguments.</p>
@@ -72,6 +97,9 @@
 
           <h3>Does Fish use the broker?</h3>
           <p>Yes. The Fish wrapper starts and reuses the same per-session broker as bash and zsh, refreshes its lease immediately before an ash request, and keeps broker setup quiet.</p>
+
+          <h3>What happens if a request is slow, unavailable, or I change my mind?</h3>
+          <p>Press <code>Ctrl-C</code> to cancel an in-flight request. The default AI request timeout is three minutes; set <code>AI_TIMEOUT</code>, for example <code>AI_TIMEOUT=90s</code>, to change it. ash retries retryable AI failures up to three times by default with a short bounded backoff; tune that behavior with <code>ASH_RETRY_MAX_ATTEMPTS</code>, <code>ASH_RETRY_BASE_DELAY</code>, and <code>ASH_RETRY_MAX_DELAY</code>.</p>
         </section>
 
         <section id="safety">
@@ -90,6 +118,9 @@
 
           <h3>Does ash trust text received via pipe the same as user text? What protections exist for malicious data?</h3>
           <p>Yes. When ash receives no command-line arguments and standard input is piped, it treats that input as the user prompt. Do not pipe untrusted web pages, logs, or generated text directly to ash unless you intend to authorize it as a prompt. This differs from ash-managed tool, file, script, pipeline, and child-agent output: ash labels those results as untrusted evidence and instructs the model never to follow instructions from them. Set <code>ASH_STRICT=1</code> to additionally replace recognized prompt-injection phrases in untrusted evidence. The allowlist and direct-argv execution rules still apply to tool execution.</p>
+
+          <h3>Are my ash files private from other users on this computer?</h3>
+          <p>During installation, ash hardens the <code>~/.ash</code> directory to owner-only permissions and managed files to owner-readable and owner-writable permissions. This protects against other local accounts under normal Unix permissions, but not against your own account, administrators, backups, or software you choose to run with access to your home directory.</p>
         </section>
 
         <section id="workflow">
@@ -97,17 +128,26 @@
           <h3>Does ash support pipes and other Unix traditions?</h3>
           <p>Yes. You can pipe text into ash as a prompt, for example <code>git diff | ash</code>. For AI-requested tool pipelines, ash supports two to sixteen allowlisted executables connected directly without a shell, such as <code>ls | grep pattern | pbcopy</code>. Shell-control patterns in tool arguments are blocked, and every executable in an ash-managed pipeline must be allowlisted.</p>
 
+          <h3>Will ash reinterpret commands inside my shell scripts, SSH commands, or cron jobs?</h3>
+          <p>No. The Bash and zsh integration wrappers return immediately in non-interactive shells, so scripts, CI jobs, SSH one-liners, and cron commands keep normal command-not-found behavior. Use an explicit invocation such as <code>ash "summarize this log"</code> or <code>some-command | ash</code> when automation should call ash.</p>
+
           <h3>How do I stop ash from interpreting my commands for a few minutes?</h3>
           <p>Run <code>ash snooze</code> for the default five minutes, or specify a duration such as <code>ash snooze 30s</code> or <code>ash snooze 1h</code>. Run <code>ash snooze off</code> to resume immediately. Snooze pauses automatic command-not-found and wrapper routing; explicit <code>ash ...</code> commands still work.</p>
 
           <h3>How can I debug ash and see more information about what it is doing?</h3>
           <p>Set <code>ASH_VERBOSE=1</code> before running ash to enable structured debug output and a terminal execution dashboard. Set <code>ASH_LOG_FILE</code> to write debug JSON to a file; <code>ASH_LOG_MAX_BYTES</code> controls rotation and defaults to 1 MiB when a log file is configured.</p>
 
+          <h3>What limits apply when ash runs tools?</h3>
+          <p>By default, each tool call has a 15-second timeout and captures up to 8192 bytes of output. An AI request may make up to 16 tool-loop iterations, and an ash-managed pipeline has two to sixteen stages. Adjust the tool timeout and output limit with <code>ASH_TOOL_TIMEOUT</code> and <code>ASH_TOOL_OUTPUT_MAX</code>; keep output focused with commands such as <code>head</code>, <code>tail</code>, or <code>grep</code>.</p>
+
           <h3>Where is the default system prompt?</h3>
           <p>The canonical prompt file is <code>~/.ash/.ash_system</code>, installed from the bundled default when you run <code>ash install</code>. ash reads that file first. If it is absent, ash falls back to <code>.ash_system</code> in the current working directory and then <code>~/.ash_system</code>. Values written as <code>$VARIABLE</code> are expanded from the environment at runtime.</p>
 
           <h3>Where do I put my own scripts for ash to call as tools?</h3>
           <p>Put them in <code>~/.ash/tools/</code>. Add the script's bare executable name to <code>~/.ash/.ash_tools</code>, ensure it is executable, and keep its interface suitable for direct argv calls. ash does not invoke a shell for allowed Unix commands.</p>
+
+          <h3>What are best practices for a Python tool in <code>~/.ash/tools</code> so the AI understands its purpose and use?</h3>
+          <p>Follow the bundled-tool pattern: use a descriptive filename and <code>#!/usr/bin/env python3</code> shebang; expose predictable named options with <code>argparse</code>; and implement an <code>--ai-docs</code> option that explains capabilities, every argument and default, output schema, failure states, and when the AI should use the tool. Emit compact structured JSON with a <code>status</code> field and actionable error details instead of prose mixed with data. Keep output bounded, validate inputs, set network timeouts, handle expected failures, and make the tool safe to call repeatedly. Add its bare filename to <code>~/.ash/.ash_tools</code>; ash can execute it only when it is allowlisted.</p>
 
           <h3>What are the provided tool scripts and where can I find their code in the repository?</h3>
           <p>The installed bootstrap scripts are <code>headlines.py</code>, <code>wikipedia.py</code>, and <code>yfinance.py</code>. Their source lives in <a href="https://github.com/Jonconradt/ash/tree/main/ash_bootstrap/tools">ash_bootstrap/tools</a> and is installed into <code>~/.ash/tools/</code>.</p>
@@ -117,6 +157,9 @@
 
           <h3>Can ash generate memory files to track complex tasks and what it has learned in the session?</h3>
           <p>Yes. It can write persistent workspace files under <code>~/.ash</code>, which are tracked in <code>~/.ash/inventory.md</code>, and session-scoped scratch files under <code>~/.ash/scratch/&lt;session-id&gt;/</code>. Use persistent workspace files for information you intend to keep; use scratch files for temporary plans, notes, and helper artifacts.</p>
+
+          <h3>Can ash schedule work for later?</h3>
+          <p>Yes, through its AI tools. On macOS, one-off scheduling uses a per-user <code>launchd</code> LaunchAgent and requires <code>launchctl</code>. On Linux, recurring schedules are supported through your user <code>crontab</code>; ash manages only its own marked entries. The one-off <code>launchd</code> scheduler is not available on Linux, so use a cron entry or another Linux scheduler for a one-time Linux job. Scheduled runs receive a limited environment and use direct HTTPS rather than an interactive shell broker, so ensure the required AI configuration is available to the scheduled job.</p>
         </section>
 
         <section id="storage">
@@ -126,6 +169,9 @@
 
           <h3>How long are history files retained?</h3>
           <p>ash removes history JSON files older than 14 days during normal application cleanup, with a 300 ms cleanup budget so exit is not delayed. The recent-message window is separate: it keeps up to 40 messages per conversation by default and can be changed with <code>ASH_HISTORY_MAX</code>.</p>
+
+          <h3>How do I clear a conversation or start fresh?</h3>
+          <p>History is separated by session ID and AI endpoint/model key. Start a new terminal session for a new session ID, or remove the relevant JSON file under <code>~/.ash/history/</code> when you intentionally want to discard that local conversation history. Removing a history file does not revoke a provider key or delete provider-side data; manage those separately with the provider.</p>
 
           <h3>What is the <code>SESSION_ID</code> and where is it generated?</h3>
           <p>It is the per-session identifier used to separate history, scratch space, broker sockets, and scheduled log names. The managed shell environment generates a random 16-character alphanumeric value from <code>/dev/urandom</code> when the shell starts; ash also creates one when an interactive invocation has no value.</p>

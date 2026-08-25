@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -54,7 +54,7 @@
         </div>
         <p class="compatibility"><span class="status-dot"></span> macOS &middot; Linux &middot; Open source</p>
       </div>
-      <div class="terminal-window" aria-label="Example ash terminal session">
+      <div class="terminal-window" role="img" aria-label="Example ash terminal session">
         <div class="terminal-bar"><span></span><span></span><span></span><b>bash &mdash; session 04</b></div>
         <div class="terminal-body">
           <p><span class="prompt">$</span> <span class="command">uptime</span></p>
@@ -93,14 +93,12 @@
         <div><p class="eyebrow">Start small</p><h2>Give your shell<br><em>some company.</em></h2></div>
         <div class="install-details">
           <p>Linux and macOS users can install the latest release in one step. The installer verifies the download, installs to <code>~/.local/bin</code>, and configures detected Fish, zsh, or bash integration, falling back to bash.</p>
-          <p>Set the following environment variables after running the installer. The website now has a one-line installer, but you still have to set:
-
-<pre><code>export AI_AUTH_TOKEN='84…89'
+          <p>Set the following environment variables after running the installer. The website now has a one-line installer, but you still have to set:</p>
+          <pre><code>export AI_AUTH_TOKEN='84…89'
 export AI_ENDPOINT='https://ollama.com'
 export AI_MODEL='gemma4:31b-cloud'
 </code></pre>
-
-Local, OpenAI, Google, Anthropic, and any other provider with an OpenAI compatible API are supported.</p>
+          <p>Local, OpenAI, Google, Anthropic, and any other provider with an OpenAI compatible API are supported.</p>
           <pre class="code-block"><code><span class="code-command">curl -fsSL https://jonconradt.github.io/ash/install.sh | sh</span></code></pre>
           <div class="install-links"><a class="button button-light" href="https://github.com/Jonconradt/ash/releases/latest">View packages <span aria-hidden="true">&#8599;</span></a><a class="text-link light-link" href="https://github.com/Jonconradt/ash#configure">Full configuration <span aria-hidden="true">&#8594;</span></a></div>
         </div>
