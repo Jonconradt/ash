@@ -44,13 +44,10 @@ func parseAIConfigFromEnv() (aiConfig, error) {
 	}
 
 	rawEndpoint := strings.TrimSpace(os.Getenv(aiEnvEndpoint))
-	if rawEndpoint == "" {
-		return aiConfig{}, fmt.Errorf("%s is required", aiEnvEndpoint)
-	}
-
 	model := strings.TrimSpace(os.Getenv(aiEnvModel))
-	if model == "" {
-		return aiConfig{}, fmt.Errorf("%s is required", aiEnvModel)
+	authToken := strings.TrimSpace(os.Getenv(aiEnvAuthToken))
+	if rawEndpoint == "" || model == "" {
+		return aiConfig{}, missingAIEnvSetupError()
 	}
 
 	baseURL, host, scheme, err := parseAIEndpoint(rawEndpoint)
@@ -68,14 +65,12 @@ func parseAIConfigFromEnv() (aiConfig, error) {
 		return aiConfig{}, err
 	}
 
-	authToken := strings.TrimSpace(os.Getenv(aiEnvAuthToken))
-
 	if isCloudAIHost(host) {
 		if scheme != "https" {
 			return aiConfig{}, errors.New("AI_ENDPOINT must use https for cloud endpoints")
 		}
 		if authToken == "" {
-			return aiConfig{}, errors.New("cloud endpoints require AI_AUTH_TOKEN")
+			return aiConfig{}, missingAIEnvSetupError()
 		}
 	}
 

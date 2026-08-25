@@ -129,14 +129,14 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 	}()
 
-	if recommendation, err := installRecommendation(); err == nil && recommendation != "" {
-		slog.Info(recommendation, "EID", "Ss6EkIfE")
-	}
-
 	aiCfg, err := parseAIConfigFromEnv()
 	if err != nil {
-		slog.Error(fmt.Sprintf("invalid AI configuration: %v", err), "EID", "2BiYZgst")
+		_, _ = fmt.Fprintf(stderr, "Configuration error:\n\n%s\n", err)
 		return 1
+	}
+
+	if recommendation, err := installRecommendation(); err == nil && recommendation != "" {
+		slog.Info(recommendation, "EID", "Ss6EkIfE")
 	}
 
 	userInput := strings.TrimSpace(strings.Join(args, " "))
