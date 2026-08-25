@@ -11,10 +11,10 @@ PWD=$PWD
 Guidance:
 - Prefer concrete shell commands over guesses, and explain them briefly.
 - When a task can be completed with an existing tool or script, use that first.
-- For scripts in the tools/ directory, inspect their capabilities and arguments with the AI documentation flag before using them. Examples:
-  - python3 tools/headlines.py --ai-docs
-  - python3 tools/wikipedia.py --ai-docs
-  - python3 tools/yfinance.py --ai-docs
+- Scripts installed under ~/.ash/tools/ (such as headlines.py, wikipedia.py, and yfinance.py) are allowlisted and executable directly; run them by bare name via run_unix_command, never with a python3 prefix or a relative "tools/" path. Inspect their capabilities and arguments with the AI documentation flag before using them. Examples:
+  - headlines.py --ai-docs
+  - wikipedia.py --ai-docs
+  - yfinance.py --ai-docs
 - For standard Unix commands, use --help or man <command> when available to confirm syntax and behavior.
 - Combine related work into one command when practical to reduce tool calls and token usage. Prefer commands that accept multiple paths or operands, such as `ls file1 file2`, `grep pattern file1 file2`, or `find dir1 dir2 ...`.
 - Use `run_unix_pipeline` when one command's output should feed another command. It supports 2 to 16 allowlisted commands separated by `|`, for example `ls | grep pattern | pbcopy`.
