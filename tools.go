@@ -210,7 +210,7 @@ func (s localToolShim) ListTools() []toolDefinition {
 			Type: "function",
 			Function: toolFunctionDefinition{
 				Name:        "ash_read_scratch_file",
-				Description: "Read a file in the current session's managed scratch directory under ~/.ash/scratch",
+				Description: "Read a file in the current session's managed scratch directory under ~/.ash/scratch. The result includes an absolute_path; use that exact absolute path (not a guessed path) if you need to execute the file with run_unix_command.",
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
@@ -227,7 +227,7 @@ func (s localToolShim) ListTools() []toolDefinition {
 			Type: "function",
 			Function: toolFunctionDefinition{
 				Name:        "ash_write_scratch_file",
-				Description: "Write a file in the current session's managed scratch directory under ~/.ash/scratch",
+				Description: "Write a file in the current session's managed scratch directory under ~/.ash/scratch. The result includes an absolute_path; use that exact absolute path (not a guessed path) if you need to execute the file with run_unix_command.",
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
@@ -252,7 +252,7 @@ func (s localToolShim) ListTools() []toolDefinition {
 			Type: "function",
 			Function: toolFunctionDefinition{
 				Name:        "ash_append_scratch_file",
-				Description: "Append content to a file in the current session's managed scratch directory under ~/.ash/scratch",
+				Description: "Append content to a file in the current session's managed scratch directory under ~/.ash/scratch. The result includes an absolute_path; use that exact absolute path (not a guessed path) if you need to execute the file with run_unix_command.",
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
@@ -273,7 +273,7 @@ func (s localToolShim) ListTools() []toolDefinition {
 			Type: "function",
 			Function: toolFunctionDefinition{
 				Name:        "ash_edit_scratch_file",
-				Description: "Replace a file in the current session's managed scratch directory under ~/.ash/scratch",
+				Description: "Replace a file in the current session's managed scratch directory under ~/.ash/scratch. The result includes an absolute_path; use that exact absolute path (not a guessed path) if you need to execute the file with run_unix_command.",
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
@@ -822,7 +822,7 @@ func (s localToolShim) callReadScratchFile(args map[string]any) toolCommandResul
 	if err := updateScratchAccessMarker(root); err != nil {
 		return toolCommandResult{OK: false, Command: "ash_read_scratch_file", Error: err.Error(), EID: "G4rQePRH"}
 	}
-	return toolCommandResult{OK: true, Command: "ash_read_scratch_file", ExitCode: 0, Stdout: fmt.Sprintf("path=%s\n%s", relPath, payload)}
+	return toolCommandResult{OK: true, Command: "ash_read_scratch_file", ExitCode: 0, Stdout: fmt.Sprintf("path=%s\nabsolute_path=%s\n%s", relPath, absolutePath, payload)}
 }
 
 func (s localToolShim) callWriteScratchFile(args map[string]any) toolCommandResult {
@@ -851,7 +851,7 @@ func (s localToolShim) callWriteScratchFile(args map[string]any) toolCommandResu
 	if err := updateScratchAccessMarker(root); err != nil {
 		return toolCommandResult{OK: false, Command: "ash_write_scratch_file", Error: err.Error(), EID: "P9U2vU7Q"}
 	}
-	return toolCommandResult{OK: true, Command: "ash_write_scratch_file", ExitCode: 0, Stdout: fmt.Sprintf("wrote %s", relPath)}
+	return toolCommandResult{OK: true, Command: "ash_write_scratch_file", ExitCode: 0, Stdout: fmt.Sprintf("wrote %s\nabsolute_path=%s", relPath, absolutePath)}
 }
 
 func (s localToolShim) callAppendScratchFile(args map[string]any) toolCommandResult {
@@ -884,7 +884,7 @@ func (s localToolShim) callAppendScratchFile(args map[string]any) toolCommandRes
 	if err := updateScratchAccessMarker(root); err != nil {
 		return toolCommandResult{OK: false, Command: "ash_append_scratch_file", Error: err.Error(), EID: "sR5qCdHV"}
 	}
-	return toolCommandResult{OK: true, Command: "ash_append_scratch_file", ExitCode: 0, Stdout: fmt.Sprintf("appended %s", relPath)}
+	return toolCommandResult{OK: true, Command: "ash_append_scratch_file", ExitCode: 0, Stdout: fmt.Sprintf("appended %s\nabsolute_path=%s", relPath, absolutePath)}
 }
 
 func (s localToolShim) callEditScratchFile(args map[string]any) toolCommandResult {
@@ -913,5 +913,5 @@ func (s localToolShim) callEditScratchFile(args map[string]any) toolCommandResul
 	if err := updateScratchAccessMarker(root); err != nil {
 		return toolCommandResult{OK: false, Command: "ash_edit_scratch_file", Error: err.Error(), EID: "gN8F6LqP"}
 	}
-	return toolCommandResult{OK: true, Command: "ash_edit_scratch_file", ExitCode: 0, Stdout: fmt.Sprintf("updated %s", relPath)}
+	return toolCommandResult{OK: true, Command: "ash_edit_scratch_file", ExitCode: 0, Stdout: fmt.Sprintf("updated %s\nabsolute_path=%s", relPath, absolutePath)}
 }
