@@ -10,6 +10,7 @@ import (
 
 const (
 	shellBash = "bash"
+	shellFish = "fish"
 	shellZsh  = "zsh"
 	shellPwsh = "pwsh"
 )
@@ -33,6 +34,15 @@ var installShellTargets = map[string]installShellTarget{
 		SourceBlock:    bashInstallSourceBlock,
 		WrapperContent: bashInstallWrapperContent,
 		PostInstall:    ensureBashProfileSourcingForInstall,
+	},
+	shellFish: {
+		Name:           shellFish,
+		SupportedOnOS:  func(goos string) bool { return goos != "windows" },
+		RCPath:         fishRCPath,
+		WrapperFile:    fishWrapperFileName(),
+		SourceBlock:    fishInstallSourceBlock,
+		WrapperContent: fishInstallWrapperContent,
+		PostInstall:    nil,
 	},
 	shellZsh: {
 		Name:           shellZsh,

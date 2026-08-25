@@ -17,6 +17,7 @@ import (
 //go:embed ash_bootstrap/.ash_system
 //go:embed ash_bootstrap/.ash_tools
 //go:embed ash_bootstrap/.ash_bashrc
+//go:embed ash_bootstrap/.ash_fish.fish
 //go:embed ash_bootstrap/.ash_zshrc
 //go:embed ash_bootstrap/tools/*
 var embeddedBootstrapAssets embed.FS
@@ -40,6 +41,7 @@ func installEmbeddedBootstrapAssets(overwrite bool, stdout io.Writer) error {
 		{srcPath: "ash_bootstrap/.ash_system", dstPath: filepath.Join(root, systemFileName), mode: 0o600},
 		{srcPath: "ash_bootstrap/.ash_tools", dstPath: filepath.Join(root, toolsFileName), mode: 0o600},
 		{srcPath: "ash_bootstrap/.ash_bashrc", dstPath: filepath.Join(root, ".ash_bashrc"), mode: 0o600},
+		{srcPath: "ash_bootstrap/.ash_fish.fish", dstPath: filepath.Join(root, ".ash_fish.fish"), mode: 0o600},
 		{srcPath: "ash_bootstrap/.ash_zshrc", dstPath: filepath.Join(root, ".ash_zshrc"), mode: 0o600},
 	}
 
@@ -51,6 +53,14 @@ func installEmbeddedBootstrapAssets(overwrite bool, stdout io.Writer) error {
 		if err := installManagedAssetFile(asset.dstPath, content, overwrite, asset.mode, stdout, false); err != nil {
 			return err
 		}
+	}
+
+	envContent, err := osReadFile(filepath.Join(root, ".ash_env"))
+	if err != nil {
+		return fmt.Errorf("read managed ash env: %w", err)
+	}
+	if err := installManagedAssetFile(filepath.Join(root, ".ash_fish_env.fish"), buildFishEnvironmentFile(string(envContent)), true, 0o600, stdout, false); err != nil {
+		return err
 	}
 
 	entries, err := fs.ReadDir(embeddedBootstrapAssets, "ash_bootstrap/tools")
@@ -168,6 +178,44 @@ func parseShellExportValue(raw string) (string, bool) {
 		return unquoted, true
 	}
 	return raw, true
+}
+
+func buildFishEnvironmentFile(content string) []byte {
+	var b strings.Builder
+	b.WriteString("# managed by ash install\n")
+	for _, line := range strings.Split(content, "\n") {
+		key, value, ok := parseExportAssignment(line)
+		if !ok || !fishEnvironmentKeyAllowed(key) {
+			continue
+		}
+		if key == "SESSION_ID" {
+			b.WriteString("if not set -q SESSION_ID\n")
+			b.WriteString("\tset -gx SESSION_ID (command head -c 100 /dev/urandom | command tr -dc 'a-zA-Z0-9' | command fold -w 16 | command head -n 1)\n")
+			b.WriteString("end\n")
+			continue
+		}
+		if key == "PATH" {
+			b.WriteString("set -gx PATH \"$HOME/.ash/tools\" $PATH\n")
+			continue
+		}
+		b.WriteString("set -gx ")
+		b.WriteString(key)
+		b.WriteString(" ")
+		b.WriteString(fishQuotedValue(value))
+		b.WriteString("\n")
+	}
+	return []byte(b.String())
+}
+
+func fishEnvironmentKeyAllowed(key string) bool {
+	if key == "SESSION_ID" || key == "PATH" {
+		return true
+	}
+	return strings.HasPrefix(key, "AI_") || strings.HasPrefix(key, "ASH_")
+}
+
+func fishQuotedValue(value string) string {
+	return "'" + strings.ReplaceAll(strings.ReplaceAll(value, "\\", "\\\\"), "'", "\\'") + "'"
 }
 
 func removeLegacyToolScripts(root string, embeddedEntries []fs.DirEntry, stdout io.Writer) error {

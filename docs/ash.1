@@ -7,7 +7,7 @@ ash \- practical shell assistant for command-not-found workflows
 .br
 .B ash
 .B install
-.RI [ --shell " bash|zsh|pwsh" ]
+.RI [ --shell " bash|fish|zsh|pwsh" ]
 .RI [ --dry-run ]
 .RI [ --overwrite ]
 .br
@@ -37,12 +37,16 @@ For PowerShell 7 (
 .BR pwsh ),
 the target is
 .IR ~/Documents/PowerShell/Microsoft.PowerShell_profile.ps1 .
+For Fish, the target is
+.I $XDG_CONFIG_HOME/fish/config.fish
+(defaulting to
+.IR ~/.config/fish/config.fish ).
 .SH COMMANDS
 .TP
 .B ash [text ...]
 Run a single assistant request.
 .TP
-.B ash install [--shell bash|zsh|pwsh] [--dry-run]
+.B ash install [--shell bash|fish|zsh|pwsh] [--dry-run]
 Install or update shell integration.
 .IP
 .B --shell
@@ -54,6 +58,20 @@ on Windows.
 .IP
 .B --dry-run
 Preview file changes without writing.
+.PP
+Fish uses its native
+.B fish_command_not_found
+hook and supports ash's broker, snooze handling, and compatible natural-language
+wrappers. Fish reserves its lowercase
+.B test
+and
+.B type
+builtins, so use
+.B Test
+or
+.B Type
+for ash intent. Ksh93 is not supported because it has no generic
+command-not-found hook.
 .TP
 .B ash snooze [duration|off]
 Pause automatic shell prompt processing. The default duration is five minutes.

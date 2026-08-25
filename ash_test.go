@@ -2225,6 +2225,7 @@ func TestSnoozeStateFailsOpen(t *testing.T) {
 func TestSnoozeGuardsAreInstalled(t *testing.T) {
 	for name, content := range map[string]string{
 		"bash": bashInstallWrapperContent(),
+		"fish": fishInstallWrapperContent(),
 		"zsh":  zshInstallWrapperContent(),
 		"pwsh": pwshInstallWrapperContent(),
 	} {
@@ -2234,6 +2235,33 @@ func TestSnoozeGuardsAreInstalled(t *testing.T) {
 		if !strings.Contains(content, "_ash_prompt_processing_enabled") {
 			t.Errorf("%s wrapper does not define snooze guard", name)
 		}
+	}
+}
+
+func TestBuildFishEnvironmentFile(t *testing.T) {
+	content := strings.Join([]string{
+		"export SESSION_ID=`head -c 100 /dev/urandom`",
+		`export PATH="$HOME/.ash/tools:$PATH"`,
+		"export AI_ENDPOINT='https://example.test'",
+		"export ASH_MAX_TOOL_ITERS=16",
+		"export UNRELATED=value",
+		"",
+	}, "\n")
+
+	got := string(buildFishEnvironmentFile(content))
+	for _, want := range []string{
+		"# managed by ash install",
+		"if not set -q SESSION_ID",
+		`set -gx PATH "$HOME/.ash/tools" $PATH`,
+		"set -gx AI_ENDPOINT 'https://example.test'",
+		"set -gx ASH_MAX_TOOL_ITERS '16'",
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected Fish environment file to contain %q, got %q", want, got)
+		}
+	}
+	if strings.Contains(got, "UNRELATED") {
+		t.Fatalf("Fish environment file must not contain unrelated variables: %q", got)
 	}
 }
 
@@ -2247,7 +2275,9 @@ func TestDetectShellName(t *testing.T) {
 		{name: "zsh path", shellPath: "/usr/bin/zsh", want: "zsh"},
 		{name: "pwsh exe", shellPath: `C:\Program Files\PowerShell\7\pwsh.exe`, want: "pwsh"},
 		{name: "powershell exe", shellPath: `C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe`, want: "pwsh"},
-		{name: "unknown", shellPath: "/bin/fish", want: ""},
+		{name: "fish path", shellPath: "/bin/fish", want: "fish"},
+		{name: "ksh unsupported", shellPath: "/bin/ksh", want: ""},
+		{name: "unknown", shellPath: "/bin/sh", want: ""},
 	}
 
 	for _, tt := range tests {
@@ -2271,6 +2301,9 @@ func TestInstallTargetResolutionByOS(t *testing.T) {
 		}
 		if _, err := resolveInstallShellTarget("zsh", activeGOOS()); err != nil {
 			t.Fatalf("expected zsh target on darwin, got error: %v", err)
+		}
+		if _, err := resolveInstallShellTarget("fish", activeGOOS()); err != nil {
+			t.Fatalf("expected fish target on darwin, got error: %v", err)
 		}
 		if _, err := resolveInstallShellTarget("pwsh", activeGOOS()); err == nil {
 			t.Fatalf("expected pwsh to be unsupported on darwin")
@@ -2311,9 +2344,16 @@ func TestInstallTargetResolutionByOS(t *testing.T) {
 
 func TestDefaultInstallShell(t *testing.T) {
 	t.Run("defaults to bash on unix when undetected", func(t *testing.T) {
-		got := defaultInstallShell("/bin/fish", "darwin")
+		got := defaultInstallShell("/bin/sh", "darwin")
 		if got != shellBash {
 			t.Fatalf("defaultInstallShell returned %q, want %q", got, shellBash)
+		}
+	})
+
+	t.Run("keeps detected fish shell", func(t *testing.T) {
+		got := defaultInstallShell("/bin/fish", "darwin")
+		if got != shellFish {
+			t.Fatalf("defaultInstallShell returned %q, want %q", got, shellFish)
 		}
 	})
 
@@ -2463,6 +2503,51 @@ func TestInstallUsesEmbeddedBootstrapAssets(t *testing.T) {
 	workspaceToolsPath := filepath.Join(home, ashWorkspaceDirName, "tools", "wikipedia.py")
 	if _, err := os.Stat(workspaceToolsPath); err != nil {
 		t.Fatalf("expected tool script to be installed: %v", err)
+	}
+}
+
+func TestRunInstallFish(t *testing.T) {
+	home := t.TempDir()
+	configHome := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", configHome)
+	t.Setenv("SHELL", "/opt/homebrew/bin/fish")
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"install", "--shell", "fish"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected Fish install to succeed, got %d stderr=%q", code, stderr.String())
+	}
+
+	rcPath := filepath.Join(configHome, "fish", "config.fish")
+	rcContent, err := os.ReadFile(rcPath)
+	if err != nil {
+		t.Fatalf("read Fish config: %v", err)
+	}
+	if !strings.Contains(string(rcContent), ".ash_fish.fish") {
+		t.Fatalf("expected Fish config to source wrapper, got %q", rcContent)
+	}
+
+	workspace := filepath.Join(home, ashWorkspaceDirName)
+	for _, path := range []string{
+		filepath.Join(workspace, ".ash_fish.fish"),
+		filepath.Join(workspace, ".ash_fish_env.fish"),
+	} {
+		content, readErr := os.ReadFile(path)
+		if readErr != nil {
+			t.Fatalf("read %s: %v", path, readErr)
+		}
+		if !strings.Contains(string(content), installStartMarker) && strings.HasSuffix(path, ".ash_fish.fish") {
+			t.Fatalf("expected Fish wrapper markers in %s", path)
+		}
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = run([]string{"install", "--shell", "fish"}, &stdout, &stderr)
+	if code != 0 || !strings.Contains(stdout.String(), "already present") {
+		t.Fatalf("expected idempotent Fish install, code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 }
 

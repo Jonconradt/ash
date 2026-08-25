@@ -109,8 +109,10 @@ download against the release `SHA256SUMS` manifest and installs `ash` to
 `~/.local/bin` without requiring `sudo`. Set `ASH_INSTALL_DIR` to choose a
 different destination when needed.
 
-The installer runs `ash install` for the detected shell. Unknown shells default
-to bash. Restart the shell or source its rc file afterward. If `~/.local/bin`
+The installer runs `ash install` for the detected shell. Bash, zsh, and Fish are
+detected; unknown shells default to bash. Fish uses its standard
+`$XDG_CONFIG_HOME/fish/config.fish` path (defaulting to `~/.config/fish/config.fish`).
+Restart the shell or source its rc file afterward. If `~/.local/bin`
 is not already on `PATH`, add it before using `ash`:
 
 ```bash
@@ -120,6 +122,17 @@ export PATH="$HOME/.local/bin:$PATH"
 Native packages remain available from the [latest GitHub release](https://github.com/Jonconradt/ash/releases/latest): macOS `.pkg`, and Linux `.deb`
 or `.rpm` packages. Configure `AI_ENDPOINT` and `AI_MODEL` after installation
 as described below.
+
+### Fish support
+
+Run `ash install --shell fish` to install Fish integration. It uses Fish's native
+`fish_command_not_found` hook, shares the connection broker and snooze behavior
+with bash/zsh, and installs compatible natural-language collision wrappers.
+
+Fish reserves its lowercase `test` and `type` builtins, so those commands cannot
+be wrapped. Use `Test ...` or `Type ...` for ash intent, or invoke `ash` directly.
+Ksh93 is not supported: it has no generic command-not-found hook; its `FPATH`
+mechanism only autoloads a file whose name matches an unknown command.
 
 ## Release Process
 

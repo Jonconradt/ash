@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ash FAQ</title>
+  <meta name="description" content="Answers about ash installation, providers, security, tools, history, and shell integration.">
+  <link rel="canonical" href="https://jonconradt.github.io/ash/faq.html">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="ash home"><span class="brand-mark">&gt;_</span> ash</a>
+    <nav aria-label="Primary navigation">
+      <a href="index.html#how-it-works">How it works</a>
+      <a href="index.html#install">Install</a>
+      <a href="docs.html">Docs</a>
+      <a href="faq.html" aria-current="page">FAQ</a>
+      <a href="https://github.com/Jonconradt/ash">GitHub</a>
+    </nav>
+  </header>
+
+  <main class="page-width docs-page">
+    <header class="docs-header">
+      <p class="eyebrow">Answers</p>
+      <h1>Frequently asked<br><em>questions.</em></h1>
+      <p>Clear answers about installation, providers, security boundaries, tools, and the files ash manages on your machine.</p>
+    </header>
+
+    <div class="docs-layout">
+      <nav class="docs-contents" aria-label="FAQ contents">
+        <strong>Topics</strong>
+        <a href="#installing">Installing and updating</a>
+        <a href="#ai">AI and connections</a>
+        <a href="#safety">Safety and control</a>
+        <a href="#workflow">Tools and workflow</a>
+        <a href="#storage">Sessions and storage</a>
+        <a href="#support">Support and community</a>
+      </nav>
+      <article class="docs-content">
+        <section id="installing">
+          <h2>Installing and Updating</h2>
+          <h3>Does ash work on Windows 11?</h3>
+          <p>Not as a currently released, fully supported platform. ash has a PowerShell 7 install target, but Windows release packaging is disabled and <code>ash update</code> intentionally rejects Windows. Use WSL for the supported Linux experience.</p>
+
+          <h3>How do I install ash in the Windows Subsystem for Linux (WSL)?</h3>
+          <p>Install it inside your WSL distribution as Linux: <code>curl -fsSL https://jonconradt.github.io/ash/install.sh | sh</code>. Then configure <code>AI_ENDPOINT</code> and <code>AI_MODEL</code>, and run <code>ash install</code> for the shell running inside WSL. This is separate from any Windows PowerShell configuration.</p>
+
+          <h3>How do I update ash to the latest release version?</h3>
+          <p>Run <code>ash update</code> on macOS or Linux. It downloads the latest stable matching archive, verifies the release manifest with its Sigstore bundle and SHA-256 digest, then installs to <code>~/go/bin/ash</code>. Use <code>ash update --version vX.Y.Z</code> for a specific version; use <code>--yes</code> only when you want customized managed files replaced.</p>
+
+          <h3>Does ash support Fish?</h3>
+          <p>Yes. Run <code>ash install --shell fish</code>. ash adds a managed block to <code>$XDG_CONFIG_HOME/fish/config.fish</code>, or <code>~/.config/fish/config.fish</code> when XDG_CONFIG_HOME is unset. Fish uses <code>fish_command_not_found</code>, so an unresolved command reaches ash with its original arguments.</p>
+
+          <h3>Why not lowercase <code>test</code> and <code>type</code> in Fish?</h3>
+          <p>Fish reserves those lowercase names as essential builtins and does not allow a function to replace them. Use <code>Test ...</code> or <code>Type ...</code> to express ash intent, or invoke <code>ash "..."</code> directly. Other compatible collision wrappers remain available.</p>
+
+          <h3>What about ksh93?</h3>
+          <p>ksh93 is not supported for shell integration. Its <code>FPATH</code> behavior can only load a file named after an unknown command; it has no generic command-not-found callback that can safely implement ash prompt routing or broker lifecycle.</p>
+        </section>
+
+        <section id="ai">
+          <h2>AI and Connections</h2>
+          <h3>Does ash include the AI?</h3>
+          <p>No. ash is a client for an AI endpoint that you configure. Set <code>AI_ENDPOINT</code> and <code>AI_MODEL</code>; ash supports local Ollama and detects supported cloud-provider adapters from the endpoint, with an optional <code>AI_PROVIDER</code> override.</p>
+
+          <h3>Where can I find the AUTH_KEY for the most popular cloud AI providers?</h3>
+          <p>ash calls this value <code>AI_AUTH_TOKEN</code>; it does not create or distribute provider keys. Create a key in your provider account, such as <a href="https://platform.openai.com/api-keys">OpenAI</a>, <a href="https://console.anthropic.com/settings/keys">Anthropic</a>, <a href="https://aistudio.google.com/app/apikey">Google AI Studio</a>, or <a href="https://ollama.com/settings/keys">Ollama</a>, then export it as <code>AI_AUTH_TOKEN</code>. Cloud endpoints must use HTTPS and require a token.</p>
+
+          <h3>Does ash open a new connection each time?</h3>
+          <p>Not for normal interactive Unix shell use. Bash, zsh, and Fish start one broker per shell session, communicate with it through a private Unix socket, and reuse its bounded HTTP connection pool. The broker exits after inactivity; scheduled jobs use direct requests rather than a persistent shell broker.</p>
+
+          <h3>Does Fish use the broker?</h3>
+          <p>Yes. The Fish wrapper starts and reuses the same per-session broker as bash and zsh, refreshes its lease immediately before an ash request, and keeps broker setup quiet.</p>
+        </section>
+
+        <section id="safety">
+          <h2>Safety and Control</h2>
+          <h3>How do I lock down ash to be safer, and what are the implications?</h3>
+          <p>Keep the executable allowlist narrow, favor read-only tools, and do not add privileged or destructive commands. Set <code>ASH_STRICT=1</code> to block recognized prompt-injection patterns from untrusted tool, file, script, pipeline, and child-agent output. This can also hide legitimate text that resembles an injection attempt. The allowlist is an execution boundary, not a sandbox: ash and permitted tools still run as you.</p>
+
+          <h3>Can ash run destructive commands like <code>rm</code>?</h3>
+          <p>Not with the installed default allowlist. It explicitly advises against <code>rm</code>, <code>mv</code>, <code>dd</code>, <code>chmod</code>, <code>chown</code>, <code>kill</code>, and <code>sudo</code>. If you add one of them, ash can request it with your permissions; review that decision carefully.</p>
+
+          <h3>How do I change the commands ash is allowed to execute?</h3>
+          <p>Edit <code>~/.ash/.ash_tools</code> and list bare executable names, one per line or comma-separated. Lines beginning with <code>#</code> are comments and paths or arguments are rejected. Alternatively set <code>ASH_TOOL_ALLOWLIST</code> to a comma-separated list; it overrides the file for that invocation. Changes are read on the next ash request.</p>
+
+          <h3>What user is ash running under?</h3>
+          <p>ash and every allowed tool run as the user who starts ash. It does not elevate privileges. The managed <code>~/.ash</code> workspace is permission-hardened, but its contents remain accessible to your user and to any process you explicitly allow.</p>
+
+          <h3>Does ash trust text received via pipe the same as user text? What protections exist for malicious data?</h3>
+          <p>Yes. When ash receives no command-line arguments and standard input is piped, it treats that input as the user prompt. Do not pipe untrusted web pages, logs, or generated text directly to ash unless you intend to authorize it as a prompt. This differs from ash-managed tool, file, script, pipeline, and child-agent output: ash labels those results as untrusted evidence and instructs the model never to follow instructions from them. Set <code>ASH_STRICT=1</code> to additionally replace recognized prompt-injection phrases in untrusted evidence. The allowlist and direct-argv execution rules still apply to tool execution.</p>
+        </section>
+
+        <section id="workflow">
+          <h2>Tools and Workflow</h2>
+          <h3>Does ash support pipes and other Unix traditions?</h3>
+          <p>Yes. You can pipe text into ash as a prompt, for example <code>git diff | ash</code>. For AI-requested tool pipelines, ash supports two to sixteen allowlisted executables connected directly without a shell, such as <code>ls | grep pattern | pbcopy</code>. Shell-control patterns in tool arguments are blocked, and every executable in an ash-managed pipeline must be allowlisted.</p>
+
+          <h3>How do I stop ash from interpreting my commands for a few minutes?</h3>
+          <p>Run <code>ash snooze</code> for the default five minutes, or specify a duration such as <code>ash snooze 30s</code> or <code>ash snooze 1h</code>. Run <code>ash snooze off</code> to resume immediately. Snooze pauses automatic command-not-found and wrapper routing; explicit <code>ash ...</code> commands still work.</p>
+
+          <h3>How can I debug ash and see more information about what it is doing?</h3>
+          <p>Set <code>ASH_VERBOSE=1</code> before running ash to enable structured debug output and a terminal execution dashboard. Set <code>ASH_LOG_FILE</code> to write debug JSON to a file; <code>ASH_LOG_MAX_BYTES</code> controls rotation and defaults to 1 MiB when a log file is configured.</p>
+
+          <h3>Where is the default system prompt?</h3>
+          <p>The canonical prompt file is <code>~/.ash/.ash_system</code>, installed from the bundled default when you run <code>ash install</code>. ash reads that file first. If it is absent, ash falls back to <code>.ash_system</code> in the current working directory and then <code>~/.ash_system</code>. Values written as <code>$VARIABLE</code> are expanded from the environment at runtime.</p>
+
+          <h3>Where do I put my own scripts for ash to call as tools?</h3>
+          <p>Put them in <code>~/.ash/tools/</code>. Add the script's bare executable name to <code>~/.ash/.ash_tools</code>, ensure it is executable, and keep its interface suitable for direct argv calls. ash does not invoke a shell for allowed Unix commands.</p>
+
+          <h3>What are the provided tool scripts and where can I find their code in the repository?</h3>
+          <p>The installed bootstrap scripts are <code>headlines.py</code>, <code>wikipedia.py</code>, and <code>yfinance.py</code>. Their source lives in <a href="https://github.com/Jonconradt/ash/tree/main/ash_bootstrap/tools">ash_bootstrap/tools</a> and is installed into <code>~/.ash/tools/</code>.</p>
+
+          <h3>Can ash call sub-agents?</h3>
+          <p>Yes. A parent agent can use <code>run_sub_agent</code> for one focused, independent task. A child inherits the working directory, configuration, tools, and OS permissions, returns a bounded result, and cannot create another child. The default maximum is six sub-agents per parent run and can be changed with <code>ASH_MAX_AGENTS</code>.</p>
+
+          <h3>Can ash generate memory files to track complex tasks and what it has learned in the session?</h3>
+          <p>Yes. It can write persistent workspace files under <code>~/.ash</code>, which are tracked in <code>~/.ash/inventory.md</code>, and session-scoped scratch files under <code>~/.ash/scratch/&lt;session-id&gt;/</code>. Use persistent workspace files for information you intend to keep; use scratch files for temporary plans, notes, and helper artifacts.</p>
+        </section>
+
+        <section id="storage">
+          <h2>Sessions and Storage</h2>
+          <h3>Where are the history or log files for ash?</h3>
+          <p>Conversation history is stored as JSON in <code>~/.ash/history/&lt;SESSION_ID&gt;.json</code>; scheduled runs use <code>task_&lt;SESSION_ID&gt;.json</code>. When scheduled debug logging is enabled, its default log location is <code>~/.ash/logs/task_&lt;SESSION_ID&gt;.log</code>. You can choose another debug-log path with <code>ASH_LOG_FILE</code>.</p>
+
+          <h3>How long are history files retained?</h3>
+          <p>ash removes history JSON files older than 14 days during normal application cleanup, with a 300 ms cleanup budget so exit is not delayed. The recent-message window is separate: it keeps up to 40 messages per conversation by default and can be changed with <code>ASH_HISTORY_MAX</code>.</p>
+
+          <h3>What is the <code>SESSION_ID</code> and where is it generated?</h3>
+          <p>It is the per-session identifier used to separate history, scratch space, broker sockets, and scheduled log names. The managed shell environment generates a random 16-character alphanumeric value from <code>/dev/urandom</code> when the shell starts; ash also creates one when an interactive invocation has no value.</p>
+
+          <h3>Can I replace the implementation of the <code>SESSION_ID</code> generator?</h3>
+          <p>You can supply your own <code>SESSION_ID</code> before starting ash or customize your local managed environment file, but ash validates it. Valid IDs are at most 128 characters and use letters, digits, underscores, hyphens, with one optional child-session dot suffix. Do not use untrusted or shared values: collisions combine session history and runtime state.</p>
+        </section>
+
+        <section id="support">
+          <h2>Support and Community</h2>
+          <h3>How do I file a bug?</h3>
+          <p>Open an issue at <a href="https://github.com/Jonconradt/ash/issues">github.com/Jonconradt/ash/issues</a> with the ash version or commit, your operating system and shell, the configuration relevant to the problem with secrets removed, reproducible steps, and the observed result. For a security vulnerability, do not open a public issue; report it privately by email or GitHub security advisory.</p>
+
+          <h3>Is there a discussion board in the ash project?</h3>
+          <p>Yes. Use <a href="https://github.com/Jonconradt/ash/discussions">GitHub Discussions</a> for questions and ideas, and <a href="https://github.com/Jonconradt/ash/issues">GitHub Issues</a> for reproducible bugs and tracked work.</p>
+        </section>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer page-width">
+    <a class="brand" href="./"><span class="brand-mark">&gt;_</span> ash</a>
+    <span>Practical AI for the terminal.</span>
+    <a href="https://github.com/Jonconradt/ash">GitHub <span aria-hidden="true">&#8599;</span></a>
+  </footer>
+</body>
+</html>
