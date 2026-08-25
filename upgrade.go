@@ -439,8 +439,25 @@ func installUpgradeArchive(content []byte, version string, options upgradeOption
 		}
 		return err
 	}
+	if err := reconcileUpgradeToolsAllowlist(candidateAssets, stdout); err != nil {
+		return err
+	}
 	_, _ = fmt.Fprintf(stdout, "updated ash to %s at %s (commit %s)\n", version, destination, ashCommit)
 	return nil
+}
+
+// reconcileUpgradeToolsAllowlist appends any bundled allowlist entries introduced by the
+// upgrade into the user's existing .ash_tools, even when that file was kept as customized.
+func reconcileUpgradeToolsAllowlist(candidateAssets string, stdout io.Writer) error {
+	baseline, err := os.ReadFile(filepath.Join(candidateAssets, ".ash_tools"))
+	if err != nil {
+		return fmt.Errorf("read candidate .ash_tools: %w", err)
+	}
+	root, err := ashWorkspaceDir()
+	if err != nil {
+		return err
+	}
+	return syncAllowlistAdditions(filepath.Join(root, toolsFileName), baseline, stdout)
 }
 
 func runUpgradeAssetExport(args []string, stdout, stderr io.Writer) int {

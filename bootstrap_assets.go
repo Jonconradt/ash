@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/user"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -53,6 +54,16 @@ func installEmbeddedBootstrapAssets(overwrite bool, stdout io.Writer) error {
 		if err := installManagedAssetFile(asset.dstPath, content, overwrite, asset.mode, stdout, false); err != nil {
 			return err
 		}
+	}
+
+	// Bundled tool scripts must always be allowlisted, even when a pre-existing
+	// .ash_tools was kept as-is because the user customized it.
+	toolsBaseline, err := readEmbeddedBootstrapAsset("ash_bootstrap/.ash_tools")
+	if err != nil {
+		return fmt.Errorf("read embedded .ash_tools baseline: %w", err)
+	}
+	if err := syncAllowlistAdditions(filepath.Join(root, toolsFileName), toolsBaseline, stdout); err != nil {
+		return err
 	}
 
 	envContent, err := osReadFile(filepath.Join(root, ".ash_env"))
@@ -263,6 +274,50 @@ func removeLegacyToolScripts(root string, embeddedEntries []fs.DirEntry, stdout 
 		}
 	}
 
+	return nil
+}
+
+// syncAllowlistAdditions appends allowlist entries present in baselineContent but missing from
+// the file at dstPath, preserving the rest of the file untouched. It is a no-op if dstPath does
+// not exist yet or already contains every baseline entry.
+func syncAllowlistAdditions(dstPath string, baselineContent []byte, stdout io.Writer) error {
+	existingContent, err := osReadFile(dstPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return fmt.Errorf("read %s: %w", dstPath, err)
+	}
+
+	existing := parseAllowlistFile(string(existingContent))
+	baseline := parseAllowlistFile(string(baselineContent))
+	missing := make([]string, 0, len(baseline))
+	for name := range baseline {
+		if _, ok := existing[name]; !ok {
+			missing = append(missing, name)
+		}
+	}
+	if len(missing) == 0 {
+		return nil
+	}
+	sort.Strings(missing)
+
+	var b strings.Builder
+	b.Write(existingContent)
+	if len(existingContent) > 0 && existingContent[len(existingContent)-1] != '\n' {
+		b.WriteString("\n")
+	}
+	b.WriteString("\n# --- ash-managed: entries added automatically from a newer bundled allowlist ---\n")
+	for _, name := range missing {
+		b.WriteString(name)
+		b.WriteString("\n")
+	}
+	if err := os.WriteFile(dstPath, []byte(b.String()), 0o600); err != nil {
+		return fmt.Errorf("write %s: %w", dstPath, err)
+	}
+	if stdout != nil {
+		_, _ = fmt.Fprintf(stdout, "added new allowlist entries to %s: %s\n", dstPath, strings.Join(missing, ", "))
+	}
 	return nil
 }
 
