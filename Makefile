@@ -1,4 +1,4 @@
-.PHONY: all verify build lint site-lint yaml-lint python-lint markdown-lint test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install setup-hooks version release release-check release-build release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one release-checksums
+.PHONY: all verify build config lint site-lint yaml-lint python-lint markdown-lint test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install setup-hooks version release release-check release-build release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one release-checksums
 
 SHELL := /bin/bash
 
@@ -9,6 +9,8 @@ RUFF_VERSION ?= 0.12.10
 MARKDOWNLINT_CLI2_VERSION ?= 0.23.2
 GOSEC_VERSION ?= v2.28.0
 GOVULNCHECK_VERSION ?= v1.1.4
+STATICCHECK_VERSION ?= latest
+YAMLFMT_VERSION ?= latest
 APP_NAME ?= ash
 RELEASE_ARCH ?= arm64
 RELEASE_OUTPUT_DIR ?= dist/release
@@ -45,6 +47,16 @@ BINARY_EXT = $(if $(filter windows,$(RELEASE_GOOS)),.exe,)
 RELEASE_BINARY_PATH ?= $(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)$(BINARY_EXT)
 
 all: verify install
+
+config:
+	@GOLANGCI_LINT_VERSION=$(GOLANGCI_LINT_VERSION) \
+	GOSEC_VERSION=$(GOSEC_VERSION) \
+	GOVULNCHECK_VERSION=$(GOVULNCHECK_VERSION) \
+	STATICCHECK_VERSION=$(STATICCHECK_VERSION) \
+	YAMLFMT_VERSION=$(YAMLFMT_VERSION) \
+	RUFF_VERSION=$(RUFF_VERSION) \
+	MARKDOWNLINT_CLI2_VERSION=$(MARKDOWNLINT_CLI2_VERSION) \
+	./scripts/dev/install_dev_tools.sh
 
 verify: test test-race test-cover vet staticcheck security test-fuzz benchmark
 

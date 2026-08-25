@@ -2,6 +2,14 @@
 
 ## Before submitting
 
+First-time setup: install the required developer toolchain (Go, Node.js/npm,
+Python3, `uv`, and the Go lint/security tools) for macOS (Homebrew) or
+Debian/Ubuntu (apt):
+
+```bash
+make config
+```
+
 Run:
 
 ```bash
