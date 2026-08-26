@@ -71,6 +71,7 @@ func runSyncRouteWords(stdout, stderr io.Writer) int {
 		_, _ = fmt.Fprintf(stdout, "%s already up to date\n", zshAsset)
 		return 0
 	}
+	// #nosec G703 -- zshAsset is a fixed repository-controlled path used only for the generated shell asset.
 	if err := os.WriteFile(zshAsset, []byte(updated), 0o600); err != nil {
 		_, _ = fmt.Fprintln(stderr, err)
 		return 1

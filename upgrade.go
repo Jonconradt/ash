@@ -417,9 +417,9 @@ func installUpgradeArchive(content []byte, version string, options upgradeOption
 	if err != nil {
 		return err
 	}
-	destinationDir := filepath.Join(home, ".local", "bin")
-	if err := os.MkdirAll(destinationDir, 0o755); err != nil {
-		return fmt.Errorf("create %s: %w", destinationDir, err)
+	destinationDir, err := ensureUserLocalBinDir(home)
+	if err != nil {
+		return err
 	}
 	destination := filepath.Join(destinationDir, "ash")
 	// #nosec G304 -- destination is the fixed user-local ~/.local/bin/ash path.
@@ -449,7 +449,16 @@ func installUpgradeArchive(content []byte, version string, options upgradeOption
 
 // reconcileUpgradeToolsAllowlist appends any bundled allowlist entries introduced by the
 // upgrade into the user's existing .ash_tools, even when that file was kept as customized.
+func ensureUserLocalBinDir(home string) (string, error) {
+	destinationDir := filepath.Join(home, ".local", "bin")
+	if err := os.MkdirAll(destinationDir, 0o700); err != nil {
+		return "", fmt.Errorf("create %s: %w", destinationDir, err)
+	}
+	return destinationDir, nil
+}
+
 func reconcileUpgradeToolsAllowlist(candidateAssets string, stdout io.Writer) error {
+	// #nosec G304 -- candidateAssets is a private staging directory created by the updater under a temp root.
 	baseline, err := os.ReadFile(filepath.Join(candidateAssets, ".ash_tools"))
 	if err != nil {
 		return fmt.Errorf("read candidate .ash_tools: %w", err)

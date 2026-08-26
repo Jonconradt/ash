@@ -42,6 +42,7 @@ func startBackgroundPythonProvision(stdout io.Writer) {
 	defer func() { _ = logFile.Close() }()
 
 	// context.Background is intentional: the child must outlive this process.
+	// #nosec G204 -- exe is the resolved ash executable path, not user-controlled input.
 	cmd := exec.CommandContext(context.Background(), exe, "--internal-provision-python")
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
