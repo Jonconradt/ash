@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -148,7 +149,8 @@ func readBrokerFrame(r io.Reader) ([]byte, error) {
 }
 
 func runBroker(args []string, stdout, stderr io.Writer) int {
-	ctx := context.Background()
+	ctx, stopSignals := signalNotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
+	defer stopSignals()
 	var socket, lease string
 	for index := 0; index < len(args); index++ {
 		switch args[index] {
@@ -177,6 +179,10 @@ func runBroker(args []string, stdout, stderr io.Writer) int {
 	}
 	if socket == "" || token == "" {
 		_, _ = fmt.Fprintln(stderr, "broker requires --socket and ASH_BROKER_TOKEN")
+		return 2
+	}
+	if _, err := parseAIConfigFromEnv(); err != nil {
+		_, _ = fmt.Fprintln(stderr, "broker requires a complete AI environment")
 		return 2
 	}
 	// #nosec G703 -- the broker socket path is supplied by the same-user shell setup.
@@ -212,6 +218,10 @@ func runBroker(args []string, stdout, stderr io.Writer) int {
 	var active sync.WaitGroup
 	lastActivity := time.Now()
 	var activityMu sync.Mutex
+	go func() {
+		<-ctx.Done()
+		_ = listener.Close()
+	}()
 	go func() {
 		ticker := time.NewTicker(time.Minute)
 		defer ticker.Stop()

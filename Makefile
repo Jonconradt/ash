@@ -1,4 +1,4 @@
-.PHONY: all verify build config lint site-lint yaml-lint python-lint markdown-lint test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install setup-hooks version release release-check release-build release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one release-checksums
+.PHONY: all verify build config lint site-lint yaml-lint python-lint markdown-lint sync-route-words test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install setup-hooks version release release-check release-build release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one release-checksums
 
 SHELL := /bin/bash
 
@@ -59,6 +59,9 @@ config:
 	./scripts/dev/install_dev_tools.sh
 
 verify: test test-race test-cover vet staticcheck security test-fuzz benchmark
+
+sync-route-words:
+	@go run . --internal-sync-route-words
 
 build: lint test
 	@go install -ldflags "-X main.ashVersion=$(BUILD_VERSION) -X main.ashCommit=$(BUILD_COMMIT)" .

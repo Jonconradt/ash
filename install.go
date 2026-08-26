@@ -17,6 +17,9 @@ import (
 const (
 	installStartMarker = "# >>> ash install >>>"
 	installEndMarker   = "# <<< ash install <<<"
+
+	// The suffix strip keeps the prepend idempotent because .ash_env is sourced twice per shell.
+	managedPathExportLine = `export PATH="$HOME/.ash/tools:$HOME/.local/bin:${PATH#$HOME/.ash/tools:$HOME/.local/bin:}"`
 )
 
 type endpointPreset struct {
@@ -70,6 +73,9 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 	if err := installEmbeddedBootstrapAssets(overwrite, stdout); err != nil {
 		slog.Error(fmt.Sprintf("install error: %v", err), "EID", "Hrs2Jw5A")
 		return 1
+	}
+	if !dryRun {
+		provisionPythonEnv(stdout)
 	}
 
 	existing, err := readFileIfExists(rcPath)
@@ -394,7 +400,7 @@ func buildManagedAshEnv(values map[string]string) string {
 	var b strings.Builder
 	b.WriteString("# managed by ash install\n")
 	b.WriteString("export SESSION_ID=`head -c 100 /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1`\n")
-	b.WriteString("export PATH=\"$HOME/.ash/tools:$PATH\"\n")
+	b.WriteString(managedPathExportLine + "\n")
 	for _, key := range keys {
 		fmt.Fprintf(&b, "export %s=%s\n", key, shellQuote(values[key]))
 	}
@@ -494,7 +500,12 @@ func hardenAshWorkspacePermissions() error {
 			if err != nil {
 				return err
 			}
-			return rootDir.Chmod(relativePath, 0o600)
+			// Tool scripts and venv entry points must stay runnable.
+			fileMode := fs.FileMode(0o600)
+			if mode.Perm()&0o100 != 0 {
+				fileMode = 0o700
+			}
+			return rootDir.Chmod(relativePath, fileMode)
 		}
 		return nil
 	})

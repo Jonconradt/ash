@@ -71,6 +71,7 @@ make lint
 make test
 make install
 make verify
+make sync-route-words
 make version
 make release
 make release RELEASE_VERSION=v1.2.3
@@ -81,6 +82,9 @@ make release RELEASE_VERSION=v1.2.3
 - `make test` runs `go test ./...`
 - `make install` runs `go install ./...`
 - `make verify` runs strict checks (tests, race, coverage gate, vet, staticcheck, gosec, govulncheck)
+- `make sync-route-words` regenerates the ambiguous-word block in the shell assets from
+  `ash_bootstrap/route_words.txt`, the canonical list. Edit only that file; a test fails if
+  the generated blocks are stale
 - `make version` runs quality checks and builds installer artifacts for the selected host/targets
 - `make release` runs quality checks, builds an arm64 macOS `.pkg`, validates it,
   writes a SHA-256 checksum to `dist/release/`, generates release notes from the
@@ -112,12 +116,8 @@ different destination when needed.
 The installer runs `ash install` for the detected shell. Bash, zsh, and Fish are
 detected; unknown shells default to bash. Fish uses its standard
 `$XDG_CONFIG_HOME/fish/config.fish` path (defaulting to `~/.config/fish/config.fish`).
-Restart the shell or source its rc file afterward. If `~/.local/bin`
-is not already on `PATH`, add it before using `ash`:
-
-```bash
-export PATH="$HOME/.local/bin:$PATH"
-```
+`ash install` adds `~/.local/bin` to `PATH` from the managed `~/.ash/.ash_env`
+file, so restart the shell or source its rc file afterward.
 
 Native packages remain available from the [latest GitHub release](https://github.com/Jonconradt/ash/releases/latest): macOS `.pkg`, and Linux `.deb`
 or `.rpm` packages. Configure `AI_ENDPOINT` and `AI_MODEL` after installation
@@ -362,7 +362,8 @@ ash update --skip-customized
 ```
 
 The updater supports macOS and Linux on amd64 and arm64 and installs to
-`~/go/bin/ash`. It verifies the Sigstore keyless signature for `SHA256SUMS`
+`~/.local/bin/ash`, the same location used by the install script. It verifies the
+Sigstore keyless signature for `SHA256SUMS`
 against the `Jonconradt/ash` release workflow, then verifies the selected
 archive's SHA-256 digest. A missing or mismatched signature or digest is a hard
 failure and leaves the existing installation unchanged. Windows updates are not
@@ -370,7 +371,7 @@ currently supported.
 
 Customized files under `~/.ash` are skipped by default. Use `--yes` to replace
 them, or `--skip-customized` to make the default explicit. The updater never
-overwrites system-managed installations and reports when `~/go/bin` must be
+overwrites system-managed installations and reports when `~/.local/bin` must be
 placed earlier on `PATH`.
 
 `ash snooze` pauses processing for five minutes by default. Custom durations use
@@ -621,93 +622,29 @@ Use `Time ...` (capitalized wrapper) or `ash "time ..."` for AI intent.
 
 ### Zsh setup
 
-For zsh, use `command_not_found_handler` and the same wrapper pattern:
+Zsh does not use wrapper functions. Wrappers would shadow real builtins such as
+`test`, `type`, and `which` inside scripts, and zsh expands globs before command
+lookup, so a prompt ending in `?` fails with `no matches found` before any
+wrapper can run.
 
-```zsh
-command_not_found_handler() {
-  ash "$@"
-  return $?
-}
+Instead, `ash install --shell zsh` registers a ZLE `accept-line` widget. ZLE
+exists only in interactive shells, so scripts and `zsh -c` keep stock zsh
+behavior. On Enter the widget applies fork-free guards to the raw input buffer
+and passes anything that looks like a real command straight through:
 
-_ash_should_route() {
-  local cmd="$1"
-  shift
-  local -a args
-  args=("$@")
-  local argc=${#args}
+- multi-line buffers, pipelines, redirection, command substitution, assignments,
+  paths, and flags are never routed
+- a first word that resolves as a command, function, alias, builtin, or reserved
+  word is passed through, unless it is one of the ambiguous words `at`, `for`,
+  `in`, `test`, `time`, `type`, `what`, `where`, `which`, `who`, `write`
+- ambiguous words are resolved by `ash route --check`, the shared heuristic
 
-  [[ $argc -eq 0 ]] && return 1
+When the widget decides to route, it rewrites the buffer to `ash '<original>'`.
+Quoting the whole line keeps globs, reserved words, and a trailing `?` away from
+zsh, so `Tell me about Go?` and `time to go home` reach ash intact.
 
-  local a
-  for a in "${args[@]}"; do
-    [[ "$a" == -* ]] && return 1
-  done
-
-  for a in "${args[@]}"; do
-    [[ "$a" == */* || "$a" == ./* || "$a" == ../* ]] && return 1
-  done
-
-  if [[ "$cmd" == "Time" || "$cmd" == "test" || "$cmd" == "Test" || "$cmd" == "type" || "$cmd" == "Type" ]]; then
-    if [[ $argc -eq 1 && "${args[1]}" =~ '^[A-Za-z0-9_.-]+$' ]]; then
-      return 1
-    fi
-  fi
-
-  local full="$cmd"
-  for a in "${args[@]}"; do
-    full+=" $a"
-  done
-
-  [[ "$full" == *\? && $argc -ge 2 ]] && return 0
-
-  local first
-  first="$(printf '%s' "${args[1]}" | tr '[:upper:]' '[:lower:]')"
-  case "$first" in
-    is|are|am|do|does|did|can|could|should|would|will|why|how|when|where|who)
-      [[ $argc -ge 2 ]] && return 0
-      ;;
-  esac
-
-  return 1
-}
-
-_ash_route_or_delegate() {
-  local cmd="$1"
-  shift
-  if _ash_should_route "$cmd" "$@"; then
-    ash "$cmd" "$@"
-    return $?
-  fi
-  command "$cmd" "$@"
-}
-
-_ash_route_or_delegate_builtin() {
-  local builtin_name="$1"
-  shift
-  if _ash_should_route "$builtin_name" "$@"; then
-    ash "$builtin_name" "$@"
-    return $?
-  fi
-  builtin "$builtin_name" "$@"
-}
-
-what()  { _ash_route_or_delegate what  "$@"; }
-What()  { _ash_route_or_delegate What  "$@"; }
-which() { _ash_route_or_delegate which "$@"; }
-Which() { _ash_route_or_delegate Which "$@"; }
-who()   { _ash_route_or_delegate who   "$@"; }
-Who()   { _ash_route_or_delegate Who   "$@"; }
-where() { _ash_route_or_delegate_builtin where "$@"; }
-Where() { _ash_route_or_delegate_builtin where "$@"; }
-
-test()  { _ash_route_or_delegate_builtin test "$@"; }
-Test()  { _ash_route_or_delegate_builtin test "$@"; }
-type()  { _ash_route_or_delegate_builtin type "$@"; }
-Type()  { _ash_route_or_delegate_builtin type "$@"; }
-Time()  { _ash_route_or_delegate Time "$@"; }
-```
-
-In zsh, `time` is also reserved syntax, so only `Time ...` can be wrapped.
+`command_not_found_handler` remains as a fallback if the widget fails to
+register, and returns 127 in non-interactive shells.
 
 ### Troubleshooting
 

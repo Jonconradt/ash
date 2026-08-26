@@ -45,7 +45,7 @@
           <p>You need the <code>ash</code> executable, an AI endpoint, and a model name. Set <code>AI_ENDPOINT</code> and <code>AI_MODEL</code>. A local endpoint such as Ollama can use <code>http://localhost:11434</code>; cloud endpoints must use HTTPS and also require <code>AI_AUTH_TOKEN</code>. Shell integration is optional: you can always run <code>ash "your question"</code> directly.</p>
 
           <h3>Where does ash install, and how do I check that my shell can find it?</h3>
-          <p>The verified installer places ash in <code>~/.local/bin/ash</code>. Run <code>command -v ash</code> to check whether it is on your <code>PATH</code>. If it is not found, run <code>export PATH="$HOME/.local/bin:$PATH"</code> and add that line to your shell startup file before opening a new terminal. The self-updater is different: it installs its replacement binary in <code>~/go/bin/ash</code>.</p>
+          <p>The verified installer places ash in <code>~/.local/bin/ash</code>, and <code>ash install</code> adds that directory to your <code>PATH</code> through the managed <code>~/.ash/.ash_env</code> file. Open a new terminal, then run <code>command -v ash</code> to confirm. The self-updater installs its replacement binary to the same <code>~/.local/bin/ash</code> location.</p>
 
           <h3>How do I use ash without changing my shell?</h3>
           <p>Pass a quoted prompt directly: <code>ash "how do I find large files?"</code>. With no arguments, ash also accepts a non-interactive standard-input prompt, such as <code>git diff | ash</code>. Direct use is the least surprising option when you are learning ash or writing a script.</p>
@@ -63,7 +63,7 @@
           <p>Install it inside your WSL distribution as Linux: <code>curl -fsSL https://jonconradt.github.io/ash/install.sh | sh</code>. Then configure <code>AI_ENDPOINT</code> and <code>AI_MODEL</code>, and run <code>ash install</code> for the shell running inside WSL. This is separate from any Windows PowerShell configuration.</p>
 
           <h3>How do I update ash to the latest release version?</h3>
-          <p>Run <code>ash update</code> on macOS or Linux. It downloads the latest stable matching archive, verifies the release manifest with its Sigstore bundle and SHA-256 digest, then installs to <code>~/go/bin/ash</code>. Use <code>ash update --version vX.Y.Z</code> for a specific version; use <code>--yes</code> only when you want customized managed files replaced.</p>
+          <p>Run <code>ash update</code> on macOS or Linux. It downloads the latest stable matching archive, verifies the release manifest with its Sigstore bundle and SHA-256 digest, then installs to <code>~/.local/bin/ash</code>. Use <code>ash update --version vX.Y.Z</code> for a specific version; use <code>--yes</code> only when you want customized managed files replaced.</p>
 
           <h3>I ran <code>ash install</code>. Why does nothing change in this terminal?</h3>
           <p>Installation updates a startup file; it does not rewrite the shell process already running. Open a new terminal, or reload the file for your shell: <code>source ~/.bashrc</code> for Bash, <code>source ~/.zshrc</code> for zsh, or <code>source ~/.config/fish/config.fish</code> for Fish unless you use a custom <code>XDG_CONFIG_HOME</code>.</p>

@@ -6,6 +6,7 @@ case "$-" in
 esac
 
 _ash_ensure_broker() {
+	[[ -n "${AI_ENDPOINT:-}" && -n "${AI_MODEL:-}" ]] || return 1
 	if [[ -n "${ASH_BROKER_SOCKET:-}" && -n "${ASH_BROKER_TOKEN:-}" && -S "$ASH_BROKER_SOCKET" && -n "${ASH_BROKER_PID:-}" ]] && kill -0 "$ASH_BROKER_PID" 2>/dev/null; then
 		return 0
 	fi
@@ -24,9 +25,16 @@ _ash_ensure_broker() {
 	if [[ -z "$token" ]]; then
 		return 1
 	fi
-	ASH_BROKER_TOKEN="$token" command ash broker --socket "$socket_path" --lease "$lease_path" </dev/null >/dev/null 2>&1 &
-	local broker_pid=$!
-	disown "$broker_pid" 2>/dev/null || true
+	# Launching from a subshell keeps bash's job-start notice off the terminal; the
+	# pid is handed back through a file because $! is not visible to the parent.
+	local pid_path="$runtime_dir/${SESSION_ID:-shell}.pid"
+	( ASH_BROKER_TOKEN="$token" command ash broker --socket "$socket_path" --lease "$lease_path" </dev/null >/dev/null 2>&1 & printf '%s' "$!" > "$pid_path" )
+	local broker_pid
+	broker_pid="$(cat "$pid_path" 2>/dev/null)"
+	rm -f "$pid_path" 2>/dev/null
+	if [[ -z "$broker_pid" ]]; then
+		return 1
+	fi
 	local attempt
 	for attempt in {1..40}; do
 		if [[ -S "$socket_path" ]]; then
@@ -68,147 +76,39 @@ command_not_found_handle() {
 	return 127
 }
 
+# Question words that can open the second position of a natural-language line.
+_ash_leading_question_word() {
+	case "$1" in
+		[Ii][Ss]|[Aa][Rr][Ee]|[Aa][Mm]|[Dd][Oo]|[Dd][Oo][Ee][Ss]|[Dd][Ii][Dd]|[Cc][Aa][Nn]|[Cc][Oo][Uu][Ll][Dd]|[Ss][Hh][Oo][Uu][Ll][Dd]|[Ww][Oo][Uu][Ll][Dd]|[Ww][Ii][Ll][Ll]|[Ww][Hh][Yy]|[Hh][Oo][Ww]|[Ww][Hh][Ee][Nn]|[Ww][Hh][Ee][Rr][Ee]|[Ww][Hh][Oo])
+			return 0
+			;;
+	esac
+	return 1
+}
+
+# The heuristic itself lives in Go (ash route --check) so every shell shares one
+# implementation. These guards only reject inputs that Go could never route, and
+# they stay fork-free so ordinary command use never pays for a subprocess.
 _ash_should_route() {
-  local cmd="$1"
-  shift
-  local args=("$@")
-  local argc=${#args[@]}
-	local cmd_lower
-	cmd_lower="$(printf '%s' "$cmd" | tr '[:upper:]' '[:lower:]')"
-	local natural_wrapper=0
-	case "$cmd_lower" in
-		what|which|who|where|at|in|for|write) natural_wrapper=1 ;;
-	esac
+	local cmd="$1"
+	shift
+	local argc=$#
+	[[ $argc -ge 2 ]] || return 1
 
-  [[ $argc -eq 0 ]] && return 1
-
-  local a
-  for a in "${args[@]}"; do
-    [[ "$a" == -* ]] && return 1
-  done
-
-	local has_path_like=0
-	for a in "${args[@]}"; do
-		if [[ "$a" == */* || "$a" == ./* || "$a" == ../* ]]; then
-			has_path_like=1
-			break
-		fi
+	local a
+	for a in "$@"; do
+		[[ "$a" == -* ]] && return 1
 	done
-	if [[ $has_path_like -eq 1 && ( $natural_wrapper -eq 0 || $argc -eq 1 ) ]]; then
-		return 1
-	fi
 
-	if [[ "$cmd_lower" == "at" ]]; then
-		local first_at
-		first_at="$(printf '%s' "${args[0]}" | tr '[:upper:]' '[:lower:]')"
-		first_at="${first_at%%[?!.,:;]}"
-		if [[ "$first_at" =~ [0-9:] ]]; then
-			return 1
-		fi
-		case "$first_at" in
-			now|today|tomorrow|teatime|midnight|noon)
-				return 1
-				;;
-			am|pm)
-				return 1
-				;;
-		esac
-	fi
-
-  if [[ "$cmd" == "Time" || "$cmd" == "test" || "$cmd" == "Test" || "$cmd" == "type" || "$cmd" == "Type" ]]; then
-    if [[ $argc -eq 1 && "${args[0]}" =~ ^[A-Za-z0-9_.-]+$ ]]; then
-      return 1
-    fi
-  fi
-
-  local full="$cmd"
-  for a in "${args[@]}"; do
-    full+=" $a"
-  done
-
-  [[ "$full" == *\? && $argc -ge 2 ]] && return 0
-
-  local first
-  first="$(printf '%s' "${args[0]}" | tr '[:upper:]' '[:lower:]')"
-  case "$first" in
-    is|are|am|do|does|did|can|could|should|would|will|why|how|when|where|who)
-			if [[ $argc -ge 2 ]]; then
-				if [[ $has_path_like -eq 0 || ( $natural_wrapper -eq 1 && $argc -ge 3 ) ]]; then
-					return 0
-				fi
-			fi
-      ;;
-  esac
-
-	case "$cmd_lower" in
-		write)
-			if [[ $argc -ge 2 ]]; then
-				local first_token
-				first_token="$(printf '%s' "${args[0]}" | tr '[:upper:]' '[:lower:]')"
-				first_token="${first_token%%[?!.,:;]}"
-				case "$first_token" in
-					a|an|the|this|that|these|those|my|our|your|please|poem)
-						return 0
-						;;
-				 esac
-			fi
-			;;
-		what|which|who|where)
-			if [[ $argc -ge 3 ]]; then
-				local limit=4
-				(( argc < limit )) && limit=$argc
-				local i token raw
-				for (( i=1; i<limit; i++ )); do
-					raw="${args[$i]}"
-					token="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
-					token="${token%%[?!.,:;]}"
-					case "$token" in
-						is|are|am|do|does|did|can|could|should|would|will|why|how|when|where|who|if)
-							return 0
-							;;
-					esac
-				done
-			fi
-			;;
-		say)
-			if [[ $argc -ge 2 ]]; then
-				local first_token
-				first_token="$(printf '%s' "${args[0]}" | tr '[:upper:]' '[:lower:]')"
-				first_token="${first_token%%[?!.,:;]}"
-				case "$first_token" in
-					out|something|a|an|the|please|why|how|when|where|who|what|can|could|should|would)
-						return 0
-						;;
-				esac
-			fi
-			;;
-		in|for)
-			if [[ $argc -ge 2 ]]; then
-				local first_token
-				first_token="$(printf '%s' "${args[0]}" | tr '[:upper:]' '[:lower:]')"
-				first_token="${first_token%%[?!.,:;]}"
-				case "$first_token" in
-					this|that|these|those|the|a|an|my|our|your|please|what|when|how|why|who|where|is|are|do|can|should|would)
-						return 0
-						;;
-				esac
-			fi
-			;;
-		at)
-			if [[ $argc -ge 2 ]]; then
-				local first_token
-				first_token="$(printf '%s' "${args[0]}" | tr '[:upper:]' '[:lower:]')"
-				first_token="${first_token%%[?!.,:;]}"
-				case "$first_token" in
-					remind|tell|ask|message|note|please|what|when|how|why|who|where)
-						return 0
-						;;
-				esac
-			fi
+	case "$cmd" in
+		what|What|which|Which|who|Who|where|Where|at|At|in|In|for|For|write|Write) ;;
+		*)
+			local last="${!argc}"
+			[[ "$last" == *\? ]] || _ash_leading_question_word "$1" || return 1
 			;;
 	esac
 
-  return 1
+	command ash route --check -- "$cmd" "$@"
 }
 
 _ash_route_or_delegate() {

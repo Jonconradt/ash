@@ -29,6 +29,12 @@ import (
 	"github.com/charmbracelet/glamour"
 )
 
+// TestMain keeps the suite from building real virtualenvs during install/upgrade tests.
+func TestMain(m *testing.M) {
+	provisionPythonEnv = func(io.Writer) {}
+	os.Exit(m.Run())
+}
+
 type stubToolShim struct {
 	tools []toolDefinition
 }
@@ -1080,7 +1086,7 @@ func TestBuildManagedAshEnvIncludesSessionIDLine(t *testing.T) {
 	if !strings.Contains(got, "export AI_MODEL='llama3.1'\n") {
 		t.Fatalf("expected managed ash env to include AI_MODEL export, got %q", got)
 	}
-	if !strings.Contains(got, "export PATH=\"$HOME/.ash/tools:$PATH\"\n") {
+	if !strings.Contains(got, managedPathExportLine+"\n") {
 		t.Fatalf("expected managed ash env to include tools PATH export, got %q", got)
 	}
 }
@@ -2252,7 +2258,7 @@ func TestBuildFishEnvironmentFile(t *testing.T) {
 	for _, want := range []string{
 		"# managed by ash install",
 		"if not set -q SESSION_ID",
-		`set -gx PATH "$HOME/.ash/tools" $PATH`,
+		`set -gx PATH "$HOME/.ash/tools" "$HOME/.local/bin" $PATH`,
 		"set -gx AI_ENDPOINT 'https://example.test'",
 		"set -gx ASH_MAX_TOOL_ITERS '16'",
 	} {
@@ -2591,7 +2597,7 @@ func TestInstallOverwriteMode(t *testing.T) {
 		t.Fatalf("expected overwrite mode to replace existing env file, got %q", string(content))
 	}
 	for _, want := range []string{
-		`export PATH="$HOME/.ash/tools:$PATH"`,
+		managedPathExportLine,
 		"export AI_ENDPOINT='https://api.openai.com/v1'",
 		"export AI_MODEL='gpt-4.1-mini'",
 		"export AI_AUTH_TYPE='bearer'",
@@ -3359,106 +3365,75 @@ func TestShouldRouteToAshConservative(t *testing.T) {
 	}
 }
 
-func runShellCollisionFixture(t *testing.T, shell, fixture, invocation string) string {
-	t.Helper()
-
-	shellPath, err := exec.LookPath(shell)
-	if err != nil {
-		t.Skipf("%s not available: %v", shell, err)
-	}
-
-	fixturePath := filepath.Join("testdata", fixture)
-	command := fmt.Sprintf("source %q; %s", fixturePath, invocation)
-	execCmd := exec.CommandContext(context.Background(), shellPath, "-c", command)
-	output, err := execCmd.CombinedOutput()
-	if err != nil {
-		t.Fatalf("%s fixture invocation failed: %v\noutput=%s", shell, err, output)
-	}
-
-	return strings.TrimSpace(string(output))
-}
-
-func TestBashCollisionWrappers(t *testing.T) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		t.Fatalf("UserHomeDir failed: %v", err)
-	}
-
+func TestBashRoutingPolicy(t *testing.T) {
+	// bash guards defer to shouldRoutePrompt via `ash route --check`; see bash_route_test.go
+	// for the guard-equivalence and fork-avoidance tests.
 	tests := []struct {
 		name       string
 		invocation string
-		want       string
+		want       bool
 	}{
-		{name: "title case what routed", invocation: "What time is it?", want: "ASH:What time is it?"},
-		{name: "lower case what routed", invocation: "what time is it?", want: "ASH:what time is it?"},
-		{name: "write natural language routed", invocation: "write a poem using the following as inspiration love.txt", want: "ASH:write a poem using the following as inspiration love.txt"},
-		{name: "write command form delegates", invocation: "write user", want: "DELEGATE:write:user"},
-		{name: "what interrogative routed", invocation: "what is awk", want: "ASH:what is awk"},
-		{name: "what mid auxiliary routed", invocation: "What directory am I in and are there any executeable files Run multiple tools if necessary", want: "ASH:What directory am I in and are there any executeable files Run multiple tools if necessary"},
-		{name: "what sentence with path routed", invocation: "what time is it and list all of the files in the ~/.ash/logs", want: "ASH:what time is it and list all of the files in the " + filepath.Join(homeDir, ".ash", "logs")},
-		{name: "what path delegates", invocation: "what /usr/bin/what", want: "DELEGATE:what:/usr/bin/what"},
-		{name: "what flag delegates", invocation: "what -s file", want: "DELEGATE:what:-s file"},
-		{name: "title case time routed", invocation: "Time is it late?", want: "ASH:Time is it late?"},
-		{name: "test question routed", invocation: "test should I use jq", want: "ASH:test should I use jq"},
-		{name: "test flag delegates", invocation: "test -f /etc/hosts", want: "DELEGATE:test:-f /etc/hosts"},
-		{name: "type question routed", invocation: "type why is grep slow?", want: "ASH:type why is grep slow?"},
-		{name: "type command form delegates", invocation: "type ls", want: "DELEGATE:type:ls"},
-		{name: "which question routed", invocation: "which should I use ripgrep or grep", want: "ASH:which should I use ripgrep or grep"},
-		{name: "which command form delegates", invocation: "which ls", want: "DELEGATE:which:ls"},
-		{name: "who question routed", invocation: "who am I?", want: "ASH:who am I?"},
-		{name: "who with path routed", invocation: "who am I and list files in ~/.ash/logs", want: "ASH:who am I and list files in " + filepath.Join(homeDir, ".ash", "logs")},
-		{name: "who no args delegates", invocation: "who", want: "DELEGATE:who:"},
-		{name: "In title case routed", invocation: "In this repo what files changed", want: "ASH:In this repo what files changed"},
-		{name: "For title case routed", invocation: "For this error what should I do", want: "ASH:For this error what should I do"},
-		{name: "for loop unchanged", invocation: "for x in a b; do echo $x; done", want: "a\nb"},
-		{name: "at natural routed", invocation: "at remind me tomorrow", want: "ASH:at remind me tomorrow"},
-		{name: "at scheduler delegates", invocation: "at 5pm", want: "DELEGATE:at:5pm"},
+		{name: "title case what routed", invocation: "What time is it?", want: true},
+		{name: "lower case what routed", invocation: "what time is it?", want: true},
+		{name: "write natural language routed", invocation: "write a poem using the following as inspiration love.txt", want: true},
+		{name: "write command form delegates", invocation: "write user", want: false},
+		{name: "what mid auxiliary routed", invocation: "What directory am I in and are there any executeable files", want: true},
+		{name: "what sentence with path routed", invocation: "what time is it and list all of the files in the ~/.ash/logs", want: true},
+		{name: "what path delegates", invocation: "what /usr/bin/what", want: false},
+		{name: "what flag delegates", invocation: "what -a", want: false},
+		{name: "title case time routed", invocation: "Time is it late?", want: true},
+		{name: "test question routed", invocation: "test is this thing on?", want: true},
+		{name: "test flag delegates", invocation: "test -f /etc/hosts", want: false},
+		{name: "type question routed", invocation: "type is this a question?", want: true},
+		{name: "type command form delegates", invocation: "type ls", want: false},
+		{name: "which question routed", invocation: "which file is bigger?", want: true},
+		{name: "which command form delegates", invocation: "which ls", want: false},
+		{name: "who question routed", invocation: "who am i", want: true},
+		{name: "who no args delegates", invocation: "who", want: false},
+		{name: "In title case routed", invocation: "In this repo what files changed", want: true},
+		{name: "For title case routed", invocation: "For this error what should I do", want: true},
+		{name: "at natural routed", invocation: "at remind me tomorrow", want: true},
+		{name: "at scheduler delegates", invocation: "at 5pm", want: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := runShellCollisionFixture(t, "bash", "collision_wrappers.bash", tt.invocation)
-			if got != tt.want {
-				t.Fatalf("bash fixture output mismatch: got %q want %q", got, tt.want)
+			if got := shouldRoutePrompt(tt.invocation); got != tt.want {
+				t.Fatalf("shouldRoutePrompt(%q) = %v, want %v", tt.invocation, got, tt.want)
 			}
 		})
 	}
 }
 
-func TestZshCollisionWrappers(t *testing.T) {
-	homeDir, err := os.UserHomeDir()
-	if err != nil {
-		t.Fatalf("UserHomeDir failed: %v", err)
-	}
-
+func TestZshRoutingPolicy(t *testing.T) {
+	// zsh routes through the ZLE widget, which delegates the decision to shouldRoutePrompt.
 	tests := []struct {
 		name       string
 		invocation string
-		want       string
+		want       bool
 	}{
-		{name: "title case what routed", invocation: "What time is it?", want: "ASH:What time is it?"},
-		{name: "lower case what routed", invocation: "what time is it?", want: "ASH:what time is it?"},
-		{name: "write natural language routed", invocation: "write a poem using the following as inspiration love.txt", want: "ASH:write a poem using the following as inspiration love.txt"},
-		{name: "write command form delegates", invocation: "write user", want: "DELEGATE:write:user"},
-		{name: "what mid auxiliary routed", invocation: "What directory am I in and are there any executeable files Run multiple tools if necessary", want: "ASH:What directory am I in and are there any executeable files Run multiple tools if necessary"},
-		{name: "what sentence with path routed", invocation: "what time is it and list all of the files in the ~/.ash/logs", want: "ASH:what time is it and list all of the files in the " + filepath.Join(homeDir, ".ash", "logs")},
-		{name: "what path delegates", invocation: "what /usr/bin/what", want: "DELEGATE:what:/usr/bin/what"},
-		{name: "title case time routed", invocation: "Time is it late?", want: "ASH:Time is it late?"},
-		{name: "where question routed", invocation: "where should logs go", want: "ASH:where should logs go"},
-		{name: "where command form delegates", invocation: "where ls", want: "DELEGATE:where:ls"},
-		{name: "who with path routed", invocation: "who am I and list files in ~/.ash/logs", want: "ASH:who am I and list files in " + filepath.Join(homeDir, ".ash", "logs")},
-		{name: "In title case routed", invocation: "In this repo what files changed", want: "ASH:In this repo what files changed"},
-		{name: "For title case routed", invocation: "For this error what should I do", want: "ASH:For this error what should I do"},
-		{name: "for loop unchanged", invocation: "for x in a b; do echo $x; done", want: "a\nb"},
-		{name: "at natural routed", invocation: "at remind me tomorrow", want: "ASH:at remind me tomorrow"},
-		{name: "at scheduler delegates", invocation: "at 5pm", want: "DELEGATE:at:5pm"},
+		{name: "title case what routed", invocation: "What time is it?", want: true},
+		{name: "lower case what routed", invocation: "what time is it?", want: true},
+		{name: "write natural language routed", invocation: "write a poem using the following as inspiration love.txt", want: true},
+		{name: "write command form delegates", invocation: "write user", want: false},
+		{name: "what mid auxiliary routed", invocation: "What directory am I in and are there any executeable files Run multiple tools if necessary", want: true},
+		{name: "what sentence with path routed", invocation: "what time is it and list all of the files in the ~/.ash/logs", want: true},
+		{name: "what path delegates", invocation: "what /usr/bin/what", want: false},
+		{name: "title case time routed", invocation: "Time is it late?", want: true},
+		{name: "where question routed", invocation: "where should logs go", want: true},
+		{name: "where command form delegates", invocation: "where ls", want: false},
+		{name: "who with path routed", invocation: "who am I and list files in ~/.ash/logs", want: true},
+		{name: "In title case routed", invocation: "In this repo what files changed", want: true},
+		{name: "For title case routed", invocation: "For this error what should I do", want: true},
+		{name: "for loop unchanged", invocation: "for x in a b; do echo $x; done", want: false},
+		{name: "at natural routed", invocation: "at remind me tomorrow", want: true},
+		{name: "at scheduler delegates", invocation: "at 5pm", want: false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := runShellCollisionFixture(t, "zsh", "collision_wrappers.zsh", tt.invocation)
-			if got != tt.want {
-				t.Fatalf("zsh fixture output mismatch: got %q want %q", got, tt.want)
+			if got := shouldRoutePrompt(tt.invocation); got != tt.want {
+				t.Fatalf("shouldRoutePrompt(%q) = %v, want %v", tt.invocation, got, tt.want)
 			}
 		})
 	}

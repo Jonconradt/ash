@@ -106,11 +106,21 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if args[0] == "broker" {
 		return runBroker(args[1:], stdout, stderr)
 	}
+	if args[0] == "route" {
+		return runRoute(args[1:], stdout, stderr)
+	}
 	if args[0] == "update" {
 		return runUpgrade(args[1:], stdout, stderr)
 	}
 	if args[0] == "--internal-export-assets" {
 		return runUpgradeAssetExport(args[1:], stdout, stderr)
+	}
+	if args[0] == "--internal-sync-route-words" {
+		return runSyncRouteWords(stdout, stderr)
+	}
+	if args[0] == "--internal-provision-python" {
+		provisionManagedPythonEnv(stdout)
+		return 0
 	}
 
 	defaultsStarted := timeNow()

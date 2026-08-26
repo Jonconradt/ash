@@ -480,6 +480,13 @@ func (s localToolShim) callUnixCommand(ctx context.Context, args map[string]any)
 		}
 	}
 
+	// Bundled .py tools run under the managed interpreter so third-party deps resolve.
+	if script, ok := managedPythonScript(commandName); ok {
+		if interpreter := ashPythonInterpreter(); interpreter != "python3" {
+			return toolCommandRunner(ctx, interpreter, append([]string{script}, argv...), toolTimeout(), toolOutputLimit())
+		}
+	}
+
 	return toolCommandRunner(ctx, commandName, argv, toolTimeout(), toolOutputLimit())
 }
 
@@ -502,7 +509,7 @@ func (s localToolShim) callPython3(ctx context.Context, args map[string]any) too
 	}
 
 	pythonArgs := append([]string{"-c", code}, argv...)
-	return toolCommandRunner(ctx, "python3", pythonArgs, toolTimeout(), toolOutputLimit())
+	return toolCommandRunner(ctx, ashPythonInterpreter(), pythonArgs, toolTimeout(), toolOutputLimit())
 }
 
 // callScheduleFuturePrompt schedules a future ash prompt using launchd and returns the resulting execution status.

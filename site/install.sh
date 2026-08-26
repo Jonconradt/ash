@@ -131,5 +131,5 @@ esac
 printf 'ash %s installed to %s/ash\n' "$tag" "$install_dir"
 case :$PATH: in
   *:"$install_dir":*) ;;
-  *) printf 'Add %s to PATH before using the ash command.\n' "$install_dir" ;;
+  *) printf 'Open a new shell to pick up %s on PATH.\n' "$install_dir" ;;
 esac

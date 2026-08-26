@@ -20,6 +20,7 @@ import (
 //go:embed ash_bootstrap/.ash_bashrc
 //go:embed ash_bootstrap/.ash_fish.fish
 //go:embed ash_bootstrap/.ash_zshrc
+//go:embed ash_bootstrap/route_words.txt
 //go:embed ash_bootstrap/tools/*
 var embeddedBootstrapAssets embed.FS
 
@@ -82,7 +83,8 @@ func installEmbeddedBootstrapAssets(overwrite bool, stdout io.Writer) error {
 		return err
 	}
 	for _, entry := range entries {
-		if entry.IsDir() {
+		// requirements.txt drives venv provisioning; it is not a runnable tool.
+		if entry.IsDir() || entry.Name() == "requirements.txt" {
 			continue
 		}
 		srcPath := filepath.ToSlash(filepath.Join("ash_bootstrap", "tools", entry.Name()))
@@ -206,7 +208,7 @@ func buildFishEnvironmentFile(content string) []byte {
 			continue
 		}
 		if key == "PATH" {
-			b.WriteString("set -gx PATH \"$HOME/.ash/tools\" $PATH\n")
+			b.WriteString("set -gx PATH \"$HOME/.ash/tools\" \"$HOME/.local/bin\" $PATH\n")
 			continue
 		}
 		b.WriteString("set -gx ")

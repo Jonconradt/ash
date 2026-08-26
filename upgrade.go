@@ -417,12 +417,12 @@ func installUpgradeArchive(content []byte, version string, options upgradeOption
 	if err != nil {
 		return err
 	}
-	destinationDir := filepath.Join(home, "go", "bin")
-	if err := os.MkdirAll(destinationDir, 0o700); err != nil {
+	destinationDir := filepath.Join(home, ".local", "bin")
+	if err := os.MkdirAll(destinationDir, 0o755); err != nil {
 		return fmt.Errorf("create %s: %w", destinationDir, err)
 	}
 	destination := filepath.Join(destinationDir, "ash")
-	// #nosec G304 -- destination is the fixed user-local ~/go/bin/ash path.
+	// #nosec G304 -- destination is the fixed user-local ~/.local/bin/ash path.
 	previousBinary, previousErr := os.ReadFile(destination)
 	if previousErr != nil && !errors.Is(previousErr, os.ErrNotExist) {
 		return previousErr
@@ -442,6 +442,7 @@ func installUpgradeArchive(content []byte, version string, options upgradeOption
 	if err := reconcileUpgradeToolsAllowlist(candidateAssets, stdout); err != nil {
 		return err
 	}
+	provisionPythonEnv(stdout)
 	_, _ = fmt.Fprintf(stdout, "updated ash to %s at %s (commit %s)\n", version, destination, ashCommit)
 	return nil
 }

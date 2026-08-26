@@ -93,7 +93,7 @@ the current shell loads the snooze-aware integration.
 .B ash update [--version vX.Y.Z] [--yes|--skip-customized]
 Download and install the latest stable macOS or Linux release for the current
 architecture into
-.IR ~/go/bin/ash .
+.IR ~/.local/bin/ash .
 The release's
 .B SHA256SUMS
 manifest must pass Sigstore keyless verification against the ash release
@@ -262,6 +262,20 @@ Determines the ash workspace location under
 .TP
 .B PATH
 Used to locate executables for tool commands and helper utilities.
+.B ash install
+prepends
+.I ~/.ash/tools
+and
+.I ~/.local/bin
+via the managed
+.I ~/.ash/.ash_env
+file.
+.TP
+.B ASH_PYTHON
+Interpreter used for bundled Python tools. Defaults to the managed virtualenv at
+.I ~/.ash/venv
+when present, otherwise system
+.IR python3 .
 .SH FILES
 .TP
 .I ~/.ash/.ash_system
@@ -269,6 +283,13 @@ Canonical system prompt file.
 .TP
 .I ~/.ash/.ash_tools
 Canonical tool allowlist file.
+.TP
+.I ~/.ash/venv/
+Managed virtualenv holding third-party dependencies for bundled Python tools. Built
+in the background by
+.BR "ash install" ;
+progress is written to
+.IR ~/.ash/python-env.log .
 .TP
 .I ~/.ash/history/
 Conversation history files.

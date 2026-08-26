@@ -8,6 +8,12 @@ if not status is-interactive
 end
 
 function _ash_ensure_broker
+	if not set -q AI_ENDPOINT; or not set -q AI_MODEL
+		return 1
+	end
+	if test -z "$AI_ENDPOINT"; or test -z "$AI_MODEL"
+		return 1
+	end
 	if set -q ASH_BROKER_SOCKET ASH_BROKER_TOKEN ASH_BROKER_PID
 		if test -S "$ASH_BROKER_SOCKET"; and command kill -0 "$ASH_BROKER_PID" 2>/dev/null
 			return 0

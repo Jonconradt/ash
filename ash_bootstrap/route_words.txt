@@ -1,0 +1,14 @@
+# Canonical list of leading words that are also real commands, builtins, or reserved
+# words. Shell integrations must consult the routing heuristic for these instead of
+# assuming shell intent. Regenerate shell assets with: make sync-route-words
+at
+for
+in
+test
+time
+type
+what
+where
+which
+who
+write
