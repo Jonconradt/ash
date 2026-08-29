@@ -209,15 +209,15 @@ func fetchAvailableModels(provider aiProvider, baseURL, authToken string) ([]str
 
 // promptSelectModel displays a numeric menu of models and returns the chosen (or manually entered) model name.
 func promptSelectModel(reader *bufio.Reader, stdout io.Writer, models []string) (string, error) {
-	_, _ = fmt.Fprintln(stdout, "Select a model:")
+	printMenuTitle(stdout, "Select a model:")
 	for i, m := range models {
-		_, _ = fmt.Fprintf(stdout, "  %d) %s\n", i+1, m)
+		printMenuItem(stdout, i+1, m, "")
 	}
 	customIdx := len(models) + 1
-	_, _ = fmt.Fprintf(stdout, "  %d) Enter a custom model name\n", customIdx)
+	printMenuItem(stdout, customIdx, "Enter a custom model name", "")
 
 	for {
-		_, _ = fmt.Fprintf(stdout, "%s:  ", aiEnvModel)
+		printPrompt(stdout, aiEnvModel)
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			return "", err
@@ -234,7 +234,7 @@ func promptSelectModel(reader *bufio.Reader, stdout io.Writer, models []string) 
 				return promptNonEmpty(reader, stdout, aiEnvModel)
 			}
 		}
-		_, _ = fmt.Fprintln(stdout, "invalid selection, enter a menu number")
+		printError(stdout, "invalid selection, enter a menu number")
 	}
 }
 
@@ -250,12 +250,12 @@ func promptModelForEndpoint(reader *bufio.Reader, stdout io.Writer, provider aiP
 
 // promptSelectDetectedProvider displays a numeric menu of detected cloud providers and returns the chosen one.
 func promptSelectDetectedProvider(reader *bufio.Reader, stdout io.Writer, detected []detectedCloudProvider) (detectedCloudProvider, error) {
-	_, _ = fmt.Fprintln(stdout, "Multiple cloud AI provider credentials detected:")
+	printMenuTitle(stdout, "Multiple cloud AI provider credentials detected:")
 	for i, d := range detected {
-		_, _ = fmt.Fprintf(stdout, "  %d) %s\n", i+1, d.Name)
+		printMenuItem(stdout, i+1, d.Name, "")
 	}
 	for {
-		_, _ = fmt.Fprint(stdout, "Select provider:  ")
+		printPrompt(stdout, "Select provider")
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			return detectedCloudProvider{}, err
@@ -264,7 +264,7 @@ func promptSelectDetectedProvider(reader *bufio.Reader, stdout io.Writer, detect
 		if convErr == nil && idx >= 1 && idx <= len(detected) {
 			return detected[idx-1], nil
 		}
-		_, _ = fmt.Fprintln(stdout, "invalid selection, enter a menu number")
+		printError(stdout, "invalid selection, enter a menu number")
 	}
 }
 
@@ -304,12 +304,12 @@ func promptInstallEnvValuesAuto(reader *bufio.Reader, stdout io.Writer) (map[str
 				return nil, err
 			}
 		}
-		_, _ = fmt.Fprintf(stdout, "Detected %s credentials; configuring ash automatically.\n", chosen.Name)
+		printSuccess(stdout, fmt.Sprintf("Detected %s credentials; configuring ash automatically.", chosen.Name))
 		return finishAutoConfigure(reader, stdout, chosen.Endpoint, chosen.AuthToken)
 	}
 
 	if local := detectLocalAIService(); local != nil {
-		_, _ = fmt.Fprintf(stdout, "Detected local AI server (%s); configuring ash automatically.\n", local.Name)
+		printSuccess(stdout, fmt.Sprintf("Detected local AI server (%s); configuring ash automatically.", local.Name))
 		return finishAutoConfigure(reader, stdout, local.BaseURL, "")
 	}
 

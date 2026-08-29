@@ -307,7 +307,7 @@ func ashEnvFilePath() (string, error) {
 
 // promptInstallEnvValues collects the AI endpoint and authentication values needed to create a managed ash environment file.
 func promptInstallEnvValues(reader *bufio.Reader, stdout io.Writer) (map[string]string, error) {
-	_, _ = fmt.Fprintln(stdout, "Configure ash environment values")
+	printMenuTitle(stdout, "Configure ash environment values")
 	endpoint, err := promptEndpointWithPresets(reader, stdout)
 	if err != nil {
 		return nil, err
@@ -353,17 +353,14 @@ func promptInstallEnvValues(reader *bufio.Reader, stdout io.Writer) (map[string]
 
 // promptEndpointWithPresets prompts for an AI endpoint, accepting either a preset choice or a custom URL.
 func promptEndpointWithPresets(reader *bufio.Reader, stdout io.Writer) (string, error) {
-	_, _ = fmt.Fprintln(stdout, "Select AI endpoint preset or enter a custom URL:")
+	printMenuTitle(stdout, "Select AI endpoint preset or enter a custom URL:")
 	for i, preset := range installEndpointPresets {
-		if preset.URL == "" {
-			_, _ = fmt.Fprintf(stdout, "  %d) %s\n", i+1, preset.Name)
-			continue
-		}
-		_, _ = fmt.Fprintf(stdout, "  %d) %s - %s\n", i+1, preset.Name, preset.URL)
+		printMenuItem(stdout, i+1, preset.Name, preset.URL)
 	}
+	printHint(stdout, "Enter a menu number above, or paste a full http(s) URL directly.")
 
 	for {
-		_, _ = fmt.Fprintf(stdout, "%s:  ", aiEnvEndpoint)
+		printPrompt(stdout, aiEnvEndpoint)
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			return "", err
@@ -378,7 +375,7 @@ func promptEndpointWithPresets(reader *bufio.Reader, stdout io.Writer) (string, 
 					return preset.URL, nil
 				}
 				for {
-					_, _ = fmt.Fprintf(stdout, "%s (custom URL):  ", aiEnvEndpoint)
+					printPrompt(stdout, aiEnvEndpoint+" (custom URL)")
 					customLine, customErr := reader.ReadString('\n')
 					if customErr != nil {
 						return "", customErr
@@ -390,21 +387,21 @@ func promptEndpointWithPresets(reader *bufio.Reader, stdout io.Writer) (string, 
 					if _, _, _, parseErr := parseAIEndpoint(custom); parseErr == nil {
 						return strings.TrimRight(custom, "/"), nil
 					}
-					_, _ = fmt.Fprintln(stdout, "invalid endpoint, enter a full http(s) URL")
+					printError(stdout, "invalid endpoint, enter a full http(s) URL")
 				}
 			}
 		}
 		if _, _, _, parseErr := parseAIEndpoint(input); parseErr == nil {
 			return strings.TrimRight(input, "/"), nil
 		}
-		_, _ = fmt.Fprintln(stdout, "invalid endpoint, enter a preset number or full http(s) URL")
+		printError(stdout, "invalid endpoint, enter a preset number or full http(s) URL")
 	}
 }
 
 // promptNonEmpty reads a non-empty value from the user for the provided prompt key.
 func promptNonEmpty(reader *bufio.Reader, stdout io.Writer, key string) (string, error) {
 	for {
-		_, _ = fmt.Fprintf(stdout, "%s:  ", key)
+		printPrompt(stdout, key)
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			return "", err
@@ -418,7 +415,7 @@ func promptNonEmpty(reader *bufio.Reader, stdout io.Writer, key string) (string,
 
 // promptOptional reads an optional value from the user for the provided prompt key.
 func promptOptional(reader *bufio.Reader, stdout io.Writer, key string) (string, error) {
-	_, _ = fmt.Fprintf(stdout, "%s:  ", key)
+	printPrompt(stdout, key)
 	line, err := reader.ReadString('\n')
 	if err != nil {
 		return "", err
