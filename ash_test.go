@@ -3138,6 +3138,20 @@ func TestPromptEndpointWithPresets(t *testing.T) {
 			t.Fatalf("promptEndpointWithPresets returned %q, want %q", got, "https://example.com/custom")
 		}
 	})
+
+	t.Run("Other preset prompts for a custom URL", func(t *testing.T) {
+		otherIdx := len(installEndpointPresets)
+		reader := bufio.NewReader(strings.NewReader(strconv.Itoa(otherIdx) + "\nhttps://example.com/other/\n"))
+		var stdout bytes.Buffer
+
+		got, err := promptEndpointWithPresets(reader, &stdout)
+		if err != nil {
+			t.Fatalf("promptEndpointWithPresets returned error: %v", err)
+		}
+		if got != "https://example.com/other" {
+			t.Fatalf("promptEndpointWithPresets returned %q, want %q", got, "https://example.com/other")
+		}
+	})
 }
 
 func TestRunInstallHardensWorkspacePermissions(t *testing.T) {

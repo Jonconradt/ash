@@ -65,7 +65,7 @@ ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></pre>
             <dt><code>ash [text ...]</code></dt>
             <dd>Run a single assistant request.</dd>
             <dt><code>ash install [--shell bash|zsh|pwsh] [--dry-run]</code></dt>
-            <dd>Install or update shell integration. When <code>--shell</code> is omitted, the current shell is used when possible and PowerShell defaults to <code>pwsh</code> on Windows. <code>--dry-run</code> previews changes without writing.</dd>
+            <dd>Install or update shell integration. When <code>--shell</code> is omitted, the current shell is used when possible and PowerShell defaults to <code>pwsh</code> on Windows. <code>--dry-run</code> previews changes without writing. When interactive, install also auto-configures <code>AI_ENDPOINT</code>, <code>AI_MODEL</code>, and <code>AI_AUTH_TOKEN</code>: it prefers an already-set cloud provider API key (OpenAI, Anthropic, Google Gemini, Azure OpenAI, Mistral, Cohere, Groq, xAI, DeepSeek, Together AI, OpenRouter, or HuggingFace), then a running local inference server (Ollama, LM Studio, llama.cpp/MLX/LocalAI, vLLM, text-generation-webui, Jan, or GPT4All), and otherwise prompts with a numbered provider menu. The model is chosen from the endpoint's model list when available.</dd>
             <dt><code>ash snooze [duration|off]</code></dt>
             <dd>Pause automatic shell prompt processing. The default is five minutes. Durations use Go syntax such as <code>30s</code>, <code>5m</code>, or <code>1h</code>. Use <code>off</code> to resume immediately.</dd>
             <dt><code>ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></dt>

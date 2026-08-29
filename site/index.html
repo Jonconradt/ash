@@ -93,12 +93,12 @@
         <div><p class="eyebrow">Start small</p><h2>Give your shell<br><em>some company.</em></h2></div>
         <div class="install-details">
           <p>Linux and macOS users can install the latest release in one step. The installer verifies the download, installs to <code>~/.local/bin</code>, and configures detected Fish, zsh, or bash integration, falling back to bash.</p>
-          <p>Set the following environment variables after running the installer. The website now has a one-line installer, but you still have to set:</p>
+          <p><code>ash install</code> auto-configures your AI provider: it detects an already-set cloud provider API key or a running local inference server, otherwise it shows a numbered menu to pick a provider and model. Or set these yourself:</p>
           <pre><code>export AI_AUTH_TOKEN='84…89'
 export AI_ENDPOINT='https://ollama.com'
 export AI_MODEL='gemma4:31b-cloud'
 </code></pre>
-          <p>Local, OpenAI, Google, Anthropic, and any other provider with an OpenAI compatible API are supported.</p>
+          <p>Local, OpenAI, Anthropic, Google, Azure OpenAI, Mistral, Cohere, Groq, xAI, DeepSeek, Together AI, OpenRouter, HuggingFace, and any other provider with an OpenAI compatible API are supported.</p>
           <pre class="code-block"><code><span class="code-command">curl -fsSL https://jonconradt.github.io/ash/install.sh | sh</span></code></pre>
           <div class="install-links"><a class="button button-light" href="https://github.com/Jonconradt/ash/releases/latest">View packages <span aria-hidden="true">&#8599;</span></a><a class="text-link light-link" href="https://github.com/Jonconradt/ash#configure">Full configuration <span aria-hidden="true">&#8594;</span></a></div>
         </div>

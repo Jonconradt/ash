@@ -28,7 +28,7 @@ What if I am on MacOS and I want the results in my clipboard? Add pbcopy to .ash
 
 Where is the system prompt? Put your system prompt in ~/.ash/.ash_system. It supports replacement of environment variables.
 
-Does this support Ollama, OpenAI, Google, Anthropic? Yes, during install provide the URL of your provider, and your app key. The app key will be added to ~/.ash/.ash_env
+Does this support Ollama, OpenAI, Google, Anthropic? Yes, plus Azure OpenAI, Mistral, Cohere, Groq, xAI, DeepSeek, Together AI, OpenRouter, and HuggingFace. During install, ash auto-detects an already-configured provider key or a local server; otherwise it shows a numbered menu so you can pick a provider (or enter a custom URL) and supply your app key. The app key will be added to ~/.ash/.ash_env
 
 Is this thing secure and safe? It really depends on how bold you are. It runs as your user so it can read your files, but it is limited in the commands it can execute, but it can execute python (if you allow it). If you allow curl or wget and are running a naive model you could end up executing more than you wanted.
 
@@ -37,6 +37,7 @@ Is this thing secure and safe? It really depends on how bold you are. It runs as
 - Uses `AI_ENDPOINT` and `AI_MODEL` to target local or cloud provider endpoints
 - Uses bearer authentication automatically when `AI_AUTH_TOKEN` is set
 - Auto-detects provider adapters (`ollama`, `openai`, `google`, `anthropic`) from endpoint
+- `ash install` auto-configures from an already-set cloud provider API key or a running local inference server, and offers a numbered model picker
 - Supports optional `AI_PROVIDER` override for advanced routing control
 - Uses provider-native tool calling through per-provider adapters
 - Enables provider-native caching by default when supported
@@ -189,7 +190,15 @@ The package is currently unsigned and not notarized by design.
 
 ## Configure
 
-Set a local Ollama target:
+Running `ash install` automatically configures the AI endpoint, model, and auth token when it can:
+
+1. If a known cloud provider API key is already set in your environment (for example `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`/`GOOGLE_API_KEY`, `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT`, `MISTRAL_API_KEY`, `COHERE_API_KEY`, `GROQ_API_KEY`, `XAI_API_KEY`, `DEEPSEEK_API_KEY`, `TOGETHER_API_KEY`, `OPENROUTER_API_KEY`, or `HF_TOKEN`), ash uses it directly. If more than one is set, you're prompted to pick which one to use.
+2. Otherwise, ash probes for a local inference server (Ollama, LM Studio, llama.cpp/MLX/LocalAI, vLLM, text-generation-webui, Jan, or GPT4All) on its default port.
+3. If neither is found, you're shown a numbered menu of cloud providers (plus the option to enter a custom URL) and prompted for an API key.
+
+In every case, once an endpoint and key are known, ash queries the endpoint's model-listing API and lets you pick the model from a numbered menu (falling back to free-text entry if listing isn't supported). The result is written to `~/.ash/.ash_env`, which the managed install block sources from your `.bashrc`/`.zshrc`.
+
+To configure manually instead, set a local Ollama target:
 
 ```bash
 export AI_ENDPOINT="http://localhost:11434"
@@ -232,6 +241,14 @@ Common `AI_ENDPOINT` values:
 - OpenAI: `https://api.openai.com/v1`
 - Anthropic: `https://api.anthropic.com/v1`
 - Google Gemini (OpenAI-compatible): `https://generativelanguage.googleapis.com/v1beta/openai/`
+- Azure OpenAI (OpenAI-compatible): your `AZURE_OPENAI_ENDPOINT` value
+- Mistral (OpenAI-compatible): `https://api.mistral.ai/v1`
+- Cohere (OpenAI-compatible): `https://api.cohere.ai/compatibility/v1`
+- Groq (OpenAI-compatible): `https://api.groq.com/openai/v1`
+- xAI Grok (OpenAI-compatible): `https://api.x.ai/v1`
+- DeepSeek (OpenAI-compatible): `https://api.deepseek.com/v1`
+- Together AI (OpenAI-compatible): `https://api.together.xyz/v1`
+- OpenRouter (OpenAI-compatible): `https://openrouter.ai/api/v1`
 - HuggingFace Router (OpenAI-compatible): `https://router.huggingface.co/v1`
 
 Notes:

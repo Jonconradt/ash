@@ -41,7 +41,7 @@ func TestParseAIConfigFromEnv(t *testing.T) {
 			wantModel:      "mistral",
 			wantHistoryKey: "https://api.example.com/ollama/mistral",
 			wantAuth:       "Bearer abc123",
-			wantProvider:   providerOllama,
+			wantProvider:   providerOpenAI,
 			wantUseCache:   true,
 		},
 		{

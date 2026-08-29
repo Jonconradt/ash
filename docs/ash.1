@@ -59,6 +59,41 @@ on Windows.
 .B --dry-run
 Preview file changes without writing.
 .PP
+When run interactively without
+.B --dry-run,
+.B ash install
+also configures
+.IR ~/.ash/.ash_env
+with
+.BR AI_ENDPOINT ,
+.BR AI_MODEL ,
+and
+.B AI_AUTH_TOKEN
+when they are not already set. It first checks the environment for an
+already-configured cloud provider key
+(for example
+.BR OPENAI_API_KEY ,
+.BR ANTHROPIC_API_KEY ,
+.BR GEMINI_API_KEY / GOOGLE_API_KEY ,
+.BR AZURE_OPENAI_API_KEY / AZURE_OPENAI_ENDPOINT ,
+.BR MISTRAL_API_KEY ,
+.BR COHERE_API_KEY ,
+.BR GROQ_API_KEY ,
+.BR XAI_API_KEY ,
+.BR DEEPSEEK_API_KEY ,
+.BR TOGETHER_API_KEY ,
+.BR OPENROUTER_API_KEY ,
+or
+.BR HF_TOKEN );
+if more than one is set, it prompts for which to use. Otherwise it probes for a
+running local inference server (Ollama, LM Studio, llama.cpp/MLX/LocalAI,
+vLLM, text-generation-webui, Jan, or GPT4All) on its default port. If neither
+is found, it shows a numbered menu of cloud providers, plus an option to enter
+a custom URL, and prompts for an API key. Once an endpoint and key are known,
+it queries the endpoint's model-listing API and presents a numbered menu of
+available models, falling back to free-text entry when listing is
+unsupported.
+.PP
 Fish uses its native
 .B fish_command_not_found
 hook and supports ash's broker, snooze handling, and compatible natural-language

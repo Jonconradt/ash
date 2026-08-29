@@ -33,7 +33,15 @@ var installEndpointPresets = []endpointPreset{
 	{Name: "OpenAI", URL: "https://api.openai.com/v1"},
 	{Name: "Anthropic", URL: "https://api.anthropic.com/v1"},
 	{Name: "Google Gemini (OpenAI-compatible)", URL: "https://generativelanguage.googleapis.com/v1beta/openai/"},
+	{Name: "Mistral (OpenAI-compatible)", URL: "https://api.mistral.ai/v1"},
+	{Name: "Cohere (OpenAI-compatible)", URL: "https://api.cohere.ai/compatibility/v1"},
+	{Name: "Groq (OpenAI-compatible)", URL: "https://api.groq.com/openai/v1"},
+	{Name: "xAI Grok (OpenAI-compatible)", URL: "https://api.x.ai/v1"},
+	{Name: "DeepSeek (OpenAI-compatible)", URL: "https://api.deepseek.com/v1"},
+	{Name: "Together AI (OpenAI-compatible)", URL: "https://api.together.xyz/v1"},
+	{Name: "OpenRouter (OpenAI-compatible)", URL: "https://openrouter.ai/api/v1"},
 	{Name: "HuggingFace Router (OpenAI-compatible)", URL: "https://router.huggingface.co/v1"},
+	{Name: "Other (enter a custom URL)", URL: ""},
 }
 
 // runInstall runs the requested operation.
@@ -188,9 +196,15 @@ func maybeConfigureInstallEnv(stdout, stderr io.Writer, dryRun bool) error {
 	}
 
 	reader := bufio.NewReader(os.Stdin)
-	values, err := promptInstallEnvValues(reader, stdout)
+	values, err := promptInstallEnvValuesAuto(reader, stdout)
 	if err != nil {
 		return err
+	}
+	if values == nil {
+		values, err = promptInstallEnvValues(reader, stdout)
+		if err != nil {
+			return err
+		}
 	}
 	if len(values) == 0 {
 		return nil
@@ -298,12 +312,8 @@ func promptInstallEnvValues(reader *bufio.Reader, stdout io.Writer) (map[string]
 	if err != nil {
 		return nil, err
 	}
-	model, err := promptNonEmpty(reader, stdout, aiEnvModel)
-	if err != nil {
-		return nil, err
-	}
 
-	_, host, _, err := parseAIEndpoint(endpoint)
+	baseURL, host, _, err := parseAIEndpoint(endpoint)
 	if err != nil {
 		return nil, err
 	}
@@ -325,6 +335,12 @@ func promptInstallEnvValues(reader *bufio.Reader, stdout io.Writer) (map[string]
 		}
 	}
 
+	provider := detectAIProvider(baseURL, host)
+	model, err := promptModelForEndpoint(reader, stdout, provider, baseURL, authToken)
+	if err != nil {
+		return nil, err
+	}
+
 	values := map[string]string{
 		aiEnvEndpoint: endpoint,
 		aiEnvModel:    model,
@@ -339,6 +355,10 @@ func promptInstallEnvValues(reader *bufio.Reader, stdout io.Writer) (map[string]
 func promptEndpointWithPresets(reader *bufio.Reader, stdout io.Writer) (string, error) {
 	_, _ = fmt.Fprintln(stdout, "Select AI endpoint preset or enter a custom URL:")
 	for i, preset := range installEndpointPresets {
+		if preset.URL == "" {
+			_, _ = fmt.Fprintf(stdout, "  %d) %s\n", i+1, preset.Name)
+			continue
+		}
 		_, _ = fmt.Fprintf(stdout, "  %d) %s - %s\n", i+1, preset.Name, preset.URL)
 	}
 
@@ -354,7 +374,24 @@ func promptEndpointWithPresets(reader *bufio.Reader, stdout io.Writer) (string, 
 		}
 		if idx, convErr := strconv.Atoi(input); convErr == nil {
 			if idx >= 1 && idx <= len(installEndpointPresets) {
-				return installEndpointPresets[idx-1].URL, nil
+				if preset := installEndpointPresets[idx-1]; preset.URL != "" {
+					return preset.URL, nil
+				}
+				for {
+					_, _ = fmt.Fprintf(stdout, "%s (custom URL):  ", aiEnvEndpoint)
+					customLine, customErr := reader.ReadString('\n')
+					if customErr != nil {
+						return "", customErr
+					}
+					custom := strings.TrimSpace(customLine)
+					if custom == "" {
+						continue
+					}
+					if _, _, _, parseErr := parseAIEndpoint(custom); parseErr == nil {
+						return strings.TrimRight(custom, "/"), nil
+					}
+					_, _ = fmt.Fprintln(stdout, "invalid endpoint, enter a full http(s) URL")
+				}
 			}
 		}
 		if _, _, _, parseErr := parseAIEndpoint(input); parseErr == nil {

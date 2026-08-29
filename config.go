@@ -140,6 +140,11 @@ func detectAIProvider(baseURL string, host string) aiProvider {
 		return providerGoogle
 	}
 
+	// Unknown cloud hosts are assumed to be OpenAI-compatible (e.g. Mistral, Groq, DeepSeek);
+	// only unknown local/loopback hosts default to the native Ollama protocol.
+	if isCloudAIHost(h) {
+		return providerOpenAI
+	}
 	return providerOllama
 }
 

@@ -16,6 +16,8 @@ The CLI entry point in [ash.go](ash.go) initializes configuration, loads the sys
 - [tools.go](tools.go): tool definitions and local tool execution shim.
 - [support.go](support.go): logging, history lifecycle, file-system helpers, and debug output.
 - [install.go](install.go): shell wrapper installation and workspace initialization.
+- [ai_autoconfig.go](ai_autoconfig.go): cloud provider/local server auto-detection and model-listing prompts used by `ash install`.
+- [provider.go](provider.go): provider adapter registry (`ollama`, `openai`, `google`, `anthropic`) and per-provider request/response translation.
 - [snooze.go](snooze.go): persistent expiry state for pausing automatic shell routing.
 
 ## Operational notes
@@ -24,3 +26,4 @@ The CLI entry point in [ash.go](ash.go) initializes configuration, loads the sys
 - Shell integrations check `~/.ash/.ash_snooze_until` before automatic wrapper and command-not-found routing. Direct `ash` invocations bypass this check.
 - Debug logging can be enabled with ASH_VERBOSE and optionally written to a rotating log file.
 - Tool execution is restricted by allowlist and path containment rules.
+- `ash install` auto-configures `AI_ENDPOINT`/`AI_MODEL`/`AI_AUTH_TOKEN`: it checks for an already-set cloud provider API key (12 providers, see [ai_autoconfig.go](ai_autoconfig.go)), then a running local inference server, then falls back to an interactive numbered menu; AWS Bedrock is intentionally excluded (see [issue #4](https://github.com/Jonconradt/ash/issues/4)).
