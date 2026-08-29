@@ -346,6 +346,9 @@ release-notes:
 		echo "cannot generate release notes: ash produced empty output" >&2; \
 	else \
 		echo "cannot generate release notes: ash did not produce the required user-facing sections after $$attempts attempts" >&2; \
+		echo '--- generated release notes ---' >&2; \
+		cat "$$tmp_path" >&2; \
+		echo '--- end generated release notes ---' >&2; \
 	fi; \
 	exit 1
 
