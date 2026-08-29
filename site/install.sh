@@ -126,7 +126,13 @@ case $shell_name in
   *) install_shell=bash ;;
 esac
 
-"$install_dir/ash" install --shell "$install_shell"
+# When this script itself is piped (curl ... | sh), stdin is the script body, not the user's
+# terminal. Redirect from /dev/tty so 'ash install' can still prompt interactively.
+if [ -r /dev/tty ] && [ -c /dev/tty ]; then
+  "$install_dir/ash" install --shell "$install_shell" < /dev/tty
+else
+  "$install_dir/ash" install --shell "$install_shell"
+fi
 
 printf 'ash %s installed to %s/ash\n' "$tag" "$install_dir"
 case :$PATH: in

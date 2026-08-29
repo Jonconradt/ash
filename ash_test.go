@@ -2468,7 +2468,17 @@ func TestInstallRecommendation(t *testing.T) {
 	}
 }
 
+// forceNonInteractiveInstallEnv makes maybeConfigureInstallEnv's prompt gate deterministic
+// regardless of whether the test process itself happens to have a real terminal attached to stdin.
+func forceNonInteractiveInstallEnv(t *testing.T) {
+	t.Helper()
+	original := shouldPromptInstallEnv
+	shouldPromptInstallEnv = func() bool { return false }
+	t.Cleanup(func() { shouldPromptInstallEnv = original })
+}
+
 func TestInstallUsesEmbeddedBootstrapAssets(t *testing.T) {
+	forceNonInteractiveInstallEnv(t)
 	originalCwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd failed: %v", err)
@@ -2517,6 +2527,7 @@ func TestInstallUsesEmbeddedBootstrapAssets(t *testing.T) {
 }
 
 func TestRunInstallFish(t *testing.T) {
+	forceNonInteractiveInstallEnv(t)
 	home := t.TempDir()
 	configHome := t.TempDir()
 	t.Setenv("HOME", home)
@@ -2562,6 +2573,7 @@ func TestRunInstallFish(t *testing.T) {
 }
 
 func TestInstallOverwriteMode(t *testing.T) {
+	forceNonInteractiveInstallEnv(t)
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("SHELL", "/bin/bash")
@@ -2619,6 +2631,7 @@ func TestInstallOverwriteMode(t *testing.T) {
 }
 
 func TestInstallRemovesLegacyToolScripts(t *testing.T) {
+	forceNonInteractiveInstallEnv(t)
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("SHELL", "/bin/bash")
@@ -2651,6 +2664,7 @@ func TestInstallRemovesLegacyToolScripts(t *testing.T) {
 }
 
 func TestRunInstall(t *testing.T) {
+	forceNonInteractiveInstallEnv(t)
 	originalCwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd failed: %v", err)
@@ -2663,6 +2677,11 @@ func TestRunInstall(t *testing.T) {
 	cwd := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("SHELL", "/bin/bash")
+	// Isolate from any AI_* provider vars already set in the ambient environment so
+	// hasRequiredInstallEnvValues/shouldConfigureInstallEnv behave as on a fresh machine.
+	t.Setenv(aiEnvEndpoint, "")
+	t.Setenv(aiEnvModel, "")
+	t.Setenv(aiEnvAuthToken, "")
 	if err := os.Chdir(cwd); err != nil {
 		t.Fatalf("Chdir failed: %v", err)
 	}
@@ -2690,6 +2709,15 @@ func TestRunInstall(t *testing.T) {
 	content := string(rcContent)
 	if !strings.Contains(content, installStartMarker) || !strings.Contains(content, installEndMarker) {
 		t.Fatalf("expected install block markers in rc file, got %q", content)
+	}
+
+	if !strings.Contains(stdout.String(), "AI provider not configured automatically") {
+		t.Fatalf("expected non-interactive configuration guidance, got %q", stdout.String())
+	}
+
+	wrapperPathAfterFreshInstall := filepath.Join(home, ashWorkspaceDirName, ".ash_bashrc")
+	if strings.Contains(stdout.String(), "kept existing "+wrapperPathAfterFreshInstall) {
+		t.Fatalf("fresh install should not report the active shell wrapper as pre-existing, got %q", stdout.String())
 	}
 
 	stdout.Reset()
@@ -2775,6 +2803,7 @@ func TestRunInstall(t *testing.T) {
 }
 
 func TestRunInstallMigratesLegacyBashProfileSourcing(t *testing.T) {
+	forceNonInteractiveInstallEnv(t)
 	home := t.TempDir()
 	cwd := t.TempDir()
 	t.Setenv("HOME", home)
@@ -2816,6 +2845,7 @@ func TestRunInstallMigratesLegacyBashProfileSourcing(t *testing.T) {
 }
 
 func TestRunInstallCleansLegacyAshSourcingWhenBashRCAlreadyPresent(t *testing.T) {
+	forceNonInteractiveInstallEnv(t)
 	home := t.TempDir()
 	cwd := t.TempDir()
 	t.Setenv("HOME", home)
@@ -2891,6 +2921,7 @@ func TestRunInstallDryRun(t *testing.T) {
 }
 
 func TestRunInstallPwshDefaultOnWindows(t *testing.T) {
+	forceNonInteractiveInstallEnv(t)
 	originalGOOS := currentGOOS
 	t.Cleanup(func() { currentGOOS = originalGOOS })
 	currentGOOS = "windows"
@@ -3155,6 +3186,7 @@ func TestPromptEndpointWithPresets(t *testing.T) {
 }
 
 func TestRunInstallHardensWorkspacePermissions(t *testing.T) {
+	forceNonInteractiveInstallEnv(t)
 	originalCwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd failed: %v", err)

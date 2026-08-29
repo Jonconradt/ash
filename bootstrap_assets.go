@@ -28,7 +28,7 @@ func readEmbeddedBootstrapAsset(path string) ([]byte, error) {
 	return embeddedBootstrapAssets.ReadFile(path)
 }
 
-func installEmbeddedBootstrapAssets(overwrite bool, stdout io.Writer) error {
+func installEmbeddedBootstrapAssets(overwrite bool, skipPath string, stdout io.Writer) error {
 	root, err := ashWorkspaceDir()
 	if err != nil {
 		return err
@@ -48,6 +48,11 @@ func installEmbeddedBootstrapAssets(overwrite bool, stdout io.Writer) error {
 	}
 
 	for _, asset := range assetFiles {
+		// The active shell's wrapper file was already written fresh by ensureInstallShellWrapper;
+		// reprocessing it here would report a misleading "kept existing" for a file ash itself just wrote.
+		if skipPath != "" && asset.dstPath == skipPath {
+			continue
+		}
 		content, err := bootstrapAssetContent(asset.srcPath, asset.dstPath, overwrite)
 		if err != nil {
 			return err

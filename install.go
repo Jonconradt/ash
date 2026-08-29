@@ -78,7 +78,12 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 		slog.Error(fmt.Sprintf("install error: %v", err), "EID", "bnjrQttE")
 		return 1
 	}
-	if err := installEmbeddedBootstrapAssets(overwrite, stdout); err != nil {
+	activeWrapperPath, err := installShellWrapperPath(shellName)
+	if err != nil {
+		slog.Error(fmt.Sprintf("install error: %v", err), "EID", "3f0v2Kx1")
+		return 1
+	}
+	if err := installEmbeddedBootstrapAssets(overwrite, activeWrapperPath, stdout); err != nil {
 		slog.Error(fmt.Sprintf("install error: %v", err), "EID", "Hrs2Jw5A")
 		return 1
 	}
@@ -191,7 +196,12 @@ func maybeConfigureInstallEnv(stdout, stderr io.Writer, dryRun bool) error {
 	if err != nil {
 		return err
 	}
-	if !shouldConfigure || !shouldPromptInstallEnv() {
+	if !shouldConfigure {
+		return nil
+	}
+	if !shouldPromptInstallEnv() {
+		printHint(stdout, "AI provider not configured automatically: this shell session is not interactive (for example, running through 'curl | sh').")
+		printHint(stdout, "Open a new terminal and run 'ash install' again to pick a provider and model, or set AI_ENDPOINT, AI_MODEL, and AI_AUTH_TOKEN manually.")
 		return nil
 	}
 
@@ -236,13 +246,20 @@ func shouldConfigureInstallEnv() (bool, error) {
 		return false, err
 	}
 
-	if _, err := os.Stat(path); err == nil {
-		return false, nil
-	} else if errors.Is(err, os.ErrNotExist) {
-		return true, nil
-	} else {
+	// The bootstrap asset sync step (installEmbeddedBootstrapAssets) unconditionally writes a
+	// template .ash_env for SESSION_ID/PATH/etc. before this runs, so mere file existence cannot
+	// signal "already configured"; check for a real AI_ENDPOINT export instead.
+	content, err := osReadFile(path)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return true, nil
+		}
 		return false, err
 	}
+	if strings.Contains(string(content), "export "+aiEnvEndpoint+"=") {
+		return false, nil
+	}
+	return true, nil
 }
 
 // hasRequiredInstallEnvValues reports whether the condition is true.
@@ -271,7 +288,7 @@ func hasRequiredInstallEnvValues() bool {
 }
 
 // shouldPromptInstallEnv reports whether the condition is true.
-func shouldPromptInstallEnv() bool {
+var shouldPromptInstallEnv = func() bool {
 	if runningInCI() {
 		return false
 	}

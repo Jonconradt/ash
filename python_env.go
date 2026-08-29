@@ -13,8 +13,6 @@ import (
 
 const managedVenvDirName = "venv"
 
-const provisionLogName = "python-env.log"
-
 // provisionPythonEnv is indirected so tests can skip real virtualenv creation.
 // Provisioning is synchronous so bundled tools are usable as soon as installation returns.
 var provisionPythonEnv = provisionManagedPythonEnv

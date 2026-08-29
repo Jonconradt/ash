@@ -135,7 +135,7 @@ func TestRequirementsTxtIsNotInstalledAsTool(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	var out strings.Builder
-	if err := installEmbeddedBootstrapAssets(true, &out); err != nil {
+	if err := installEmbeddedBootstrapAssets(true, "", &out); err != nil {
 		t.Fatalf("installEmbeddedBootstrapAssets: %v", err)
 	}
 
