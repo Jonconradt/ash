@@ -323,9 +323,9 @@ release-notes:
 		{ \
 			printf '%s\n\n' 'You are preparing release notes for ASH $(RELEASE_VERSION).'; \
 			printf '%s\n' 'Return only concise, friendly, user-facing Markdown. Start directly with the release notes; do not add an introduction or describe this task.'; \
-			printf '%s\n' 'Use exactly these required headings in this order:'; \
-			printf '%s\n' '## 🚀 Features'; \
-			printf '%s\n' '## 🛠️ Fixes & Improvements'; \
+			printf '%s\n' 'Use exactly these required section names in this order; decorative icons are optional:'; \
+			printf '%s\n' '## Features'; \
+			printf '%s\n' '## Fixes & Improvements'; \
 			printf '%s\n' 'Add ## ⚠️ Breaking Changes & Migrations only when the history proves users must change configuration or behavior.'; \
 			printf '%s\n' 'Under each required heading, use short Markdown bullets that begin with the user benefit or observable change, then give only enough detail to be useful.'; \
 			printf '%s\n' 'Translate implementation language into plain product language. Do not mention commits, hashes, tests, dependency updates, formatting, or internal refactors unless users are affected.'; \
@@ -333,7 +333,7 @@ release-notes:
 			printf '%s\n\n' 'Commit history follows:'; \
 			printf '%s\n' "$$git_log"; \
 		} | NO_COLOR=1 "$(RELEASE_OUTPUT_DIR)/$(APP_NAME)" > "$$tmp_path"; \
-		if [[ -s "$$tmp_path" ]] && grep -qx '## 🚀 Features' "$$tmp_path" && grep -qx '## 🛠️ Fixes & Improvements' "$$tmp_path"; then \
+		if [[ -s "$$tmp_path" ]] && grep -Eq '^## (🚀 )?Features[[:space:]]*$$' "$$tmp_path" && grep -Eq '^## (🛠️? )?Fixes & Improvements[[:space:]]*$$' "$$tmp_path"; then \
 			mv "$$tmp_path" "$(RELEASE_NOTES_PATH)"; \
 			echo "generated release notes: $(RELEASE_NOTES_PATH)"; \
 			exit 0; \
