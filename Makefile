@@ -1,4 +1,4 @@
-.PHONY: all verify build config lint site-lint yaml-lint python-lint markdown-lint sync-route-words test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install setup-hooks version release release-check release-build release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one release-checksums
+.PHONY: all verify build config lint site-lint yaml-lint python-lint markdown-lint sync-route-words test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install setup-hooks version release release-check release-clean release-build release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one release-checksums
 
 SHELL := /bin/bash
 
@@ -127,7 +127,7 @@ install: test lint  gosec
 
 version: release-check release-artifacts
 
-release: release-check release-build release-pkg release-validate release-notes release-publish release-watch
+release: release-check release-clean release-build release-pkg release-validate release-notes release-publish release-watch
 
 release-check: lint test gosec govulncheck
 	@if [[ -n "$$(git status --porcelain)" ]]; then \
@@ -145,6 +145,9 @@ release-check: lint test gosec govulncheck
 		echo "RELEASE_VERSION must look like vX.Y.Z (optionally with suffix), got: $(RELEASE_VERSION)"; \
 		exit 1; \
 	fi
+
+release-clean:
+	@rm -rf "$(RELEASE_OUTPUT_DIR)"
 
 release-build:
 	@mkdir -p "$(RELEASE_OUTPUT_DIR)"
