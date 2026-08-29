@@ -99,7 +99,10 @@ export AI_ENDPOINT='https://ollama.com'
 export AI_MODEL='gemma4:31b-cloud'
 </code></pre>
           <p>Local, OpenAI, Anthropic, Google, Azure OpenAI, Mistral, Cohere, Groq, xAI, DeepSeek, Together AI, OpenRouter, HuggingFace, and any other provider with an OpenAI compatible API are supported.</p>
-          <pre class="code-block"><code><span class="code-command">curl -fsSL https://jonconradt.github.io/ash/install.sh | sh</span></code></pre>
+          <div class="code-block-wrap">
+            <pre class="code-block"><code><span class="code-command">curl -fsSL https://jonconradt.github.io/ash/install.sh | sh</span></code></pre>
+            <button type="button" class="copy-button" data-copy-target=".code-command" aria-label="Copy install command">Copy</button>
+          </div>
           <div class="install-links"><a class="button button-light" href="https://github.com/Jonconradt/ash/releases/latest">View packages <span aria-hidden="true">&#8599;</span></a><a class="text-link light-link" href="https://github.com/Jonconradt/ash#configure">Full configuration <span aria-hidden="true">&#8594;</span></a></div>
         </div>
       </div>
@@ -119,5 +122,23 @@ export AI_MODEL='gemma4:31b-cloud'
   </main>
 
   <footer class="site-footer page-width"><span class="brand"><span class="brand-mark">&gt;_</span> ash</span><span>Open source shell intelligence</span><a href="docs.html">Documentation</a><a href="https://github.com/Jonconradt/ash">github.com/Jonconradt/ash</a></footer>
+
+  <script>
+    document.querySelectorAll('.copy-button').forEach(function (button) {
+      button.addEventListener('click', function () {
+        var target = document.querySelector(button.getAttribute('data-copy-target'));
+        if (!target) return;
+        navigator.clipboard.writeText(target.textContent.trim()).then(function () {
+          var original = button.textContent;
+          button.textContent = 'Copied!';
+          button.classList.add('copied');
+          setTimeout(function () {
+            button.textContent = original;
+            button.classList.remove('copied');
+          }, 1800);
+        });
+      });
+    });
+  </script>
 </body>
 </html>
