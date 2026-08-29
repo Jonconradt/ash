@@ -125,6 +125,8 @@ fpm -s dir -t deb \
   -n "$app_name" \
   -v "$clean_version" \
   --architecture "$arch" \
+  --depends python3 \
+  --depends python3-venv \
   --prefix / \
   -C "$payload_root" \
   -p "$output_path" \

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -17,43 +16,8 @@ const managedVenvDirName = "venv"
 const provisionLogName = "python-env.log"
 
 // provisionPythonEnv is indirected so tests can skip real virtualenv creation.
-var provisionPythonEnv = startBackgroundPythonProvision
-
-// startBackgroundPythonProvision detaches the virtualenv build so `ash install` returns
-// immediately; pip pulling pandas/numpy would otherwise block the shell for minutes.
-func startBackgroundPythonProvision(stdout io.Writer) {
-	root, err := ashWorkspaceDir()
-	if err != nil {
-		provisionManagedPythonEnv(stdout)
-		return
-	}
-	exe, err := osExecutable()
-	if err != nil {
-		provisionManagedPythonEnv(stdout)
-		return
-	}
-	logPath := filepath.Join(root, provisionLogName)
-	// #nosec G304 -- logPath is a fixed name inside the ash-owned workspace.
-	logFile, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
-	if err != nil {
-		provisionManagedPythonEnv(stdout)
-		return
-	}
-	defer func() { _ = logFile.Close() }()
-
-	// context.Background is intentional: the child must outlive this process.
-	// #nosec G204 -- exe is the resolved ash executable path, not user-controlled input.
-	cmd := exec.CommandContext(context.Background(), exe, "--internal-provision-python")
-	cmd.Stdout = logFile
-	cmd.Stderr = logFile
-	detachProcess(cmd)
-	if startErr := cmd.Start(); startErr != nil {
-		provisionManagedPythonEnv(stdout)
-		return
-	}
-	_ = cmd.Process.Release()
-	_, _ = fmt.Fprintf(stdout, "preparing python environment for bundled tools in the background (log: %s)\n", logPath)
-}
+// Provisioning is synchronous so bundled tools are usable as soon as installation returns.
+var provisionPythonEnv = provisionManagedPythonEnv
 
 // managedVenvPython returns the interpreter path inside the ash-managed virtualenv.
 func managedVenvPython() (string, error) {
@@ -75,11 +39,25 @@ func ashPythonInterpreter() string {
 	}
 	venvPython, err := managedVenvPython()
 	if err == nil {
-		if info, statErr := os.Stat(venvPython); statErr == nil && !info.IsDir() {
+		if managedVenvReady(venvPython) {
 			return venvPython
 		}
 	}
 	return "python3"
+}
+
+// managedVenvReady avoids selecting a partially-created virtualenv. Python can leave
+// bin/python3 behind when venv creation fails before ensurepip installs pip.
+func managedVenvReady(venvPython string) bool {
+	if info, err := os.Stat(venvPython); err != nil || info.IsDir() {
+		return false
+	}
+	pipPath := filepath.Join(filepath.Dir(venvPython), "pip")
+	if runtime.GOOS == "windows" {
+		pipPath += ".exe"
+	}
+	info, err := os.Stat(pipPath)
+	return err == nil && !info.IsDir()
 }
 
 // managedPythonScript resolves a bundled tool name to its installed script path.
@@ -120,7 +98,11 @@ func provisionManagedPythonEnv(stdout io.Writer) {
 		return
 	}
 
-	if _, statErr := os.Stat(venvPython); statErr != nil {
+	if !managedVenvReady(venvPython) {
+		if removeErr := os.RemoveAll(venvDir); removeErr != nil {
+			_, _ = fmt.Fprintf(stdout, "skipping python environment setup: remove incomplete environment: %v\n", removeErr)
+			return
+		}
 		if runErr := runProvisionCommand(stdout, "python3", "-m", "venv", venvDir); runErr != nil {
 			_, _ = fmt.Fprintf(stdout, "skipping python environment setup: %v\n", runErr)
 			_, _ = fmt.Fprintln(stdout, "install python3 and the venv module, then rerun 'ash install', to enable bundled python tools")

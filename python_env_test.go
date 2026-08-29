@@ -27,6 +27,10 @@ func TestAshPythonInterpreterPrefersOverrideThenVenv(t *testing.T) {
 	if err := os.WriteFile(venvPython, []byte("#!/bin/sh\n"), 0o700); err != nil {
 		t.Fatalf("write venv python: %v", err)
 	}
+	pipPath := filepath.Join(filepath.Dir(venvPython), "pip")
+	if err := os.WriteFile(pipPath, []byte("#!/bin/sh\n"), 0o700); err != nil {
+		t.Fatalf("write venv pip: %v", err)
+	}
 	if got := ashPythonInterpreter(); got != venvPython {
 		t.Fatalf("expected managed venv interpreter %q, got %q", venvPython, got)
 	}
@@ -34,6 +38,27 @@ func TestAshPythonInterpreterPrefersOverrideThenVenv(t *testing.T) {
 	t.Setenv("ASH_PYTHON", "/custom/python3")
 	if got := ashPythonInterpreter(); got != "/custom/python3" {
 		t.Fatalf("expected ASH_PYTHON override, got %q", got)
+	}
+}
+
+func TestAshPythonInterpreterSkipsIncompleteVenv(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("ASH_PYTHON", "")
+
+	venvPython, err := managedVenvPython()
+	if err != nil {
+		t.Fatalf("managedVenvPython: %v", err)
+	}
+	if err := os.MkdirAll(filepath.Dir(venvPython), 0o700); err != nil {
+		t.Fatalf("mkdir venv bin: %v", err)
+	}
+	if err := os.WriteFile(venvPython, []byte("#!/bin/sh\n"), 0o700); err != nil {
+		t.Fatalf("write incomplete venv python: %v", err)
+	}
+
+	if got := ashPythonInterpreter(); got != "python3" {
+		t.Fatalf("expected system python3 for incomplete venv, got %q", got)
 	}
 }
 

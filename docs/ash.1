@@ -286,10 +286,12 @@ Canonical tool allowlist file.
 .TP
 .I ~/.ash/venv/
 Managed virtualenv holding third-party dependencies for bundled Python tools. Built
-in the background by
+by
 .BR "ash install" ;
-progress is written to
-.IR ~/.ash/python-env.log .
+installation does not complete until the bundled dependencies are ready. On
+Debian and Ubuntu, the package install declares
+.B python3-venv
+as a dependency. Other install methods require Python 3 with venv support.
 .TP
 .I ~/.ash/history/
 Conversation history files.

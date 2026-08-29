@@ -119,6 +119,12 @@ detected; unknown shells default to bash. Fish uses its standard
 `ash install` adds `~/.local/bin` to `PATH` from the managed `~/.ash/.ash_env`
 file, so restart the shell or source its rc file afterward.
 
+Bundled Python tools use an isolated virtualenv at `~/.ash/venv`; `ash install`
+waits for its dependencies, including `yfinance`, to be installed. Debian and
+Ubuntu packages declare `python3` and `python3-venv` as dependencies. When
+installing from the tarball on another platform, install Python 3 with venv
+support before running `ash install`.
+
 Native packages remain available from the [latest GitHub release](https://github.com/Jonconradt/ash/releases/latest): macOS `.pkg`, and Linux `.deb`
 or `.rpm` packages. Configure `AI_ENDPOINT` and `AI_MODEL` after installation
 as described below.
