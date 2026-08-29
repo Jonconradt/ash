@@ -1531,6 +1531,10 @@ func TestRunToolLoopRetriesExecutionPrompt(t *testing.T) {
 	originalRunner := toolCommandRunner
 	t.Cleanup(func() { toolCommandRunner = originalRunner })
 
+	// Isolate from any real ~/.ash/venv on the host so ashPythonInterpreter resolves to "python3".
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("ASH_PYTHON", "")
+
 	toolCommandRunner = func(ctx context.Context, name string, args []string, timeout time.Duration, outputMax int) toolCommandResult {
 		if name != "python3" {
 			t.Fatalf("unexpected command: %q", name)
