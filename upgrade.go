@@ -24,8 +24,11 @@ import (
 	"strings"
 	"time"
 
+	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
+	rekorV1 "github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1"
 	sigstoreBundle "github.com/sigstore/sigstore-go/pkg/bundle"
 	sigstoreRoot "github.com/sigstore/sigstore-go/pkg/root"
+	sigstoreTlog "github.com/sigstore/sigstore-go/pkg/tlog"
 	sigstoreTUF "github.com/sigstore/sigstore-go/pkg/tuf"
 	sigstoreVerify "github.com/sigstore/sigstore-go/pkg/verify"
 	sigstoreSignature "github.com/sigstore/sigstore/pkg/signature"
@@ -82,12 +85,21 @@ type upgradeAsset struct {
 }
 
 type legacyUpgradeBundle struct {
-	Base64Signature string `json:"base64Signature"`
-	Cert            string `json:"cert"`
-	RekorBundle     struct {
-		Payload              json.RawMessage `json:"Payload"`
-		SignedEntryTimestamp string          `json:"SignedEntryTimestamp"`
-	} `json:"rekorBundle"`
+	Base64Signature string            `json:"base64Signature"`
+	Cert            string            `json:"cert"`
+	RekorBundle     legacyRekorBundle `json:"rekorBundle"`
+}
+
+type legacyRekorBundle struct {
+	Payload              json.RawMessage `json:"Payload"`
+	SignedEntryTimestamp string          `json:"SignedEntryTimestamp"`
+}
+
+type legacyRekorPayload struct {
+	Body           string `json:"body"`
+	IntegratedTime int64  `json:"integratedTime"`
+	LogID          string `json:"logID"`
+	LogIndex       int64  `json:"logIndex"`
 }
 
 func upgradeAssetName(version, goos, goarch string) string {
@@ -369,19 +381,23 @@ func verifyLegacyUpgradeBundle(manifest []byte, bundle legacyUpgradeBundle, vers
 	if err != nil {
 		return fmt.Errorf("load Sigstore trusted root: %w", err)
 	}
+	signatureBytes, err := base64.StdEncoding.DecodeString(bundle.Base64Signature)
+	if err != nil {
+		return fmt.Errorf("decode legacy signature: %w", err)
+	}
+	verificationTime, err := verifyLegacyRekorBundle(manifest, leaf, signatureBytes, bundle.RekorBundle, trustedRoot)
+	if err != nil {
+		return err
+	}
 	verified := false
 	for _, authority := range trustedRoot.FulcioCertificateAuthorities() {
-		if _, err := authority.Verify(leaf, time.Now()); err == nil {
+		if _, err := authority.Verify(leaf, verificationTime); err == nil {
 			verified = true
 			break
 		}
 	}
 	if !verified {
 		return errors.New("legacy certificate is not trusted by Sigstore")
-	}
-	signatureBytes, err := base64.StdEncoding.DecodeString(bundle.Base64Signature)
-	if err != nil {
-		return fmt.Errorf("decode legacy signature: %w", err)
 	}
 	verifier, err := sigstoreSignature.LoadDefaultVerifier(leaf.PublicKey)
 	if err != nil {
@@ -390,10 +406,63 @@ func verifyLegacyUpgradeBundle(manifest []byte, bundle legacyUpgradeBundle, vers
 	if err := verifier.VerifySignature(bytes.NewReader(signatureBytes), bytes.NewReader(manifest)); err != nil {
 		return fmt.Errorf("verify legacy manifest signature: %w", err)
 	}
-	if len(bundle.RekorBundle.Payload) == 0 || bundle.RekorBundle.SignedEntryTimestamp == "" {
-		return errors.New("legacy bundle is missing Rekor evidence")
-	}
 	return nil
+}
+
+func verifyLegacyRekorBundle(manifest []byte, leaf *x509.Certificate, signature []byte, bundle legacyRekorBundle, trustedRoot *sigstoreRoot.LiveTrustedRoot) (time.Time, error) {
+	if len(bundle.Payload) == 0 || bundle.SignedEntryTimestamp == "" {
+		return time.Time{}, errors.New("legacy bundle is missing Rekor evidence")
+	}
+	var payload legacyRekorPayload
+	if err := json.Unmarshal(bundle.Payload, &payload); err != nil {
+		return time.Time{}, fmt.Errorf("parse legacy Rekor payload: %w", err)
+	}
+	body, err := base64.StdEncoding.DecodeString(payload.Body)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("decode legacy Rekor body: %w", err)
+	}
+	logID, err := hex.DecodeString(payload.LogID)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("decode legacy Rekor log ID: %w", err)
+	}
+	signedEntryTimestamp, err := base64.StdEncoding.DecodeString(bundle.SignedEntryTimestamp)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("decode legacy Rekor timestamp: %w", err)
+	}
+	entry, err := sigstoreTlog.NewTlogEntry(&rekorV1.TransparencyLogEntry{
+		LogIndex:          payload.LogIndex,
+		LogId:             &protocommon.LogId{KeyId: logID},
+		KindVersion:       &rekorV1.KindVersion{Kind: "hashedrekord", Version: "0.0.1"},
+		IntegratedTime:    payload.IntegratedTime,
+		InclusionPromise:  &rekorV1.InclusionPromise{SignedEntryTimestamp: signedEntryTimestamp},
+		CanonicalizedBody: body,
+	})
+	if err != nil {
+		return time.Time{}, fmt.Errorf("parse legacy Rekor entry: %w", err)
+	}
+	if err := sigstoreTlog.VerifySET(entry, trustedRoot.RekorLogs()); err != nil {
+		return time.Time{}, fmt.Errorf("verify legacy Rekor timestamp: %w", err)
+	}
+	verificationTime := entry.IntegratedTime()
+	if verificationTime.Before(leaf.NotBefore) || verificationTime.After(leaf.NotAfter) {
+		return time.Time{}, errors.New("legacy Rekor timestamp is outside the certificate validity period")
+	}
+	rekorCertificate, ok := entry.PublicKey().(*x509.Certificate)
+	if !ok || !bytes.Equal(rekorCertificate.Raw, leaf.Raw) {
+		return time.Time{}, errors.New("legacy Rekor entry certificate does not match the bundle")
+	}
+	if !bytes.Equal(entry.Signature(), signature) {
+		return time.Time{}, errors.New("legacy Rekor entry signature does not match the bundle")
+	}
+	digest, algorithm, ok := entry.GetHashedRekordDigest()
+	if !ok || algorithm != "sha256" {
+		return time.Time{}, errors.New("legacy Rekor entry has an unsupported manifest digest")
+	}
+	manifestDigest := sha256.Sum256(manifest)
+	if !bytes.Equal(digest, manifestDigest[:]) {
+		return time.Time{}, errors.New("legacy Rekor entry digest does not match the manifest")
+	}
+	return verificationTime, nil
 }
 
 func installUpgradeArchive(content []byte, version string, options upgradeOptions, stdout io.Writer) error {
