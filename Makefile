@@ -333,7 +333,7 @@ release-notes:
 			printf '%s\n\n' 'Commit history follows:'; \
 			printf '%s\n' "$$git_log"; \
 		} | NO_COLOR=1 "$(RELEASE_OUTPUT_DIR)/$(APP_NAME)" > "$$tmp_path"; \
-		if [[ -s "$$tmp_path" ]] && grep -Eq '^## (🚀 )?Features[[:space:]]*$$' "$$tmp_path" && grep -Eq '^## (🛠️? )?Fixes & Improvements[[:space:]]*$$' "$$tmp_path"; then \
+		if [[ -s "$$tmp_path" ]] && grep -Eq '^[[:space:]]*## (🚀 )?Features[[:space:]]*$$' "$$tmp_path" && grep -Eq '^[[:space:]]*## (🛠️? )?Fixes & Improvements[[:space:]]*$$' "$$tmp_path"; then \
 			mv "$$tmp_path" "$(RELEASE_NOTES_PATH)"; \
 			echo "generated release notes: $(RELEASE_NOTES_PATH)"; \
 			exit 0; \
