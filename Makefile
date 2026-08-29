@@ -412,7 +412,7 @@ release-publish:
 		exit 1; \
 	fi; \
 	if [[ -z "$$local_sha" ]]; then \
-		git tag -a "$(RELEASE_VERSION)" -F "$(RELEASE_NOTES_PATH)"; \
+		git tag -a "$(RELEASE_VERSION)" --cleanup=verbatim -F "$(RELEASE_NOTES_PATH)"; \
 		echo "created local tag $(RELEASE_VERSION)"; \
 	else \
 		echo "local tag $(RELEASE_VERSION) already exists at HEAD"; \
