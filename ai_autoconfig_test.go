@@ -184,6 +184,50 @@ func TestPromptSelectModelNumericChoice(t *testing.T) {
 	}
 }
 
+func TestResolveOllamaCloudSelectionPromptsForKeyAndSwitchesEndpoint(t *testing.T) {
+	t.Setenv("OLLAMA_API_KEY", "")
+	reader := bufio.NewReader(strings.NewReader("cloud-key\n"))
+	var stdout bytes.Buffer
+
+	endpoint, token, err := resolveOllamaCloudSelection(reader, &stdout, "http://localhost:11434", "localhost", "gemma4-31b:cloud", "")
+	if err != nil {
+		t.Fatalf("resolveOllamaCloudSelection returned error: %v", err)
+	}
+	if endpoint != ollamaCloudEndpoint {
+		t.Fatalf("endpoint = %q, want %q", endpoint, ollamaCloudEndpoint)
+	}
+	if token != "cloud-key" {
+		t.Fatalf("token = %q, want cloud-key", token)
+	}
+}
+
+func TestResolveOllamaCloudSelectionUsesExistingKey(t *testing.T) {
+	t.Setenv("OLLAMA_API_KEY", "env-key")
+	reader := bufio.NewReader(strings.NewReader(""))
+	var stdout bytes.Buffer
+
+	endpoint, token, err := resolveOllamaCloudSelection(reader, &stdout, "http://localhost:11434", "localhost", "gemma4-31b:cloud", "")
+	if err != nil {
+		t.Fatalf("resolveOllamaCloudSelection returned error: %v", err)
+	}
+	if endpoint != ollamaCloudEndpoint || token != "env-key" {
+		t.Fatalf("got endpoint=%q token=%q", endpoint, token)
+	}
+}
+
+func TestResolveOllamaCloudSelectionLeavesLocalModelsAlone(t *testing.T) {
+	reader := bufio.NewReader(strings.NewReader(""))
+	var stdout bytes.Buffer
+
+	endpoint, token, err := resolveOllamaCloudSelection(reader, &stdout, "http://localhost:11434", "localhost", "llama3.1:8b", "")
+	if err != nil {
+		t.Fatalf("resolveOllamaCloudSelection returned error: %v", err)
+	}
+	if endpoint != "http://localhost:11434" || token != "" {
+		t.Fatalf("got endpoint=%q token=%q", endpoint, token)
+	}
+}
+
 func TestPromptSelectModelCustomEntry(t *testing.T) {
 	reader := bufio.NewReader(strings.NewReader("3\nmy-custom-model\n"))
 	var stdout bytes.Buffer

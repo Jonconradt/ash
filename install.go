@@ -358,6 +358,11 @@ func promptInstallEnvValues(reader *bufio.Reader, stdout io.Writer) (map[string]
 		return nil, err
 	}
 
+	endpoint, authToken, err = resolveOllamaCloudSelection(reader, stdout, endpoint, host, model, authToken)
+	if err != nil {
+		return nil, err
+	}
+
 	values := map[string]string{
 		aiEnvEndpoint: endpoint,
 		aiEnvModel:    model,

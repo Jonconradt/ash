@@ -268,6 +268,40 @@ func promptSelectDetectedProvider(reader *bufio.Reader, stdout io.Writer, detect
 	}
 }
 
+// ollamaCloudEndpoint is the hosted Ollama endpoint used for models served from Ollama's cloud.
+const ollamaCloudEndpoint = "https://ollama.com"
+
+// isOllamaCloudModel reports whether a model name refers to an Ollama cloud-hosted model, which a
+// local Ollama server only forwards when authenticated.
+func isOllamaCloudModel(model string) bool {
+	return strings.HasSuffix(strings.ToLower(strings.TrimSpace(model)), ":cloud")
+}
+
+// resolveOllamaCloudSelection redirects a ":cloud" model chosen against a local Ollama server to the
+// Ollama cloud endpoint and collects the API key required to reach it.
+func resolveOllamaCloudSelection(reader *bufio.Reader, stdout io.Writer, baseURL, host, model, authToken string) (string, string, error) {
+	if !isOllamaCloudModel(model) || isCloudAIHost(host) {
+		return baseURL, authToken, nil
+	}
+	if detectAIProvider(baseURL, host) != providerOllama {
+		return baseURL, authToken, nil
+	}
+
+	printHint(stdout, fmt.Sprintf("%q is an Ollama cloud model; using %s, which requires an API key.", model, ollamaCloudEndpoint))
+	if authToken == "" {
+		authToken = strings.TrimSpace(os.Getenv("OLLAMA_API_KEY"))
+	}
+	if authToken == "" {
+		printHint(stdout, "Create a key at https://ollama.com/settings/keys")
+		var err error
+		authToken, err = promptNonEmpty(reader, stdout, aiEnvAuthToken)
+		if err != nil {
+			return "", "", err
+		}
+	}
+	return ollamaCloudEndpoint, authToken, nil
+}
+
 // finishAutoConfigure resolves the provider for an endpoint and prompts for a model, returning the managed env values.
 func finishAutoConfigure(reader *bufio.Reader, stdout io.Writer, endpoint, authToken string) (map[string]string, error) {
 	baseURL, host, _, err := parseAIEndpoint(endpoint)
@@ -277,6 +311,11 @@ func finishAutoConfigure(reader *bufio.Reader, stdout io.Writer, endpoint, authT
 	provider := detectAIProvider(baseURL, host)
 
 	model, err := promptModelForEndpoint(reader, stdout, provider, baseURL, authToken)
+	if err != nil {
+		return nil, err
+	}
+
+	baseURL, authToken, err = resolveOllamaCloudSelection(reader, stdout, baseURL, host, model, authToken)
 	if err != nil {
 		return nil, err
 	}
