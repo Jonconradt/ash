@@ -139,6 +139,9 @@ func detectAIProvider(baseURL string, host string) aiProvider {
 	if strings.Contains(h, "googleapis.com") && strings.Contains(h, "generativelanguage") {
 		return providerGoogle
 	}
+	if strings.Contains(h, "ollama.com") {
+		return providerOllama
+	}
 
 	// Unknown cloud hosts are assumed to be OpenAI-compatible (e.g. Mistral, Groq, DeepSeek);
 	// only unknown local/loopback hosts default to the native Ollama protocol.

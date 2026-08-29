@@ -330,6 +330,12 @@ func TestDetectAIProviderAndCloudHostClassification(t *testing.T) {
 	if got := detectAIProvider("https://generativelanguage.googleapis.com/v1beta/models", "generativelanguage.googleapis.com"); got != providerGoogle {
 		t.Fatalf("expected google provider for generative language host, got %q", got)
 	}
+	if got := detectAIProvider("https://ollama.com", "ollama.com"); got != providerOllama {
+		t.Fatalf("expected ollama provider for Ollama Cloud host, got %q", got)
+	}
+	if got := detectAIProvider("https://api.mistral.ai/v1", "api.mistral.ai"); got != providerOpenAI {
+		t.Fatalf("expected openai-compatible provider for unknown cloud host, got %q", got)
+	}
 
 	if isCloudAIHost("localhost") {
 		t.Fatalf("localhost should not be classified as cloud")
