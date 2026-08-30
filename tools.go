@@ -467,6 +467,9 @@ func (s localToolShim) callUnixPipeline(ctx context.Context, args map[string]any
 			if isBlockedArgument(arg) {
 				return toolCommandResult{OK: false, Command: pipeline, Error: "argument contains blocked shell control pattern", EID: "nnbIek1C"}
 			}
+			if isBlockedDotfileArgument(arg) {
+				return toolCommandResult{OK: false, Command: pipeline, Error: "argument references a hidden dotfile", EID: "Dz9QaLm2"}
+			}
 		}
 		commands = append(commands, fields)
 	}
@@ -510,6 +513,9 @@ func (s localToolShim) callUnixCommand(ctx context.Context, args map[string]any)
 	for _, arg := range argv {
 		if isBlockedArgument(arg) {
 			return toolCommandResult{OK: false, Command: commandName, Error: "argument contains blocked shell control pattern", EID: "nnbIek1C"}
+		}
+		if isBlockedDotfileArgument(arg) {
+			return toolCommandResult{OK: false, Command: commandName, Error: "argument references a hidden dotfile", EID: "Vx3TfRk8"}
 		}
 	}
 
@@ -577,6 +583,9 @@ func (s localToolShim) callPython3(ctx context.Context, args map[string]any) too
 	for _, arg := range argv {
 		if isBlockedArgument(arg) {
 			return toolCommandResult{OK: false, Command: "python3", Error: "argv contains blocked shell control pattern", EID: "WT86KNdu"}
+		}
+		if isBlockedDotfileArgument(arg) {
+			return toolCommandResult{OK: false, Command: "python3", Error: "argv references a hidden dotfile", EID: "Ns7CjBp4"}
 		}
 	}
 

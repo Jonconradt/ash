@@ -174,3 +174,31 @@ func TestRunUnixCommandRelativeScratchPathStillCountedAsScratchExec(t *testing.T
 		t.Fatalf("expected scratch exec recorded for plan/run.sh via relative path, got counts %v", snap.ScratchExecs)
 	}
 }
+
+func TestScratchFileToolsRejectHiddenDotfilePaths(t *testing.T) {
+	shim := localToolShim{}
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SESSION_ID", "session_123")
+	t.Setenv("ASH_STRICT", "")
+	ctx := context.Background()
+
+	writeResult := shim.CallTool(ctx, "ash_write_scratch_file", map[string]any{
+		"path":    "notes/.secret.txt",
+		"content": "alpha",
+	})
+	if !strings.Contains(writeResult, "hidden dotfile") {
+		t.Fatalf("expected ash_write_scratch_file to reject dotfile path, got %s", writeResult)
+	}
+
+	_ = shim.CallTool(ctx, "ash_write_scratch_file", map[string]any{
+		"path":    "plan/notes.txt",
+		"content": "alpha",
+	})
+	readResult := shim.CallTool(ctx, "ash_read_scratch_file", map[string]any{
+		"path": ".env",
+	})
+	if !strings.Contains(readResult, "hidden dotfile") {
+		t.Fatalf("expected ash_read_scratch_file to reject dotfile path, got %s", readResult)
+	}
+}

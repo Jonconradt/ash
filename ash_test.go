@@ -118,6 +118,30 @@ func TestToolExecutionAndWorkspaceHelpers(t *testing.T) {
 		}
 	})
 
+	t.Run("hasBlockedDotSegment default vs strict", func(t *testing.T) {
+		t.Setenv("ASH_STRICT", "")
+		if !hasBlockedDotSegment(".env") {
+			t.Fatalf("expected bare dotfile name to be blocked")
+		}
+		if !hasBlockedDotSegment("foo/.env") {
+			t.Fatalf("expected nested dotfile basename to be blocked")
+		}
+		if hasBlockedDotSegment("a/.git/config") {
+			t.Fatalf("expected nested hidden directory to be allowed by default")
+		}
+		if hasBlockedDotSegment("./file.txt") || hasBlockedDotSegment("../file.txt") {
+			t.Fatalf("expected '.' and '..' segments to never be treated as dotfiles")
+		}
+
+		t.Setenv("ASH_STRICT", "1")
+		if !hasBlockedDotSegment("a/.git/config") {
+			t.Fatalf("expected ASH_STRICT to block any hidden path segment")
+		}
+		if hasBlockedDotSegment("./file.txt") {
+			t.Fatalf("expected '.' segment to never be treated as a dotfile even under ASH_STRICT")
+		}
+	})
+
 	t.Run("runToolCommand uses exit errors and timeouts", func(t *testing.T) {
 		ctx := context.Background()
 		result := runToolCommand(ctx, "sh", []string{"-c", "exit 3"}, time.Second, 128)
@@ -156,6 +180,28 @@ func TestToolExecutionAndWorkspaceHelpers(t *testing.T) {
 		}
 		if abs != filepath.Join(root, "file.txt") {
 			t.Fatalf("unexpected absolute path: %q", abs)
+		}
+	})
+
+	t.Run("resolveWorkspacePath rejects hidden dotfiles", func(t *testing.T) {
+		t.Setenv("ASH_STRICT", "")
+		root := t.TempDir()
+
+		if _, _, err := resolveWorkspacePath(root, ".ash_env"); err == nil || !strings.Contains(err.Error(), "hidden dotfile") {
+			t.Fatalf("expected top-level dotfile rejection, got %v", err)
+		}
+		if _, _, err := resolveWorkspacePath(root, "plan/.hidden"); err == nil || !strings.Contains(err.Error(), "hidden dotfile") {
+			t.Fatalf("expected nested dotfile rejection, got %v", err)
+		}
+		// By default, only the final path component is checked; a hidden directory earlier
+		// in the path (not the file itself) is allowed.
+		if _, _, err := resolveWorkspacePath(root, "a/.git/config"); err != nil {
+			t.Fatalf("expected nested hidden directory to be allowed by default, got %v", err)
+		}
+
+		t.Setenv("ASH_STRICT", "1")
+		if _, _, err := resolveWorkspacePath(root, "a/.git/config"); err == nil || !strings.Contains(err.Error(), "hidden dotfile") {
+			t.Fatalf("expected ASH_STRICT to reject any hidden path segment, got %v", err)
 		}
 	})
 
@@ -591,6 +637,27 @@ func TestLoadAllowlistedCommands(t *testing.T) {
 		}
 	})
 
+	t.Run("dot-prefixed entries are dropped", func(t *testing.T) {
+		if got := normalizeToolName(".secret"); got != "" {
+			t.Fatalf("expected dot-prefixed tool name to be rejected, got %q", got)
+		}
+		if got := normalizeToolName("ls"); got != "ls" {
+			t.Fatalf("expected bare tool name to pass through, got %q", got)
+		}
+
+		t.Setenv("ASH_TOOL_ALLOWLIST", "ls,.secret")
+		allowed, err := loadAllowlistedCommands()
+		if err != nil {
+			t.Fatalf("loadAllowlistedCommands error: %v", err)
+		}
+		if _, ok := allowed[".secret"]; ok {
+			t.Fatalf("expected dot-prefixed entry to be dropped: %#v", allowed)
+		}
+		if _, ok := allowed["ls"]; !ok {
+			t.Fatalf("expected ls to remain allowlisted: %#v", allowed)
+		}
+	})
+
 	t.Run("python3 dropped when run_python3 is available", func(t *testing.T) {
 		original := execLookPath
 		t.Cleanup(func() { execLookPath = original })
@@ -711,6 +778,38 @@ func TestLocalToolShimRunUnixCommandPolicy(t *testing.T) {
 		})
 		if !strings.Contains(resultJSON, "blocked shell control pattern") {
 			t.Fatalf("expected blocked arg failure, got %s", resultJSON)
+		}
+	})
+
+	t.Run("reject hidden dotfile arg", func(t *testing.T) {
+		t.Setenv("ASH_STRICT", "")
+		resultJSON := shim.CallTool(context.Background(), "run_unix_command", map[string]any{
+			"command": "ls",
+			"args":    []any{".env"},
+		})
+		if !strings.Contains(resultJSON, "hidden dotfile") {
+			t.Fatalf("expected hidden dotfile rejection, got %s", resultJSON)
+		}
+
+		// Not gated by ASH_STRICT: this is always enforced.
+		toolCommandRunner = func(ctx context.Context, name string, args []string, timeout time.Duration, outputMax int) toolCommandResult {
+			return toolCommandResult{OK: true, Command: name, ExitCode: 0}
+		}
+		nestedOK := shim.CallTool(context.Background(), "run_unix_command", map[string]any{
+			"command": "ls",
+			"args":    []any{"a/.git/config"},
+		})
+		if !strings.Contains(nestedOK, `"ok":true`) {
+			t.Fatalf("expected nested hidden directory arg to be allowed by default, got %s", nestedOK)
+		}
+
+		t.Setenv("ASH_STRICT", "1")
+		nestedBlocked := shim.CallTool(context.Background(), "run_unix_command", map[string]any{
+			"command": "ls",
+			"args":    []any{"a/.git/config"},
+		})
+		if !strings.Contains(nestedBlocked, "hidden dotfile") {
+			t.Fatalf("expected ASH_STRICT to reject nested hidden directory arg, got %s", nestedBlocked)
 		}
 	})
 

@@ -86,6 +86,7 @@ func TestCallPython3(t *testing.T) {
 		{name: "outside scratch", args: map[string]any{"script_path": "/tmp/outside.py"}, wantOK: false},
 		{name: "non python script", args: map[string]any{"script_path": filepath.Join(root, "work.sh")}, wantOK: false},
 		{name: "strict mode", strict: "1", args: map[string]any{"code": "print('ok')"}, wantOK: false},
+		{name: "argv references hidden dotfile", args: map[string]any{"code": "print('ok')", "argv": []any{".env"}}, wantOK: false},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

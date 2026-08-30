@@ -1461,7 +1461,11 @@ func resolveWorkspacePath(root, userPath string) (absolute string, rel string, e
 		if relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) {
 			return "", "", errors.New("path must be inside ~/.ash")
 		}
-		return cleanInput, filepath.ToSlash(relPath), nil
+		slashRel := filepath.ToSlash(relPath)
+		if hasBlockedDotSegment(slashRel) {
+			return "", "", errors.New("path must not reference a hidden dotfile")
+		}
+		return cleanInput, slashRel, nil
 	}
 
 	joined := filepath.Join(root, cleanInput)
@@ -1473,7 +1477,11 @@ func resolveWorkspacePath(root, userPath string) (absolute string, rel string, e
 	if relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) {
 		return "", "", errors.New("path must be inside ~/.ash")
 	}
-	return clean, filepath.ToSlash(relPath), nil
+	slashRel := filepath.ToSlash(relPath)
+	if hasBlockedDotSegment(slashRel) {
+		return "", "", errors.New("path must not reference a hidden dotfile")
+	}
+	return clean, slashRel, nil
 }
 
 // updateWorkspaceInventory updates the workspace inventory file with the supplied file purpose.
@@ -1609,6 +1617,38 @@ func toStringSliceArg(value any) ([]string, error) {
 // isBlockedArgument reports whether an argument contains shell metacharacters that should be rejected for safety.
 func isBlockedArgument(arg string) bool {
 	return argumentBlockPattern.MatchString(arg)
+}
+
+// hasBlockedDotSegment reports whether a slash-separated relative path contains a segment that
+// names a hidden dotfile. "." and ".." are navigational tokens, never treated as dotfiles. By
+// default only the final (basename) segment is checked; ASH_STRICT widens the check to every
+// segment, so nested hidden directories (e.g. "a/.git/config", "~/.ssh/id_rsa") are also blocked.
+func hasBlockedDotSegment(path string) bool {
+	var segments []string
+	for _, part := range strings.Split(path, "/") {
+		if part == "" || part == "." || part == ".." {
+			continue
+		}
+		segments = append(segments, part)
+	}
+	if len(segments) == 0 {
+		return false
+	}
+	if strictSecurityModeEnabled() {
+		for _, segment := range segments {
+			if strings.HasPrefix(segment, ".") {
+				return true
+			}
+		}
+		return false
+	}
+	return strings.HasPrefix(segments[len(segments)-1], ".")
+}
+
+// isBlockedDotfileArgument reports whether a command argument references a hidden dotfile path,
+// using the same segment-granularity rule as hasBlockedDotSegment.
+func isBlockedDotfileArgument(arg string) bool {
+	return hasBlockedDotSegment(arg)
 }
 
 // sanitizeJSONError replaces newline and quote characters so JSON error messages remain single-line and safe to embed.

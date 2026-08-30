@@ -314,10 +314,10 @@ func parseAllowlistFile(raw string) map[string]struct{} {
 	return set
 }
 
-// normalizeToolName trims whitespace and rejects slash-delimited values so tool names remain canonical.
+// normalizeToolName trims whitespace and rejects slash-delimited or dot-prefixed (hidden) values so tool names remain canonical.
 func normalizeToolName(value string) string {
 	trimmed := strings.TrimSpace(value)
-	if trimmed == "" || strings.Contains(trimmed, "/") {
+	if trimmed == "" || strings.Contains(trimmed, "/") || strings.HasPrefix(trimmed, ".") {
 		return ""
 	}
 	return trimmed
