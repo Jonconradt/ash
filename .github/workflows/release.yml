@@ -152,8 +152,21 @@ jobs:
           cosign sign-blob --yes --bundle SHA256SUMS.sigstore.json SHA256SUMS
       - name: Extract release notes
         run: |
-          git for-each-ref --format='%(contents)' "refs/tags/${GITHUB_REF_NAME}" > release-notes.md
+          set -euo pipefail
+          # actions/checkout writes a lightweight tag, so %(contents) would yield the commit message.
+          git fetch --force origin "refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
+          if [[ "$(git cat-file -t "refs/tags/${GITHUB_REF_NAME}")" != "tag" ]]; then
+            echo "::error::${GITHUB_REF_NAME} is not an annotated tag; release notes are unavailable"
+            exit 1
+          fi
+          git tag --list --format='%(contents)' "${GITHUB_REF_NAME}" > release-notes.md
           test -s release-notes.md
+          if ! grep -Eq '^[[:space:]]*## ([^[:alnum:][:space:]]+ )?Features[[:space:]]*$' release-notes.md ||
+            ! grep -Eq '^[[:space:]]*## ([^[:alnum:][:space:]]+ )?Fixes & Improvements[[:space:]]*$' release-notes.md; then
+            echo "::error::release notes for ${GITHUB_REF_NAME} are missing the required user-facing sections"
+            cat release-notes.md
+            exit 1
+          fi
       - name: Publish GitHub release
         uses: softprops/action-gh-release@v3
         with:

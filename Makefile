@@ -336,7 +336,7 @@ release-notes:
 			printf '%s\n\n' 'Commit history follows:'; \
 			printf '%s\n' "$$git_log"; \
 		} | NO_COLOR=1 "$(RELEASE_OUTPUT_DIR)/$(APP_NAME)" > "$$tmp_path"; \
-		if [[ -s "$$tmp_path" ]] && grep -Eq '^[[:space:]]*## (🚀 )?Features[[:space:]]*$$' "$$tmp_path" && grep -Eq '^[[:space:]]*## (🛠️? )?Fixes & Improvements[[:space:]]*$$' "$$tmp_path"; then \
+		if [[ -s "$$tmp_path" ]] && grep -Eq '^[[:space:]]*## ([^[:alnum:][:space:]]+ )?Features[[:space:]]*$$' "$$tmp_path" && grep -Eq '^[[:space:]]*## ([^[:alnum:][:space:]]+ )?Fixes & Improvements[[:space:]]*$$' "$$tmp_path"; then \
 			mv "$$tmp_path" "$(RELEASE_NOTES_PATH)"; \
 			echo "generated release notes: $(RELEASE_NOTES_PATH)"; \
 			exit 0; \
@@ -417,6 +417,9 @@ release-publish:
 	if [[ -z "$$local_sha" ]]; then \
 		git tag -a "$(RELEASE_VERSION)" --cleanup=verbatim -F "$(RELEASE_NOTES_PATH)"; \
 		echo "created local tag $(RELEASE_VERSION)"; \
+	elif [[ "$$(git cat-file -t "refs/tags/$(RELEASE_VERSION)")" != "tag" ]]; then \
+		echo "local tag $(RELEASE_VERSION) is lightweight and carries no release notes; delete it and re-run"; \
+		exit 1; \
 	else \
 		echo "local tag $(RELEASE_VERSION) already exists at HEAD"; \
 	fi
