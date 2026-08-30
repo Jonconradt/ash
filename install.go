@@ -95,6 +95,10 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 		slog.Error(fmt.Sprintf("install error: %v", err), "EID", "Hrs2Jw5A")
 		return 1
 	}
+	if err := maybeAdoptBundledAllowlistEntries(stdout, dryRun); err != nil {
+		slog.Error(fmt.Sprintf("install error: %v", err), "EID", "WnGm9KpQ")
+		return 1
+	}
 	if !dryRun {
 		provisionPythonEnv(stdout)
 	}
@@ -192,6 +196,43 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 	_, _ = fmt.Fprintln(stdout, "synced .ash_system/.ash_tools to ~/.ash when present")
 	_, _ = fmt.Fprintln(stdout, "restart your shell or source your rc file to activate wrappers")
 	return 0
+}
+
+// maybeAdoptBundledAllowlistEntries asks before broadening an existing customized policy.
+func maybeAdoptBundledAllowlistEntries(stdout io.Writer, dryRun bool) error {
+	if dryRun || !shouldPromptInstallEnv() {
+		return nil
+	}
+	root, err := ashWorkspaceDir()
+	if err != nil {
+		return err
+	}
+	baseline, err := readEmbeddedBootstrapAsset("ash_bootstrap/.ash_tools")
+	if err != nil {
+		return fmt.Errorf("read bundled allowlist: %w", err)
+	}
+	path := filepath.Join(root, toolsFileName)
+	missing, err := missingAllowlistAdditions(path, baseline)
+	if err != nil || len(missing) == 0 {
+		return err
+	}
+	printMenuTitle(stdout, "Update tool policy")
+	printHint(stdout, "New bundled entries: "+strings.Join(missing, ", "))
+	printHint(stdout, "Your existing policy is preserved unless you approve this addition.")
+	printPrompt(stdout, "Add entries to .ash_tools? [y/N]")
+	answer, err := bufio.NewReader(os.Stdin).ReadString('\n')
+	if err != nil && !errors.Is(err, io.EOF) {
+		return err
+	}
+	if strings.EqualFold(strings.TrimSpace(answer), "y") || strings.EqualFold(strings.TrimSpace(answer), "yes") {
+		if err := syncAllowlistAdditions(path, baseline, stdout); err != nil {
+			return err
+		}
+		printSuccess(stdout, "Updated .ash_tools with bundled entries")
+		return nil
+	}
+	printHint(stdout, "Kept existing .ash_tools policy")
+	return nil
 }
 
 // maybeConfigureInstallEnv writes managed environment settings to the user workspace when the install flow is interactive and needs configuration.

@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -190,10 +191,19 @@ func isCloudAIHost(host string) bool {
 
 // readSystemPrompt reads data from the filesystem.
 func readSystemPrompt() (string, error) {
+	allowlist, err := loadAllowlistedCommands()
+	if err != nil {
+		return "", err
+	}
+	return readSystemPromptWithAllowlist(allowlist)
+}
+
+// readSystemPromptWithAllowlist renders the selected prompt against one resolved tool policy.
+func readSystemPromptWithAllowlist(allowlist map[string]struct{}) (string, error) {
 	if root, err := ashWorkspaceDir(); err == nil {
 		canonicalPath := filepath.Join(root, systemFileName)
 		if content, err := osReadFile(canonicalPath); err == nil {
-			return expandSystemPrompt(string(content)), nil
+			return expandSystemPromptWithAllowlist(string(content), allowlist), nil
 		} else if !errors.Is(err, os.ErrNotExist) {
 			return "", err
 		}
@@ -206,7 +216,7 @@ func readSystemPrompt() (string, error) {
 
 	cwdPath := filepath.Join(cwd, systemFileName)
 	if content, err := osReadFile(cwdPath); err == nil {
-		return expandSystemPrompt(string(content)), nil
+		return expandSystemPromptWithAllowlist(string(content), allowlist), nil
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return "", err
 	}
@@ -218,7 +228,7 @@ func readSystemPrompt() (string, error) {
 
 	homePath := filepath.Join(home, systemFileName)
 	if content, err := osReadFile(homePath); err == nil {
-		return expandSystemPrompt(string(content)), nil
+		return expandSystemPromptWithAllowlist(string(content), allowlist), nil
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return "", err
 	}
@@ -249,7 +259,7 @@ func loadAllowlistedCommandsFromSource() (map[string]struct{}, error) {
 	if root, err := ashWorkspaceDir(); err == nil {
 		canonicalPath := filepath.Join(root, toolsFileName)
 		if content, err := osReadFile(canonicalPath); err == nil {
-			return parseAllowlistFile(string(content)), nil
+			return parseAllowlistFileWithToolDirectoryList(string(content))
 		} else if !errors.Is(err, os.ErrNotExist) {
 			return nil, err
 		}
@@ -262,7 +272,7 @@ func loadAllowlistedCommandsFromSource() (map[string]struct{}, error) {
 
 	cwdPath := filepath.Join(cwd, toolsFileName)
 	if content, err := osReadFile(cwdPath); err == nil {
-		return parseAllowlistFile(string(content)), nil
+		return parseAllowlistFileWithToolDirectoryList(string(content))
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
@@ -274,7 +284,7 @@ func loadAllowlistedCommandsFromSource() (map[string]struct{}, error) {
 
 	homePath := filepath.Join(home, toolsFileName)
 	if content, err := osReadFile(homePath); err == nil {
-		return parseAllowlistFile(string(content)), nil
+		return parseAllowlistFileWithToolDirectoryList(string(content))
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
@@ -300,7 +310,7 @@ func parseAllowlistFile(raw string) map[string]struct{} {
 	set := map[string]struct{}{}
 	for _, line := range strings.Split(raw, "\n") {
 		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+		if trimmed == "" || strings.Contains(trimmed, toolsDirListToken) || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
 		for _, token := range strings.Split(trimmed, ",") {
@@ -314,10 +324,28 @@ func parseAllowlistFile(raw string) map[string]struct{} {
 	return set
 }
 
+// parseAllowlistFileWithToolDirectoryList expands the Ash-owned standalone marker only in files.
+func parseAllowlistFileWithToolDirectoryList(raw string) (map[string]struct{}, error) {
+	set := parseAllowlistFile(raw)
+	for _, line := range strings.Split(raw, "\n") {
+		if strings.TrimSpace(line) != toolsDirListToken {
+			continue
+		}
+		tools, err := eligibleToolScripts()
+		if err != nil {
+			return nil, err
+		}
+		for _, tool := range tools {
+			set[tool] = struct{}{}
+		}
+	}
+	return set, nil
+}
+
 // normalizeToolName trims whitespace and rejects slash-delimited or dot-prefixed (hidden) values so tool names remain canonical.
 func normalizeToolName(value string) string {
 	trimmed := strings.TrimSpace(value)
-	if trimmed == "" || strings.Contains(trimmed, "/") || strings.HasPrefix(trimmed, ".") {
+	if trimmed == "" || trimmed == toolsDirListToken || strings.Contains(trimmed, "/") || strings.HasPrefix(trimmed, ".") {
 		return ""
 	}
 	return trimmed
@@ -326,10 +354,17 @@ func normalizeToolName(value string) string {
 const (
 	pythonAvailableInstructionsPath   = "ash_bootstrap/prompt-instructions/python-available.txt"
 	pythonUnavailableInstructionsPath = "ash_bootstrap/prompt-instructions/python-unavailable.txt"
+	// #nosec G101 -- this is an internal prompt placeholder, not a credential.
+	toolsDirListToken = "$TOOLS_DIR_LIST"
 )
 
 // expandSystemPrompt injects conditional guidance, strips source comments, and expands runtime values.
 func expandSystemPrompt(prompt string) string {
+	return expandSystemPromptWithAllowlist(prompt, nil)
+}
+
+// expandSystemPromptWithAllowlist expands Ash-owned prompt tokens before ordinary environment values.
+func expandSystemPromptWithAllowlist(prompt string, allowlist map[string]struct{}) string {
 	instructionsPath := pythonUnavailableInstructionsPath
 	if pythonExecutionAvailable() {
 		instructionsPath = pythonAvailableInstructionsPath
@@ -340,6 +375,7 @@ func expandSystemPrompt(prompt string) string {
 	}
 	prompt = strings.ReplaceAll(prompt, "$IF_PYTHON_AVAILABLE", string(instructions))
 	prompt = stripSystemPromptComments(prompt)
+	prompt = strings.ReplaceAll(prompt, toolsDirListToken, renderEligibleToolScripts(allowlist))
 
 	unameValue := ""
 	if _, err := execLookPath("uname"); err == nil {
@@ -357,6 +393,56 @@ func expandSystemPrompt(prompt string) string {
 		}
 		return os.Getenv(key)
 	})
+}
+
+// eligibleToolScripts returns readable, executable regular files in Ash's managed tools directory.
+func eligibleToolScripts() ([]string, error) {
+	root, err := ashWorkspaceDir()
+	if err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(filepath.Join(root, "tools"))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	tools := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || normalizeToolName(entry.Name()) != entry.Name() {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return nil, err
+		}
+		mode := info.Mode()
+		if !mode.IsRegular() || mode.Perm()&0o444 == 0 || mode.Perm()&0o111 == 0 {
+			continue
+		}
+		tools = append(tools, entry.Name())
+	}
+	sort.Strings(tools)
+	return tools, nil
+}
+
+func renderEligibleToolScripts(allowlist map[string]struct{}) string {
+	tools, err := eligibleToolScripts()
+	if err != nil || len(tools) == 0 {
+		return "No eligible managed tool scripts are currently available."
+	}
+	allowed := make([]string, 0, len(tools))
+	for _, tool := range tools {
+		if _, ok := allowlist[tool]; ok {
+			allowed = append(allowed, tool)
+		}
+	}
+	if len(allowed) == 0 {
+		return "No eligible managed tool scripts are currently allowed."
+	}
+	return strings.Join(allowed, ", ")
 }
 
 func stripSystemPromptComments(prompt string) string {

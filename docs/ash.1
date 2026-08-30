@@ -204,7 +204,9 @@ Optional comma-separated allowlist for
 .B run_unix_command
 tool executables. When unset,
 .I ~/.ash/.ash_tools
-is used if present.
+is used if present. The standalone $TOOLS_DIR_LIST line in that file is an
+internal Ash directive that permits eligible managed tool scripts; it is not an
+environment variable.
 .TP
 .B ASH_TOOL_TIMEOUT
 Optional timeout for local tool command execution. Default is 15s.
@@ -314,10 +316,13 @@ when present, otherwise system
 .SH FILES
 .TP
 .I ~/.ash/.ash_system
-Canonical system prompt file.
+Canonical system prompt file. $TOOLS_DIR_LIST and $IF_PYTHON_AVAILABLE are
+reserved internal Ash substitutions, not environment variables. The tool list
+contains only allowed regular files in ~/.ash/tools with read and execute bits.
 .TP
 .I ~/.ash/.ash_tools
-Canonical tool allowlist file.
+Canonical tool allowlist file. Replace its standalone $TOOLS_DIR_LIST directive
+with literal bare names for a fixed restrictive managed-script policy.
 .TP
 .I ~/.ash/venv/
 Managed virtualenv holding third-party dependencies for bundled Python tools. Built

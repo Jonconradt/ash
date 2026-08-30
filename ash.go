@@ -161,13 +161,6 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	systemPrompt, err := readSystemPrompt()
-	if err != nil {
-		slog.Error(fmt.Sprintf("failed to read %s: %v", systemFileName, err), "EID", "8N3r3Vz0")
-		return 1
-	}
-	systemPrompt = buildSystemPrompt(systemPrompt, timeNow())
-
 	historyPath, err := getHistoryPath()
 	if err != nil {
 		slog.Error(fmt.Sprintf("failed to resolve history path: %v", err), "EID", "7rF5MhPj")
@@ -185,6 +178,14 @@ func run(args []string, stdout, stderr io.Writer) int {
 		slog.Error(fmt.Sprintf("failed to read %s: %v", toolsFileName, err), "EID", "f6qdSTFE")
 		return 1
 	}
+
+	systemPrompt, err := readSystemPromptWithAllowlist(allowlist)
+	if err != nil {
+		slog.Error(fmt.Sprintf("failed to read %s: %v", systemFileName, err), "EID", "8N3r3Vz0")
+		return 1
+	}
+	systemPrompt = buildSystemPrompt(systemPrompt, timeNow())
+
 	requestID := requestIDGenerator()
 	summaryRequestID = requestID
 	metrics.addStageDuration(metricsStageDefaults, timeNow().Sub(defaultsStarted))

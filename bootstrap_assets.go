@@ -78,16 +78,6 @@ func installEmbeddedBootstrapAssets(overwrite bool, skipPath string, stdout io.W
 		}
 	}
 
-	// Bundled tool scripts must always be allowlisted, even when a pre-existing
-	// .ash_tools was kept as-is because the user customized it.
-	toolsBaseline, err := readEmbeddedBootstrapAsset("ash_bootstrap/.ash_tools")
-	if err != nil {
-		return fmt.Errorf("read embedded .ash_tools baseline: %w", err)
-	}
-	if err := syncAllowlistAdditions(filepath.Join(root, toolsFileName), toolsBaseline, stdout); err != nil {
-		return err
-	}
-
 	envContent, err := osReadFile(filepath.Join(root, ".ash_env"))
 	if err != nil {
 		return fmt.Errorf("read managed ash env: %w", err)
@@ -300,16 +290,14 @@ func removeLegacyToolScripts(root string, embeddedEntries []fs.DirEntry, stdout 
 	return nil
 }
 
-// syncAllowlistAdditions appends allowlist entries present in baselineContent but missing from
-// the file at dstPath, preserving the rest of the file untouched. It is a no-op if dstPath does
-// not exist yet or already contains every baseline entry.
-func syncAllowlistAdditions(dstPath string, baselineContent []byte, stdout io.Writer) error {
+// missingAllowlistAdditions returns baseline entries absent from an existing policy file.
+func missingAllowlistAdditions(dstPath string, baselineContent []byte) ([]string, error) {
 	existingContent, err := osReadFile(dstPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return nil
+			return nil, nil
 		}
-		return fmt.Errorf("read %s: %w", dstPath, err)
+		return nil, fmt.Errorf("read %s: %w", dstPath, err)
 	}
 
 	existing := parseAllowlistFile(string(existingContent))
@@ -321,9 +309,22 @@ func syncAllowlistAdditions(dstPath string, baselineContent []byte, stdout io.Wr
 		}
 	}
 	if len(missing) == 0 {
-		return nil
+		return nil, nil
 	}
 	sort.Strings(missing)
+	return missing, nil
+}
+
+// syncAllowlistAdditions explicitly appends selected bundled entries to an existing policy.
+func syncAllowlistAdditions(dstPath string, baselineContent []byte, stdout io.Writer) error {
+	missing, err := missingAllowlistAdditions(dstPath, baselineContent)
+	if err != nil || len(missing) == 0 {
+		return err
+	}
+	existingContent, err := osReadFile(dstPath)
+	if err != nil {
+		return fmt.Errorf("read %s: %w", dstPath, err)
+	}
 
 	var b strings.Builder
 	b.Write(existingContent)

@@ -93,7 +93,7 @@ ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></pre>
             <dt><code>ASH_SCHEDULED_TASK</code></dt><dd>Internal scheduler flag used by ash-managed invocations.</dd>
             <dt><code>ASH_TASK_MAX</code></dt><dd>Optional cap on execution tasks derived from a request. Default: <code>6</code>.</dd>
             <dt><code>ASH_TASK_STALL_ROUNDS</code></dt><dd>Optional assistant stall rounds before stopping. Default: <code>2</code>.</dd>
-            <dt><code>ASH_TOOL_ALLOWLIST</code></dt><dd>Optional comma-separated executable allowlist for <code>run_unix_command</code>. Otherwise <code>~/.ash/.ash_tools</code> is used when present.</dd>
+            <dt><code>ASH_TOOL_ALLOWLIST</code></dt><dd>Optional comma-separated executable allowlist for <code>run_unix_command</code>. Otherwise <code>~/.ash/.ash_tools</code> is used when present; this override does not expand internal Ash tokens.</dd>
             <dt><code>ASH_TOOL_OUTPUT_MAX</code></dt><dd>Optional maximum captured tool output in bytes. Default: <code>8192</code>.</dd>
             <dt><code>ASH_TOOL_TIMEOUT</code></dt><dd>Optional local tool command timeout. Default: <code>15s</code>.</dd>
             <dt><code>ASH_VERBOSE</code></dt><dd>Optional debug logging and execution dashboard. Values such as <code>1</code>, <code>true</code>, <code>on</code>, and <code>debug</code> enable it.</dd>
@@ -104,8 +104,8 @@ ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></pre>
         <section id="files">
           <h2>Files</h2>
           <ul>
-            <li><code>~/.ash/.ash_system</code> &mdash; canonical system prompt.</li>
-            <li><code>~/.ash/.ash_tools</code> &mdash; canonical tool allowlist.</li>
+            <li><code>~/.ash/.ash_system</code> &mdash; canonical system prompt. <code>$TOOLS_DIR_LIST</code> and <code>$IF_PYTHON_AVAILABLE</code> are internal Ash substitutions, never environment variables.</li>
+            <li><code>~/.ash/.ash_tools</code> &mdash; canonical tool allowlist. Its standalone <code>$TOOLS_DIR_LIST</code> directive permits allowed regular managed scripts with read and execute bits; replace it with literal names for a restrictive policy.</li>
             <li><code>~/.ash/history/</code> &mdash; conversation history files.</li>
             <li><code>~/.ash/scratch/</code> &mdash; session-scoped scratch files.</li>
             <li><code>~/.ash/.ash_snooze_until</code> &mdash; automatic prompt snooze expiry.</li>

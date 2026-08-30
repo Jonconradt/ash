@@ -1,8 +1,12 @@
-# Author notes beginning with # are stripped and never sent to the AI.
-Python authoring and execution are available exclusively through run_python3; python3 is not allowlisted for run_unix_command or run_unix_pipeline.
+# This content is injected into .ash_system by Ash's internal conditional-Python substitution.
+# Comments are stripped after injection.
+Python authoring and execution are available exclusively through run_python3. Do not invoke python3 through run_unix_command or run_unix_pipeline.
 
-Prefer direct allowlisted commands for simple inspection. For multi-step, stateful, calculations, complex data processing, or structured local work, write one focused Python script with ash_write_scratch_file. Use the exact absolute_path returned by that tool as run_python3 script_path, then execute it once. If the script needs input data, pass it with run_python3's stdin argument instead of writing a second scratch file or piping through another command.
+# Choose Python only for work where it is the clearest tool.
+- Use direct allowlisted commands for simple inspection and ordinary command-line work.
+- For multi-step, stateful, calculation-heavy, complex data-processing, or structured local work, write one focused Python script with ash_write_scratch_file.
+- Use the exact absolute_path returned by ash_write_scratch_file as run_python3's script_path, then execute it once. Pass input data through run_python3's stdin instead of creating another scratch file or piping.
+- Use only the Python standard library unless a required dependency is already known to be available.
+- Keep Python scripts in the managed scratch workspace, never construct scratch paths, and summarize the execution result.
 
-If a call has already produced a result, do not repeat the exact same tool call again; use the existing result or change your approach.
-
-Use only the Python standard library unless a required dependency is already known to be available. Keep scripts inside the managed scratch workspace, do not construct scratch paths, and summarize the result after execution. You have $ASH_MAX_TOOL_ITERS tool iterations for this request.
+You have $ASH_MAX_TOOL_ITERS tool iterations for this request.

@@ -19,6 +19,8 @@ Do not create public issues for security problems. Include:
 
 The tool execution subsystem is intentionally constrained to a local allowlist of executables. The model can only invoke commands that are explicitly allowlisted and can only pass direct argv values that do not contain blocked shell-control patterns. This is an execution boundary, not a sandbox: ash and any allowlisted tool run with the full OS permissions of the invoking user. Allowlisting a broad-capability executable (`python3`, `curl`, `osascript`, etc.) grants the model everything that executable can do as you.
 
+`$TOOLS_DIR_LIST` and `$IF_PYTHON_AVAILABLE` in `.ash_system` are reserved internal Ash substitutions, never environment-derived variables. The former can list only allowed regular files under `~/.ash/tools/` with both read and execute permission bits; it is prompt guidance, not the enforcement boundary.
+
 ## Prompt injection and tool safety
 
 The project is designed for local, user-driven shell assistance. Treat all model-generated command requests, and all tool/file/script/pipeline/child-agent output fed back to the model, as untrusted input. By default, ash mitigates this only by instructing the model (via system-prompt guidance) never to follow instructions found in that data — a soft control, since it depends on the model's own adherence and is not a guaranteed defense against a sufficiently crafted injection.

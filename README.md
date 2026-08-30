@@ -270,7 +270,7 @@ Notes:
 - `AI` (legacy, unsupported): Deprecated and rejected; use `AI_ENDPOINT` and `AI_MODEL`.
 - `AI_TIMEOUT` (optional): AI request timeout. Default `3m`.
 - `ASH_HISTORY_MAX` (optional): Max retained history messages per key. Default `40`.
-- `ASH_TOOL_ALLOWLIST` (optional): Comma-separated allowlisted executables for `run_unix_command`.
+- `ASH_TOOL_ALLOWLIST` (optional): Comma-separated allowlisted executables for `run_unix_command`; it overrides `.ash_tools` and does not expand Ash internal tokens.
 - `ASH_TOOL_TIMEOUT` (optional): Timeout for local tool execution. Default `15s`.
 - `ASH_TOOL_OUTPUT_MAX` (optional): Max bytes captured from tool output. Default `8192`.
 - `ASH_MAX_TOOL_ITERS` (optional): Maximum AI tool-loop iterations. Default `16`.
@@ -310,6 +310,8 @@ Example `.ash_system` content:
 ```text
 You are a concise shell assistant. Keep answers short and practical. 🙂
 ```
+
+`$TOOLS_DIR_LIST` and `$IF_PYTHON_AVAILABLE` are reserved internal Ash substitutions, not environment variables. Ash computes them before expanding ordinary environment variables. `$TOOLS_DIR_LIST` lists only allowed, regular files in `~/.ash/tools/` that have both a read bit and an execute bit set.
 
 History is stored in:
 
@@ -459,6 +461,8 @@ osascript
 ```
 
 If both are present, `ASH_TOOL_ALLOWLIST` wins.
+
+The standalone `$TOOLS_DIR_LIST` line in `.ash_tools` is an internal Ash directive that allows eligible managed tool scripts. Replace that line with literal bare names for a fixed restrictive script policy. Install never silently broadens an existing custom policy; when interactive, it asks before adding newly bundled entries.
 
 ### Tool safety settings
 

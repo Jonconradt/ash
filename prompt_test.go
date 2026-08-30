@@ -163,6 +163,55 @@ func TestExpandSystemPromptConditionalInstructionsAndComments(t *testing.T) {
 	}
 }
 
+func TestToolDirectoryListIsInternalAndFiltersEligibleScripts(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("TOOLS_DIR_LIST", "environment-value-must-not-appear")
+	t.Setenv("IF_PYTHON_AVAILABLE", "environment-value-must-not-appear")
+
+	toolsDir := filepath.Join(home, ashWorkspaceDirName, "tools")
+	if err := os.MkdirAll(toolsDir, 0o700); err != nil {
+		t.Fatalf("mkdir tools directory: %v", err)
+	}
+	for _, script := range []struct {
+		name string
+		mode os.FileMode
+	}{
+		{name: "allowed.py", mode: 0o700},
+		{name: "not-readable.py", mode: 0o100},
+		{name: "not-executable.py", mode: 0o400},
+		{name: ".hidden.py", mode: 0o700},
+	} {
+		if err := os.WriteFile(filepath.Join(toolsDir, script.name), []byte("#!/bin/sh\n"), script.mode); err != nil {
+			t.Fatalf("write %s: %v", script.name, err)
+		}
+	}
+	if err := os.Mkdir(filepath.Join(toolsDir, "directory.py"), 0o700); err != nil {
+		t.Fatalf("mkdir non-script entry: %v", err)
+	}
+
+	allowed, err := parseAllowlistFileWithToolDirectoryList("ls\n$TOOLS_DIR_LIST\n$TOOLS_DIR_LIST,ps\n")
+	if err != nil {
+		t.Fatalf("parse allowlist marker: %v", err)
+	}
+	if _, ok := allowed["allowed.py"]; !ok {
+		t.Fatalf("expected eligible script in allowlist: %#v", allowed)
+	}
+	for _, name := range []string{"not-readable.py", "not-executable.py", ".hidden.py", "directory.py", toolsDirListToken, "ps"} {
+		if _, ok := allowed[name]; ok {
+			t.Fatalf("unexpected allowlist entry %q: %#v", name, allowed)
+		}
+	}
+
+	prompt := expandSystemPromptWithAllowlist("tools=$TOOLS_DIR_LIST python=$IF_PYTHON_AVAILABLE", allowed)
+	if !strings.Contains(prompt, "tools=allowed.py") {
+		t.Fatalf("expected rendered eligible tool list, got %q", prompt)
+	}
+	if strings.Contains(prompt, "environment-value-must-not-appear") || strings.Contains(prompt, toolsDirListToken) || strings.Contains(prompt, "$IF_PYTHON_AVAILABLE") {
+		t.Fatalf("internal tokens were affected by environment values: %q", prompt)
+	}
+}
+
 func TestReadSystemPromptExpandsUname(t *testing.T) {
 	originalCwd, err := os.Getwd()
 	if err != nil {
