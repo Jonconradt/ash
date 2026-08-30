@@ -58,12 +58,13 @@ Is this thing secure and safe? It really depends on how bold you are. It runs as
 ## Build
 
 ```bash
-go build -ldflags "-X main.ashVersion=dev -X main.ashCommit=$(git rev-parse HEAD)" -o ash .
+go build -ldflags "-X main.ashVersion=v0.17.1 -X main.ashCommit=$(git rev-parse HEAD) -X main.ashDevelopmentBuild=true" -o ash .
 ```
 
-Build metadata is injected through linker flags. `main.ashVersion` defaults to
-`dev` and `main.ashCommit` defaults to `unknown`; release builds pass the tag
-version and Git HEAD automatically.
+Build metadata is injected through linker flags. `make build` uses the latest
+release tag and Git HEAD, marking the dashboard as a development build (for
+example, `ASH v0.17.1 (dev:abcd) EXECUTION SUMMARY`). Release builds pass the
+tag version and Git HEAD without the development suffix.
 
 ## Make Targets
 
@@ -423,7 +424,7 @@ When enabled, `ash` logs structured diagnostics with Go's standard-library `log/
 `ash` publishes these tools to the configured provider on each request:
 
 - `run_unix_command`: executes one allowlisted Unix executable with direct argv (no shell)
-- `run_python3`: executes `python3 -c <code>` with optional argv
+- `run_python3`: when a runnable Python interpreter is available and `ASH_STRICT` is off, executes either `python3 -c <code>` or a `.py` file in the current managed scratch session with optional argv
 - `run_sub_agent`: delegates one focused task to a child ash process, subject to `ASH_MAX_AGENTS`
 - `schedule_future_prompt`: schedules one prompt run via a user `launchd` LaunchAgent
 - `schedule_recurring_prompt`: schedules recurring prompt runs via `crontab`
@@ -432,6 +433,8 @@ When enabled, `ash` logs structured diagnostics with Go's standard-library `log/
 - `ash_write_workspace_file`: writes a file in `~/.ash` and auto-updates `~/.ash/inventory.md`
 
 Tool execution is local to your machine. Use a narrow allowlist.
+
+`run_python3` is separate from the Unix executable allowlist. It is published only when ash resolves its selected interpreter (`ASH_PYTHON`, the managed virtualenv, or system `python3`) and strict mode is disabled. To execute a generated script, write it with `ash_write_scratch_file` and pass the returned `absolute_path` as `script_path`; ash accepts only `.py` files inside the current scratch session. `ASH_STRICT=1` removes the tool and blocks ash-managed bundled `.py` tools as defense in depth.
 
 Sub-agents use the same ash executable, working directory, configuration, tools, and OS permissions. Their session IDs have the form `{parent-session-id}.{six-random-characters}`. Delegation is one level only: child agents cannot publish or invoke `run_sub_agent`, schedule ash, or directly invoke ash through the built-in tools. Control-C cancels the parent and terminates active child work. On Unix, ash places each child in a process group so cancellation and timeout terminate its descendants; Windows guarantees immediate child cancellation, but descendant cleanup is not a sandbox guarantee. Tool, script, file, piped, and child output is untrusted data and must not be treated as instructions or allowed to override the system prompt or user request. Arbitrary Python or shell programs may still launch processes independently; this feature is not a sandbox. Each ash process maintains its own HTTPS connection pool. A child process cannot reuse the parent process's live TLS connection, but retries within one process reuse its HTTP client and transport.
 

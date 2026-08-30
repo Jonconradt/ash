@@ -15,8 +15,9 @@ import (
 )
 
 var (
-	ashVersion = "dev"
-	ashCommit  = "unknown"
+	ashVersion          = "dev"
+	ashCommit           = "unknown"
+	ashDevelopmentBuild = "false"
 )
 
 const (
@@ -31,6 +32,7 @@ const (
 	defaultTaskMax                    = 6
 	defaultRelevanceWin               = 4
 	defaultStallRounds                = 2
+	defaultToolRepeatLimit            = 2
 	defaultLaunchdTimeout             = 15 * time.Second
 	defaultCronTimeout                = 15 * time.Second
 	defaultSchedulerLogMaxBytes int64 = 1 << 20
@@ -124,12 +126,14 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 
 	defaultsStarted := timeNow()
-	if _, err := ensureSessionID(); err != nil {
+	sessionID, err := ensureSessionID()
+	if err != nil {
 		slog.Error("failed to initialize SESSION_ID", "error", err, "EID", "xYQ5IJX7")
 		return 1
 	}
 
 	configureDebugLogging()
+	slog.Debug("ash session started", "session_id", sessionID, "version", executionDashboardVersion(), "EID", "vN2wSb8Q")
 	defer cleanupHistoryRetention(defaultHistoryRetention, defaultHistoryCleanupBudget)
 	defer func() {
 		if root, err := ashScratchRoot(); err == nil {

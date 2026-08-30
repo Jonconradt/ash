@@ -42,6 +42,9 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 	observations := make([]toolObservation, 0, 8)
 	stallRounds := 0
 	forcedToolRetryUsed := false
+	repeatLimit := toolRepeatLimit()
+	lastCallSignature := ""
+	repeatCount := 0
 	slog.Debug("Tool loop started", "request_id", requestIDFromContext(ctx), "max_iters", maxIters, "tools", len(tools), "EID", "kLt1nKGy")
 
 	for i := 0; i <= maxIters; i++ {
@@ -137,10 +140,35 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 				ToolName:   toolName,
 				ToolCallID: call.ID,
 			})
+
+			signature := toolCallSignature(toolName, call.Function.Arguments, toolResult)
+			if signature == lastCallSignature {
+				repeatCount++
+			} else {
+				lastCallSignature = signature
+				repeatCount = 1
+			}
+			if repeatCount >= repeatLimit {
+				slog.Debug("Repeated identical tool call detected", "request_id", requestIDFromContext(ctx), "name", toolName, "repeat_count", repeatCount, "EID", "aHt3RqXe")
+				messages = append(messages, message{
+					Role:    "system",
+					Content: "That exact tool call already produced this result. Use the existing observation to answer, or call a different tool with different arguments; do not repeat the same call.",
+				})
+				repeatCount = 0
+			}
 		}
 	}
 
 	return "", nil, errors.New("unreachable tool loop state")
+}
+
+// toolCallSignature returns a stable identifier for a tool invocation and its result, used to detect no-progress repetition.
+func toolCallSignature(name string, args map[string]any, result string) string {
+	encodedArgs, err := json.Marshal(args)
+	if err != nil {
+		encodedArgs = []byte(fmt.Sprintf("%v", args))
+	}
+	return name + "\x00" + string(encodedArgs) + "\x00" + hashForLog([]byte(result))
 }
 
 // shouldForceToolRetry reports whether the condition is true.

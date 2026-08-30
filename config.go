@@ -228,6 +228,20 @@ func readSystemPrompt() (string, error) {
 
 // loadAllowlistedCommands loads data from storage.
 func loadAllowlistedCommands() (map[string]struct{}, error) {
+	allowed, err := loadAllowlistedCommandsFromSource()
+	if err != nil {
+		return nil, err
+	}
+	// python3 has its own scratch-scoped tool (run_python3); dropping it here
+	// stops the model from bypassing that tool via run_unix_command/run_unix_pipeline.
+	if pythonExecutionAvailable() {
+		delete(allowed, "python3")
+	}
+	return allowed, nil
+}
+
+// loadAllowlistedCommandsFromSource resolves the raw allowlist from env, cwd, or home, before any post-processing.
+func loadAllowlistedCommandsFromSource() (map[string]struct{}, error) {
 	if raw := strings.TrimSpace(os.Getenv("ASH_TOOL_ALLOWLIST")); raw != "" {
 		return parseAllowlistCSV(raw), nil
 	}
@@ -309,8 +323,24 @@ func normalizeToolName(value string) string {
 	return trimmed
 }
 
-// expandSystemPrompt expands environment variables and the UNAME placeholder in the supplied prompt template.
+const (
+	pythonAvailableInstructionsPath   = "ash_bootstrap/prompt-instructions/python-available.txt"
+	pythonUnavailableInstructionsPath = "ash_bootstrap/prompt-instructions/python-unavailable.txt"
+)
+
+// expandSystemPrompt injects conditional guidance, strips source comments, and expands runtime values.
 func expandSystemPrompt(prompt string) string {
+	instructionsPath := pythonUnavailableInstructionsPath
+	if pythonExecutionAvailable() {
+		instructionsPath = pythonAvailableInstructionsPath
+	}
+	instructions, err := readEmbeddedBootstrapAsset(instructionsPath)
+	if err != nil {
+		panic("embedded " + instructionsPath + " is missing: " + err.Error())
+	}
+	prompt = strings.ReplaceAll(prompt, "$IF_PYTHON_AVAILABLE", string(instructions))
+	prompt = stripSystemPromptComments(prompt)
+
 	unameValue := ""
 	if _, err := execLookPath("uname"); err == nil {
 		if output, err := execCommandOutput("uname", "-a"); err == nil {
@@ -322,8 +352,22 @@ func expandSystemPrompt(prompt string) string {
 		if key == "UNAME" && unameValue != "" {
 			return unameValue
 		}
+		if key == "ASH_MAX_TOOL_ITERS" {
+			return strconv.Itoa(maxToolIterations())
+		}
 		return os.Getenv(key)
 	})
+}
+
+func stripSystemPromptComments(prompt string) string {
+	lines := strings.Split(prompt, "\n")
+	kept := lines[:0]
+	for _, line := range lines {
+		if !strings.HasPrefix(line, "#") {
+			kept = append(kept, line)
+		}
+	}
+	return strings.Join(kept, "\n")
 }
 
 // historyLimit returns the maximum number of messages retained for chat history, or the default when unset or invalid.
@@ -455,4 +499,14 @@ func maxTaskStallRounds() int {
 		}
 	}
 	return defaultStallRounds
+}
+
+// toolRepeatLimit returns the configured number of consecutive identical tool calls allowed before the loop intervenes, or the default when unset or invalid.
+func toolRepeatLimit() int {
+	if raw := strings.TrimSpace(os.Getenv("ASH_TOOL_REPEAT_LIMIT")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			return parsed
+		}
+	}
+	return defaultToolRepeatLimit
 }

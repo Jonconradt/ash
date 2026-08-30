@@ -1,0 +1,2 @@
+# Author notes beginning with # are stripped and never sent to the AI.
+Python authoring and execution are not allowed. Do not write, modify, invoke, or attempt to run Python scripts or Python-backed tools. Use only the non-Python tools that are published for this request.

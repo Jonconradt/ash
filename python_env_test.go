@@ -62,6 +62,40 @@ func TestAshPythonInterpreterSkipsIncompleteVenv(t *testing.T) {
 	}
 }
 
+func TestPythonExecutionAvailable(t *testing.T) {
+	originalLookPath := execLookPath
+	t.Cleanup(func() { execLookPath = originalLookPath })
+
+	tests := []struct {
+		name      string
+		strict    string
+		available bool
+		want      bool
+	}{
+		{name: "available", available: true, want: true},
+		{name: "interpreter unavailable", want: false},
+		{name: "strict mode", strict: "true", available: true, want: false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("ASH_STRICT", test.strict)
+			t.Setenv("ASH_PYTHON", "python3")
+			execLookPath = func(file string) (string, error) {
+				if file != "python3" {
+					t.Fatalf("unexpected interpreter lookup: %q", file)
+				}
+				if test.available {
+					return "/usr/bin/python3", nil
+				}
+				return "", os.ErrNotExist
+			}
+			if got := pythonExecutionAvailable(); got != test.want {
+				t.Fatalf("pythonExecutionAvailable() = %t, want %t", got, test.want)
+			}
+		})
+	}
+}
+
 func TestManagedPythonScriptResolvesOnlyInstalledPyTools(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

@@ -104,6 +104,65 @@ func TestReadSystemPromptExpandsEnvironmentVariables(t *testing.T) {
 	}
 }
 
+func TestExpandSystemPromptConditionalInstructionsAndComments(t *testing.T) {
+	originalLookPath := execLookPath
+	t.Cleanup(func() { execLookPath = originalLookPath })
+	t.Setenv("ASH_STRICT", "")
+	t.Setenv("ASH_PYTHON", "python3")
+	t.Setenv("ASH_MAX_TOOL_ITERS", "")
+	execLookPath = func(file string) (string, error) {
+		if file == "python3" {
+			return "/usr/bin/python3", nil
+		}
+		return "", errors.New("not found")
+	}
+
+	tests := []struct {
+		name                string
+		strict              string
+		pythonAvailable     bool
+		maxToolIters        string
+		wantInstructionText string
+		wantLimit           string
+	}{
+		{name: "available with default limit", pythonAvailable: true, wantInstructionText: "Python authoring and execution are available", wantLimit: "16"},
+		{name: "available with configured limit", pythonAvailable: true, maxToolIters: "3", wantInstructionText: "Python authoring and execution are available", wantLimit: "3"},
+		{name: "available with invalid limit", pythonAvailable: true, maxToolIters: "invalid", wantInstructionText: "Python authoring and execution are available", wantLimit: "16"},
+		{name: "strict mode", strict: "1", pythonAvailable: true, wantInstructionText: "Python authoring and execution are not allowed"},
+		{name: "interpreter unavailable", wantInstructionText: "Python authoring and execution are not allowed"},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("ASH_STRICT", test.strict)
+			t.Setenv("ASH_MAX_TOOL_ITERS", test.maxToolIters)
+			execLookPath = func(file string) (string, error) {
+				if file == "python3" && test.pythonAvailable {
+					return "/usr/bin/python3", nil
+				}
+				return "", errors.New("not found")
+			}
+
+			got := expandSystemPrompt("# base comment\nbase\n$IF_PYTHON_AVAILABLE\n# trailing comment\n  # indented content")
+			if strings.Contains(got, "base comment") || strings.Contains(got, "trailing comment") || strings.Contains(got, "Author notes") {
+				t.Fatalf("comment reached rendered prompt: %q", got)
+			}
+			if !strings.Contains(got, "base") || !strings.Contains(got, "  # indented content") {
+				t.Fatalf("non-comment content was removed: %q", got)
+			}
+			if !strings.Contains(got, test.wantInstructionText) {
+				t.Fatalf("rendered prompt missing instruction %q: %q", test.wantInstructionText, got)
+			}
+			if strings.Contains(got, "$IF_PYTHON_AVAILABLE") || strings.Contains(got, "$ASH_MAX_TOOL_ITERS") {
+				t.Fatalf("rendered prompt has an unexpanded placeholder: %q", got)
+			}
+			if test.wantLimit != "" && !strings.Contains(got, "You have "+test.wantLimit+" tool iterations") {
+				t.Fatalf("rendered prompt missing effective limit %q: %q", test.wantLimit, got)
+			}
+		})
+	}
+}
+
 func TestReadSystemPromptExpandsUname(t *testing.T) {
 	originalCwd, err := os.Getwd()
 	if err != nil {
@@ -134,10 +193,15 @@ func TestReadSystemPromptExpandsUname(t *testing.T) {
 	}
 
 	execLookPath = func(file string) (string, error) {
-		if file != "uname" {
+		switch file {
+		case "uname":
+			return "/usr/bin/uname", nil
+		case "python3":
+			return "/usr/bin/python3", nil
+		default:
 			t.Fatalf("unexpected lookpath query: %q", file)
+			return "", nil
 		}
-		return "/usr/bin/uname", nil
 	}
 	execCommandOutput = func(name string, args ...string) ([]byte, error) {
 		if name != "uname" {
@@ -227,7 +291,6 @@ func TestReadSystemPromptErrors(t *testing.T) {
 		osUserHomeDir = origHome
 	})
 }
-
 func TestBuildSystemPrompt(t *testing.T) {
 	now := time.Date(2026, time.July, 24, 9, 15, 30, 0, time.FixedZone("PDT", -7*3600))
 

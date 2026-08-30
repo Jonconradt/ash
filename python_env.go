@@ -44,6 +44,15 @@ func ashPythonInterpreter() string {
 	return "python3"
 }
 
+// pythonExecutionAvailable reports whether ash may expose and execute Python.
+func pythonExecutionAvailable() bool {
+	if strictSecurityModeEnabled() {
+		return false
+	}
+	_, err := execLookPath(ashPythonInterpreter())
+	return err == nil
+}
+
 // managedVenvReady avoids selecting a partially-created virtualenv. Python can leave
 // bin/python3 behind when venv creation fails before ensurepip installs pip.
 func managedVenvReady(venvPython string) bool {

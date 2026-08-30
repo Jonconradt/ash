@@ -564,9 +564,15 @@ func TestLoadAllowlistedCommands(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Getwd failed: %v", err)
 	}
+	originalLookPath := execLookPath
 	t.Cleanup(func() {
 		_ = os.Chdir(originalCwd)
+		execLookPath = originalLookPath
 	})
+	// Deterministic: python3 availability must not depend on the host running these tests.
+	t.Setenv("ASH_STRICT", "")
+	t.Setenv("ASH_PYTHON", "python3")
+	execLookPath = func(string) (string, error) { return "", errors.New("not found") }
 
 	t.Run("env override", func(t *testing.T) {
 		t.Setenv("ASH_TOOL_ALLOWLIST", "ls, ps,python3")
@@ -581,7 +587,40 @@ func TestLoadAllowlistedCommands(t *testing.T) {
 			t.Fatalf("expected ps in allowlist: %#v", allowed)
 		}
 		if _, ok := allowed["python3"]; !ok {
-			t.Fatalf("expected python3 in allowlist: %#v", allowed)
+			t.Fatalf("expected python3 in allowlist when Python execution is unavailable: %#v", allowed)
+		}
+	})
+
+	t.Run("python3 dropped when run_python3 is available", func(t *testing.T) {
+		original := execLookPath
+		t.Cleanup(func() { execLookPath = original })
+		execLookPath = func(string) (string, error) { return "/usr/bin/python3", nil }
+
+		t.Setenv("ASH_TOOL_ALLOWLIST", "ls, ps,python3")
+		allowed, err := loadAllowlistedCommands()
+		if err != nil {
+			t.Fatalf("loadAllowlistedCommands error: %v", err)
+		}
+		if _, ok := allowed["python3"]; ok {
+			t.Fatalf("expected python3 to be dropped when run_python3 is available: %#v", allowed)
+		}
+		if _, ok := allowed["ls"]; !ok {
+			t.Fatalf("expected other allowlisted commands to remain: %#v", allowed)
+		}
+	})
+
+	t.Run("python3 kept when Python execution unavailable", func(t *testing.T) {
+		original := execLookPath
+		t.Cleanup(func() { execLookPath = original })
+		execLookPath = func(string) (string, error) { return "", errors.New("not found") }
+
+		t.Setenv("ASH_TOOL_ALLOWLIST", "python3")
+		allowed, err := loadAllowlistedCommands()
+		if err != nil {
+			t.Fatalf("loadAllowlistedCommands error: %v", err)
+		}
+		if _, ok := allowed["python3"]; !ok {
+			t.Fatalf("expected python3 to remain allowlisted as a fallback: %#v", allowed)
 		}
 	})
 
@@ -1189,6 +1228,88 @@ func TestSchedulerDebugLoggingRotatesJSON(t *testing.T) {
 	}
 }
 
+// TestRunLogsSessionIDAndVersionAsFirstDebugEntry verifies the very first verbose debug log
+// line of a run() invocation announces the current SESSION_ID and version, so a developer
+// scanning logs from the top always knows which session/build produced them.
+func TestRunLogsSessionIDAndVersionAsFirstDebugEntry(t *testing.T) {
+	origDebugWriter := debugWriter
+	origVersion := ashVersion
+	origCommit := ashCommit
+	origDevelopment := ashDevelopmentBuild
+	t.Cleanup(func() {
+		debugWriter = origDebugWriter
+		ashVersion = origVersion
+		ashCommit = origCommit
+		ashDevelopmentBuild = origDevelopment
+	})
+
+	t.Run("release build", func(t *testing.T) {
+		ashVersion = "1.2.3"
+		ashDevelopmentBuild = "false"
+		gotVersion := runAndCaptureFirstDebugEntry(t)
+		if gotVersion["version"] != "v1.2.3" {
+			t.Fatalf("expected version v1.2.3, got %#v", gotVersion["version"])
+		}
+	})
+
+	t.Run("developer build", func(t *testing.T) {
+		ashVersion = "1.2.3"
+		ashCommit = "abcdef1234567890"
+		ashDevelopmentBuild = "true"
+		gotVersion := runAndCaptureFirstDebugEntry(t)
+		if gotVersion["version"] != "v1.2.3 (dev:7890)" {
+			t.Fatalf("expected developer build version suffix, got %#v", gotVersion["version"])
+		}
+	})
+}
+
+// runAndCaptureFirstDebugEntry runs ash once with ASH_VERBOSE=1 and returns the parsed first debug log line.
+func runAndCaptureFirstDebugEntry(t *testing.T) map[string]any {
+	t.Helper()
+
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SESSION_ID", "")
+	t.Setenv("ASH_VERBOSE", "1")
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"message":{"role":"assistant","content":"ok"}}`))
+	}))
+	defer srv.Close()
+	t.Setenv("AI_ENDPOINT", srv.URL)
+	t.Setenv("AI_MODEL", "llama3.1")
+
+	var stdout bytes.Buffer
+	var stderr syncBuffer
+	if code := run([]string{"hello"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("run returned %d, stderr=%q", code, stderr.String())
+	}
+
+	lines := strings.Split(strings.TrimSpace(stderr.String()), "\n")
+	if len(lines) == 0 {
+		t.Fatalf("expected debug log output, got none")
+	}
+
+	var first map[string]any
+	if err := json.Unmarshal([]byte(lines[0]), &first); err != nil {
+		t.Fatalf("expected first log line to be JSON, got %q: %v", lines[0], err)
+	}
+	if first["message"] != "ash session started" {
+		t.Fatalf("expected first log entry to announce session start, got %#v", first)
+	}
+
+	sessionID, err := ensureSessionID()
+	if err != nil {
+		t.Fatalf("ensureSessionID error: %v", err)
+	}
+	if first["session_id"] != sessionID {
+		t.Fatalf("expected session_id %q in first log entry, got %#v", sessionID, first["session_id"])
+	}
+
+	return first
+}
+
 func TestVerboseDebugLogsUseStructuredJSON(t *testing.T) {
 	origWriter := debugWriter
 	origJSON := debugJSONLogging
@@ -1524,6 +1645,46 @@ func TestRunToolLoop(t *testing.T) {
 
 	if len(updated) < 3 {
 		t.Fatalf("expected tool loop messages, got %#v", updated)
+	}
+}
+
+func TestRunToolLoopDetectsRepeatedIdenticalToolCalls(t *testing.T) {
+	originalRunner := toolCommandRunner
+	t.Cleanup(func() { toolCommandRunner = originalRunner })
+
+	toolCommandRunner = func(ctx context.Context, name string, args []string, timeout time.Duration, outputMax int) toolCommandResult {
+		return toolCommandResult{OK: true, Command: "ls -1", ExitCode: 0, Stdout: "a\nb\n"}
+	}
+
+	requestCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		w.Header().Set("Content-Type", "application/json")
+		if requestCount <= 3 {
+			_, _ = w.Write([]byte(`{"message":{"role":"assistant","content":"","tool_calls":[{"type":"function","function":{"index":0,"name":"run_unix_command","arguments":{"command":"ls","args":["-1"]}}}]}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"message":{"role":"assistant","content":"done"}}`))
+	}))
+	defer srv.Close()
+
+	shim := localToolShim{allowlist: map[string]struct{}{"ls": {}}}
+	final, updated, err := runToolLoop(context.Background(), testAIConfig(srv.URL, "model"), "list files repeatedly", []message{{Role: "user", Content: "list files repeatedly"}}, shim)
+	if err != nil {
+		t.Fatalf("runToolLoop returned error: %v", err)
+	}
+	if final != "done" {
+		t.Fatalf("expected final assistant reply, got %q", final)
+	}
+
+	repeatWarnings := 0
+	for _, msg := range updated {
+		if msg.Role == "system" && strings.Contains(msg.Content, "already produced this result") {
+			repeatWarnings++
+		}
+	}
+	if repeatWarnings != 1 {
+		t.Fatalf("expected exactly one repeat-call warning for three identical calls, got %d: %#v", repeatWarnings, updated)
 	}
 }
 
@@ -4016,6 +4177,7 @@ func FuzzEnsureSingleTrailingNewline(f *testing.F) {
 	f.Add("hello")
 	f.Add("hello\n\n")
 	f.Add("🙂 markdown **bold**")
+	f.Add("# hidden\nvisible\n  # preserved\n")
 
 	f.Fuzz(func(t *testing.T, input string) {
 		out := ensureSingleTrailingNewline(input)
@@ -4024,6 +4186,11 @@ func FuzzEnsureSingleTrailingNewline(f *testing.F) {
 		}
 		if strings.HasSuffix(out, "\n\n") {
 			t.Fatalf("expected exactly one trailing newline for %q, got %q", input, out)
+		}
+		for _, line := range strings.Split(stripSystemPromptComments(input), "\n") {
+			if strings.HasPrefix(line, "#") {
+				t.Fatalf("comment line was not stripped: %q", line)
+			}
 		}
 	})
 }

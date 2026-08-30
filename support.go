@@ -80,16 +80,17 @@ var (
 	newHTTPClient       = func(timeout time.Duration) *http.Client {
 		return &http.Client{Timeout: timeout}
 	}
-	argumentBlockPattern                = regexp.MustCompile(`(;|\|\||&&|\||` + "`" + `|\$\(|>|<|\x00|\n|\r)`)
-	promptInjectionPattern              = regexp.MustCompile(`(?i)(ignore\s+(all\s+)?previous\s+instructions|disregard\s+previous\s+instructions|system\s+prompt|developer\s+message|you\s+are\s+now|jailbreak|override\s+instructions|follow\s+these\s+instructions\s+instead)`)
-	toolCommandRunner                   = runToolCommand
-	toolPipelineRunner                  = runToolPipeline
-	pickCloudBusy503Message             = randomCloudBusy503Message
-	pickCloudServer500Message           = randomCloudServer500Message
-	debugWriter               io.Writer = os.Stderr
-	debugJSONLogging          bool
-	requestIDGenerator        func() string
-	appLogger                 *slog.Logger
+	argumentBlockPattern                 = regexp.MustCompile(`(;|\|\||&&|\||` + "`" + `|\$\(|>|<|\x00|\n|\r)`)
+	promptInjectionPattern               = regexp.MustCompile(`(?i)(ignore\s+(all\s+)?previous\s+instructions|disregard\s+previous\s+instructions|system\s+prompt|developer\s+message|you\s+are\s+now|jailbreak|override\s+instructions|follow\s+these\s+instructions\s+instead)`)
+	toolCommandRunner                    = runToolCommand
+	toolCommandWithInputRunner           = runToolCommandWithInput
+	toolPipelineRunner                   = runToolPipeline
+	pickCloudBusy503Message              = randomCloudBusy503Message
+	pickCloudServer500Message            = randomCloudServer500Message
+	debugWriter                io.Writer = os.Stderr
+	debugJSONLogging           bool
+	requestIDGenerator         func() string
+	appLogger                  *slog.Logger
 )
 
 type agentBudget struct {
@@ -303,6 +304,8 @@ func runToolPipeline(ctx context.Context, commands [][]string, display string, t
 		}
 		pipes[i] = struct{ reader, writer *os.File }{reader: reader, writer: writer}
 	}
+	// Fallback safety net only; the happy path closes every fd explicitly below
+	// once both connected processes have started (see comment near Start()).
 	defer func() {
 		for _, pipe := range pipes {
 			_ = pipe.reader.Close()
@@ -336,6 +339,13 @@ func runToolPipeline(ctx context.Context, commands [][]string, display string, t
 			return toolCommandResult{OK: false, Command: display, ExitCode: -1, Error: err.Error(), EID: "j7qQm8vN"}
 		}
 		started = append(started, process)
+	}
+	// exec duplicates each pipe fd into the connected children; the parent's own
+	// copies must be closed now or the reading end of every pipe never sees EOF
+	// (downstream stages that read to EOF, e.g. python3/grep/cat, hang until killed).
+	for _, pipe := range pipes {
+		_ = pipe.reader.Close()
+		_ = pipe.writer.Close()
 	}
 
 	var waitErr error

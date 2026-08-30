@@ -50,6 +50,18 @@ func TestExecutionMetricsAggregateStagesToolsAndTokens(t *testing.T) {
 }
 
 func TestRenderExecutionDashboard(t *testing.T) {
+	originalVersion := ashVersion
+	originalCommit := ashCommit
+	originalDevelopmentBuild := ashDevelopmentBuild
+	ashVersion = "0.17.1"
+	ashCommit = "0123456789abcdef"
+	ashDevelopmentBuild = "true"
+	t.Cleanup(func() {
+		ashVersion = originalVersion
+		ashCommit = originalCommit
+		ashDevelopmentBuild = originalDevelopmentBuild
+	})
+
 	metrics := newExecutionMetrics(time.Now())
 	metrics.addStageDuration(metricsStageDefaults, 500*time.Millisecond)
 	metrics.addStageDuration(metricsStageConnect, 2*time.Second)
@@ -60,7 +72,7 @@ func TestRenderExecutionDashboard(t *testing.T) {
 
 	output := renderExecutionDashboard(metrics, false)
 	for _, expected := range []string{
-		"ASH EXECUTION SUMMARY",
+		"ASH v0.17.1 (dev:cdef) EXECUTION SUMMARY",
 		"Loading defaults",
 		"Connecting to AI server",
 		"Connection reused    no",
@@ -76,6 +88,40 @@ func TestRenderExecutionDashboard(t *testing.T) {
 		if !strings.Contains(output, expected) {
 			t.Errorf("dashboard missing %q:\n%s", expected, output)
 		}
+	}
+}
+
+func TestExecutionDashboardVersion(t *testing.T) {
+	originalVersion := ashVersion
+	originalCommit := ashCommit
+	originalDevelopmentBuild := ashDevelopmentBuild
+	t.Cleanup(func() {
+		ashVersion = originalVersion
+		ashCommit = originalCommit
+		ashDevelopmentBuild = originalDevelopmentBuild
+	})
+
+	tests := []struct {
+		name        string
+		version     string
+		commit      string
+		development string
+		want        string
+	}{
+		{name: "release tag", version: "v0.17.1", commit: "0123456789abcdef", development: "false", want: "v0.17.1"},
+		{name: "development build", version: "v0.17.1", commit: "0123456789abcdef", development: "true", want: "v0.17.1 (dev:cdef)"},
+		{name: "development build with short commit", version: "0.17.1", commit: "abcd", development: "true", want: "v0.17.1 (dev:abcd)"},
+		{name: "development build without commit", version: "dev", commit: "unknown", development: "true", want: "vdev (dev)"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			ashVersion = test.version
+			ashCommit = test.commit
+			ashDevelopmentBuild = test.development
+			if got := executionDashboardVersion(); got != test.want {
+				t.Fatalf("executionDashboardVersion() = %q, want %q", got, test.want)
+			}
+		})
 	}
 }
 
@@ -167,15 +213,23 @@ func TestProviderResponseUsageIsNormalized(t *testing.T) {
 
 func TestRunPrintsDashboardOnEarlyExitWhenVerbose(t *testing.T) {
 	originalInteractive := stdinIsInteractive
-	t.Cleanup(func() { stdinIsInteractive = originalInteractive })
+	originalVersion := ashVersion
+	originalDevelopmentBuild := ashDevelopmentBuild
+	t.Cleanup(func() {
+		stdinIsInteractive = originalInteractive
+		ashVersion = originalVersion
+		ashDevelopmentBuild = originalDevelopmentBuild
+	})
 	stdinIsInteractive = func() bool { return true }
+	ashVersion = "0.17.1"
+	ashDevelopmentBuild = "false"
 	t.Setenv("ASH_VERBOSE", "Yes")
 
 	var stdout, stderr bytes.Buffer
 	if code := run(nil, &stdout, &stderr); code != 1 {
 		t.Fatalf("run returned %d, want 1", code)
 	}
-	if !strings.Contains(stdout.String(), "ASH EXECUTION SUMMARY") {
+	if !strings.Contains(stdout.String(), "ASH v0.17.1 EXECUTION SUMMARY") {
 		t.Fatalf("dashboard was not written to stdout: %q", stdout.String())
 	}
 	if strings.Contains(stdout.String(), "\033[") {

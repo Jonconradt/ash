@@ -15,7 +15,7 @@
 #
 # Notes:
 # - ASH_TOOL_ALLOWLIST environment variable overrides this file.
-# - python3 is also available through ash's dedicated run_python3 tool.
+# - python3 always runs through ash's dedicated run_python3 tool, never here.
 #
 # -----------------------------------------------------------------------------
 # Internet and current information search tools
@@ -37,6 +37,7 @@ date
 cal
 printenv
 env
+echo
 
 # -----------------------------------------------------------------------------
 # File and directory inspection
@@ -104,7 +105,7 @@ which
 # Structured data helpers
 # -----------------------------------------------------------------------------
 jq
-python3
+# python3 is intentionally excluded: it always runs through run_python3 instead.
 
 # -----------------------------------------------------------------------------
 # Additional read-only diagnostics (safe and useful for Linux/macOS)

@@ -295,7 +295,7 @@ func renderExecutionDashboard(metrics *executionMetrics, ansi bool) string {
 		}
 		return cyan + value + reset
 	}
-	header := "ASH EXECUTION SUMMARY"
+	header := fmt.Sprintf("ASH %s EXECUTION SUMMARY", executionDashboardVersion())
 	if ansi {
 		header = bold + header + reset
 	}
@@ -329,6 +329,27 @@ func renderExecutionDashboard(metrics *executionMetrics, ansi bool) string {
 	writeCountBreakdown(&b, style("Scratch files executed"), snap.ScratchExecs)
 	fmt.Fprintf(&b, "%-20s %s\n", style("Total realtime"), formatMetricDuration(metrics.totalDuration()))
 	return b.String()
+}
+
+func executionDashboardVersion() string {
+	version := strings.TrimSpace(ashVersion)
+	if version == "" {
+		version = "dev"
+	}
+	if !strings.HasPrefix(version, "v") {
+		version = "v" + version
+	}
+	if ashDevelopmentBuild != "true" {
+		return version
+	}
+	commit := strings.TrimSpace(ashCommit)
+	if commit == "" || commit == "unknown" {
+		return version + " (dev)"
+	}
+	if len(commit) > 4 {
+		commit = commit[len(commit)-4:]
+	}
+	return fmt.Sprintf("%s (dev:%s)", version, commit)
 }
 
 // writeCountBreakdown writes one line per key in counts (sorted for deterministic output),

@@ -12,6 +12,8 @@ GOVULNCHECK_VERSION ?= v1.1.4
 STATICCHECK_VERSION ?= latest
 YAMLFMT_VERSION ?= latest
 APP_NAME ?= ash
+LOCAL_BIN_DIR ?= $(HOME)/.local/bin
+LOCAL_BINARY_PATH ?= $(LOCAL_BIN_DIR)/$(APP_NAME)
 RELEASE_ARCH ?= arm64
 RELEASE_OUTPUT_DIR ?= dist/release
 RELEASE_PACKAGE_DIR ?= $(RELEASE_OUTPUT_DIR)
@@ -21,7 +23,7 @@ RELEASE_GOOS ?= darwin
 RELEASE_FORMAT ?= pkg
 RELEASE_WATCH ?= 1
 RELEASE_WATCH_STRICT ?= 1
-BUILD_VERSION ?= dev
+BUILD_VERSION ?= $(if $(LATEST_RELEASE_TAG),$(LATEST_RELEASE_TAG),dev)
 # Resolved once at parse time; recursive expansion would re-run git after release-publish tags HEAD.
 ifeq ($(origin BUILD_COMMIT),undefined)
 BUILD_COMMIT := $(shell git rev-parse HEAD 2>/dev/null || printf 'unknown')
@@ -65,7 +67,8 @@ sync-route-words:
 	@go run . --internal-sync-route-words
 
 build: lint test
-	@go install -ldflags "-X main.ashVersion=$(BUILD_VERSION) -X main.ashCommit=$(BUILD_COMMIT)" .
+	@mkdir -p "$(LOCAL_BIN_DIR)"
+	@go build -o "$(LOCAL_BINARY_PATH)" -ldflags "-X main.ashVersion=$(BUILD_VERSION) -X main.ashCommit=$(BUILD_COMMIT) -X main.ashDevelopmentBuild=true" .
 
 lint: site-lint yaml-lint python-lint markdown-lint
 	@go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run ./...

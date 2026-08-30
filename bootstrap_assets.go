@@ -25,6 +25,7 @@ import (
 //go:embed ash_bootstrap/rc-source-fish.fish
 //go:embed ash_bootstrap/rc-source-pwsh.ps1
 //go:embed ash_bootstrap/route_words.txt
+//go:embed ash_bootstrap/prompt-instructions/*
 //go:embed ash_bootstrap/tools/*
 var embeddedBootstrapAssets embed.FS
 

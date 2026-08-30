@@ -291,6 +291,39 @@ func (s localToolShim) ListTools() []toolDefinition {
 			},
 		},
 	}
+	if pythonExecutionAvailable() {
+		tools = append(tools, toolDefinition{
+			Type: "function",
+			Function: toolFunctionDefinition{
+				Name:        "run_python3",
+				Description: "Execute either non-empty Python code or one .py script in the current session's managed scratch directory. Provide exactly one of code or script_path; script_path must be the absolute_path returned by ash_write_scratch_file. This is the only supported way to run Python; python3 is not directly allowlisted for run_unix_command/run_unix_pipeline.",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"code": map[string]any{
+							"type":        "string",
+							"description": "Python source to execute with python3 -c",
+						},
+						"script_path": map[string]any{
+							"type":        "string",
+							"description": "Absolute path returned by ash_write_scratch_file for a .py script",
+						},
+						"argv": map[string]any{
+							"type": "array",
+							"items": map[string]any{
+								"type": "string",
+							},
+							"description": "Direct arguments passed to the selected code or script",
+						},
+						"stdin": map[string]any{
+							"type":        "string",
+							"description": "Optional text delivered to the process's standard input, avoiding a separate scratch file for input data",
+						},
+					},
+				},
+			},
+		})
+	}
 	if !isChildAgent() {
 		tools = append(tools, toolDefinition{
 			Type: "function",
@@ -484,6 +517,9 @@ func (s localToolShim) callUnixCommand(ctx context.Context, args map[string]any)
 
 	// Bundled .py tools run under the managed interpreter so third-party deps resolve.
 	if script, ok := managedPythonScript(commandName); ok {
+		if !pythonExecutionAvailable() {
+			return toolCommandResult{OK: false, Command: commandName, Error: "Python execution is not available", EID: "sLf6Wk8P"}
+		}
 		if interpreter := ashPythonInterpreter(); interpreter != "python3" {
 			return toolCommandRunner(ctx, interpreter, append([]string{script}, argv...), toolTimeout(), toolOutputLimit())
 		}
@@ -510,16 +546,32 @@ func recordScratchExecArgs(ctx context.Context, argv []string) {
 	}
 }
 
-// callPython3 executes a Python snippet via python3 -c after validating the provided code and argv values.
+// callPython3 executes inline Python code or one Python script from the current scratch session.
 func (s localToolShim) callPython3(ctx context.Context, args map[string]any) toolCommandResult {
-	code, ok := toStringArg(args["code"])
-	if !ok || strings.TrimSpace(code) == "" {
+	if !pythonExecutionAvailable() {
+		return toolCommandResult{OK: false, Command: "python3", Error: "Python execution is not available", EID: "sLf6Wk8P"}
+	}
+
+	code, hasCode := toStringArg(args["code"])
+	scriptPath, hasScriptPath := toStringArg(args["script_path"])
+	if hasCode && strings.TrimSpace(code) == "" {
 		return toolCommandResult{OK: false, Command: "python3", Error: "code must be a non-empty string", EID: "GmnCP0Ho"}
+	}
+	if hasScriptPath && strings.TrimSpace(scriptPath) == "" {
+		return toolCommandResult{OK: false, Command: "python3", Error: "script_path must be a non-empty string", EID: "bF8tK3qL"}
+	}
+	if hasCode == hasScriptPath {
+		return toolCommandResult{OK: false, Command: "python3", Error: "provide exactly one of code or script_path", EID: "kR4mV9xC"}
 	}
 
 	argv, err := toStringSliceArg(args["argv"])
 	if err != nil {
 		return toolCommandResult{OK: false, Command: "python3", Error: err.Error(), EID: "c6BJjKpr"}
+	}
+
+	stdin, hasStdin := toStringArg(args["stdin"])
+	if hasStdin && !utf8.ValidString(stdin) {
+		return toolCommandResult{OK: false, Command: "python3", Error: "stdin must be valid UTF-8", EID: "n4wQzB7x"}
 	}
 
 	for _, arg := range argv {
@@ -528,7 +580,34 @@ func (s localToolShim) callPython3(ctx context.Context, args map[string]any) too
 		}
 	}
 
-	pythonArgs := append([]string{"-c", code}, argv...)
+	var pythonArgs []string
+	if hasCode {
+		pythonArgs = append([]string{"-c", code}, argv...)
+	} else {
+		root, rootErr := ashScratchSessionRoot()
+		if rootErr != nil {
+			return toolCommandResult{OK: false, Command: "python3", Error: rootErr.Error(), EID: "wC7pL2nR"}
+		}
+		absolutePath, _, pathErr := resolveScratchPath(root, scriptPath)
+		if pathErr != nil {
+			return toolCommandResult{OK: false, Command: "python3", Error: pathErr.Error(), EID: "zV5hQ1dN"}
+		}
+		if !strings.HasSuffix(absolutePath, ".py") {
+			return toolCommandResult{OK: false, Command: "python3", Error: "script_path must name a .py file", EID: "pM9xJ6sB"}
+		}
+		info, statErr := os.Stat(absolutePath)
+		if statErr != nil {
+			return toolCommandResult{OK: false, Command: "python3", Error: statErr.Error(), EID: "dQ3fH8vT"}
+		}
+		if info.IsDir() {
+			return toolCommandResult{OK: false, Command: "python3", Error: "script_path must name a regular file", EID: "gN4kW7cS"}
+		}
+		recordScratchExecArgs(ctx, []string{absolutePath})
+		pythonArgs = append([]string{absolutePath}, argv...)
+	}
+	if hasStdin && stdin != "" {
+		return toolCommandWithInputRunner(ctx, ashPythonInterpreter(), pythonArgs, stdin, toolTimeout(), toolOutputLimit())
+	}
 	return toolCommandRunner(ctx, ashPythonInterpreter(), pythonArgs, toolTimeout(), toolOutputLimit())
 }
 
