@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -63,6 +64,12 @@ func TestBrokerRoundTripReusesConfiguredTransport(t *testing.T) {
 	}))
 	defer server.Close()
 
+	serverURL, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	allowedHost := serverURL.Host
+
 	socket := "/tmp/ash-broker-test-" + strconv.Itoa(os.Getpid()) + ".sock"
 	_ = os.Remove(socket)
 	t.Cleanup(func() { _ = os.Remove(socket) })
@@ -79,7 +86,7 @@ func TestBrokerRoundTripReusesConfiguredTransport(t *testing.T) {
 			if acceptErr != nil {
 				return
 			}
-			go handleBrokerConn(context.Background(), connection, token, client)
+			go handleBrokerConn(context.Background(), connection, token, client, allowedHost)
 		}
 	}()
 
@@ -100,6 +107,50 @@ func TestBrokerRoundTripReusesConfiguredTransport(t *testing.T) {
 	}
 	if _, err := os.Stat(socket); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestBrokerURLAllowedPinsToConfiguredHost(t *testing.T) {
+	if brokerURLAllowed("https://api.example.com/v1/chat", "api.example.com") != true {
+		t.Fatal("expected matching host to be allowed")
+	}
+	if brokerURLAllowed("https://attacker.example.com/v1/chat", "api.example.com") {
+		t.Fatal("expected mismatched host to be rejected")
+	}
+	if brokerURLAllowed("https://user@api.example.com/v1/chat", "api.example.com") {
+		t.Fatal("expected embedded userinfo to be rejected")
+	}
+}
+
+func TestHandleBrokerConnRejectsUnconfiguredHost(t *testing.T) {
+	socket := "/tmp/ash-broker-test-host-" + strconv.Itoa(os.Getpid()) + ".sock"
+	_ = os.Remove(socket)
+	t.Cleanup(func() { _ = os.Remove(socket) })
+	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "unix", socket)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = listener.Close() }()
+	token := "test-token"
+	client := newBrokerHTTPClient()
+	go func() {
+		for {
+			connection, acceptErr := listener.Accept()
+			if acceptErr != nil {
+				return
+			}
+			go handleBrokerConn(context.Background(), connection, token, client, "api.example.com")
+		}
+	}()
+
+	t.Setenv(brokerSocketEnv, socket)
+	t.Setenv(brokerTokenEnv, token)
+	request, err := http.NewRequestWithContext(context.Background(), http.MethodPost, "https://attacker.example.com/v1/chat", strings.NewReader("{}"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := brokerDo(context.Background(), request); err == nil {
+		t.Fatal("expected request to unconfigured host to be rejected")
 	}
 }
 

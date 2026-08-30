@@ -14,6 +14,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptrace"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -115,9 +116,9 @@ func brokerHeaderAllowed(name string) bool {
 	}
 }
 
-func brokerURLAllowed(rawURL string) bool {
+func brokerURLAllowed(rawURL string, allowedHost string) bool {
 	request, err := http.NewRequestWithContext(context.Background(), http.MethodPost, rawURL, nil)
-	return err == nil && request.URL.User == nil && request.URL.Host != "" && (request.URL.Scheme == "http" || request.URL.Scheme == "https")
+	return err == nil && request.URL.User == nil && request.URL.Host != "" && (request.URL.Scheme == "http" || request.URL.Scheme == "https") && strings.EqualFold(request.URL.Host, allowedHost)
 }
 
 func writeBrokerFrame(w io.Writer, payload []byte) error {
@@ -190,10 +191,17 @@ func runBroker(args []string, stdout, stderr io.Writer) int {
 		_, _ = fmt.Fprintln(stderr, "broker requires --socket, --parent-pid, and ASH_BROKER_TOKEN")
 		return 2
 	}
-	if _, err := parseAIConfigFromEnv(); err != nil {
+	aiCfg, err := parseAIConfigFromEnv()
+	if err != nil {
 		_, _ = fmt.Fprintln(stderr, "broker requires a complete AI environment")
 		return 2
 	}
+	endpointURL, err := url.Parse(aiCfg.BaseURL)
+	if err != nil || endpointURL.Host == "" {
+		_, _ = fmt.Fprintln(stderr, "broker requires a valid AI_ENDPOINT host")
+		return 2
+	}
+	allowedHost := endpointURL.Host
 	// #nosec G703 -- the broker socket path is supplied by the same-user shell setup.
 	if err := os.MkdirAll(filepath.Dir(socket), 0o700); err != nil {
 		_, _ = fmt.Fprintln(stderr, err)
@@ -208,9 +216,9 @@ func runBroker(args []string, stdout, stderr io.Writer) int {
 	}
 	// #nosec G703 -- the broker socket path is supplied by the same-user shell setup.
 	_ = os.Remove(socket)
-	listener, err := (&net.ListenConfig{}).Listen(ctx, "unix", socket)
-	if err != nil {
-		_, _ = fmt.Fprintln(stderr, err)
+	listener, listenErr := (&net.ListenConfig{}).Listen(ctx, "unix", socket)
+	if listenErr != nil {
+		_, _ = fmt.Fprintln(stderr, listenErr)
 		return 1
 	}
 	defer func() {
@@ -245,7 +253,7 @@ func runBroker(args []string, stdout, stderr io.Writer) int {
 			break
 		}
 		active.Add(1)
-		go func() { defer active.Done(); handleBrokerConn(ctx, conn, token, client) }()
+		go func() { defer active.Done(); handleBrokerConn(ctx, conn, token, client, allowedHost) }()
 	}
 	active.Wait()
 	return 0
@@ -259,7 +267,7 @@ func brokerParentAlive(parentPID int) bool {
 	return err == nil || errors.Is(err, syscall.EPERM)
 }
 
-func handleBrokerConn(ctx context.Context, conn net.Conn, token string, client *http.Client) {
+func handleBrokerConn(ctx context.Context, conn net.Conn, token string, client *http.Client, allowedHost string) {
 	defer func() { _ = conn.Close() }()
 	if !brokerPeerAllowed(conn) {
 		return
@@ -270,7 +278,7 @@ func handleBrokerConn(ctx context.Context, conn net.Conn, token string, client *
 		return
 	}
 	var request brokerRequest
-	if json.Unmarshal(payload, &request) != nil || request.Version != brokerVersion || subtle.ConstantTimeCompare([]byte(request.Token), []byte(token)) != 1 || !brokerURLAllowed(request.URL) || len(request.Body) > brokerMaxBody {
+	if json.Unmarshal(payload, &request) != nil || request.Version != brokerVersion || subtle.ConstantTimeCompare([]byte(request.Token), []byte(token)) != 1 || !brokerURLAllowed(request.URL, allowedHost) || len(request.Body) > brokerMaxBody {
 		_ = writeBrokerFrame(conn, mustBrokerJSON(brokerResponse{Version: brokerVersion, Error: "broker request rejected"}))
 		return
 	}
