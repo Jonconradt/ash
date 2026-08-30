@@ -90,7 +90,7 @@ func TestZshBootstrapAssetShape(t *testing.T) {
 
 	for _, want := range []string{
 		`[[ -n "${AI_ENDPOINT:-}" && -n "${AI_MODEL:-}" ]] || return 1`,
-		`</dev/null >/dev/null 2>&1 &!`,
+		`--parent-pid "$parent_pid"`,
 		"add-zsh-hook zshexit _ash_shutdown_broker",
 		"zle -N accept-line _ash_accept_line",
 		`[[ -o interactive ]] || return 127`,
@@ -104,6 +104,25 @@ func TestZshBootstrapAssetShape(t *testing.T) {
 	for _, unwanted := range []string{"_ash_route_or_delegate", `disown "`, "which() {", "test()  {"} {
 		if strings.Contains(asset, unwanted) {
 			t.Errorf("zsh asset still contains %q", unwanted)
+		}
+	}
+}
+
+func TestUnixShellBootstrapAssetsPassParentPID(t *testing.T) {
+	cases := []struct {
+		path string
+		want string
+	}{
+		{path: "ash_bootstrap/.ash_bashrc", want: `local parent_pid="$BASHPID"`},
+		{path: "ash_bootstrap/.ash_fish.fish", want: "set -l parent_pid $fish_pid"},
+	}
+	for _, tc := range cases {
+		content, err := readEmbeddedBootstrapAsset(tc.path)
+		if err != nil {
+			t.Fatalf("read embedded asset %q: %v", tc.path, err)
+		}
+		if !strings.Contains(string(content), tc.want) || !strings.Contains(string(content), `--parent-pid "$parent_pid"`) {
+			t.Errorf("bootstrap asset %q does not pass its parent PID", tc.path)
 		}
 	}
 }

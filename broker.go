@@ -24,14 +24,14 @@ import (
 )
 
 const (
-	brokerSocketEnv = "ASH_BROKER_SOCKET"
-	brokerTokenEnv  = "ASH_BROKER_TOKEN"
-	brokerLeaseEnv  = "ASH_BROKER_LEASE"
-	brokerVersion   = 1
-	brokerMaxFrame  = 16 << 20
-	brokerMaxBody   = 8 << 20
-	brokerMaxHeader = 64 << 10
-	brokerIdle      = 10 * time.Minute
+	brokerSocketEnv  = "ASH_BROKER_SOCKET"
+	brokerTokenEnv   = "ASH_BROKER_TOKEN"
+	brokerLeaseEnv   = "ASH_BROKER_LEASE"
+	brokerVersion    = 1
+	brokerMaxFrame   = 16 << 20
+	brokerMaxBody    = 8 << 20
+	brokerMaxHeader  = 64 << 10
+	brokerParentPoll = 5 * time.Second
 )
 
 type brokerRequest struct {
@@ -151,7 +151,8 @@ func readBrokerFrame(r io.Reader) ([]byte, error) {
 func runBroker(args []string, stdout, stderr io.Writer) int {
 	ctx, stopSignals := signalNotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 	defer stopSignals()
-	var socket, lease string
+	var socket string
+	var parentPID int
 	for index := 0; index < len(args); index++ {
 		switch args[index] {
 		case "--socket":
@@ -161,24 +162,32 @@ func runBroker(args []string, stdout, stderr io.Writer) int {
 				return 2
 			}
 			socket = args[index]
+		case "--parent-pid":
+			index++
+			if index >= len(args) {
+				_, _ = fmt.Fprintln(stderr, "--parent-pid requires a value")
+				return 2
+			}
+			parsedPID, err := strconv.Atoi(args[index])
+			if err != nil || parsedPID <= 0 {
+				_, _ = fmt.Fprintln(stderr, "--parent-pid must be a positive integer")
+				return 2
+			}
+			parentPID = parsedPID
 		case "--lease":
 			index++
 			if index >= len(args) {
 				_, _ = fmt.Fprintln(stderr, "--lease requires a value")
 				return 2
 			}
-			lease = args[index]
 		default:
 			_, _ = fmt.Fprintf(stderr, "unknown broker option %q\n", args[index])
 			return 2
 		}
 	}
 	token := strings.TrimSpace(os.Getenv(brokerTokenEnv))
-	if lease == "" {
-		lease = strings.TrimSpace(os.Getenv(brokerLeaseEnv))
-	}
-	if socket == "" || token == "" {
-		_, _ = fmt.Fprintln(stderr, "broker requires --socket and ASH_BROKER_TOKEN")
+	if socket == "" || token == "" || parentPID == 0 {
+		_, _ = fmt.Fprintln(stderr, "broker requires --socket, --parent-pid, and ASH_BROKER_TOKEN")
 		return 2
 	}
 	if _, err := parseAIConfigFromEnv(); err != nil {
@@ -216,26 +225,15 @@ func runBroker(args []string, stdout, stderr io.Writer) int {
 	}
 	client := newBrokerHTTPClient()
 	var active sync.WaitGroup
-	lastActivity := time.Now()
-	var activityMu sync.Mutex
 	go func() {
 		<-ctx.Done()
 		_ = listener.Close()
 	}()
 	go func() {
-		ticker := time.NewTicker(time.Minute)
+		ticker := time.NewTicker(brokerParentPoll)
 		defer ticker.Stop()
 		for range ticker.C {
-			activityMu.Lock()
-			idle := time.Since(lastActivity) >= brokerIdle
-			activityMu.Unlock()
-			if lease != "" {
-				// #nosec G703 -- the lease path is supplied by the same-user shell setup.
-				if info, statErr := os.Stat(lease); statErr != nil || time.Since(info.ModTime()) >= brokerIdle {
-					idle = true
-				}
-			}
-			if idle {
+			if !brokerParentAlive(parentPID) {
 				_ = listener.Close()
 				return
 			}
@@ -246,14 +244,19 @@ func runBroker(args []string, stdout, stderr io.Writer) int {
 		if acceptErr != nil {
 			break
 		}
-		activityMu.Lock()
-		lastActivity = time.Now()
-		activityMu.Unlock()
 		active.Add(1)
 		go func() { defer active.Done(); handleBrokerConn(ctx, conn, token, client) }()
 	}
 	active.Wait()
 	return 0
+}
+
+func brokerParentAlive(parentPID int) bool {
+	if parentPID <= 0 {
+		return false
+	}
+	err := syscall.Kill(parentPID, 0)
+	return err == nil || errors.Is(err, syscall.EPERM)
 }
 
 func handleBrokerConn(ctx context.Context, conn net.Conn, token string, client *http.Client) {
@@ -328,6 +331,6 @@ func newBrokerHTTPClient() *http.Client {
 	transport.MaxIdleConns = 32
 	transport.MaxIdleConnsPerHost = 8
 	transport.MaxConnsPerHost = 16
-	transport.IdleConnTimeout = 2 * time.Minute
+	transport.IdleConnTimeout = 0
 	return &http.Client{Transport: transport, Timeout: aiTimeout()}
 }

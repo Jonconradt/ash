@@ -20,6 +20,40 @@ func TestBrokerFrameLimit(t *testing.T) {
 	}
 }
 
+func TestRunBrokerRequiresParentPID(t *testing.T) {
+	t.Setenv(brokerTokenEnv, "test-token")
+	var stdout, stderr strings.Builder
+	if code := runBroker([]string{"--socket", filepath.Join(t.TempDir(), "broker.sock")}, &stdout, &stderr); code != 2 {
+		t.Fatalf("runBroker without parent PID = %d, want 2", code)
+	}
+	if !strings.Contains(stderr.String(), "--parent-pid") {
+		t.Fatalf("expected parent PID error, got %q", stderr.String())
+	}
+}
+
+func TestBrokerParentAlive(t *testing.T) {
+	if !brokerParentAlive(os.Getpid()) {
+		t.Fatal("expected current process to be alive")
+	}
+	if brokerParentAlive(0) {
+		t.Fatal("expected zero PID to be rejected")
+	}
+}
+
+func TestBrokerHTTPClientRetainsBoundedIdleConnections(t *testing.T) {
+	client := newBrokerHTTPClient()
+	transport, ok := client.Transport.(*http.Transport)
+	if !ok {
+		t.Fatalf("transport = %T, want *http.Transport", client.Transport)
+	}
+	if transport.IdleConnTimeout != 0 {
+		t.Fatalf("IdleConnTimeout = %s, want 0", transport.IdleConnTimeout)
+	}
+	if transport.MaxIdleConns != 32 || transport.MaxIdleConnsPerHost != 8 || transport.MaxConnsPerHost != 16 {
+		t.Fatalf("unexpected broker connection limits: idle=%d idle_per_host=%d per_host=%d", transport.MaxIdleConns, transport.MaxIdleConnsPerHost, transport.MaxConnsPerHost)
+	}
+}
+
 func TestBrokerRoundTripReusesConfiguredTransport(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.Method != http.MethodPost || request.Header.Get("Authorization") != "Bearer test" {

@@ -31,10 +31,11 @@ function _ash_ensure_broker
 	command touch "$lease_path"; or return 1
 	set -l token (command head -c 32 /dev/urandom | command od -An -tx1 | string replace -a ' ' '' | string join '')
 	test -n "$token"; or return 1
+	set -l parent_pid $fish_pid
 
 	begin
 		set -lx ASH_BROKER_TOKEN "$token"
-		command ash broker --socket "$socket_path" --lease "$lease_path" </dev/null >/dev/null 2>&1
+		command ash broker --socket "$socket_path" --parent-pid "$parent_pid" --lease "$lease_path" </dev/null >/dev/null 2>&1
 	end &
 	set -l broker_pid $last_pid
 	disown "$broker_pid" 2>/dev/null; or true

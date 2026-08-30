@@ -23,7 +23,8 @@ _ash_ensure_broker() {
 		return 1
 	fi
 	# &! backgrounds and disowns atomically, so no job-control notice reaches the terminal.
-	ASH_BROKER_TOKEN="$token" command ash broker --socket "$socket_path" --lease "$lease_path" </dev/null >/dev/null 2>&1 &!
+	local parent_pid="$$"
+	ASH_BROKER_TOKEN="$token" command ash broker --socket "$socket_path" --parent-pid "$parent_pid" --lease "$lease_path" </dev/null >/dev/null 2>&1 &!
 	local broker_pid=$!
 	local attempt
 	for attempt in {1..40}; do
