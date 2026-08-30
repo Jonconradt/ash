@@ -1731,6 +1731,15 @@ func renderMarkdownWithGlamour(markdown string) (string, error) {
 	return renderer.Render(markdown)
 }
 
+// renderAssistantOutput styles output for terminals and preserves raw Markdown when the output is redirected or piped.
+func renderAssistantOutput(raw string, terminal bool) string {
+	if !terminal {
+		return ensureSingleTrailingNewline(strings.TrimSpace(raw))
+	}
+
+	return formatAssistantOutput(raw)
+}
+
 // formatAssistantOutput renders assistant output for terminal display, falling back to plain text when rendering fails.
 func formatAssistantOutput(raw string) string {
 	rendered, err := markdownRenderer(raw)

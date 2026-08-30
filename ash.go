@@ -236,7 +236,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 
 	slog.Debug("assistant final reply", "request_id", requestIDFromContext(ctx), "bytes", len(assistantReply), "sha256", hashForLog([]byte(assistantReply)), "EID", "jzszDMVF")
-	_, _ = fmt.Fprint(stdout, formatAssistantOutput(assistantReply))
+	_, _ = fmt.Fprint(stdout, renderAssistantOutput(assistantReply, writerIsTerminal(stdout)))
 
 	conversation = stripSystemMessage(updatedMessages)
 	conversation = keepRecentMessages(conversation, historyLimit())

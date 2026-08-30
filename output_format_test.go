@@ -4,6 +4,9 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/charmbracelet/glamour"
+	"github.com/muesli/termenv"
 )
 
 func TestEnsureSingleTrailingNewline(t *testing.T) {
@@ -42,6 +45,40 @@ func TestFormatAssistantOutputUsesRenderer(t *testing.T) {
 	got := formatAssistantOutput("# title")
 	if got != "styled\n" {
 		t.Fatalf("output mismatch: got %q want %q", got, "styled\\n")
+	}
+}
+
+func TestRenderAssistantOutput(t *testing.T) {
+	original := markdownRenderer
+	t.Cleanup(func() { markdownRenderer = original })
+
+	markdownRenderer = func(string) (string, error) {
+		return "  • styled\n\n", nil
+	}
+
+	if got := renderAssistantOutput("\n- raw\n\n", false); got != "- raw\n" {
+		t.Fatalf("non-terminal output should stay raw markdown, got %q", got)
+	}
+	if got := renderAssistantOutput("- raw", true); got != "• styled\n" {
+		t.Fatalf("terminal output should be rendered, got %q", got)
+	}
+}
+
+func TestRenderAssistantOutputStylesForAnsiTerminal(t *testing.T) {
+	originalFactory := newTermRenderer
+	t.Cleanup(func() { newTermRenderer = originalFactory })
+
+	// Tests run without a TTY, so glamour would otherwise fall back to its notty style.
+	newTermRenderer = func(options ...glamour.TermRendererOption) (*glamour.TermRenderer, error) {
+		return originalFactory(append(options, glamour.WithStandardStyle("dark"), glamour.WithColorProfile(termenv.TrueColor))...)
+	}
+
+	got := renderAssistantOutput("## Features\n\n- alpha\n", true)
+	if !strings.Contains(got, "\x1b[") {
+		t.Fatalf("expected ANSI styling for an interactive terminal, got %q", got)
+	}
+	if !strings.Contains(got, "Features") || !strings.Contains(got, "alpha") {
+		t.Fatalf("expected rendered content, got %q", got)
 	}
 }
 

@@ -4078,8 +4078,8 @@ func TestRun(t *testing.T) {
 		if code != 0 {
 			t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
 		}
-		if !strings.Contains(stdout.String(), "\x1b[1m") {
-			t.Fatalf("expected ANSI output, got %q", stdout.String())
+		if stdout.String() != assistantRaw+"\n" {
+			t.Fatalf("expected raw markdown on non-terminal stdout, got %q", stdout.String())
 		}
 
 		content, err := os.ReadFile(filepath.Join(home, ashWorkspaceDirName, historyDirName, "historySuccess.json"))
