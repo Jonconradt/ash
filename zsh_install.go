@@ -14,11 +14,7 @@ func zshWrapperFileName() string {
 }
 
 func zshInstallSourceBlock() string {
-	return strings.TrimSpace(`
-` + installStartMarker + `
-[ -f "$HOME/.ash/.ash_env" ] && . "$HOME/.ash/.ash_env"
-[ -f "$HOME/.ash/.ash_zshrc" ] && . "$HOME/.ash/.ash_zshrc"
-` + installEndMarker)
+	return installSourceBlockFromAsset("ash_bootstrap/rc-source-zsh.sh")
 }
 
 func zshInstallWrapperContent() string {

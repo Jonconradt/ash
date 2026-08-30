@@ -18,8 +18,16 @@ const (
 	installStartMarker = "# >>> ash install >>>"
 	installEndMarker   = "# <<< ash install <<<"
 
-	// The suffix strip keeps the prepend idempotent because .ash_env is sourced twice per shell.
-	managedPathExportLine = `export PATH="$HOME/.ash/tools:$HOME/.local/bin:${PATH#$HOME/.ash/tools:$HOME/.local/bin:}"`
+	// Wraps PATH in sentinel colons, strips any existing $HOME/.ash/tools or $HOME/.local/bin
+	// entries wherever they occur, then prepends fresh copies. This stays idempotent no matter
+	// how many times .ash_env is sourced in one shell, and even if another rc file (or an
+	// external tool re-sourcing rc files) already added one of these directories elsewhere.
+	managedPathExportLine = `PATH=":$PATH:"
+PATH="${PATH//:$HOME\/.local\/bin:/:}"
+PATH="${PATH//:$HOME\/.ash\/tools:/:}"
+PATH="${PATH#:}"
+PATH="${PATH%:}"
+export PATH="$HOME/.ash/tools:$HOME/.local/bin:$PATH"`
 )
 
 type endpointPreset struct {

@@ -1,4 +1,9 @@
 # managed by ash install
 export SESSION_ID=`head -c 100 /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1`
-export PATH="$HOME/.ash/tools:$HOME/.local/bin:${PATH#$HOME/.ash/tools:$HOME/.local/bin:}"
+PATH=":$PATH:"
+PATH="${PATH//:$HOME\/.local\/bin:/:}"
+PATH="${PATH//:$HOME\/.ash\/tools:/:}"
+PATH="${PATH#:}"
+PATH="${PATH%:}"
+export PATH="$HOME/.ash/tools:$HOME/.local/bin:$PATH"
 export ASH_MAX_TOOL_ITERS=16

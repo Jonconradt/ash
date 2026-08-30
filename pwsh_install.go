@@ -14,10 +14,7 @@ func pwshWrapperFileName() string {
 }
 
 func pwshInstallSourceBlock() string {
-	return strings.TrimSpace(`
-` + installStartMarker + `
-if (Test-Path "$HOME/.ash/.ash_pwsh.ps1") { . "$HOME/.ash/.ash_pwsh.ps1" }
-` + installEndMarker)
+	return installSourceBlockFromAsset("ash_bootstrap/rc-source-pwsh.ps1")
 }
 
 func pwshInstallWrapperContent() string {

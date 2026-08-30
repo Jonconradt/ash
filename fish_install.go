@@ -19,12 +19,7 @@ func fishWrapperFileName() string {
 }
 
 func fishInstallSourceBlock() string {
-	return strings.TrimSpace(`
-` + installStartMarker + `
-if test -f "$HOME/.ash/.ash_fish.fish"
-	source "$HOME/.ash/.ash_fish.fish"
-end
-` + installEndMarker)
+	return installSourceBlockFromAsset("ash_bootstrap/rc-source-fish.fish")
 }
 
 func fishInstallWrapperContent() string {

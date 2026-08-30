@@ -16,11 +16,7 @@ func bashWrapperFileName() string {
 }
 
 func bashInstallSourceBlock() string {
-	return strings.TrimSpace(`
-` + installStartMarker + `
-[ -f "$HOME/.ash/.ash_env" ] && . "$HOME/.ash/.ash_env"
-[ -f "$HOME/.ash/.ash_bashrc" ] && . "$HOME/.ash/.ash_bashrc"
-` + installEndMarker)
+	return installSourceBlockFromAsset("ash_bootstrap/rc-source-bash.sh")
 }
 
 func bashInstallWrapperContent() string {

@@ -20,12 +20,27 @@ import (
 //go:embed ash_bootstrap/.ash_bashrc
 //go:embed ash_bootstrap/.ash_fish.fish
 //go:embed ash_bootstrap/.ash_zshrc
+//go:embed ash_bootstrap/rc-source-bash.sh
+//go:embed ash_bootstrap/rc-source-zsh.sh
+//go:embed ash_bootstrap/rc-source-fish.fish
+//go:embed ash_bootstrap/rc-source-pwsh.ps1
 //go:embed ash_bootstrap/route_words.txt
 //go:embed ash_bootstrap/tools/*
 var embeddedBootstrapAssets embed.FS
 
 func readEmbeddedBootstrapAsset(path string) ([]byte, error) {
 	return embeddedBootstrapAssets.ReadFile(path)
+}
+
+// installSourceBlockFromAsset reads the shell-specific rc-sourcing snippet at srcPath and
+// wraps it with the managed install markers. Keeping the snippet in its own file under
+// ash_bootstrap/ makes it easy to find and edit without digging through Go string literals.
+func installSourceBlockFromAsset(srcPath string) string {
+	body, err := readEmbeddedBootstrapAsset(srcPath)
+	if err != nil {
+		panic("embedded " + srcPath + " is missing: " + err.Error())
+	}
+	return strings.TrimSpace(installStartMarker + "\n" + string(body) + installEndMarker)
 }
 
 func installEmbeddedBootstrapAssets(overwrite bool, skipPath string, stdout io.Writer) error {
