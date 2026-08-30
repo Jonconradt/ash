@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -32,6 +33,9 @@ type executionMetrics struct {
 	stages                map[metricsStage]time.Duration
 	toolCalls             int
 	toolDuration          time.Duration
+	toolCallCounts        map[string]int
+	scratchWrites         map[string]int
+	scratchExecs          map[string]int
 	subAgentCalls         int
 	subAgentDuration      time.Duration
 	subAgentCanceled      int
@@ -45,12 +49,52 @@ type executionMetrics struct {
 	connectionObserved    bool
 }
 
+// unknownToolName buckets tool-call counts when the invoked tool's name is blank.
+const unknownToolName = "unknown"
+
+// executionMetricsSnapshot is an immutable, race-free copy of executionMetrics for reporting.
+type executionMetricsSnapshot struct {
+	ToolCalls             int
+	ToolDuration          time.Duration
+	ToolCallCounts        map[string]int
+	ScratchWrites         map[string]int
+	ScratchExecs          map[string]int
+	SubAgentCalls         int
+	SubAgentDuration      time.Duration
+	SubAgentCanceled      int
+	SubAgentTimedOut      int
+	SubAgentFailed        int
+	InputTokens           int
+	OutputTokens          int
+	InputTokensAvailable  bool
+	OutputTokensAvailable bool
+}
+
 type metricsContextKey struct{}
+
+type requestIDContextKey struct{}
+
+// withRequestID attaches a per-invocation request ID to ctx for downstream log correlation.
+func withRequestID(ctx context.Context, requestID string) context.Context {
+	return context.WithValue(ctx, requestIDContextKey{}, requestID)
+}
+
+// requestIDFromContext returns the request ID attached via withRequestID, or "" if none was set.
+func requestIDFromContext(ctx context.Context) string {
+	if ctx == nil {
+		return ""
+	}
+	requestID, _ := ctx.Value(requestIDContextKey{}).(string)
+	return requestID
+}
 
 func newExecutionMetrics(startedAt time.Time) *executionMetrics {
 	return &executionMetrics{
-		startedAt: startedAt,
-		stages:    make(map[metricsStage]time.Duration),
+		startedAt:      startedAt,
+		stages:         make(map[metricsStage]time.Duration),
+		toolCallCounts: make(map[string]int),
+		scratchWrites:  make(map[string]int),
+		scratchExecs:   make(map[string]int),
 	}
 }
 
@@ -72,9 +116,14 @@ func (m *executionMetrics) stageDuration(stage metricsStage) time.Duration {
 	return m.stages[stage]
 }
 
-func (m *executionMetrics) addToolCall(duration time.Duration) {
+// addToolCall records one tool invocation's duration and increments its per-name count.
+// A blank name is bucketed under unknownToolName rather than silently discarded.
+func (m *executionMetrics) addToolCall(name string, duration time.Duration) {
 	if m == nil {
 		return
+	}
+	if name == "" {
+		name = unknownToolName
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -82,6 +131,29 @@ func (m *executionMetrics) addToolCall(duration time.Duration) {
 	if duration > 0 {
 		m.toolDuration += duration
 	}
+	m.toolCallCounts[name]++
+}
+
+// addScratchWrite records one write/append/edit to the scratch file at relPath.
+// An empty path is ignored to avoid a spurious map entry.
+func (m *executionMetrics) addScratchWrite(relPath string) {
+	if m == nil || relPath == "" {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.scratchWrites[relPath]++
+}
+
+// addScratchExec records one execution of the scratch file at relPath.
+// An empty path is ignored to avoid a spurious map entry.
+func (m *executionMetrics) addScratchExec(relPath string) {
+	if m == nil || relPath == "" {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.scratchExecs[relPath]++
 }
 
 func (m *executionMetrics) addSubAgent(duration time.Duration, result toolCommandResult) {
@@ -173,13 +245,39 @@ func (m *executionMetrics) totalDuration() time.Duration {
 	return finishedAt.Sub(startedAt)
 }
 
-func (m *executionMetrics) snapshot() (toolCalls int, toolDuration time.Duration, subAgentCalls int, subAgentDuration time.Duration, subAgentCanceled int, subAgentTimedOut int, subAgentFailed int, inputTokens int, outputTokens int, inputAvailable bool, outputAvailable bool) {
+// snapshot returns a race-free copy of the metrics for reporting. Calling snapshot on a
+// nil receiver returns a zero-value snapshot rather than panicking.
+func (m *executionMetrics) snapshot() executionMetricsSnapshot {
 	if m == nil {
-		return 0, 0, 0, 0, 0, 0, 0, 0, 0, false, false
+		return executionMetricsSnapshot{}
 	}
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.toolCalls, m.toolDuration, m.subAgentCalls, m.subAgentDuration, m.subAgentCanceled, m.subAgentTimedOut, m.subAgentFailed, m.inputTokens, m.outputTokens, m.inputTokensAvailable, m.outputTokensAvailable
+	return executionMetricsSnapshot{
+		ToolCalls:             m.toolCalls,
+		ToolDuration:          m.toolDuration,
+		ToolCallCounts:        copyStringIntMap(m.toolCallCounts),
+		ScratchWrites:         copyStringIntMap(m.scratchWrites),
+		ScratchExecs:          copyStringIntMap(m.scratchExecs),
+		SubAgentCalls:         m.subAgentCalls,
+		SubAgentDuration:      m.subAgentDuration,
+		SubAgentCanceled:      m.subAgentCanceled,
+		SubAgentTimedOut:      m.subAgentTimedOut,
+		SubAgentFailed:        m.subAgentFailed,
+		InputTokens:           m.inputTokens,
+		OutputTokens:          m.outputTokens,
+		InputTokensAvailable:  m.inputTokensAvailable,
+		OutputTokensAvailable: m.outputTokensAvailable,
+	}
+}
+
+// copyStringIntMap returns an independent copy of src so callers can't mutate metrics state.
+func copyStringIntMap(src map[string]int) map[string]int {
+	dst := make(map[string]int, len(src))
+	for k, v := range src {
+		dst[k] = v
+	}
+	return dst
 }
 
 func renderExecutionDashboard(metrics *executionMetrics, ansi bool) string {
@@ -201,14 +299,14 @@ func renderExecutionDashboard(metrics *executionMetrics, ansi bool) string {
 	if ansi {
 		header = bold + header + reset
 	}
-	toolCalls, toolDuration, subAgentCalls, subAgentDuration, subAgentCanceled, subAgentTimedOut, subAgentFailed, inputTokenCount, outputTokenCount, inputAvailable, outputAvailable := metrics.snapshot()
+	snap := metrics.snapshot()
 	inputTokens := "N/A"
-	if inputAvailable {
-		inputTokens = strconv.Itoa(inputTokenCount)
+	if snap.InputTokensAvailable {
+		inputTokens = strconv.Itoa(snap.InputTokens)
 	}
 	outputTokens := "N/A"
-	if outputAvailable {
-		outputTokens = strconv.Itoa(outputTokenCount)
+	if snap.OutputTokensAvailable {
+		outputTokens = strconv.Itoa(snap.OutputTokens)
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "\n%s\n", header)
@@ -222,12 +320,32 @@ func renderExecutionDashboard(metrics *executionMetrics, ansi bool) string {
 	metrics.mu.RUnlock()
 	fmt.Fprintf(&b, "%-20s %s\n", style("Connection reused"), connectionStatus)
 	fmt.Fprintf(&b, "%-20s %s\n", style("AI processing"), formatMetricDuration(metrics.stageDuration(metricsStageAIProcessing)))
-	fmt.Fprintf(&b, "%-20s %d tools (%s)\n", style("Tool calls"), toolCalls, formatMetricDuration(toolDuration))
-	fmt.Fprintf(&b, "%-20s %d (%s), canceled %d, timed out %d, failed %d\n", style("Sub-agents"), subAgentCalls, formatMetricDuration(subAgentDuration), subAgentCanceled, subAgentTimedOut, subAgentFailed)
+	fmt.Fprintf(&b, "%-20s %d tools (%s)\n", style("Tool calls"), snap.ToolCalls, formatMetricDuration(snap.ToolDuration))
+	writeCountBreakdown(&b, style("  by tool"), snap.ToolCallCounts)
+	fmt.Fprintf(&b, "%-20s %d (%s), canceled %d, timed out %d, failed %d\n", style("Sub-agents"), snap.SubAgentCalls, formatMetricDuration(snap.SubAgentDuration), snap.SubAgentCanceled, snap.SubAgentTimedOut, snap.SubAgentFailed)
 	fmt.Fprintf(&b, "%-20s %s\n", style("Input tokens"), inputTokens)
 	fmt.Fprintf(&b, "%-20s %s\n", style("Output tokens"), outputTokens)
+	writeCountBreakdown(&b, style("Scratch files written"), snap.ScratchWrites)
+	writeCountBreakdown(&b, style("Scratch files executed"), snap.ScratchExecs)
 	fmt.Fprintf(&b, "%-20s %s\n", style("Total realtime"), formatMetricDuration(metrics.totalDuration()))
 	return b.String()
+}
+
+// writeCountBreakdown writes one line per key in counts (sorted for deterministic output),
+// preceded by a header line. It writes nothing when counts is empty.
+func writeCountBreakdown(b *strings.Builder, header string, counts map[string]int) {
+	if len(counts) == 0 {
+		return
+	}
+	keys := make([]string, 0, len(counts))
+	for key := range counts {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	fmt.Fprintf(b, "%s\n", header)
+	for _, key := range keys {
+		fmt.Fprintf(b, "  %-30s %d\n", key, counts[key])
+	}
 }
 
 func writerIsTerminal(writer io.Writer) bool {

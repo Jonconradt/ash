@@ -179,8 +179,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 		slog.Error(fmt.Sprintf("failed to read %s: %v", toolsFileName, err), "EID", "f6qdSTFE")
 		return 1
 	}
+	requestID := requestIDGenerator()
 	metrics.addStageDuration(metricsStageDefaults, timeNow().Sub(defaultsStarted))
-	slog.Debug("Allowlist loaded", "request_id", requestIDGenerator(), "allowlist", strings.Join(sortedAllowlist(allowlist), ","), "EID", "oYccBW9V")
+	slog.Debug("Allowlist loaded", "request_id", requestID, "allowlist", strings.Join(sortedAllowlist(allowlist), ","), "EID", "oYccBW9V")
 
 	toolShim := localToolShim{allowlist: allowlist, agents: newAgentBudget(maxAgents())}
 
@@ -196,12 +197,13 @@ func run(args []string, stdout, stderr io.Writer) int {
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 	ctx = withExecutionMetrics(ctx, metrics)
+	ctx = withRequestID(ctx, requestID)
 
 	stopSpinner := startThinkingIndicator(stderr)
 	assistantReply, updatedMessages, err := runToolLoop(ctx, aiCfg, userInput, messages, toolShim)
 	stopSpinner()
 	if err != nil {
-		slog.Debug("run failed", "request_id", requestIDGenerator(), "error_type", fmt.Sprintf("%T", err), "error_bytes", len(err.Error()), "error_sha256", hashForLog([]byte(err.Error())), "EID", "DFr6nXH9")
+		slog.Debug("run failed", "request_id", requestIDFromContext(ctx), "error_type", fmt.Sprintf("%T", err), "error_bytes", len(err.Error()), "error_sha256", hashForLog([]byte(err.Error())), "EID", "DFr6nXH9")
 		if errors.Is(err, context.Canceled) {
 			slog.Info("AI doesn't feel like talking right now. Try again later.", "EID", "LAOqomnJ")
 			return 130
@@ -225,7 +227,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	slog.Debug("assistant final reply", "request_id", requestIDGenerator(), "bytes", len(assistantReply), "sha256", hashForLog([]byte(assistantReply)), "EID", "jzszDMVF")
+	slog.Debug("assistant final reply", "request_id", requestIDFromContext(ctx), "bytes", len(assistantReply), "sha256", hashForLog([]byte(assistantReply)), "EID", "jzszDMVF")
 	_, _ = fmt.Fprint(stdout, formatAssistantOutput(assistantReply))
 
 	conversation = stripSystemMessage(updatedMessages)

@@ -342,11 +342,11 @@ func (s localToolShim) CallTool(ctx context.Context, name string, args map[strin
 	case "ash_read_scratch_file":
 		result = s.callReadScratchFile(args)
 	case "ash_write_scratch_file":
-		result = s.callWriteScratchFile(args)
+		result = s.callWriteScratchFile(ctx, args)
 	case "ash_append_scratch_file":
-		result = s.callAppendScratchFile(args)
+		result = s.callAppendScratchFile(ctx, args)
 	case "ash_edit_scratch_file":
-		result = s.callEditScratchFile(args)
+		result = s.callEditScratchFile(ctx, args)
 	default:
 		result = toolCommandResult{OK: false, Error: fmt.Sprintf("unknown tool: %s", name), EID: "Ryr9hU7l"}
 	}
@@ -395,7 +395,7 @@ func (s localToolShim) callSubAgent(ctx context.Context, args map[string]any) to
 	}
 	started := time.Now()
 	result := runSubAgentCommand(ctx, prompt, childID)
-	slog.Debug("sub-agent completed", "request_id", requestIDGenerator(), "parent_session_id", parentID, "child_session_id", childID, "ok", result.OK, "exit_code", result.ExitCode, "stdout_bytes", len(result.Stdout), "stderr_bytes", len(result.Stderr), "EID", "QeR8y5aL")
+	slog.Debug("sub-agent completed", "request_id", requestIDFromContext(ctx), "parent_session_id", parentID, "child_session_id", childID, "ok", result.OK, "exit_code", result.ExitCode, "stdout_bytes", len(result.Stdout), "stderr_bytes", len(result.Stderr), "EID", "QeR8y5aL")
 	if metrics := executionMetricsFromContext(ctx); metrics != nil {
 		metrics.addSubAgent(time.Since(started), result)
 	}
@@ -480,6 +480,8 @@ func (s localToolShim) callUnixCommand(ctx context.Context, args map[string]any)
 		}
 	}
 
+	recordScratchExecArgs(ctx, argv)
+
 	// Bundled .py tools run under the managed interpreter so third-party deps resolve.
 	if script, ok := managedPythonScript(commandName); ok {
 		if interpreter := ashPythonInterpreter(); interpreter != "python3" {
@@ -488,6 +490,24 @@ func (s localToolShim) callUnixCommand(ctx context.Context, args map[string]any)
 	}
 
 	return toolCommandRunner(ctx, commandName, argv, toolTimeout(), toolOutputLimit())
+}
+
+// recordScratchExecArgs records an execution metric for every argv entry that resolves inside
+// the current session's scratch directory (e.g. a script path passed to an interpreter).
+func recordScratchExecArgs(ctx context.Context, argv []string) {
+	metrics := executionMetricsFromContext(ctx)
+	if metrics == nil {
+		return
+	}
+	scratchRoot, err := ashScratchSessionRoot()
+	if err != nil {
+		return
+	}
+	for _, arg := range argv {
+		if rel, ok := scratchRelativePathIfWithin(scratchRoot, arg); ok {
+			metrics.addScratchExec(rel)
+		}
+	}
 }
 
 // callPython3 executes a Python snippet via python3 -c after validating the provided code and argv values.
@@ -832,7 +852,7 @@ func (s localToolShim) callReadScratchFile(args map[string]any) toolCommandResul
 	return toolCommandResult{OK: true, Command: "ash_read_scratch_file", ExitCode: 0, Stdout: fmt.Sprintf("path=%s\nabsolute_path=%s\n%s", relPath, absolutePath, payload)}
 }
 
-func (s localToolShim) callWriteScratchFile(args map[string]any) toolCommandResult {
+func (s localToolShim) callWriteScratchFile(ctx context.Context, args map[string]any) toolCommandResult {
 	rel, ok := toStringArg(args["path"])
 	if !ok || strings.TrimSpace(rel) == "" {
 		return toolCommandResult{OK: false, Command: "ash_write_scratch_file", Error: "path must be a non-empty string", EID: "Sz2W91zM"}
@@ -858,10 +878,13 @@ func (s localToolShim) callWriteScratchFile(args map[string]any) toolCommandResu
 	if err := updateScratchAccessMarker(root); err != nil {
 		return toolCommandResult{OK: false, Command: "ash_write_scratch_file", Error: err.Error(), EID: "P9U2vU7Q"}
 	}
+	if metrics := executionMetricsFromContext(ctx); metrics != nil {
+		metrics.addScratchWrite(relPath)
+	}
 	return toolCommandResult{OK: true, Command: "ash_write_scratch_file", ExitCode: 0, Stdout: fmt.Sprintf("wrote %s\nabsolute_path=%s", relPath, absolutePath)}
 }
 
-func (s localToolShim) callAppendScratchFile(args map[string]any) toolCommandResult {
+func (s localToolShim) callAppendScratchFile(ctx context.Context, args map[string]any) toolCommandResult {
 	rel, ok := toStringArg(args["path"])
 	if !ok || strings.TrimSpace(rel) == "" {
 		return toolCommandResult{OK: false, Command: "ash_append_scratch_file", Error: "path must be a non-empty string", EID: "AvW1nY6Q"}
@@ -891,10 +914,13 @@ func (s localToolShim) callAppendScratchFile(args map[string]any) toolCommandRes
 	if err := updateScratchAccessMarker(root); err != nil {
 		return toolCommandResult{OK: false, Command: "ash_append_scratch_file", Error: err.Error(), EID: "sR5qCdHV"}
 	}
+	if metrics := executionMetricsFromContext(ctx); metrics != nil {
+		metrics.addScratchWrite(relPath)
+	}
 	return toolCommandResult{OK: true, Command: "ash_append_scratch_file", ExitCode: 0, Stdout: fmt.Sprintf("appended %s\nabsolute_path=%s", relPath, absolutePath)}
 }
 
-func (s localToolShim) callEditScratchFile(args map[string]any) toolCommandResult {
+func (s localToolShim) callEditScratchFile(ctx context.Context, args map[string]any) toolCommandResult {
 	rel, ok := toStringArg(args["path"])
 	if !ok || strings.TrimSpace(rel) == "" {
 		return toolCommandResult{OK: false, Command: "ash_edit_scratch_file", Error: "path must be a non-empty string", EID: "jW1Vw7Xb"}
@@ -919,6 +945,9 @@ func (s localToolShim) callEditScratchFile(args map[string]any) toolCommandResul
 	}
 	if err := updateScratchAccessMarker(root); err != nil {
 		return toolCommandResult{OK: false, Command: "ash_edit_scratch_file", Error: err.Error(), EID: "gN8F6LqP"}
+	}
+	if metrics := executionMetricsFromContext(ctx); metrics != nil {
+		metrics.addScratchWrite(relPath)
 	}
 	return toolCommandResult{OK: true, Command: "ash_edit_scratch_file", ExitCode: 0, Stdout: fmt.Sprintf("updated %s\nabsolute_path=%s", relPath, absolutePath)}
 }

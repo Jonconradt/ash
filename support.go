@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -260,9 +261,18 @@ func runSubAgentCommand(ctx context.Context, prompt, childID string) toolCommand
 }
 
 func init() {
-	requestIDGenerator = func() string {
-		return hex.EncodeToString(make([]byte, 8))
+	requestIDGenerator = newRandomRequestID
+}
+
+// newRandomRequestID returns a random 16-character hex-encoded request ID, unique per call.
+func newRandomRequestID() string {
+	buf := make([]byte, 8)
+	if _, err := rand.Read(buf); err != nil {
+		// crypto/rand failure is effectively unreachable on supported platforms;
+		// fall back to a time-derived value so logging never breaks.
+		binary.BigEndian.PutUint64(buf, uint64(timeNow().UnixNano()))
 	}
+	return hex.EncodeToString(buf)
 }
 
 // runToolPipeline executes commands without a shell, connecting each stdout to the next stdin.
@@ -1343,6 +1353,34 @@ func updateScratchAccessMarker(dir string) error {
 
 func resolveScratchPath(root, userPath string) (absolute string, rel string, err error) {
 	return resolveWorkspacePath(root, userPath)
+}
+
+// scratchRelativePathIfWithin reports whether candidate (absolute or relative to the
+// current working directory) resolves inside root, returning its path relative to root.
+// It does not resolve symlinks; it only performs lexical path comparison.
+func scratchRelativePathIfWithin(root, candidate string) (rel string, ok bool) {
+	if root == "" || candidate == "" {
+		return "", false
+	}
+	absCandidate := candidate
+	if !filepath.IsAbs(absCandidate) {
+		cwd, err := osGetwd()
+		if err != nil {
+			return "", false
+		}
+		absCandidate = filepath.Join(cwd, absCandidate)
+	}
+	absCandidate = filepath.Clean(absCandidate)
+	absRoot := filepath.Clean(root)
+
+	rel, err := filepath.Rel(absRoot, absCandidate)
+	if err != nil {
+		return "", false
+	}
+	if rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", false
+	}
+	return rel, true
 }
 
 func cleanupStaleScratchDirs(root string, now time.Time) ([]string, error) {

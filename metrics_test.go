@@ -33,8 +33,8 @@ func TestExecutionMetricsAggregateStagesToolsAndTokens(t *testing.T) {
 	metrics.addStageDuration(metricsStageDefaults, 200*time.Millisecond)
 	metrics.addStageDuration(metricsStageDefaults, 300*time.Millisecond)
 	metrics.addStageDuration(metricsStageAIProcessing, 2*time.Second)
-	metrics.addToolCall(40 * time.Millisecond)
-	metrics.addToolCall(60 * time.Millisecond)
+	metrics.addToolCall("run_unix_command", 40*time.Millisecond)
+	metrics.addToolCall("run_unix_command", 60*time.Millisecond)
 	metrics.addTokenUsage(12, 8, true)
 	metrics.addTokenUsage(30, 20, true)
 
@@ -54,8 +54,8 @@ func TestRenderExecutionDashboard(t *testing.T) {
 	metrics.addStageDuration(metricsStageDefaults, 500*time.Millisecond)
 	metrics.addStageDuration(metricsStageConnect, 2*time.Second)
 	metrics.addStageDuration(metricsStageAIProcessing, 1250*time.Millisecond)
-	metrics.addToolCall(100 * time.Millisecond)
-	metrics.addToolCall(100 * time.Millisecond)
+	metrics.addToolCall("run_unix_command", 100*time.Millisecond)
+	metrics.addToolCall("run_unix_command", 100*time.Millisecond)
 	metrics.finish(time.Now().Add(4 * time.Second))
 
 	output := renderExecutionDashboard(metrics, false)
@@ -99,15 +99,18 @@ func TestExecutionMetricsConcurrentUpdates(t *testing.T) {
 		go func() {
 			defer group.Done()
 			metrics.addStageDuration(metricsStageAIProcessing, time.Millisecond)
-			metrics.addToolCall(time.Millisecond)
+			metrics.addToolCall("run_unix_command", time.Millisecond)
 			metrics.addSubAgent(time.Millisecond, toolCommandResult{OK: true})
 			metrics.addTokenUsage(1, 1, true)
 		}()
 	}
 	group.Wait()
-	toolCalls, _, subAgents, _, _, _, _, inputTokens, outputTokens, _, _ := metrics.snapshot()
-	if toolCalls != 32 || subAgents != 32 || inputTokens != 32 || outputTokens != 32 {
-		t.Fatalf("unexpected concurrent metrics: tools=%d agents=%d input=%d output=%d", toolCalls, subAgents, inputTokens, outputTokens)
+	snap := metrics.snapshot()
+	if snap.ToolCalls != 32 || snap.SubAgentCalls != 32 || snap.InputTokens != 32 || snap.OutputTokens != 32 {
+		t.Fatalf("unexpected concurrent metrics: tools=%d agents=%d input=%d output=%d", snap.ToolCalls, snap.SubAgentCalls, snap.InputTokens, snap.OutputTokens)
+	}
+	if snap.ToolCallCounts["run_unix_command"] != 32 {
+		t.Fatalf("expected per-tool count 32 for run_unix_command, got %d", snap.ToolCallCounts["run_unix_command"])
 	}
 }
 
