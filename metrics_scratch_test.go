@@ -154,8 +154,11 @@ func TestRenderExecutionDashboardShowsToolBreakdownWhenPresent(t *testing.T) {
 	if nameA > nameB {
 		t.Fatalf("expected alphabetical order (ash_write_scratch_file before run_unix_command), got:\n%s", output)
 	}
-	if !strings.Contains(output, "ash_write_scratch_file") || !strings.Contains(output, "1") {
-		t.Fatalf("expected ash_write_scratch_file count of 1, got:\n%s", output)
+	if !strings.Contains(output, "  ash_write_scratch_file\n") {
+		t.Fatalf("expected single-count tool listed without a count, got:\n%s", output)
+	}
+	if !strings.Contains(output, "run_unix_command") || !strings.Contains(output, "2") {
+		t.Fatalf("expected run_unix_command count of 2, got:\n%s", output)
 	}
 }
 

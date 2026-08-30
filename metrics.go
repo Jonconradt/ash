@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 	"sort"
 	"strconv"
@@ -331,6 +332,49 @@ func renderExecutionDashboard(metrics *executionMetrics, ansi bool) string {
 	return b.String()
 }
 
+// connectionWasReused reports whether an observed HTTP connection was reused.
+func (m *executionMetrics) connectionWasReused() bool {
+	if m == nil {
+		return false
+	}
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.connectionObserved && m.connectionReused
+}
+
+// logExecutionSummary emits the execution summary as a structured info-level record so the
+// same values the dashboard prints are available as JSON for analysis.
+func logExecutionSummary(requestID string, metrics *executionMetrics) {
+	if metrics == nil {
+		return
+	}
+	snap := metrics.snapshot()
+	slog.Info("execution summary",
+		"request_id", requestID,
+		"version", executionDashboardVersion(),
+		"defaults_ms", metrics.stageDuration(metricsStageDefaults).Milliseconds(),
+		"connect_ms", metrics.stageDuration(metricsStageConnect).Milliseconds(),
+		"connection_reused", metrics.connectionWasReused(),
+		"ai_processing_ms", metrics.stageDuration(metricsStageAIProcessing).Milliseconds(),
+		"tool_calls", snap.ToolCalls,
+		"tool_duration_ms", snap.ToolDuration.Milliseconds(),
+		"tool_call_counts", snap.ToolCallCounts,
+		"sub_agent_calls", snap.SubAgentCalls,
+		"sub_agent_duration_ms", snap.SubAgentDuration.Milliseconds(),
+		"sub_agent_canceled", snap.SubAgentCanceled,
+		"sub_agent_timed_out", snap.SubAgentTimedOut,
+		"sub_agent_failed", snap.SubAgentFailed,
+		"input_tokens", snap.InputTokens,
+		"input_tokens_available", snap.InputTokensAvailable,
+		"output_tokens", snap.OutputTokens,
+		"output_tokens_available", snap.OutputTokensAvailable,
+		"scratch_files_written", snap.ScratchWrites,
+		"scratch_files_executed", snap.ScratchExecs,
+		"total_realtime_ms", metrics.totalDuration().Milliseconds(),
+		"EID", "Xr4mTq7A",
+	)
+}
+
 func executionDashboardVersion() string {
 	version := strings.TrimSpace(ashVersion)
 	if version == "" {
@@ -354,6 +398,7 @@ func executionDashboardVersion() string {
 
 // writeCountBreakdown writes one line per key in counts (sorted for deterministic output),
 // preceded by a header line. It writes nothing when counts is empty.
+// A count of 1 is omitted because it carries no information beyond the key being listed.
 func writeCountBreakdown(b *strings.Builder, header string, counts map[string]int) {
 	if len(counts) == 0 {
 		return
@@ -365,6 +410,10 @@ func writeCountBreakdown(b *strings.Builder, header string, counts map[string]in
 	sort.Strings(keys)
 	fmt.Fprintf(b, "%s\n", header)
 	for _, key := range keys {
+		if counts[key] == 1 {
+			fmt.Fprintf(b, "  %s\n", key)
+			continue
+		}
 		fmt.Fprintf(b, "  %-30s %d\n", key, counts[key])
 	}
 }

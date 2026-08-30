@@ -72,9 +72,11 @@ func main() {
 // run runs the requested operation.
 func run(args []string, stdout, stderr io.Writer) int {
 	metrics := newExecutionMetrics(timeNow())
+	summaryRequestID := ""
 	defer func() {
 		metrics.finish(timeNow())
 		if verboseLoggingEnabled() {
+			logExecutionSummary(summaryRequestID, metrics)
 			_, _ = io.WriteString(stdout, renderExecutionDashboard(metrics, writerIsTerminal(stdout)))
 		}
 	}()
@@ -184,6 +186,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	requestID := requestIDGenerator()
+	summaryRequestID = requestID
 	metrics.addStageDuration(metricsStageDefaults, timeNow().Sub(defaultsStarted))
 	slog.Debug("Allowlist loaded", "request_id", requestID, "allowlist", strings.Join(sortedAllowlist(allowlist), ","), "EID", "oYccBW9V")
 

@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptrace"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -163,6 +164,9 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 		connectStarted := time.Now()
 		var resp *http.Response
 		connectionReused := false
+		// connectDuration covers only socket/TLS setup; the model's think time is
+		// waiting for the response and belongs to the AI processing stage.
+		var connectDuration time.Duration
 		if brokerConfigured() {
 			resp, connectionReused, err = brokerDo(ctx, req)
 			if err != nil {
@@ -171,17 +175,17 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 					err = fallbackErr
 				} else {
 					adapter.ApplyHeaders(fallbackReq, aiCfg)
-					resp, connectionReused, err = httpClientDoWithReuse(ctx, client, fallbackReq)
+					resp, connectionReused, connectDuration, err = httpClientDoWithReuse(ctx, client, fallbackReq)
 				}
 			}
 		} else {
-			resp, connectionReused, err = httpClientDoWithReuse(ctx, client, req)
+			resp, connectionReused, connectDuration, err = httpClientDoWithReuse(ctx, client, req)
 		}
 		if metrics := executionMetricsFromContext(ctx); metrics != nil {
 			metrics.setConnectionReused(connectionReused)
 		}
 		if metrics := executionMetricsFromContext(ctx); metrics != nil {
-			metrics.addStageDuration(metricsStageConnect, time.Since(connectStarted))
+			metrics.addStageDuration(metricsStageConnect, connectDuration)
 		}
 		if err != nil {
 			if !shouldRetryAIError(err, attempt, attempts) {
@@ -193,7 +197,7 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 			}
 			continue
 		}
-		processingStarted := time.Now()
+		processingStarted := connectStarted.Add(connectDuration)
 		processingRecorded := false
 		recordProcessing := func() {
 			if processingRecorded {
@@ -271,11 +275,33 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 	return chatResponse{}, errors.New("AI request failed after retries")
 }
 
-func httpClientDoWithReuse(ctx context.Context, client *http.Client, req *http.Request) (*http.Response, bool, error) {
-	reused := false
-	trace := &httptrace.ClientTrace{GotConn: func(info httptrace.GotConnInfo) { reused = info.Reused }}
+// httpClientDoWithReuse performs req and reports whether the underlying connection was
+// reused plus how long it took to obtain that connection. The connect duration excludes
+// time spent waiting for the server to generate and send the response.
+func httpClientDoWithReuse(ctx context.Context, client *http.Client, req *http.Request) (*http.Response, bool, time.Duration, error) {
+	var (
+		mu              sync.Mutex
+		reused          bool
+		gotConn         bool
+		connectDuration time.Duration
+	)
+	started := time.Now()
+	trace := &httptrace.ClientTrace{GotConn: func(info httptrace.GotConnInfo) {
+		mu.Lock()
+		defer mu.Unlock()
+		reused = info.Reused
+		if !gotConn {
+			gotConn = true
+			connectDuration = time.Since(started)
+		}
+	}}
 	response, err := client.Do(req.WithContext(httptrace.WithClientTrace(ctx, trace)))
-	return response, reused, err
+	mu.Lock()
+	defer mu.Unlock()
+	if !gotConn {
+		connectDuration = time.Since(started)
+	}
+	return response, reused, connectDuration, err
 }
 
 func shouldRetryAIError(err error, attempt, maxAttempts int) bool {
