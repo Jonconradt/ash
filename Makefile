@@ -329,6 +329,7 @@ release-notes:
 			printf '%s\n' 'Use exactly these required section names in this order; decorative icons are optional:'; \
 			printf '%s\n' '## Features'; \
 			printf '%s\n' '## Fixes & Improvements'; \
+			printf '%s\n' 'Both required headings must always appear, even when a section has nothing to report; in that case emit the heading followed by a single bullet such as "- No user-facing fixes in this release."'; \
 			printf '%s\n' 'Add ## ⚠️ Breaking Changes & Migrations only when the history proves users must change configuration or behavior.'; \
 			printf '%s\n' 'Under each required heading, use short Markdown bullets that begin with the user benefit or observable change, then give only enough detail to be useful.'; \
 			printf '%s\n' 'Translate implementation language into plain product language. Do not mention commits, hashes, tests, dependency updates, formatting, or internal refactors unless users are affected.'; \
