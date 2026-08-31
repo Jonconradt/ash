@@ -137,8 +137,8 @@ jobs:
             tar -xzf "$archive" -C artifacts
             binary="${archive%.tar.gz}"
             chmod 0755 "$binary"
-            "$binary" --version
-            "$binary" install --shell bash
+            "$binary" install --shell bash --dry-run </dev/null
+            "$binary" install --shell bash </dev/null
             test -f "$HOME/.ash/.ash_bashrc"
             bash -n "$HOME/.ash/.ash_bashrc"
             grep -q '\.ash/\.ash_bashrc' "$HOME/.bashrc"
