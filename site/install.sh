@@ -11,7 +11,7 @@ fail() {
 
 usage() {
   cat <<'EOF'
-Install the latest ash release for Linux or macOS.
+Install the latest ash release for Linux, macOS, or FreeBSD.
 
 Usage: install.sh
 
@@ -70,6 +70,7 @@ PY
 os=$(uname -s)
 case $os in
   Darwin) goos=darwin ;;
+  FreeBSD) goos=freebsd ;;
   Linux) goos=linux ;;
   *) fail "unsupported operating system: $os" ;;
 esac
@@ -78,14 +79,21 @@ machine=$(uname -m)
 case $machine in
   x86_64|amd64) goarch=amd64 ;;
   arm64|aarch64) goarch=arm64 ;;
-  *) fail "unsupported architecture: $machine" ;;
+  *) fail "unsupported architecture: $machine (ash releases target amd64 and arm64; request yours at https://github.com/$repository/issues/new)" ;;
 esac
+
+if [ "$goos" = freebsd ] && ! command -v bash >/dev/null 2>&1; then
+  fail "bash is required on FreeBSD; install it with: pkg install bash"
+fi
 
 command -v sha256sum >/dev/null 2>&1 && checksum_command=sha256sum
 if [ -z "${checksum_command:-}" ] && command -v shasum >/dev/null 2>&1; then
   checksum_command=shasum
 fi
-[ -n "${checksum_command:-}" ] || fail "sha256sum or shasum is required"
+if [ -z "${checksum_command:-}" ] && command -v sha256 >/dev/null 2>&1; then
+  checksum_command=sha256
+fi
+[ -n "${checksum_command:-}" ] || fail "sha256sum, shasum, or sha256 is required"
 
 tmp_dir=$(mktemp -d 2>/dev/null || mktemp -d -t ash-install)
 cleanup() {
@@ -109,6 +117,7 @@ expected=$(awk -v name="$asset" '$2 == name { print $1; exit }' "$tmp_dir/SHA256
 case $checksum_command in
   sha256sum) actual=$(sha256sum "$tmp_dir/$asset" | awk '{print $1}') ;;
   shasum) actual=$(shasum -a 256 "$tmp_dir/$asset" | awk '{print $1}') ;;
+  sha256) actual=$(sha256 -q "$tmp_dir/$asset") ;;
 esac
 [ "$actual" = "$expected" ] || fail "checksum verification failed for $asset"
 

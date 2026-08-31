@@ -118,6 +118,7 @@ func TestSelectUpgradeAssets(t *testing.T) {
 		TagName: "v1.2.3",
 		Assets: []upgradeAsset{
 			{Name: "ash-v1.2.3-darwin-arm64.tar.gz", DownloadURL: "https://example.test/archive"},
+			{Name: "ash-v1.2.3-freebsd-amd64.tar.gz", DownloadURL: "https://example.test/freebsd"},
 			{Name: upgradeManifest, DownloadURL: "https://example.test/manifest"},
 			{Name: upgradeBundle, DownloadURL: "https://example.test/bundle"},
 		},
@@ -128,6 +129,13 @@ func TestSelectUpgradeAssets(t *testing.T) {
 	}
 	if archive.Name != "ash-v1.2.3-darwin-arm64.tar.gz" || manifest.Name != upgradeManifest || bundle.Name != upgradeBundle {
 		t.Fatalf("selected assets = %#v, %#v, %#v", archive, manifest, bundle)
+	}
+	freebsdArchive, _, _, err := selectUpgradeAssets(release, "freebsd", "amd64")
+	if err != nil {
+		t.Fatalf("selectUpgradeAssets(freebsd) error = %v", err)
+	}
+	if freebsdArchive.Name != "ash-v1.2.3-freebsd-amd64.tar.gz" {
+		t.Fatalf("selected FreeBSD archive = %#v", freebsdArchive)
 	}
 	if _, _, _, err := selectUpgradeAssets(release, "windows", "amd64"); err == nil {
 		t.Fatal("selectUpgradeAssets() accepted unsupported OS")

@@ -102,7 +102,7 @@ make release RELEASE_VERSION=v1.2.3
 
 Contributor note: run `make lint test` before submitting changes.
 
-## Install on Linux or macOS
+## Install on Linux, macOS, or FreeBSD
 
 Install the latest release with the verified one-liner:
 
@@ -110,7 +110,7 @@ Install the latest release with the verified one-liner:
 curl -fsSL https://jonconradt.github.io/ash/install.sh | sh
 ```
 
-The installer supports Linux and macOS on `amd64` and `arm64`. It verifies the
+The installer supports Linux, macOS, and FreeBSD on `amd64` and `arm64`. It verifies the
 download against the release `SHA256SUMS` manifest and installs `ash` to
 `~/.local/bin` without requiring `sudo`. Set `ASH_INSTALL_DIR` to choose a
 different destination when needed.
@@ -128,7 +128,8 @@ installing from the tarball on another platform, install Python 3 with venv
 support before running `ash install`.
 
 Native packages remain available from the [latest GitHub release](https://github.com/Jonconradt/ash/releases/latest): macOS `.pkg`, and Linux `.deb`
-or `.rpm` packages. Configure `AI_ENDPOINT` and `AI_MODEL` after installation
+or `.rpm` packages. FreeBSD ships as a `.tar.gz` only; install `bash` with
+`pkg install bash` first. Configure `AI_ENDPOINT` and `AI_MODEL` after installation
 as described below.
 
 ### Fish support
@@ -148,7 +149,7 @@ Canonical publishing is tag-driven in GitHub Actions.
 
 1. Run `make release RELEASE_VERSION=v1.2.3` (or omit `RELEASE_VERSION` to auto-derive).
 2. `make release` creates and pushes the release tag to `origin`.
-3. The `release` workflow runs `make version` in macOS and Linux packaging jobs.
+3. The `release` workflow runs `make version` in macOS, Linux, and FreeBSD packaging jobs.
 4. GitHub Release assets are published automatically:
 
 - `ash-v1.2.3-darwin-amd64.pkg`
@@ -295,7 +296,7 @@ Notes:
 
 ### Connection reuse
 
-On macOS and Linux, the installed Bash, zsh, and Fish wrappers lazily start one unprivileged broker per interactive shell. The wrapper passes its process ID to the broker, which remains available until that shell exits. Subshells reuse their parent shell's broker; independent shells have independent brokers.
+On macOS, Linux, and FreeBSD, the installed Bash, zsh, and Fish wrappers lazily start one unprivileged broker per interactive shell. The wrapper passes its process ID to the broker, which remains available until that shell exits. Subshells reuse their parent shell's broker; independent shells have independent brokers.
 
 The broker keeps a bounded HTTPS connection pool alive across separate `ash` processes and does not apply a local idle timeout to those connections. A provider can still close an idle connection; the next prompt opens a new connection automatically. Broker use is transparent and has a direct HTTPS fallback. Its private Unix socket and capability token are ephemeral shell state and are not written to cron, launchd, or other persistent scheduler configuration. Scheduled invocations therefore use direct HTTPS unless they explicitly inherit a live broker environment.
 
@@ -387,7 +388,7 @@ ash update --yes
 ash update --skip-customized
 ```
 
-The updater supports macOS and Linux on amd64 and arm64 and installs to
+The updater supports macOS, Linux, and FreeBSD on amd64 and arm64 and installs to
 `~/.local/bin/ash`, the same location used by the install script. It verifies the
 Sigstore keyless signature for `SHA256SUMS`
 against the `Jonconradt/ash` release workflow, then verifies the selected

@@ -360,6 +360,7 @@ release-artifacts:
 	if [[ "$$target_oses" == "auto" ]]; then \
 		case "$$(uname -s)" in \
 			Darwin) target_oses="darwin" ;; \
+			FreeBSD) target_oses="freebsd" ;; \
 			Linux) target_oses="linux" ;; \
 			*) echo "unsupported host OS for auto release artifacts"; exit 1 ;; \
 		esac; \
@@ -384,6 +385,13 @@ release-artifacts:
 					$(MAKE) release-validate-one RELEASE_GOOS=linux RELEASE_ARCH=$$arch RELEASE_FORMAT=rpm RELEASE_VERSION=$(RELEASE_VERSION); \
 					$(MAKE) release-pkg-one RELEASE_GOOS=linux RELEASE_ARCH=$$arch RELEASE_FORMAT=tar.gz RELEASE_VERSION=$(RELEASE_VERSION); \
 					$(MAKE) release-validate-one RELEASE_GOOS=linux RELEASE_ARCH=$$arch RELEASE_FORMAT=tar.gz RELEASE_VERSION=$(RELEASE_VERSION); \
+				done; \
+				;; \
+			freebsd) \
+				for arch in $(RELEASE_TARGET_ARCHES); do \
+					$(MAKE) release-build-one RELEASE_GOOS=freebsd RELEASE_ARCH=$$arch RELEASE_VERSION=$(RELEASE_VERSION); \
+					$(MAKE) release-pkg-one RELEASE_GOOS=freebsd RELEASE_ARCH=$$arch RELEASE_FORMAT=tar.gz RELEASE_VERSION=$(RELEASE_VERSION); \
+					$(MAKE) release-validate-one RELEASE_GOOS=freebsd RELEASE_ARCH=$$arch RELEASE_FORMAT=tar.gz RELEASE_VERSION=$(RELEASE_VERSION); \
 				done; \
 				;; \
 			windows) \

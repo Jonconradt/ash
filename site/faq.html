@@ -63,7 +63,7 @@
           <p>Install it inside your WSL distribution as Linux: <code>curl -fsSL https://jonconradt.github.io/ash/install.sh | sh</code>. Then configure <code>AI_ENDPOINT</code> and <code>AI_MODEL</code>, and run <code>ash install</code> for the shell running inside WSL. This is separate from any Windows PowerShell configuration.</p>
 
           <h3>How do I update ash to the latest release version?</h3>
-          <p>Run <code>ash update</code> on macOS or Linux. It downloads the latest stable matching archive, verifies the release manifest with its Sigstore bundle and SHA-256 digest, then installs to <code>~/.local/bin/ash</code>. Use <code>ash update --version vX.Y.Z</code> for a specific version; use <code>--yes</code> only when you want customized managed files replaced.</p>
+          <p>Run <code>ash update</code> on macOS, Linux, or FreeBSD. It downloads the latest stable matching archive, verifies the release manifest with its Sigstore bundle and SHA-256 digest, then installs to <code>~/.local/bin/ash</code>. Use <code>ash update --version vX.Y.Z</code> for a specific version; use <code>--yes</code> only when you want customized managed files replaced.</p>
 
           <h3>I ran <code>ash install</code>. Why does nothing change in this terminal?</h3>
           <p>Installation updates a startup file; it does not rewrite the shell process already running. Open a new terminal, or reload the file for your shell: <code>source ~/.bashrc</code> for Bash, <code>source ~/.zshrc</code> for zsh, or <code>source ~/.config/fish/config.fish</code> for Fish unless you use a custom <code>XDG_CONFIG_HOME</code>.</p>

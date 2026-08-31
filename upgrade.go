@@ -107,7 +107,7 @@ func upgradeAssetName(version, goos, goarch string) string {
 }
 
 func selectUpgradeAssets(release upgradeRelease, goos, goarch string) (upgradeAsset, upgradeAsset, upgradeAsset, error) {
-	if goos != "darwin" && goos != "linux" {
+	if goos != "darwin" && goos != "freebsd" && goos != "linux" {
 		return upgradeAsset{}, upgradeAsset{}, upgradeAsset{}, fmt.Errorf("ash update is unsupported on %s", goos)
 	}
 	wanted := upgradeAssetName(release.TagName, goos, goarch)
@@ -245,7 +245,7 @@ func runUpgrade(args []string, stdout, stderr io.Writer) int {
 		printUsage(stderr)
 		return 1
 	}
-	if runtime.GOOS != "darwin" && runtime.GOOS != "linux" {
+	if runtime.GOOS != "darwin" && runtime.GOOS != "freebsd" && runtime.GOOS != "linux" {
 		_, _ = fmt.Fprintf(stderr, "ash update: unsupported platform %s\n", runtime.GOOS)
 		return 1
 	}

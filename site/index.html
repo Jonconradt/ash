@@ -23,7 +23,7 @@
     "@type": "SoftwareApplication",
     "name": "ash",
     "applicationCategory": "DeveloperApplication",
-    "operatingSystem": "macOS, Linux, Windows",
+    "operatingSystem": "macOS, Linux, FreeBSD, Windows",
     "description": "An AI assistant integrated into bash, Fish, and zsh.",
     "codeRepository": "https://github.com/Jonconradt/ash",
     "license": "https://github.com/Jonconradt/ash/blob/main/LICENSE"
@@ -52,7 +52,7 @@
           <a class="button button-primary" href="#install">Install ash <span aria-hidden="true">&#8595;</span></a>
           <a class="text-link" href="https://github.com/Jonconradt/ash#configure">Read the setup guide <span aria-hidden="true">&#8594;</span></a>
         </div>
-        <p class="compatibility"><span class="status-dot"></span> macOS &middot; Linux &middot; Open source</p>
+        <p class="compatibility"><span class="status-dot"></span> macOS &middot; Linux &middot; FreeBSD &middot; Open source</p>
       </div>
       <div class="terminal-window" role="img" aria-label="Example ash terminal session">
         <div class="terminal-bar"><span></span><span></span><span></span><b>bash &mdash; session 04</b></div>
@@ -92,7 +92,7 @@
       <div class="page-width install-content">
         <div><p class="eyebrow">Start small</p><h2>Give your shell<br><em>some company.</em></h2></div>
         <div class="install-details">
-          <p>Linux and macOS users can install the latest release in one step. The installer verifies the download, installs to <code>~/.local/bin</code>, and configures detected Fish, zsh, or bash integration, falling back to bash.</p>
+          <p>Linux, macOS, and FreeBSD users can install the latest release in one step. The installer verifies the download, installs to <code>~/.local/bin</code>, and configures detected Fish, zsh, or bash integration, falling back to bash.</p>
           <p><code>ash install</code> auto-configures your AI provider: it detects an already-set cloud provider API key or a running local inference server, otherwise it shows a numbered menu to pick a provider and model. Or set these yourself:</p>
           <pre><code>export AI_AUTH_TOKEN='84…89'
 export AI_ENDPOINT='https://ollama.com'

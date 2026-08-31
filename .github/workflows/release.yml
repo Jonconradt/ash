@@ -26,6 +26,11 @@ jobs:
           node-version: 22
       - name: Run quality checks
         run: make lint test
+      - name: Verify FreeBSD cross-compilation
+        run: |
+          GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build ./...
+          GOOS=freebsd GOARCH=arm64 CGO_ENABLED=0 go build ./...
+          GOOS=freebsd GOARCH=amd64 go vet ./...
       - name: Ensure dist directory exists
         run: mkdir -p dist
       - name: Generate SBOM
@@ -83,6 +88,62 @@ jobs:
         with:
           name: release-linux-${{ matrix.arch }}
           path: dist/release/*linux-${{ matrix.arch }}*
+  package-freebsd:
+    runs-on: ubuntu-latest
+    needs: quality
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [amd64, arm64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+      - name: Build and package FreeBSD artifacts
+        run: |
+          make release-artifacts RELEASE_TARGET_OSES=freebsd RELEASE_TARGET_ARCHES=${{ matrix.arch }} RELEASE_VERSION="${GITHUB_REF_NAME}"
+      - name: Upload FreeBSD artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: release-freebsd-${{ matrix.arch }}
+          path: dist/release/*freebsd-${{ matrix.arch }}*
+  smoke-freebsd:
+    # Advisory only: the VM boot is slow and flaky, so this never blocks publish.
+    runs-on: ubuntu-latest
+    needs: package-freebsd
+    continue-on-error: true
+    steps:
+      - name: Download FreeBSD amd64 artifact
+        uses: actions/download-artifact@v6
+        with:
+          name: release-freebsd-amd64
+          path: artifacts
+      - name: Install ash in a FreeBSD VM
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: "14"
+          cache-after-prepare: true
+          # FreeBSD ships no bash in base; prepare runs as root before the smoke script.
+          prepare: |
+            pkg install -y bash
+          run: |
+            set -eu
+            command -v bash >/dev/null 2>&1 || { echo "bash missing from the VM"; exit 1; }
+            bash --version | head -n 1
+            archive=$(ls artifacts/ash-*-freebsd-amd64.tar.gz)
+            tar -xzf "$archive" -C artifacts
+            binary="${archive%.tar.gz}"
+            chmod 0755 "$binary"
+            "$binary" --version
+            "$binary" install --shell bash
+            test -f "$HOME/.ash/.ash_bashrc"
+            bash -n "$HOME/.ash/.ash_bashrc"
+            grep -q '\.ash/\.ash_bashrc' "$HOME/.bashrc"
+            grep -q '\$HOME/\.bashrc' "$HOME/.bash_profile"
+            bash -lc 'true'
   package-windows:
     if: false # Disabled until we want a working Windows build
     runs-on: ubuntu-latest
@@ -121,6 +182,7 @@ jobs:
     needs:
       - package-macos
       - package-linux
+      - package-freebsd
     steps:
       - name: Checkout release tag
         uses: actions/checkout@v5
