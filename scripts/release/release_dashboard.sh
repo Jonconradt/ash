@@ -99,7 +99,9 @@ for asset in \
   "ash-${tag}-linux-amd64.rpm" \
   "ash-${tag}-linux-arm64.rpm" \
   "ash-${tag}-linux-amd64.tar.gz" \
-  "ash-${tag}-linux-arm64.tar.gz"; do
+  "ash-${tag}-linux-arm64.tar.gz" \
+  "ash-${tag}-freebsd-amd64.tar.gz" \
+  "ash-${tag}-freebsd-arm64.tar.gz"; do
   expected_assets+=("$asset")
 done
 
