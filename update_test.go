@@ -298,6 +298,60 @@ func TestInstallUpgradeArchiveInstallsAshAndBroker(t *testing.T) {
 	}
 }
 
+// Clients released before the broker split matched any "ash-v*" entry as the ash binary, so a
+// versioned broker name made them abort with "archive contains 2 executable ash files". The
+// release tarball therefore has to use a plain "ash-broker" entry.
+func TestFindUpgradeBinaryIgnoresBrokerEntryNames(t *testing.T) {
+	const expectedName = "ash-v0.20.0-linux-amd64"
+	for _, brokerName := range []string{"ash-broker", expectedName + "-broker"} {
+		t.Run(brokerName, func(t *testing.T) {
+			root := t.TempDir()
+			for _, name := range []string{expectedName, brokerName} {
+				if err := os.WriteFile(filepath.Join(root, name), []byte(name), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			binary, err := findUpgradeBinary(root, expectedName)
+			if err != nil {
+				t.Fatalf("findUpgradeBinary() error = %v", err)
+			}
+			if filepath.Base(binary) != expectedName {
+				t.Errorf("findUpgradeBinary() = %s, want %s", filepath.Base(binary), expectedName)
+			}
+			broker, err := findUpgradeBrokerBinary(root)
+			if err != nil {
+				t.Fatalf("findUpgradeBrokerBinary() error = %v", err)
+			}
+			if filepath.Base(broker) != brokerName {
+				t.Errorf("findUpgradeBrokerBinary() = %s, want %s", filepath.Base(broker), brokerName)
+			}
+		})
+	}
+}
+
+// Pre-split clients only replace the ash binary, so a machine can be on the newest version and
+// still be missing ash-broker; the version short-circuit must not strand it there.
+func TestInstalledBrokerBinaryExists(t *testing.T) {
+	home := t.TempDir()
+	originalHome := osUserHomeDir
+	osUserHomeDir = func() (string, error) { return home, nil }
+	t.Cleanup(func() { osUserHomeDir = originalHome })
+
+	if installedBrokerBinaryExists() {
+		t.Fatal("installedBrokerBinaryExists() = true before ash-broker was installed")
+	}
+	binDir := filepath.Join(home, ".local", "bin")
+	if err := os.MkdirAll(binDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(binDir, "ash-broker"), []byte("broker"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if !installedBrokerBinaryExists() {
+		t.Error("installedBrokerBinaryExists() = false after ash-broker was installed")
+	}
+}
+
 func TestSyncUpgradeAssetsPreservesEnvironmentValues(t *testing.T) {
 	home := t.TempDir()
 	originalHome := osUserHomeDir

@@ -259,7 +259,7 @@ func runUpgrade(args []string, stdout, stderr io.Writer) int {
 		current, parseErr := parseUpgradeVersion(ashVersion)
 		if parseErr == nil {
 			candidate, candidateErr := parseUpgradeVersion(release.TagName)
-			if candidateErr == nil && compareUpgradeVersions(candidate, current) <= 0 {
+			if candidateErr == nil && compareUpgradeVersions(candidate, current) <= 0 && installedBrokerBinaryExists() {
 				_, _ = fmt.Fprintf(stdout, "ash is already up to date at %s\n", ashVersion)
 				return 0
 			}
@@ -540,6 +540,18 @@ func ensureUserLocalBinDir(home string) (string, error) {
 		return "", fmt.Errorf("create %s: %w", destinationDir, err)
 	}
 	return destinationDir, nil
+}
+
+// installedBrokerBinaryExists reports whether ash-broker sits next to the installed ash.
+// Clients released before the broker split only replace the ash binary, so a machine that
+// crossed that boundary can be on the newest version yet still be missing the broker.
+var installedBrokerBinaryExists = func() bool {
+	home, err := osUserHomeDir()
+	if err != nil {
+		return true
+	}
+	info, err := os.Stat(filepath.Join(home, ".local", "bin", "ash-broker"))
+	return err == nil && info.Mode().IsRegular()
 }
 
 func runUpgradeAssetExport(args []string, stdout, stderr io.Writer) int {

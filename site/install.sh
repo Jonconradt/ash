@@ -131,9 +131,18 @@ install -m 0755 "$tmp_dir/$base" "$install_dir/ash" 2>/dev/null || {
 
 # This installer is published from the site branch and must cope with whichever
 # release is currently latest, including ones cut before the broker binary split.
-if [ -f "$tmp_dir/$base-broker" ]; then
-  install -m 0755 "$tmp_dir/$base-broker" "$install_dir/ash-broker" 2>/dev/null || {
-    cp "$tmp_dir/$base-broker" "$install_dir/ash-broker" || fail "could not install ash-broker to $install_dir"
+# Releases up to v0.20.0 named the broker after the versioned binary; later ones use
+# a plain "ash-broker" entry so pre-split clients can still self-update.
+if [ -f "$tmp_dir/ash-broker" ]; then
+  broker_source="$tmp_dir/ash-broker"
+elif [ -f "$tmp_dir/$base-broker" ]; then
+  broker_source="$tmp_dir/$base-broker"
+else
+  broker_source=''
+fi
+if [ -n "$broker_source" ]; then
+  install -m 0755 "$broker_source" "$install_dir/ash-broker" 2>/dev/null || {
+    cp "$broker_source" "$install_dir/ash-broker" || fail "could not install ash-broker to $install_dir"
     chmod 0755 "$install_dir/ash-broker" || fail "could not make ash-broker executable"
   }
 else

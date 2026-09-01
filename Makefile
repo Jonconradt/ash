@@ -186,6 +186,9 @@ release-pkg:
 		--man-install-path "$(MAN_INSTALL_PATH_MACOS)" \
 		--output "$(RELEASE_PKG_PATH)"
 
+# The tarball broker entry must be named plain "ash-broker", not "<versioned-binary>-broker":
+# clients released before the broker split match any "ash-v*" file as the ash binary and abort
+# the upgrade with "archive contains 2 executable ash files".
 release-pkg-one:
 	@mkdir -p "$(RELEASE_PACKAGE_DIR)"
 	@case "$(RELEASE_FORMAT)" in \
@@ -233,10 +236,10 @@ release-pkg-one:
 			tmp_dir="$$(mktemp -d)"; \
 			trap 'rm -rf "$$tmp_dir"' EXIT; \
 			cp "$(RELEASE_BINARY_PATH)" "$$tmp_dir/$(notdir $(RELEASE_BINARY_PATH))"; \
-			cp "$(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)-broker" "$$tmp_dir/$(notdir $(RELEASE_BINARY_PATH))-broker"; \
+			cp "$(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)-broker" "$$tmp_dir/$(APP_NAME)-broker"; \
 			mkdir -p "$$tmp_dir/$(TARBALL_MAN_PATH)"; \
 			install -m 0644 "$(MAN_PAGE_PATH)" "$$tmp_dir/$(TARBALL_MAN_PATH)/$(APP_NAME).1"; \
-			tar -C "$$tmp_dir" -czf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" "$(notdir $(RELEASE_BINARY_PATH))" "$(notdir $(RELEASE_BINARY_PATH))-broker" "$(TARBALL_MAN_PATH)/$(APP_NAME).1"; \
+			tar -C "$$tmp_dir" -czf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" "$(notdir $(RELEASE_BINARY_PATH))" "$(APP_NAME)-broker" "$(TARBALL_MAN_PATH)/$(APP_NAME).1"; \
 			;; \
 		*) \
 			echo "unsupported RELEASE_FORMAT=$(RELEASE_FORMAT)"; \
@@ -280,7 +283,7 @@ release-validate-one:
 			;; \
 		tar.gz) \
 			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^$(notdir $(RELEASE_BINARY_PATH))$$"; \
-			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^$(notdir $(RELEASE_BINARY_PATH))-broker$$"; \
+			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^$(APP_NAME)-broker$$"; \
 			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^$(TARBALL_MAN_PATH)/$(APP_NAME)\.1$$"; \
 			shasum -a 256 "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" > "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz.sha256"; \
 			;; \
