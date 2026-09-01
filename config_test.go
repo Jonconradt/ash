@@ -336,6 +336,12 @@ func TestDetectAIProviderAndCloudHostClassification(t *testing.T) {
 	if got := detectAIProvider("https://api.mistral.ai/v1", "api.mistral.ai"); got != providerOpenAI {
 		t.Fatalf("expected openai-compatible provider for unknown cloud host, got %q", got)
 	}
+	if got := detectAIProvider("https://api.cohere.com", "api.cohere.com"); got != providerCohere {
+		t.Fatalf("expected cohere provider, got %q", got)
+	}
+	if got := detectAIProvider("https://bedrock-runtime.us-east-1.amazonaws.com", "bedrock-runtime.us-east-1.amazonaws.com"); got != providerBedrock {
+		t.Fatalf("expected bedrock provider, got %q", got)
+	}
 
 	if isCloudAIHost("localhost") {
 		t.Fatalf("localhost should not be classified as cloud")

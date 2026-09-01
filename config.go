@@ -26,6 +26,10 @@ const (
 	aiEnvProvider = "AI_PROVIDER"
 	// #nosec G101 -- these are environment variable names, not secrets.
 	aiEnvCache = "AI_CACHE"
+	// ashEnvAlwaysOpenAIAPI, when truthy, routes the Ollama provider through the
+	// OpenAI-compatible adapter instead of the hand-rolled Ollama one, for manual
+	// testing of whether the Ollama-specific implementation is still required.
+	ashEnvAlwaysOpenAIAPI = "ASH_ALWAYS_OPENAI_API"
 )
 
 type aiConfig struct {
@@ -59,6 +63,9 @@ func parseAIConfigFromEnv() (aiConfig, error) {
 	provider, err := resolveAIProvider(strings.TrimSpace(os.Getenv(aiEnvProvider)), baseURL, host)
 	if err != nil {
 		return aiConfig{}, err
+	}
+	if provider == providerOllama && alwaysUseOpenAIAPIForOllama() {
+		provider = providerOpenAI
 	}
 
 	useCaching, err := parseAICacheEnabled(strings.TrimSpace(os.Getenv(aiEnvCache)))
@@ -105,6 +112,30 @@ func parseAICacheEnabled(raw string) (bool, error) {
 	}
 }
 
+// alwaysUseOpenAIAPIForOllama reports whether ASH_ALWAYS_OPENAI_API is truthy.
+// Defaults to false (off) when unset or unrecognized.
+func alwaysUseOpenAIAPIForOllama() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(ashEnvAlwaysOpenAIAPI))) {
+	case "1", "true", "yes", "on", "enabled":
+		return true
+	default:
+		return false
+	}
+}
+
+// streamingEnabled reports whether ASH_STREAM is truthy. Defaults to false (off)
+// when unset or unrecognized: streaming currently only affects internal response
+// accumulation (see chatStream), not live terminal output, so it defaults off
+// until a follow-up UX pass decides how streamed text should be displayed.
+func streamingEnabled() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("ASH_STREAM"))) {
+	case "1", "true", "yes", "on", "enabled":
+		return true
+	default:
+		return false
+	}
+}
+
 func resolveAIProvider(override string, baseURL string, host string) (aiProvider, error) {
 	if strings.TrimSpace(override) == "" {
 		return detectAIProvider(baseURL, host), nil
@@ -119,8 +150,12 @@ func resolveAIProvider(override string, baseURL string, host string) (aiProvider
 		return providerGoogle, nil
 	case string(providerAnthropic):
 		return providerAnthropic, nil
+	case string(providerCohere):
+		return providerCohere, nil
+	case string(providerBedrock):
+		return providerBedrock, nil
 	default:
-		return "", fmt.Errorf("%s must be one of: ollama, openai, google, gemini, anthropic", aiEnvProvider)
+		return "", fmt.Errorf("%s must be one of: ollama, openai, google, gemini, anthropic, cohere, bedrock", aiEnvProvider)
 	}
 }
 
@@ -142,6 +177,12 @@ func detectAIProvider(baseURL string, host string) aiProvider {
 	}
 	if strings.Contains(h, "ollama.com") {
 		return providerOllama
+	}
+	if strings.Contains(h, "api.cohere.com") {
+		return providerCohere
+	}
+	if strings.Contains(h, "bedrock-runtime.") && strings.Contains(h, "amazonaws.com") {
+		return providerBedrock
 	}
 
 	// Unknown cloud hosts are assumed to be OpenAI-compatible (e.g. Mistral, Groq, DeepSeek);

@@ -3,6 +3,7 @@
 ash \- practical shell assistant for command-not-found workflows
 .SH SYNOPSIS
 .B ash
+.RI [ --attach " path" ]...
 .RI [ text ... ]
 .br
 .B ash
@@ -41,6 +42,15 @@ For Fish, the target is
 .TP
 .B ash [text ...]
 Run a single assistant request.
+.IP
+.B --attach
+.I path
+Attach a file (image or document) to the request. Repeatable. The file is
+read from disk, size-checked against
+.BR ASH_ATTACHMENT_MAX_BYTES ,
+MIME-sniffed, and sent to providers/models that support multimodal input
+(currently OpenAI). Any attachments returned by the model are saved under
+the scratch directory and their paths printed.
 .TP
 .B ash install [--shell bash|fish|zsh] [--dry-run]
 Install or update shell integration.
@@ -167,7 +177,9 @@ Optional provider override. Supported values:
 .B openai,
 .B google,
 .B gemini,
-.B anthropic.
+.B anthropic,
+.B cohere,
+.B bedrock.
 When unset,
 .B ash
 auto-detects provider from the endpoint host/path.
@@ -180,6 +192,33 @@ Set to a false-like value (for example,
 or
 .B false)
 to disable.
+.TP
+.B ASH_ALWAYS_OPENAI_API
+Optional testing toggle. Defaults to off. When set to a true-like value (for
+example,
+.B 1
+or
+.B on),
+the
+.B ollama
+provider routes through the OpenAI-compatible adapter instead of its
+hand-rolled implementation, to help determine whether the Ollama-specific
+implementation is still required.
+.TP
+.B ASH_STREAM
+Optional toggle. Defaults to off. When set to a true-like value (for
+example,
+.B 1
+or
+.B on),
+requests to providers that support it are streamed incrementally rather
+than waited for as a single response. This currently only affects internal
+response accumulation, not live terminal output.
+.TP
+.B ASH_ATTACHMENT_MAX_BYTES
+Optional max size in bytes for a single
+.B --attach
+file. Default is 10485760 (10 MiB). Files larger than this are rejected.
 .TP
 .B AI
 Legacy setting that is no longer supported.

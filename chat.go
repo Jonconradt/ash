@@ -15,11 +15,20 @@ import (
 )
 
 type message struct {
-	Role       string     `json:"role"`
-	Content    string     `json:"content"`
-	ToolCalls  []toolCall `json:"tool_calls,omitempty"`
-	ToolName   string     `json:"tool_name,omitempty"`
-	ToolCallID string     `json:"tool_call_id,omitempty"`
+	Role        string       `json:"role"`
+	Content     string       `json:"content"`
+	ToolCalls   []toolCall   `json:"tool_calls,omitempty"`
+	ToolName    string       `json:"tool_name,omitempty"`
+	ToolCallID  string       `json:"tool_call_id,omitempty"`
+	Attachments []attachment `json:"attachments,omitempty"`
+}
+
+// attachment is a binary file (image or document) attached to a message, either
+// supplied by the user (--attach/@path) or returned by a tool result.
+type attachment struct {
+	MimeType string `json:"mime_type"`
+	FileName string `json:"file_name,omitempty"`
+	Data     []byte `json:"-"`
 }
 
 type chatRequest struct {
@@ -31,9 +40,10 @@ type chatRequest struct {
 }
 
 type chatResponse struct {
-	Message message   `json:"message"`
-	Error   string    `json:"error"`
-	Usage   chatUsage `json:"-"`
+	Message     message      `json:"message"`
+	Error       string       `json:"error"`
+	Usage       chatUsage    `json:"-"`
+	Attachments []attachment `json:"-"`
 }
 
 type chatStatusError struct {
@@ -131,6 +141,31 @@ func randomCloudServer500Message() string {
 	}
 	idx := int(timeNow().UnixNano() % int64(len(cloudServer500Messages)))
 	return cloudServer500Messages[idx]
+}
+
+// chatStream sends a chat request and streams incremental text deltas to onDelta as they
+// arrive, when the current provider's adapter supports streaming and ASH_STREAM is enabled;
+// otherwise it falls back to a single onDelta call with the complete text once chatExecutor
+// returns. The returned chatResponse is always the same complete result chat() would have
+// produced. The fallback path goes through the chatExecutor var (not chat directly) so tests
+// that stub chatExecutor keep working unchanged when streaming is disabled (the default).
+func chatStream(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolDefinition, onDelta func(streamDelta)) (chatResponse, error) {
+	if streamingEnabled() {
+		adapter, err := adapterForProvider(aiCfg.Provider)
+		if err == nil {
+			if streamAdapter, ok := adapter.(streamingProviderAdapter); ok {
+				return streamAdapter.SendStream(ctx, aiCfg, messages, tools, onDelta)
+			}
+		}
+	}
+	response, err := chatExecutor(ctx, aiCfg, messages, tools)
+	if err != nil {
+		return chatResponse{}, err
+	}
+	if onDelta != nil && response.Message.Content != "" {
+		onDelta(streamDelta{TextDelta: response.Message.Content})
+	}
+	return response, nil
 }
 
 // chat sends a chat request to the configured AI endpoint and returns the assistant response or an error.

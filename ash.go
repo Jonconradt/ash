@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"syscall"
@@ -128,6 +129,17 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 0
 	}
 
+	args, attachPaths, err := parseAttachFlags(args)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "%s\n", err)
+		return 1
+	}
+	attachments, err := loadAttachments(attachPaths)
+	if err != nil {
+		_, _ = fmt.Fprintf(stderr, "Attachment error: %s\n", err)
+		return 1
+	}
+
 	defaultsStarted := timeNow()
 	sessionID, err := ensureSessionID()
 	if err != nil {
@@ -198,7 +210,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	messages := make([]message, 0, len(conversation)+2)
 	messages = append(messages, message{Role: "system", Content: systemPrompt})
 	messages = append(messages, conversation...)
-	messages = append(messages, message{Role: "user", Content: userInput})
+	messages = append(messages, message{Role: "user", Content: userInput, Attachments: attachments})
 
 	timeout := aiTimeout()
 	ctx, stop := signalNotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -239,6 +251,19 @@ func run(args []string, stdout, stderr io.Writer) int {
 	slog.Debug("assistant final reply", "request_id", requestIDFromContext(ctx), "bytes", len(assistantReply), "sha256", hashForLog([]byte(assistantReply)), "EID", "jzszDMVF")
 	_, _ = fmt.Fprint(stdout, renderAssistantOutput(assistantReply, writerIsTerminal(stdout)))
 
+	if replyAttachments := finalAssistantAttachments(updatedMessages); len(replyAttachments) > 0 {
+		if scratchRoot, scratchErr := ashScratchRoot(); scratchErr == nil {
+			outDir := filepath.Join(scratchRoot, "attachments", requestID)
+			if written, writeErr := writeResponseAttachments(outDir, replyAttachments); writeErr != nil {
+				slog.Warn(fmt.Sprintf("failed to save returned attachments: %v", writeErr), "EID", "b3Kx9Qmz")
+			} else {
+				for _, path := range written {
+					_, _ = fmt.Fprintf(stdout, "Saved attachment: %s\n", path)
+				}
+			}
+		}
+	}
+
 	conversation = stripSystemMessage(updatedMessages)
 	conversation = keepRecentMessages(conversation, historyLimit())
 	history.Conversations[aiCfg.HistoryKey] = conversation
@@ -252,7 +277,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 // printUsage writes the CLI usage text for the ash command to w.
 func printUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "usage: ash <text>")
+	_, _ = fmt.Fprintln(w, "usage: ash [--attach <path>]... <text>")
 	_, _ = fmt.Fprintln(w, "       ash install [--shell bash|zsh] [--dry-run] [--overwrite]")
 	_, _ = fmt.Fprintln(w, "       ash update [--version vX.Y.Z] [--yes|--skip-customized]")
 	_, _ = fmt.Fprintln(w, "       ash broker --socket <path>")

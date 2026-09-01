@@ -1,65 +1,16 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
-	"net/http"
+	"context"
+	"errors"
 	"strings"
+
+	anthropic "github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/option"
+	"github.com/anthropics/anthropic-sdk-go/packages/param"
 )
 
 type anthropicAdapter struct{}
-
-const anthropicVersionHeaderValue = "2023-06-01"
-
-type anthropicMessagesRequest struct {
-	Model      string             `json:"model"`
-	MaxTokens  int                `json:"max_tokens"`
-	System     any                `json:"system,omitempty"`
-	Messages   []anthropicMessage `json:"messages"`
-	Tools      []anthropicTool    `json:"tools,omitempty"`
-	ToolChoice map[string]string  `json:"tool_choice,omitempty"`
-}
-
-type anthropicTool struct {
-	Name        string         `json:"name"`
-	Description string         `json:"description,omitempty"`
-	InputSchema map[string]any `json:"input_schema,omitempty"`
-}
-
-type anthropicMessage struct {
-	Role    string                  `json:"role"`
-	Content []anthropicContentBlock `json:"content"`
-}
-
-type anthropicContentBlock struct {
-	Type         string         `json:"type"`
-	Text         string         `json:"text,omitempty"`
-	ID           string         `json:"id,omitempty"`
-	Name         string         `json:"name,omitempty"`
-	Input        map[string]any `json:"input,omitempty"`
-	ToolUseID    string         `json:"tool_use_id,omitempty"`
-	Content      string         `json:"content,omitempty"`
-	CacheControl *cacheControl  `json:"cache_control,omitempty"`
-}
-
-type cacheControl struct {
-	Type string `json:"type"`
-}
-
-type anthropicMessagesResponse struct {
-	Content []anthropicContentBlock `json:"content"`
-	Error   *anthropicErrorBody     `json:"error,omitempty"`
-	Usage   *anthropicUsage         `json:"usage,omitempty"`
-}
-
-type anthropicUsage struct {
-	InputTokens  int `json:"input_tokens"`
-	OutputTokens int `json:"output_tokens"`
-}
-
-type anthropicErrorBody struct {
-	Message string `json:"message"`
-}
 
 func (a anthropicAdapter) Name() aiProvider {
 	return providerAnthropic
@@ -69,124 +20,129 @@ func (a anthropicAdapter) Capabilities() providerCapabilities {
 	return providerCapabilities{SupportsNativeCaching: true}
 }
 
-func (a anthropicAdapter) Endpoint(baseURL string) string {
-	if strings.HasSuffix(strings.TrimRight(baseURL, "/"), "/v1") {
-		return strings.TrimRight(baseURL, "/") + "/messages"
-	}
-	return strings.TrimRight(baseURL, "/") + "/v1/messages"
+// anthropicEndpoint strips a trailing `/v1`, since the SDK appends its own `/v1/messages`.
+func anthropicEndpoint(baseURL string) string {
+	trimmed := strings.TrimRight(baseURL, "/")
+	return strings.TrimSuffix(trimmed, "/v1")
 }
 
-func (a anthropicAdapter) BuildPayload(aiCfg aiConfig, messages []message, tools []toolDefinition) ([]byte, error) {
-	request := anthropicMessagesRequest{
-		Model:     aiCfg.Model,
-		MaxTokens: 2048,
-		Messages:  make([]anthropicMessage, 0, len(messages)),
-	}
+// Send implements sdkProviderAdapter using the official anthropic-sdk-go Messages API client.
+func (a anthropicAdapter) Send(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolDefinition) (chatResponse, error) {
+	client := anthropic.NewClient(
+		option.WithAPIKey(aiCfg.AuthToken),
+		option.WithBaseURL(anthropicEndpoint(aiCfg.BaseURL)),
+		option.WithHTTPClient(newAshHTTPClient()),
+		option.WithMaxRetries(0), // retries are handled by ashRoundTripper
+	)
 
 	useCache := shouldUseProviderNativeCaching(aiCfg, a)
-	systemBlocks := make([]anthropicContentBlock, 0, 1)
+	system, msgs := buildAnthropicMessages(messages, useCache)
+
+	params := anthropic.MessageNewParams{
+		Model:     anthropic.Model(aiCfg.Model),
+		MaxTokens: 2048,
+		System:    system,
+		Messages:  msgs,
+	}
+	if len(tools) > 0 {
+		params.Tools = buildAnthropicTools(tools)
+	}
+
+	resp, err := client.Messages.New(ctx, params)
+	if err != nil {
+		var apiErr *anthropic.Error
+		if errors.As(err, &apiErr) {
+			return chatResponse{}, chatStatusError{StatusCode: apiErr.StatusCode, Body: apiErr.Error()}
+		}
+		return chatResponse{}, err
+	}
+	return parseAnthropicMessage(resp), nil
+}
+
+func buildAnthropicMessages(messages []message, useCache bool) ([]anthropic.TextBlockParam, []anthropic.MessageParam) {
+	system := make([]anthropic.TextBlockParam, 0, 1)
+	out := make([]anthropic.MessageParam, 0, len(messages))
+
 	for _, msg := range messages {
 		if msg.Role == "system" {
 			if text := strings.TrimSpace(msg.Content); text != "" {
-				block := anthropicContentBlock{Type: "text", Text: text}
+				block := anthropic.TextBlockParam{Text: text}
 				if useCache {
-					block.CacheControl = &cacheControl{Type: "ephemeral"}
+					block.CacheControl = anthropic.NewCacheControlEphemeralParam()
 				}
-				systemBlocks = append(systemBlocks, block)
+				system = append(system, block)
 			}
 			continue
 		}
 
-		role := msg.Role
-		if role == "tool" {
-			role = "user"
-		}
-		wire := anthropicMessage{Role: role}
-
+		blocks := make([]anthropic.ContentBlockParamUnion, 0, 2)
 		if msg.Role == "tool" {
 			if strings.TrimSpace(msg.ToolCallID) == "" {
 				continue
 			}
-			wire.Content = append(wire.Content, anthropicContentBlock{
-				Type:      "tool_result",
-				ToolUseID: msg.ToolCallID,
-				Content:   msg.Content,
-			})
+			blocks = append(blocks, anthropic.NewToolResultBlock(msg.ToolCallID, msg.Content, false))
 		} else {
 			if text := strings.TrimSpace(msg.Content); text != "" {
-				block := anthropicContentBlock{Type: "text", Text: text}
+				block := anthropic.NewTextBlock(text)
 				if useCache && msg.Role == "user" {
-					block.CacheControl = &cacheControl{Type: "ephemeral"}
+					block.OfText.CacheControl = anthropic.NewCacheControlEphemeralParam()
 				}
-				wire.Content = append(wire.Content, block)
+				blocks = append(blocks, block)
 			}
 			for _, call := range msg.ToolCalls {
 				callID := strings.TrimSpace(call.ID)
 				if callID == "" {
-					callID = fmt.Sprintf("call_%s", strings.ReplaceAll(call.Function.Name, " ", "_"))
+					callID = "call_" + strings.ReplaceAll(call.Function.Name, " ", "_")
 				}
-				wire.Content = append(wire.Content, anthropicContentBlock{
-					Type:  "tool_use",
-					ID:    callID,
-					Name:  call.Function.Name,
-					Input: call.Function.Arguments,
-				})
+				blocks = append(blocks, anthropic.NewToolUseBlock(callID, call.Function.Arguments, call.Function.Name))
 			}
 		}
-
-		if len(wire.Content) > 0 {
-			request.Messages = append(request.Messages, wire)
+		if len(blocks) == 0 {
+			continue
 		}
-	}
 
-	if len(systemBlocks) > 0 {
-		request.System = systemBlocks
-	}
-
-	if len(tools) > 0 {
-		request.Tools = make([]anthropicTool, 0, len(tools))
-		for _, tool := range tools {
-			request.Tools = append(request.Tools, anthropicTool{
-				Name:        tool.Function.Name,
-				Description: tool.Function.Description,
-				InputSchema: tool.Function.Parameters,
-			})
+		role := anthropic.MessageParamRoleUser
+		if msg.Role == "assistant" {
+			role = anthropic.MessageParamRoleAssistant
 		}
-		request.ToolChoice = map[string]string{"type": "auto"}
+		out = append(out, anthropic.MessageParam{Role: role, Content: blocks})
 	}
-
-	return json.Marshal(request)
+	return system, out
 }
 
-func (a anthropicAdapter) ApplyHeaders(req *http.Request, aiCfg aiConfig) {
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("anthropic-version", anthropicVersionHeaderValue)
-	if aiCfg.AuthToken != "" {
-		req.Header.Set("x-api-key", aiCfg.AuthToken)
-	} else if aiCfg.Authorization != "" {
-		token := strings.TrimSpace(strings.TrimPrefix(aiCfg.Authorization, "Bearer "))
-		if token != "" {
-			req.Header.Set("x-api-key", token)
+func buildAnthropicTools(tools []toolDefinition) []anthropic.ToolUnionParam {
+	out := make([]anthropic.ToolUnionParam, 0, len(tools))
+	for _, tool := range tools {
+		schema := anthropic.ToolInputSchemaParam{}
+		if props, ok := tool.Function.Parameters["properties"]; ok {
+			schema.Properties = props
 		}
+		if required, ok := tool.Function.Parameters["required"].([]any); ok {
+			names := make([]string, 0, len(required))
+			for _, r := range required {
+				if s, ok := r.(string); ok {
+					names = append(names, s)
+				}
+			}
+			schema.Required = names
+		}
+		toolParam := anthropic.ToolParam{Name: tool.Function.Name, InputSchema: schema}
+		if tool.Function.Description != "" {
+			toolParam.Description = param.NewOpt(tool.Function.Description)
+		}
+		out = append(out, anthropic.ToolUnionParam{OfTool: &toolParam})
 	}
+	return out
 }
 
-func (a anthropicAdapter) ParseResponse(body []byte) (chatResponse, error) {
-	var parsed anthropicMessagesResponse
-	if err := json.Unmarshal(body, &parsed); err != nil {
-		return chatResponse{}, err
-	}
-	if parsed.Error != nil && strings.TrimSpace(parsed.Error.Message) != "" {
-		return chatResponse{Error: parsed.Error.Message}, nil
-	}
-
+func parseAnthropicMessage(resp *anthropic.Message) chatResponse {
 	assistant := message{Role: "assistant"}
 	textParts := make([]string, 0, 2)
-	for _, block := range parsed.Content {
+	for _, block := range resp.Content {
 		switch block.Type {
 		case "text":
-			if strings.TrimSpace(block.Text) != "" {
-				textParts = append(textParts, block.Text)
+			if text := strings.TrimSpace(block.Text); text != "" {
+				textParts = append(textParts, text)
 			}
 		case "tool_use":
 			assistant.ToolCalls = append(assistant.ToolCalls, toolCall{
@@ -194,19 +150,19 @@ func (a anthropicAdapter) ParseResponse(body []byte) (chatResponse, error) {
 				Type: "function",
 				Function: toolFunctionCall{
 					Name:      block.Name,
-					Arguments: block.Input,
+					Arguments: parseJSONObject(string(block.Input)),
 				},
 			})
 		}
 	}
 	assistant.Content = strings.TrimSpace(strings.Join(textParts, "\n"))
-	result := chatResponse{Message: assistant}
-	if parsed.Usage != nil {
-		result.Usage = chatUsage{
-			InputTokens:  parsed.Usage.InputTokens,
-			OutputTokens: parsed.Usage.OutputTokens,
-			Available:    true,
-		}
+
+	return chatResponse{
+		Message: assistant,
+		Usage: chatUsage{
+			InputTokens:  int(resp.Usage.InputTokens),
+			OutputTokens: int(resp.Usage.OutputTokens),
+			Available:    resp.Usage.InputTokens > 0 || resp.Usage.OutputTokens > 0,
+		},
 	}
-	return result, nil
 }

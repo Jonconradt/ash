@@ -1,196 +1,134 @@
 package main
 
 import (
-	"encoding/json"
+	"context"
 	"errors"
-	"net/http"
 	"strings"
+
+	"google.golang.org/genai"
 )
 
 type googleAdapter struct{}
-
-type googleChatCompletionsRequest struct {
-	Model      string               `json:"model"`
-	Messages   []googleChatMessage  `json:"messages"`
-	Tools      []googleFunctionTool `json:"tools,omitempty"`
-	ToolChoice string               `json:"tool_choice,omitempty"`
-	Stream     bool                 `json:"stream"`
-	Metadata   map[string]string    `json:"metadata,omitempty"`
-}
-
-type googleFunctionTool struct {
-	Type     string             `json:"type"`
-	Function googleFunctionSpec `json:"function"`
-}
-
-type googleFunctionSpec struct {
-	Name        string         `json:"name"`
-	Description string         `json:"description,omitempty"`
-	Parameters  map[string]any `json:"parameters,omitempty"`
-}
-
-type googleChatMessage struct {
-	Role       string               `json:"role"`
-	Content    string               `json:"content,omitempty"`
-	ToolCalls  []googleToolCallWire `json:"tool_calls,omitempty"`
-	ToolCallID string               `json:"tool_call_id,omitempty"`
-	Name       string               `json:"name,omitempty"`
-}
-
-type googleToolCallWire struct {
-	ID       string                 `json:"id,omitempty"`
-	Type     string                 `json:"type,omitempty"`
-	Function googleToolFunctionWire `json:"function"`
-}
-
-type googleToolFunctionWire struct {
-	Name      string `json:"name"`
-	Arguments string `json:"arguments"`
-}
-
-type googleChatCompletionsResponse struct {
-	Choices       []googleChoice       `json:"choices"`
-	Error         *googleAPIError      `json:"error,omitempty"`
-	Usage         *googleUsage         `json:"usage,omitempty"`
-	UsageMetadata *googleUsageMetadata `json:"usageMetadata,omitempty"`
-}
-
-type googleUsage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-}
-
-type googleUsageMetadata struct {
-	PromptTokenCount     int `json:"promptTokenCount"`
-	CandidatesTokenCount int `json:"candidatesTokenCount"`
-}
-
-type googleChoice struct {
-	Message googleChatMessage `json:"message"`
-}
-
-type googleAPIError struct {
-	Message string `json:"message"`
-}
 
 func (a googleAdapter) Name() aiProvider {
 	return providerGoogle
 }
 
 func (a googleAdapter) Capabilities() providerCapabilities {
-	return providerCapabilities{SupportsNativeCaching: true}
+	// Gemini's explicit context-caching API (CachedContent) requires creating
+	// and managing a separate cache resource; not wired up yet, so this
+	// deliberately reports no native caching rather than a no-op placeholder.
+	return providerCapabilities{SupportsNativeCaching: false}
 }
 
-func (a googleAdapter) Endpoint(baseURL string) string {
-	trimmed := strings.TrimRight(baseURL, "/")
-	if strings.HasSuffix(trimmed, "/chat/completions") {
-		return trimmed
-	}
-	return trimmed + "/chat/completions"
-}
-
-func (a googleAdapter) BuildPayload(aiCfg aiConfig, messages []message, tools []toolDefinition) ([]byte, error) {
-	request := googleChatCompletionsRequest{
-		Model:    aiCfg.Model,
-		Stream:   false,
-		Messages: make([]googleChatMessage, 0, len(messages)),
+// Send implements sdkProviderAdapter using the official google.golang.org/genai client.
+func (a googleAdapter) Send(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolDefinition) (chatResponse, error) {
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+		APIKey:      aiCfg.AuthToken,
+		Backend:     genai.BackendGeminiAPI,
+		HTTPClient:  newAshHTTPClient(),
+		HTTPOptions: genai.HTTPOptions{BaseURL: aiCfg.BaseURL},
+	})
+	if err != nil {
+		return chatResponse{}, err
 	}
 
+	config := &genai.GenerateContentConfig{}
+	contents := make([]*genai.Content, 0, len(messages))
 	for _, msg := range messages {
-		wire := googleChatMessage{Role: msg.Role, Content: msg.Content}
-		if msg.Role == "tool" {
-			wire.ToolCallID = msg.ToolCallID
-			wire.Name = msg.ToolName
-		}
-		if len(msg.ToolCalls) > 0 {
-			wire.ToolCalls = make([]googleToolCallWire, 0, len(msg.ToolCalls))
+		switch msg.Role {
+		case "system":
+			if text := strings.TrimSpace(msg.Content); text != "" {
+				config.SystemInstruction = &genai.Content{Parts: []*genai.Part{genai.NewPartFromText(text)}}
+			}
+		case "tool":
+			name := strings.TrimSpace(msg.ToolName)
+			if name == "" {
+				name = strings.TrimSpace(msg.ToolCallID)
+			}
+			if name == "" {
+				continue
+			}
+			contents = append(contents, genai.NewContentFromFunctionResponse(name, map[string]any{"result": msg.Content}, genai.RoleUser))
+		default:
+			if text := strings.TrimSpace(msg.Content); text != "" {
+				contents = append(contents, genai.NewContentFromText(text, googleContentRole(msg.Role)))
+			}
 			for _, call := range msg.ToolCalls {
-				wire.ToolCalls = append(wire.ToolCalls, googleToolCallWire{
-					ID:   call.ID,
-					Type: "function",
-					Function: googleToolFunctionWire{
-						Name:      call.Function.Name,
-						Arguments: marshalJSONObject(call.Function.Arguments),
-					},
-				})
+				contents = append(contents, genai.NewContentFromFunctionCall(call.Function.Name, call.Function.Arguments, genai.RoleModel))
 			}
 		}
-		request.Messages = append(request.Messages, wire)
 	}
 
 	if len(tools) > 0 {
-		request.Tools = make([]googleFunctionTool, 0, len(tools))
+		declarations := make([]*genai.FunctionDeclaration, 0, len(tools))
 		for _, tool := range tools {
-			request.Tools = append(request.Tools, googleFunctionTool{
-				Type: "function",
-				Function: googleFunctionSpec{
-					Name:        tool.Function.Name,
-					Description: tool.Function.Description,
-					Parameters:  tool.Function.Parameters,
-				},
+			declarations = append(declarations, &genai.FunctionDeclaration{
+				Name:                 tool.Function.Name,
+				Description:          tool.Function.Description,
+				ParametersJsonSchema: tool.Function.Parameters,
 			})
 		}
-		request.ToolChoice = "auto"
+		config.Tools = []*genai.Tool{{FunctionDeclarations: declarations}}
 	}
 
-	if shouldUseProviderNativeCaching(aiCfg, a) {
-		request.Metadata = map[string]string{"cache_preference": "provider-default"}
-	}
-
-	return json.Marshal(request)
-}
-
-func (a googleAdapter) ApplyHeaders(req *http.Request, aiCfg aiConfig) {
-	req.Header.Set("Content-Type", "application/json")
-	if aiCfg.Authorization != "" {
-		req.Header.Set("Authorization", aiCfg.Authorization)
-	}
-}
-
-func (a googleAdapter) ParseResponse(body []byte) (chatResponse, error) {
-	var parsed googleChatCompletionsResponse
-	if err := json.Unmarshal(body, &parsed); err != nil {
+	resp, err := client.Models.GenerateContent(ctx, aiCfg.Model, contents, config)
+	if err != nil {
+		var apiErr genai.APIError
+		if errors.As(err, &apiErr) {
+			return chatResponse{}, chatStatusError{StatusCode: apiErr.Code, Body: apiErr.Message}
+		}
 		return chatResponse{}, err
 	}
-	if parsed.Error != nil && strings.TrimSpace(parsed.Error.Message) != "" {
-		return chatResponse{Error: parsed.Error.Message}, nil
-	}
-	if len(parsed.Choices) == 0 {
-		return chatResponse{}, errors.New("google response missing choices")
-	}
 
-	msg := parsed.Choices[0].Message
-	out := message{Role: msg.Role, Content: msg.Content}
-	if out.Role == "" {
-		out.Role = "assistant"
-	}
-	if len(msg.ToolCalls) > 0 {
-		out.ToolCalls = make([]toolCall, 0, len(msg.ToolCalls))
-		for _, call := range msg.ToolCalls {
-			out.ToolCalls = append(out.ToolCalls, toolCall{
-				ID:   call.ID,
-				Type: call.Type,
-				Function: toolFunctionCall{
-					Name:      call.Function.Name,
-					Arguments: parseJSONObject(call.Function.Arguments),
-				},
-			})
-		}
-	}
+	assistant := parseGoogleResponse(resp)
 
-	result := chatResponse{Message: out}
-	if parsed.Usage != nil {
+	result := chatResponse{Message: assistant}
+	if resp.UsageMetadata != nil {
 		result.Usage = chatUsage{
-			InputTokens:  parsed.Usage.PromptTokens,
-			OutputTokens: parsed.Usage.CompletionTokens,
-			Available:    true,
-		}
-	} else if parsed.UsageMetadata != nil {
-		result.Usage = chatUsage{
-			InputTokens:  parsed.UsageMetadata.PromptTokenCount,
-			OutputTokens: parsed.UsageMetadata.CandidatesTokenCount,
-			Available:    true,
+			InputTokens:  int(resp.UsageMetadata.PromptTokenCount),
+			OutputTokens: int(resp.UsageMetadata.CandidatesTokenCount),
+			Available:    resp.UsageMetadata.PromptTokenCount > 0 || resp.UsageMetadata.CandidatesTokenCount > 0,
 		}
 	}
 	return result, nil
+}
+
+// parseGoogleResponse extracts text and function calls directly from the response's
+// candidate parts rather than using the SDK's Text()/FunctionCalls() helpers, which
+// log an unsolicited warning to stderr via the standard log package whenever a
+// response mixes text and function-call parts (the common case for tool-using turns).
+func parseGoogleResponse(resp *genai.GenerateContentResponse) message {
+	assistant := message{Role: "assistant"}
+	if len(resp.Candidates) == 0 || resp.Candidates[0].Content == nil {
+		return assistant
+	}
+	textParts := make([]string, 0, 2)
+	for _, part := range resp.Candidates[0].Content.Parts {
+		if part == nil {
+			continue
+		}
+		if text := strings.TrimSpace(part.Text); text != "" {
+			textParts = append(textParts, text)
+		}
+		if part.FunctionCall != nil {
+			assistant.ToolCalls = append(assistant.ToolCalls, toolCall{
+				ID:   part.FunctionCall.ID,
+				Type: "function",
+				Function: toolFunctionCall{
+					Name:      part.FunctionCall.Name,
+					Arguments: part.FunctionCall.Args,
+				},
+			})
+		}
+	}
+	assistant.Content = strings.TrimSpace(strings.Join(textParts, "\n"))
+	return assistant
+}
+
+func googleContentRole(role string) genai.Role {
+	if role == "assistant" {
+		return genai.RoleModel
+	}
+	return genai.RoleUser
 }

@@ -11,6 +11,7 @@ import (
 )
 
 var chatExecutor = chat
+var chatStreamExecutor = chatStream
 
 type executionTask struct {
 	ID     int
@@ -60,7 +61,7 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 			roundMessages = append(roundMessages[:insertAt], append([]message{stateMessage, defenseMessage}, roundMessages[insertAt:]...)...)
 		}
 
-		response, err := chatExecutor(ctx, aiCfg, roundMessages, tools)
+		response, err := chatStreamExecutor(ctx, aiCfg, roundMessages, tools, nil)
 		if err != nil {
 			return "", nil, err
 		}
@@ -68,6 +69,9 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 		assistant := response.Message
 		if strings.TrimSpace(assistant.Role) == "" {
 			assistant.Role = "assistant"
+		}
+		if len(response.Attachments) > 0 {
+			assistant.Attachments = response.Attachments
 		}
 		for j := range assistant.ToolCalls {
 			if strings.TrimSpace(assistant.ToolCalls[j].ID) == "" {

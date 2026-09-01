@@ -175,20 +175,6 @@ func TestProviderResponseUsageIsNormalized(t *testing.T) {
 			input:   12,
 			output:  8,
 		},
-		{
-			name:    "google",
-			adapter: googleAdapter{},
-			body:    `{"choices":[{"message":{"role":"assistant","content":"ok"}}],"usage":{"prompt_tokens":40,"completion_tokens":10}}`,
-			input:   40,
-			output:  10,
-		},
-		{
-			name:    "anthropic",
-			adapter: anthropicAdapter{},
-			body:    `{"content":[{"type":"text","text":"ok"}],"usage":{"input_tokens":50,"output_tokens":15}}`,
-			input:   50,
-			output:  15,
-		},
 	}
 
 	for _, tt := range tests {

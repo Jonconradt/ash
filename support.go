@@ -34,14 +34,15 @@ type historyData struct {
 }
 
 type toolCommandResult struct {
-	OK        bool   `json:"ok"`
-	Untrusted bool   `json:"untrusted,omitempty"`
-	Command   string `json:"command"`
-	ExitCode  int    `json:"exit_code"`
-	Stdout    string `json:"stdout,omitempty"`
-	Stderr    string `json:"stderr,omitempty"`
-	Error     string `json:"error,omitempty"`
-	EID       string `json:"eid,omitempty"`
+	OK          bool         `json:"ok"`
+	Untrusted   bool         `json:"untrusted,omitempty"`
+	Command     string       `json:"command"`
+	ExitCode    int          `json:"exit_code"`
+	Stdout      string       `json:"stdout,omitempty"`
+	Stderr      string       `json:"stderr,omitempty"`
+	Error       string       `json:"error,omitempty"`
+	EID         string       `json:"eid,omitempty"`
+	Attachments []attachment `json:"-"`
 }
 
 type recurringJobMetadata struct {
