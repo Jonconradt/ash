@@ -154,8 +154,105 @@ case $shell_name in
 esac
 
 # When this script itself is piped (curl ... | sh), stdin is the script body, not the user's
-# terminal. Redirect from /dev/tty so 'ash install' can still prompt interactively.
-if [ -r /dev/tty ] && [ -c /dev/tty ]; then
+# terminal, so interactive prompts must read from /dev/tty instead. The device node can exist
+# and still be unopenable when there is no controlling terminal, so probe it by opening it.
+if { : < /dev/tty; } 2>/dev/null; then
+  have_tty=yes
+else
+  have_tty=no
+fi
+
+# 'ash install' builds a virtualenv for the bundled Python tools, which needs the venv module
+# and ensurepip. Several platforms ship those separately from the base python3, so offer to
+# install them here rather than letting venv creation fail with a cryptic ensurepip error.
+ensure_python_venv() {
+  command -v python3 >/dev/null 2>&1 || return 0
+  python3 -c 'import ensurepip, venv' >/dev/null 2>&1 && return 0
+
+  printf '\nash bundles optional Python tools that need the python3 venv module and ensurepip.\n' >&2
+  printf 'Your python3 does not provide them.\n' >&2
+  printf 'ash works without them; only the bundled Python tools are disabled.\n' >&2
+
+  venv_package=''
+  venv_install_cmd=''
+  venv_privileged=no
+  case $goos in
+    linux)
+      if command -v apt-get >/dev/null 2>&1; then
+        venv_package=python3-venv
+        venv_install_cmd='apt-get install -y python3-venv'
+        venv_privileged=yes
+      fi
+      ;;
+    freebsd)
+      # FreeBSD ships pip (and the bundled wheels ensurepip needs) as a versioned pyXY-pip package.
+      if command -v pkg >/dev/null 2>&1; then
+        python_abi=$(python3 -c 'import sys; print("py%d%d" % sys.version_info[:2])' 2>/dev/null) || python_abi=''
+        if [ -n "$python_abi" ]; then
+          venv_package="$python_abi-pip"
+          venv_install_cmd="pkg install -y $python_abi-pip"
+          venv_privileged=yes
+        fi
+      fi
+      ;;
+    darwin)
+      # Homebrew's python includes venv and ensurepip, and must never be run under sudo.
+      if command -v brew >/dev/null 2>&1; then
+        venv_package=python
+        venv_install_cmd='brew install python'
+        venv_privileged=no
+      fi
+      ;;
+  esac
+
+  if [ -z "$venv_install_cmd" ]; then
+    printf "Install your platform's python3 venv/pip package, then rerun: ash install\n\n" >&2
+    return 0
+  fi
+
+  if [ "$venv_privileged" = yes ] && [ "$(id -u)" != 0 ]; then
+    if ! command -v sudo >/dev/null 2>&1; then
+      printf 'Install it as root with: %s\nThen rerun: ash install\n\n' "$venv_install_cmd" >&2
+      return 0
+    fi
+    venv_install_cmd="sudo $venv_install_cmd"
+  fi
+
+  if [ "$have_tty" != yes ]; then
+    printf 'No terminal is available to prompt you.\n' >&2
+    printf 'Install it with: %s\nThen rerun: ash install\n\n' "$venv_install_cmd" >&2
+    return 0
+  fi
+
+  printf 'Install %s now (%s)? [y/N] ' "$venv_package" "$venv_install_cmd" >&2
+  answer=''
+  read -r answer < /dev/tty || answer=''
+  case $answer in
+    y|Y|yes|Yes|YES) ;;
+    *)
+      printf 'Skipping. Install it later with: %s\n\n' "$venv_install_cmd" >&2
+      return 0
+      ;;
+  esac
+
+  # The install can fail on a bad sudo password, a user outside sudoers, or a missing
+  # package; none of that is fatal to installing ash itself.
+  # shellcheck disable=SC2024 # the /dev/tty redirect feeds the package manager's stdin, not sudo's
+  if $venv_install_cmd < /dev/tty >&2; then
+    if python3 -c 'import ensurepip, venv' >/dev/null 2>&1; then
+      printf 'python3 venv module is now available.\n\n' >&2
+    else
+      printf '%s installed but the venv module is still unavailable; continuing without bundled Python tools.\n\n' "$venv_package" >&2
+    fi
+  else
+    printf 'Could not install %s; continuing without bundled Python tools.\n\n' "$venv_package" >&2
+  fi
+  return 0
+}
+
+ensure_python_venv
+
+if [ "$have_tty" = yes ]; then
   "$install_dir/ash" install --shell "$install_shell" < /dev/tty
 else
   "$install_dir/ash" install --shell "$install_shell"
