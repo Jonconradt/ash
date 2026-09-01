@@ -545,7 +545,6 @@ func TestChatOpenAIChatCompletionsAdapterForNonOpenAIHost(t *testing.T) {
 }
 
 func TestAlwaysUseOpenAIAPIForOllamaOverridesProvider(t *testing.T) {
-	t.Setenv("ASH_ALWAYS_OPENAI_API", "")
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv(aiEnvEndpoint, "http://localhost:11434")
@@ -553,12 +552,22 @@ func TestAlwaysUseOpenAIAPIForOllamaOverridesProvider(t *testing.T) {
 	t.Setenv(aiEnvAuthToken, "")
 	t.Setenv(aiEnvProvider, "")
 
+	t.Setenv("ASH_ALWAYS_OPENAI_API", "")
 	cfg, err := parseAIConfigFromEnv()
 	if err != nil {
 		t.Fatalf("parseAIConfigFromEnv returned error: %v", err)
 	}
+	if cfg.Provider != providerOpenAI {
+		t.Fatalf("expected providerOpenAI by default, got %q", cfg.Provider)
+	}
+
+	t.Setenv("ASH_ALWAYS_OPENAI_API", "0")
+	cfg, err = parseAIConfigFromEnv()
+	if err != nil {
+		t.Fatalf("parseAIConfigFromEnv returned error: %v", err)
+	}
 	if cfg.Provider != providerOllama {
-		t.Fatalf("expected providerOllama by default, got %q", cfg.Provider)
+		t.Fatalf("expected providerOllama when ASH_ALWAYS_OPENAI_API=0, got %q", cfg.Provider)
 	}
 
 	t.Setenv("ASH_ALWAYS_OPENAI_API", "1")
@@ -638,7 +647,7 @@ func TestChatOpenAIAdapterCancelsPromptly(t *testing.T) {
 }
 
 func TestChatStreamDisabledFallsBackToChatExecutor(t *testing.T) {
-	t.Setenv("ASH_STREAM", "")
+	t.Setenv("ASH_STREAM", "0")
 	originalExecutor := chatExecutor
 	t.Cleanup(func() { chatExecutor = originalExecutor })
 	chatExecutor = func(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolDefinition) (chatResponse, error) {
@@ -751,36 +760,56 @@ func TestChatSDKPathRecordsProcessingAndTokenMetrics(t *testing.T) {
 }
 
 func TestVerboseSessionLogReportsOllamaOpenAIAPIAndStreamRequest(t *testing.T) {
-	home := t.TempDir()
-	t.Setenv("HOME", home)
-	t.Setenv("SESSION_ID", "")
-	t.Setenv("ASH_VERBOSE", "true")
-	t.Setenv(ashEnvAlwaysOpenAIAPI, "on")
-	t.Setenv("ASH_STREAM", "yes")
-	t.Setenv(aiEnvEndpoint, "http://localhost:11434")
-	t.Setenv(aiEnvModel, "llama3.1")
-
-	originalChatStreamExecutor := chatStreamExecutor
-	chatStreamExecutor = func(context.Context, aiConfig, []message, []toolDefinition, func(streamDelta)) (chatResponse, error) {
-		return chatResponse{Message: message{Role: "assistant", Content: "ok"}}, nil
-	}
-	t.Cleanup(func() { chatStreamExecutor = originalChatStreamExecutor })
-
-	var stdout bytes.Buffer
-	var stderr syncBuffer
-	if code := run([]string{"hello"}, &stdout, &stderr); code != 0 {
-		t.Fatalf("run returned %d, stderr=%q", code, stderr.String())
+	// Thoroughly exercises all four combinations of ASH_ALWAYS_OPENAI_API and
+	// ASH_STREAM, since both now default to on.
+	tests := []struct {
+		name          string
+		alwaysOpenAI  string
+		stream        string
+		wantProvider  aiProvider
+		wantOllamaAPI bool
+		wantStreamReq bool
+	}{
+		{name: "both on", alwaysOpenAI: "on", stream: "yes", wantProvider: providerOpenAI, wantOllamaAPI: true, wantStreamReq: true},
+		{name: "both off", alwaysOpenAI: "0", stream: "0", wantProvider: providerOllama, wantOllamaAPI: false, wantStreamReq: false},
+		{name: "openai api on, stream off", alwaysOpenAI: "1", stream: "off", wantProvider: providerOpenAI, wantOllamaAPI: true, wantStreamReq: false},
+		{name: "openai api off, stream on", alwaysOpenAI: "false", stream: "1", wantProvider: providerOllama, wantOllamaAPI: false, wantStreamReq: true},
 	}
 
-	record := findDebugLogRecord(t, stderr.String(), "ash session started")
-	if record["provider"] != string(providerOpenAI) {
-		t.Fatalf("expected redirected provider %q, got %#v", providerOpenAI, record["provider"])
-	}
-	if record["ollama_openai_api"] != true {
-		t.Fatalf("expected ollama_openai_api=true, got %#v", record["ollama_openai_api"])
-	}
-	if record["stream_requested"] != true {
-		t.Fatalf("expected stream_requested=true, got %#v", record["stream_requested"])
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			home := t.TempDir()
+			t.Setenv("HOME", home)
+			t.Setenv("SESSION_ID", "")
+			t.Setenv("ASH_VERBOSE", "true")
+			t.Setenv(ashEnvAlwaysOpenAIAPI, tt.alwaysOpenAI)
+			t.Setenv("ASH_STREAM", tt.stream)
+			t.Setenv(aiEnvEndpoint, "http://localhost:11434")
+			t.Setenv(aiEnvModel, "llama3.1")
+
+			originalChatStreamExecutor := chatStreamExecutor
+			chatStreamExecutor = func(context.Context, aiConfig, []message, []toolDefinition, func(streamDelta)) (chatResponse, error) {
+				return chatResponse{Message: message{Role: "assistant", Content: "ok"}}, nil
+			}
+			t.Cleanup(func() { chatStreamExecutor = originalChatStreamExecutor })
+
+			var stdout bytes.Buffer
+			var stderr syncBuffer
+			if code := run([]string{"hello"}, &stdout, &stderr); code != 0 {
+				t.Fatalf("run returned %d, stderr=%q", code, stderr.String())
+			}
+
+			record := findDebugLogRecord(t, stderr.String(), "ash session started")
+			if record["provider"] != string(tt.wantProvider) {
+				t.Fatalf("expected provider %q, got %#v", tt.wantProvider, record["provider"])
+			}
+			if record["ollama_openai_api"] != tt.wantOllamaAPI {
+				t.Fatalf("expected ollama_openai_api=%v, got %#v", tt.wantOllamaAPI, record["ollama_openai_api"])
+			}
+			if record["stream_requested"] != tt.wantStreamReq {
+				t.Fatalf("expected stream_requested=%v, got %#v", tt.wantStreamReq, record["stream_requested"])
+			}
+		})
 	}
 }
 
@@ -4188,8 +4217,10 @@ func TestZshRoutingPolicy(t *testing.T) {
 
 func TestRun(t *testing.T) {
 	t.Setenv("ASH_VERBOSE", "")
-	t.Setenv("ASH_STREAM", "")
-	t.Setenv(ashEnvAlwaysOpenAIAPI, "")
+	// This suite exercises the legacy Ollama chat-format test doubles below, so it
+	// explicitly disables both flags rather than relying on their (now-on) defaults.
+	t.Setenv("ASH_STREAM", "0")
+	t.Setenv(ashEnvAlwaysOpenAIAPI, "0")
 	originalCwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd failed: %v", err)

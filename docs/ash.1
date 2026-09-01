@@ -194,26 +194,25 @@ or
 to disable.
 .TP
 .B ASH_ALWAYS_OPENAI_API
-Optional testing toggle. Defaults to off. When set to a true-like value (for
+Optional testing toggle. Defaults to on. When set to a false-like value (for
 example,
-.B 1
+.B 0
 or
-.B on),
+.B off),
 the
 .B ollama
-provider routes through the OpenAI-compatible adapter instead of its
-hand-rolled implementation, to help determine whether the Ollama-specific
-implementation is still required.
+provider uses its hand-rolled implementation instead of routing through the
+OpenAI-compatible adapter.
 .TP
 .B ASH_STREAM
-Optional toggle. Defaults to off. When set to a true-like value (for
+Optional toggle. Defaults to on. When set to a false-like value (for
 example,
-.B 1
+.B 0
 or
-.B on),
-requests to providers that support it are streamed incrementally rather
-than waited for as a single response. This currently only affects internal
-response accumulation, not live terminal output.
+.B off),
+requests to providers that support streaming wait for a single complete
+response instead of streaming incrementally. This currently only affects
+internal response accumulation, not live terminal output.
 .TP
 .B ASH_ATTACHMENT_MAX_BYTES
 Optional max size in bytes for a single

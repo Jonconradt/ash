@@ -37,8 +37,10 @@ func TestFormatAssistantOutputGolden(t *testing.T) {
 
 func TestRunGoldenFailurePromptDirectoryAndExecutables(t *testing.T) {
 	t.Setenv("ASH_VERBOSE", "")
-	t.Setenv("ASH_STREAM", "")
-	t.Setenv(ashEnvAlwaysOpenAIAPI, "")
+	// This test's fake server speaks the legacy Ollama chat format, so it
+	// explicitly disables both flags rather than relying on their (now-on) defaults.
+	t.Setenv("ASH_STREAM", "0")
+	t.Setenv(ashEnvAlwaysOpenAIAPI, "0")
 	originalRunner := toolCommandRunner
 	originalRenderer := markdownRenderer
 	originalCwd, err := os.Getwd()

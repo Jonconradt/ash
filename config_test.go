@@ -5,8 +5,85 @@ import (
 	"testing"
 )
 
-func TestParseAIConfigFromEnv(t *testing.T) {
+func TestAlwaysUseOpenAIAPIForOllama(t *testing.T) {
+	tests := []struct {
+		name string
+		env  string
+		want bool
+	}{
+		{name: "unset defaults to on", env: "", want: true},
+		{name: "unrecognized value defaults to on", env: "maybe", want: true},
+		{name: "explicit 1", env: "1", want: true},
+		{name: "explicit true", env: "true", want: true},
+		{name: "explicit on", env: "on", want: true},
+		{name: "explicit 0", env: "0", want: false},
+		{name: "explicit false", env: "false", want: false},
+		{name: "explicit off", env: "off", want: false},
+		{name: "explicit disabled", env: "disabled", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv(ashEnvAlwaysOpenAIAPI, tt.env)
+			if got := alwaysUseOpenAIAPIForOllama(); got != tt.want {
+				t.Fatalf("alwaysUseOpenAIAPIForOllama() with %s=%q = %v, want %v", ashEnvAlwaysOpenAIAPI, tt.env, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestStreamingEnabled(t *testing.T) {
+	tests := []struct {
+		name string
+		env  string
+		want bool
+	}{
+		{name: "unset defaults to on", env: "", want: true},
+		{name: "unrecognized value defaults to on", env: "maybe", want: true},
+		{name: "explicit 1", env: "1", want: true},
+		{name: "explicit true", env: "true", want: true},
+		{name: "explicit on", env: "on", want: true},
+		{name: "explicit 0", env: "0", want: false},
+		{name: "explicit false", env: "false", want: false},
+		{name: "explicit off", env: "off", want: false},
+		{name: "explicit disabled", env: "disabled", want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("ASH_STREAM", tt.env)
+			if got := streamingEnabled(); got != tt.want {
+				t.Fatalf("streamingEnabled() with ASH_STREAM=%q = %v, want %v", tt.env, got, tt.want)
+			}
+		})
+	}
+}
+
+// TestParseAIConfigFromEnvOllamaOpenAIAPIDefault covers the ASH_ALWAYS_OPENAI_API
+// default (on) end-to-end through parseAIConfigFromEnv, separately from the raw
+// provider-detection table above which explicitly disables it.
+func TestParseAIConfigFromEnvOllamaOpenAIAPIDefault(t *testing.T) {
+	t.Setenv("AI_ENDPOINT", "http://localhost:11434")
+	t.Setenv("AI_MODEL", "llama3.1")
+	t.Setenv("AI_PROVIDER", "")
 	t.Setenv(ashEnvAlwaysOpenAIAPI, "")
+
+	cfg, err := parseAIConfigFromEnv()
+	if err != nil {
+		t.Fatalf("parseAIConfigFromEnv returned unexpected error: %v", err)
+	}
+	if cfg.Provider != providerOpenAI {
+		t.Fatalf("expected providerOpenAI by default for an ollama endpoint, got %q", cfg.Provider)
+	}
+	if !cfg.OllamaOpenAIAPI {
+		t.Fatal("expected OllamaOpenAIAPI=true by default")
+	}
+}
+
+func TestParseAIConfigFromEnv(t *testing.T) {
+	// This table exercises raw provider detection (detectAIProvider), so it
+	// explicitly disables the ASH_ALWAYS_OPENAI_API override rather than relying
+	// on its default (which is now on) - see TestAlwaysUseOpenAIAPIForOllamaDefaultsToOn
+	// for coverage of the default itself.
+	t.Setenv(ashEnvAlwaysOpenAIAPI, "0")
 	tests := []struct {
 		name           string
 		env            map[string]string
@@ -184,7 +261,7 @@ func TestParseAIConfigFromEnv(t *testing.T) {
 			t.Setenv("AI_AUTH_TOKEN", "")
 			t.Setenv("AI_PROVIDER", "")
 			t.Setenv("AI_CACHE", "")
-			t.Setenv(ashEnvAlwaysOpenAIAPI, "")
+			t.Setenv(ashEnvAlwaysOpenAIAPI, "0")
 			t.Setenv("SHELL", "")
 			for k, v := range tt.env {
 				t.Setenv(k, v)

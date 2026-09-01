@@ -116,26 +116,25 @@ func parseAICacheEnabled(raw string) (bool, error) {
 }
 
 // alwaysUseOpenAIAPIForOllama reports whether ASH_ALWAYS_OPENAI_API is truthy.
-// Defaults to false (off) when unset or unrecognized.
+// Defaults to true (on) when unset or unrecognized; set it to a falsy value
+// to opt back into the hand-rolled ollama adapter.
 func alwaysUseOpenAIAPIForOllama() bool {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv(ashEnvAlwaysOpenAIAPI))) {
-	case "1", "true", "yes", "on", "enabled":
-		return true
-	default:
+	case "0", "false", "no", "off", "disabled":
 		return false
+	default:
+		return true
 	}
 }
 
-// streamingEnabled reports whether ASH_STREAM is truthy. Defaults to false (off)
-// when unset or unrecognized: streaming currently only affects internal response
-// accumulation (see chatStream), not live terminal output, so it defaults off
-// until a follow-up UX pass decides how streamed text should be displayed.
+// streamingEnabled reports whether ASH_STREAM is truthy. Defaults to true (on)
+// when unset or unrecognized; set it to a falsy value to disable streaming.
 func streamingEnabled() bool {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv("ASH_STREAM"))) {
-	case "1", "true", "yes", "on", "enabled":
-		return true
-	default:
+	case "0", "false", "no", "off", "disabled":
 		return false
+	default:
+		return true
 	}
 }
 

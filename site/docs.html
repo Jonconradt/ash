@@ -82,7 +82,7 @@ ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></pre>
             <dt><code>AI_MODEL</code></dt><dd>Required model name sent to the endpoint.</dd>
             <dt><code>AI_PROVIDER</code></dt><dd>Optional provider override: <code>anthropic</code>, <code>bedrock</code>, <code>cohere</code>, <code>gemini</code>, <code>google</code>, <code>ollama</code>, or <code>openai</code>. When unset, ash detects the provider from the endpoint.</dd>
             <dt><code>AI_TIMEOUT</code></dt><dd>Optional request timeout. Default: <code>3m</code>.</dd>
-            <dt><code>ASH_ALWAYS_OPENAI_API</code></dt><dd>Optional testing toggle. When true-like, routes the <code>ollama</code> provider through the OpenAI-compatible SDK adapter instead of its hand-rolled implementation. Default: off.</dd>
+            <dt><code>ASH_ALWAYS_OPENAI_API</code></dt><dd>Optional testing toggle. When true-like, routes the <code>ollama</code> provider through the OpenAI-compatible SDK adapter instead of its hand-rolled implementation. Default: on.</dd>
             <dt><code>ASH_ATTACHMENT_MAX_BYTES</code></dt><dd>Optional maximum size in bytes for a file passed via <code>--attach</code>. Default: <code>10485760</code> (10 MiB).</dd>
             <dt><code>ASH_HISTORY_MAX</code></dt><dd>Optional maximum history messages per key. Default: <code>40</code>.</dd>
             <dt><code>ASH_LOG_FILE</code></dt><dd>Optional debug log path when verbose logging is enabled.</dd>
@@ -93,7 +93,7 @@ ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></pre>
             <dt><code>ASH_RETRY_BASE_DELAY</code></dt><dd>Optional retry backoff base delay. Default: <code>250ms</code>.</dd>
             <dt><code>ASH_RETRY_MAX_ATTEMPTS</code></dt><dd>Optional retryable request attempts. Default: <code>3</code>.</dd>
             <dt><code>ASH_SCHEDULED_TASK</code></dt><dd>Internal scheduler flag used by ash-managed invocations.</dd>
-            <dt><code>ASH_STREAM</code></dt><dd>Optional toggle. When true-like, streams the response from providers whose adapter supports it (currently OpenAI only). Default: off.</dd>
+            <dt><code>ASH_STREAM</code></dt><dd>Optional toggle. When true-like, streams the response from providers whose adapter supports it (currently OpenAI only). Default: on.</dd>
             <dt><code>ASH_TASK_MAX</code></dt><dd>Optional cap on execution tasks derived from a request. Default: <code>6</code>.</dd>
             <dt><code>ASH_TASK_STALL_ROUNDS</code></dt><dd>Optional assistant stall rounds before stopping. Default: <code>2</code>.</dd>
             <dt><code>ASH_TOOL_ALLOWLIST</code></dt><dd>Optional comma-separated executable allowlist for <code>run_unix_command</code>. Otherwise <code>~/.ash/.ash_tools</code> is used when present; this override does not expand internal Ash tokens.</dd>

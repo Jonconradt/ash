@@ -229,7 +229,7 @@ Optional advanced overrides:
 ```bash
 export AI_PROVIDER="openai"   # optional: ollama|openai|google|anthropic|gemini
 export AI_CACHE="off"         # optional: on by default when provider supports native caching
-export ASH_STREAM="off"       # optional: stream responses when the provider adapter supports it (currently OpenAI only)
+export ASH_STREAM="off"       # optional: on by default; stream responses when the provider adapter supports it (currently OpenAI only)
 ```
 
 Pipeline examples:
@@ -273,8 +273,8 @@ Notes:
 - `AI_PROVIDER` (optional): Override auto-detected provider (`ollama`, `openai`, `google`, `gemini`, `anthropic`).
   Also accepts `cohere` and `bedrock` for the native SDK-based adapters (auto-detected from `api.cohere.com`/`bedrock-runtime.*.amazonaws.com` when not set explicitly).
 - `AI_CACHE` (optional): Enable or disable provider-native caching (`true/false`). Default `true`.
-- `ASH_ALWAYS_OPENAI_API` (optional): When true-like, routes the `ollama` provider through the OpenAI-compatible SDK adapter instead of its hand-rolled implementation. Default off.
-- `ASH_STREAM` (optional): When true-like, streams the response from providers whose adapter supports it (currently OpenAI only). Default off; has no visible effect on output today (see [docs/ash.1](docs/ash.1)).
+- `ASH_ALWAYS_OPENAI_API` (optional): When true-like, routes the `ollama` provider through the OpenAI-compatible SDK adapter instead of its hand-rolled implementation. Default on; set to a falsy value (e.g. `0`/`off`) to use the hand-rolled ollama adapter.
+- `ASH_STREAM` (optional): When true-like, streams the response from providers whose adapter supports it (currently OpenAI only). Default on; set to a falsy value (e.g. `0`/`off`) to disable. Has no visible effect on output today (see [docs/ash.1](docs/ash.1)).
 - `ASH_ATTACHMENT_MAX_BYTES` (optional): Max size in bytes for a file passed via `--attach`. Default 10485760 (10 MiB).
 - `AI` (legacy, unsupported): Deprecated and rejected; use `AI_ENDPOINT` and `AI_MODEL`.
 - `AI_TIMEOUT` (optional): AI request timeout. Default `3m`.
