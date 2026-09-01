@@ -93,9 +93,10 @@ func TestBackoffDelay(t *testing.T) {
 		max     time.Duration
 		want    time.Duration
 	}{
-		{name: "first attempt has no delay", attempt: 1, base: time.Second, max: 0, want: 0},
-		{name: "second attempt uses base delay", attempt: 2, base: time.Second, max: 0, want: time.Second},
-		{name: "third attempt doubles base delay", attempt: 3, base: time.Second, max: 0, want: 2 * time.Second},
+		{name: "attempt below one has no delay", attempt: 0, base: time.Second, max: 0, want: 0},
+		{name: "first attempt uses base delay", attempt: 1, base: time.Second, max: 0, want: time.Second},
+		{name: "second attempt doubles base delay", attempt: 2, base: time.Second, max: 0, want: 2 * time.Second},
+		{name: "third attempt quadruples base delay", attempt: 3, base: time.Second, max: 0, want: 4 * time.Second},
 		{name: "delay clamps to max", attempt: 10, base: time.Second, max: 5 * time.Second, want: 5 * time.Second},
 		{name: "large attempt count still clamps to max", attempt: 1000, base: time.Second, max: 30 * time.Second, want: 30 * time.Second},
 	}
@@ -4511,6 +4512,47 @@ func TestRun(t *testing.T) {
 		}
 		if strings.Contains(stderr.String(), "ollama request failed") {
 			t.Fatalf("expected dedicated 500 message, got %q", stderr.String())
+		}
+	})
+
+	t.Run("cloud 429 shows playful rate limit message", func(t *testing.T) {
+		home := t.TempDir()
+		cwd := t.TempDir()
+		t.Setenv("HOME", home)
+		if err := os.Chdir(cwd); err != nil {
+			t.Fatalf("Chdir failed: %v", err)
+		}
+
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			http.Error(w, "quota exceeded", http.StatusTooManyRequests)
+		}))
+		defer srv.Close()
+
+		origPicker := pickCloudRateLimit429Message
+		t.Cleanup(func() { pickCloudRateLimit429Message = origPicker })
+		pickCloudRateLimit429Message = func() string { return "cloud 429 test fallback message" }
+
+		t.Setenv("AI", "")
+		t.Setenv("AI_ENDPOINT", srv.URL)
+		t.Setenv("AI_MODEL", "llama3.1")
+		t.Setenv("ASH_RETRY_BASE_DELAY", "1ms")
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		code := run([]string{"hello"}, &stdout, &stderr)
+		if code != 1 {
+			t.Fatalf("expected exit code 1, got %d", code)
+		}
+		if !strings.Contains(stderr.String(), "cloud 429 test fallback message") {
+			t.Fatalf("expected playful 429 fallback, got %q", stderr.String())
+		}
+		if !strings.Contains(stderr.String(), "server said: 429") {
+			t.Fatalf("expected status detail in 429 message, got %q", stderr.String())
+		}
+		if !strings.Contains(stderr.String(), "quota exceeded") {
+			t.Fatalf("expected server body in 429 message, got %q", stderr.String())
+		}
+		if strings.Contains(stderr.String(), "ollama request failed") {
+			t.Fatalf("expected dedicated 429 message, got %q", stderr.String())
 		}
 	})
 

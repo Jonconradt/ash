@@ -237,10 +237,13 @@ func run(args []string, stdout, stderr io.Writer) int {
 		if errors.As(err, &statusErr) {
 			switch statusErr.StatusCode {
 			case http.StatusServiceUnavailable:
-				slog.Warn(pickCloudBusy503Message(), "EID", "PUNKPM4h")
+				slog.Warn(withStatusDetail(pickCloudBusy503Message(), statusErr), "EID", "PUNKPM4h")
 				return 1
 			case http.StatusInternalServerError:
-				slog.Warn(pickCloudServer500Message(), "EID", "Aew3mapm")
+				slog.Warn(withStatusDetail(pickCloudServer500Message(), statusErr), "EID", "Aew3mapm")
+				return 1
+			case http.StatusTooManyRequests:
+				slog.Warn(withStatusDetail(pickCloudRateLimit429Message(), statusErr), "EID", "Qm7VtLx2")
 				return 1
 			}
 		}

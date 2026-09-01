@@ -518,7 +518,9 @@ func installUpgradeArchive(content []byte, version string, options upgradeOption
 	}
 	restartStaleBrokerDaemons(destinationDir)
 	provisionPythonEnv(stdout)
-	_, _ = fmt.Fprintf(stdout, "updated ash to %s at %s (commit %s)\n", version, destination, ashCommit)
+	// ashCommit belongs to the binary being replaced, so reporting it here would name the
+	// version just left behind; the installed build's commit shows up in ASH_VERBOSE output.
+	_, _ = fmt.Fprintf(stdout, "updated ash to %s at %s\n", version, destination)
 	return nil
 }
 

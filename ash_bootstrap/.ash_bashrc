@@ -7,6 +7,9 @@ esac
 
 _ash_ensure_broker() {
 	[[ -n "${AI_ENDPOINT:-}" && -n "${AI_MODEL:-}" ]] || return 1
+	# Without this probe a missing ash-broker reaches command_not_found_handle, which
+	# would forward the broker's own command line to the AI as a prompt.
+	command -v ash-broker >/dev/null 2>&1 || return 1
 	if [[ -n "${ASH_BROKER_SOCKET:-}" && -n "${ASH_BROKER_TOKEN:-}" && -S "$ASH_BROKER_SOCKET" && -n "${ASH_BROKER_PID:-}" ]] && kill -0 "$ASH_BROKER_PID" 2>/dev/null; then
 		return 0
 	fi

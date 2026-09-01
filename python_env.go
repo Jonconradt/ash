@@ -116,6 +116,9 @@ func provisionManagedPythonEnv(stdout io.Writer) {
 		return
 	}
 
+	// Platforms without prebuilt wheels (FreeBSD in particular) build dependencies from
+	// source here, which can run for minutes with no pip output because of --quiet.
+	_, _ = fmt.Fprintln(stdout, "installing bundled python tool dependencies (this can take several minutes)...")
 	if runErr := runProvisionCommand(stdout, venvPython, "-m", "pip", "install", "--disable-pip-version-check", "--quiet", "-r", reqPath); runErr != nil {
 		_, _ = fmt.Fprintf(stdout, "python dependency install failed: %v\n", runErr)
 		_, _ = fmt.Fprintln(stdout, "bundled python tools that need third-party packages will report a missing-library error until this succeeds")

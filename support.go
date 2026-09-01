@@ -81,17 +81,18 @@ var (
 	newHTTPClient       = func(timeout time.Duration) *http.Client {
 		return &http.Client{Timeout: timeout}
 	}
-	argumentBlockPattern                 = regexp.MustCompile(`(;|\|\||&&|\||` + "`" + `|\$\(|>|<|\x00|\n|\r)`)
-	promptInjectionPattern               = regexp.MustCompile(`(?i)(ignore\s+(all\s+)?previous\s+instructions|disregard\s+previous\s+instructions|system\s+prompt|developer\s+message|you\s+are\s+now|jailbreak|override\s+instructions|follow\s+these\s+instructions\s+instead)`)
-	toolCommandRunner                    = runToolCommand
-	toolCommandWithInputRunner           = runToolCommandWithInput
-	toolPipelineRunner                   = runToolPipeline
-	pickCloudBusy503Message              = randomCloudBusy503Message
-	pickCloudServer500Message            = randomCloudServer500Message
-	debugWriter                io.Writer = os.Stderr
-	debugJSONLogging           bool
-	requestIDGenerator         func() string
-	appLogger                  *slog.Logger
+	argumentBlockPattern                   = regexp.MustCompile(`(;|\|\||&&|\||` + "`" + `|\$\(|>|<|\x00|\n|\r)`)
+	promptInjectionPattern                 = regexp.MustCompile(`(?i)(ignore\s+(all\s+)?previous\s+instructions|disregard\s+previous\s+instructions|system\s+prompt|developer\s+message|you\s+are\s+now|jailbreak|override\s+instructions|follow\s+these\s+instructions\s+instead)`)
+	toolCommandRunner                      = runToolCommand
+	toolCommandWithInputRunner             = runToolCommandWithInput
+	toolPipelineRunner                     = runToolPipeline
+	pickCloudBusy503Message                = randomCloudBusy503Message
+	pickCloudServer500Message              = randomCloudServer500Message
+	pickCloudRateLimit429Message           = randomCloudRateLimit429Message
+	debugWriter                  io.Writer = os.Stderr
+	debugJSONLogging             bool
+	requestIDGenerator           func() string
+	appLogger                    *slog.Logger
 )
 
 type agentBudget struct {

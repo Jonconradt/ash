@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptrace"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -125,6 +126,29 @@ var cloudServer500Messages = []string{
 	"The server took a wrong turn at runtime. Please retry shortly.",
 }
 
+var cloudRateLimit429Messages = []string{
+	"Rate limited: you and the model need a short break from each other.",
+	"Too many requests, too little patience. Give it a moment and try again.",
+	"The cloud put you in the polite queue. Please retry in a bit.",
+	"429: we asked too fast and the server tapped the brakes.",
+	"The model is enforcing a cooldown. Grab a coffee and retry shortly.",
+	"Slow down, speed racer. The API wants a breather before the next question.",
+	"Request quota hit its limit and is now lying down quietly. Try again soon.",
+	"The server is counting your requests and would like you to count to ten.",
+	"Throttled: the cloud is rationing answers for the next little while.",
+	"Too many requests in flight. The tower is holding you in a landing pattern.",
+	"429 from upstream: the rate limiter woke up and chose moderation.",
+	"You have out-typed your quota. A short pause should clear it.",
+	"The API is gently suggesting you pace yourself. Retry in a minute.",
+	"Rate limit reached: the meter is spinning and needs a moment to cool.",
+	"The cloud says you are being enthusiastic. Please try again shortly.",
+	"Requests are backing up at the door. Wait a beat and knock again.",
+	"429: quota exceeded, dignity intact. Try again in a little while.",
+	"The server is rate limiting, not rejecting. Same question, later time.",
+	"Traffic control engaged. Your next request should get through soon.",
+	"Too many requests: the model needs a snack break before continuing.",
+}
+
 // randomCloudBusy503Message returns a humorous retry message for transient 503 service-busy responses.
 func randomCloudBusy503Message() string {
 	if len(cloudBusy503Messages) == 0 {
@@ -141,6 +165,25 @@ func randomCloudServer500Message() string {
 	}
 	idx := int(timeNow().UnixNano() % int64(len(cloudServer500Messages)))
 	return cloudServer500Messages[idx]
+}
+
+// randomCloudRateLimit429Message returns a humorous retry message for 429 rate-limit responses.
+func randomCloudRateLimit429Message() string {
+	if len(cloudRateLimit429Messages) == 0 {
+		return "The server is rate limiting requests. Please try again shortly."
+	}
+	idx := int(timeNow().UnixNano() % int64(len(cloudRateLimit429Messages)))
+	return cloudRateLimit429Messages[idx]
+}
+
+// withStatusDetail appends the server's status code (and any response body) to a
+// friendly message so the playful wording still carries something debuggable.
+func withStatusDetail(message string, statusErr chatStatusError) string {
+	detail := strconv.Itoa(statusErr.StatusCode)
+	if body := strings.TrimSpace(statusErr.Body); body != "" {
+		detail += ": " + body
+	}
+	return fmt.Sprintf("%s (server said: %s)", message, detail)
 }
 
 // chatStream sends a chat request and streams incremental text deltas to onDelta as they
@@ -394,13 +437,15 @@ func shouldRetryStatusCode(statusCode, attempt, maxAttempts int) bool {
 	}
 }
 
+// backoffDelay returns how long to wait after the given (1-based) failed attempt
+// before the next one, doubling from base and clamped to max.
 func backoffDelay(attempt int, base, max time.Duration) time.Duration {
-	if attempt <= 1 || base <= 0 {
+	if attempt < 1 || base <= 0 {
 		return 0
 	}
 	const maxDuration = time.Duration(1<<63 - 1)
 	delay := base
-	for step := 2; step < attempt; step++ {
+	for step := 1; step < attempt; step++ {
 		if max > 0 && delay >= max {
 			return max
 		}
