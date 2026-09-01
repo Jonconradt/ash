@@ -57,10 +57,10 @@
         <section id="installing">
           <h2>Installing and Updating</h2>
           <h3>Does ash work on Windows 11?</h3>
-          <p>Not as a currently released, fully supported platform. ash has a PowerShell 7 install target, but Windows release packaging is disabled and <code>ash update</code> intentionally rejects Windows. Use WSL for the supported Linux experience.</p>
+          <p>Not natively. ash supports bash, zsh, and Fish on macOS, Linux, and FreeBSD; there is no PowerShell install target. Use WSL for the supported Linux experience.</p>
 
           <h3>How do I install ash in the Windows Subsystem for Linux (WSL)?</h3>
-          <p>Install it inside your WSL distribution as Linux: <code>curl -fsSL https://jonconradt.github.io/ash/install.sh | sh</code>. Then configure <code>AI_ENDPOINT</code> and <code>AI_MODEL</code>, and run <code>ash install</code> for the shell running inside WSL. This is separate from any Windows PowerShell configuration.</p>
+          <p>Install it inside your WSL distribution as Linux: <code>curl -fsSL https://jonconradt.github.io/ash/install.sh | sh</code>. Then configure <code>AI_ENDPOINT</code> and <code>AI_MODEL</code>, and run <code>ash install</code> for the shell running inside WSL.</p>
 
           <h3>How do I update ash to the latest release version?</h3>
           <p>Run <code>ash update</code> on macOS, Linux, or FreeBSD. It downloads the latest stable matching archive, verifies the release manifest with its Sigstore bundle and SHA-256 digest, then installs to <code>~/.local/bin/ash</code>. Use <code>ash update --version vX.Y.Z</code> for a specific version; use <code>--yes</code> only when you want customized managed files replaced.</p>

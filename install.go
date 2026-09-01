@@ -64,7 +64,7 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 	}
 
 	if shellName == "" {
-		shellName = defaultInstallShell(os.Getenv("SHELL"), activeGOOS())
+		shellName = defaultInstallShell(os.Getenv("SHELL"))
 	}
 
 	rcPath, err := rcPathForShell(shellName)
@@ -653,7 +653,7 @@ func detectShellName(shellPath string) string {
 
 // rcPathForShell returns the user rc file path for the supplied shell name.
 func rcPathForShell(shellName string) (string, error) {
-	target, err := resolveInstallShellTarget(shellName, activeGOOS())
+	target, err := resolveInstallShellTarget(shellName)
 	if err != nil {
 		return "", err
 	}
@@ -740,15 +740,10 @@ func replaceManagedInstallBlock(existing, block string) (string, bool) {
 func installRecommendation() (string, error) {
 	shellName := detectShellName(os.Getenv("SHELL"))
 	if shellName == "" {
-		if activeGOOS() == "windows" {
-			shellName = shellPwsh
-		} else {
-			return "", nil
-		}
+		return "", nil
 	}
 
-	target, ok := installShellTargets[shellName]
-	if !ok || !target.SupportedOnOS(activeGOOS()) {
+	if _, ok := installShellTargets[shellName]; !ok {
 		return "", nil
 	}
 
@@ -815,7 +810,7 @@ func bashInstalledViaProfileSourcing() (bool, error) {
 
 // installSourceBlockForShell returns the shell snippet that sources ash for the supplied shell name.
 func installSourceBlockForShell(shellName string) string {
-	target, err := resolveInstallShellTarget(shellName, activeGOOS())
+	target, err := resolveInstallShellTarget(shellName)
 	if err != nil {
 		return ""
 	}
@@ -825,7 +820,7 @@ func installSourceBlockForShell(shellName string) string {
 
 // installShellWrapperPath returns the path to the shell wrapper file used by ash for the supplied shell.
 func installShellWrapperPath(shellName string) (string, error) {
-	target, err := resolveInstallShellTarget(shellName, activeGOOS())
+	target, err := resolveInstallShellTarget(shellName)
 	if err != nil {
 		return "", err
 	}
@@ -840,7 +835,7 @@ func installShellWrapperPath(shellName string) (string, error) {
 
 // ensureInstallShellWrapper ensures required state exists and is up to date.
 func ensureInstallShellWrapper(shellName string, dryRun bool, stdout io.Writer) error {
-	target, err := resolveInstallShellTarget(shellName, activeGOOS())
+	target, err := resolveInstallShellTarget(shellName)
 	if err != nil {
 		return err
 	}
@@ -864,7 +859,7 @@ func ensureInstallShellWrapper(shellName string, dryRun bool, stdout io.Writer) 
 
 // ensureShellPostInstall runs shell-specific post-install actions when needed.
 func ensureShellPostInstall(shellName string, dryRun bool, stdout io.Writer) error {
-	target, err := resolveInstallShellTarget(shellName, activeGOOS())
+	target, err := resolveInstallShellTarget(shellName)
 	if err != nil {
 		return err
 	}

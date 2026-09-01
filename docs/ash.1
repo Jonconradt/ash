@@ -7,7 +7,7 @@ ash \- practical shell assistant for command-not-found workflows
 .br
 .B ash
 .B install
-.RI [ --shell " bash|fish|zsh|pwsh" ]
+.RI [ --shell " bash|fish|zsh" ]
 .RI [ --dry-run ]
 .RI [ --overwrite ]
 .br
@@ -33,10 +33,6 @@ For bash, the target is
 .I ~/.bashrc
 and for zsh the target is
 .I ~/.zshrc.
-For PowerShell 7 (
-.BR pwsh ),
-the target is
-.IR ~/Documents/PowerShell/Microsoft.PowerShell_profile.ps1 .
 For Fish, the target is
 .I $XDG_CONFIG_HOME/fish/config.fish
 (defaulting to
@@ -46,15 +42,15 @@ For Fish, the target is
 .B ash [text ...]
 Run a single assistant request.
 .TP
-.B ash install [--shell bash|fish|zsh|pwsh] [--dry-run]
+.B ash install [--shell bash|fish|zsh] [--dry-run]
 Install or update shell integration.
 .IP
 .B --shell
 Select a shell explicitly. When omitted,
 .B ash
 uses the current shell when possible and defaults to
-.B pwsh
-on Windows.
+.B bash
+when the shell cannot be detected.
 .IP
 .B --dry-run
 Preview file changes without writing.
@@ -140,7 +136,7 @@ are skipped by default;
 .B --yes
 replaces them and
 .B --skip-customized
-explicitly keeps them. Windows updates are not supported.
+explicitly keeps them.
 .SH ENVIRONMENT
 .TP
 .B AI_ENDPOINT
@@ -264,8 +260,7 @@ agents. Control-C cancels the parent and active child work. Tool, script, file,
 piped, and child output is untrusted data and must not override system or user
 instructions. This feature is not a sandbox when arbitrary Python or shell
 execution is enabled. On Unix, timeout and Control-C terminate the child
-process group; on Windows, immediate child cancellation is supported but
-descendant cleanup is not guaranteed.
+process group.
 .PP
 Ash also maintains a session-scoped scratch workspace under
 .IR ~/.ash/scratch/<session-id>/ .
@@ -354,11 +349,7 @@ Install managed bash integration.
 .TP
 .B ash install --shell zsh --dry-run
 Preview zsh integration changes.
-.TP
-.B ash install --shell pwsh
-Install managed PowerShell 7 integration.
 .SH SEE ALSO
 .BR bash (1),
 .BR zsh (1),
-.BR pwsh (1),
 .BR man (1)

@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"time"
 )
@@ -22,9 +21,6 @@ func managedVenvPython() (string, error) {
 	root, err := ashWorkspaceDir()
 	if err != nil {
 		return "", err
-	}
-	if runtime.GOOS == "windows" {
-		return filepath.Join(root, managedVenvDirName, "Scripts", "python.exe"), nil
 	}
 	return filepath.Join(root, managedVenvDirName, "bin", "python3"), nil
 }
@@ -60,9 +56,6 @@ func managedVenvReady(venvPython string) bool {
 		return false
 	}
 	pipPath := filepath.Join(filepath.Dir(venvPython), "pip")
-	if runtime.GOOS == "windows" {
-		pipPath += ".exe"
-	}
 	info, err := os.Stat(pipPath)
 	return err == nil && !info.IsDir()
 }

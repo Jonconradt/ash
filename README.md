@@ -185,7 +185,6 @@ Requirements for local packaging:
 
 - macOS with `pkgbuild` and `pkgutil` available
 - Linux packaging requires `fpm` (for `.deb`/`.rpm`) plus `dpkg-deb`/`rpm` for validation
-- Windows packaging requires `msitools` (`wixl` and `msiinfo`) and `python3`
 - Go toolchain installed
 
 The package is currently unsigned and not notarized by design.
@@ -352,10 +351,7 @@ Install shell integration (wrappers plus command-not-found hook):
 ```bash
 ash install --shell bash
 ash install --shell zsh
-ash install --shell pwsh
 ```
-
-On Windows 11, `ash install` defaults to `pwsh` when `--shell` is omitted.
 
 Preview without writing files:
 
@@ -365,7 +361,6 @@ ash install --shell bash --dry-run
 
 `ash install` is idempotent and appends a single managed block to your rc file.
 For bash it targets `~/.bashrc`; for zsh it targets `~/.zshrc`.
-For PowerShell 7 (`pwsh`) it targets `~/Documents/PowerShell/Microsoft.PowerShell_profile.ps1`.
 During install, if `./.ash_system` or `./.ash_tools` exist in your current
 directory, they are copied into `~/.ash/` and become the canonical files used
 by `ash`.
@@ -393,8 +388,7 @@ The updater supports macOS, Linux, and FreeBSD on amd64 and arm64 and installs t
 Sigstore keyless signature for `SHA256SUMS`
 against the `Jonconradt/ash` release workflow, then verifies the selected
 archive's SHA-256 digest. A missing or mismatched signature or digest is a hard
-failure and leaves the existing installation unchanged. Windows updates are not
-currently supported.
+failure and leaves the existing installation unchanged.
 
 Customized files under `~/.ash` are skipped by default. Use `--yes` to replace
 them, or `--skip-customized` to make the default explicit. The updater never
@@ -414,7 +408,6 @@ Installer implementation is split per shell target for maintainability:
 
 - `bash_install.go`
 - `zsh_install.go`
-- `pwsh_install.go`
 
 When enabled, `ash` logs structured diagnostics with Go's standard-library `log/slog` and prints an execution timing dashboard before exit. Logs include bounded metadata such as request IDs, statuses, durations, and sizes, but do not include prompts, credentials, raw tool arguments, or raw tool output.
 
@@ -439,7 +432,7 @@ Tool execution is local to your machine. Use a narrow allowlist.
 
 `run_python3` is separate from the Unix executable allowlist. It is published only when ash resolves its selected interpreter (`ASH_PYTHON`, the managed virtualenv, or system `python3`) and strict mode is disabled. To execute a generated script, write it with `ash_write_scratch_file` and pass the returned `absolute_path` as `script_path`; ash accepts only `.py` files inside the current scratch session. `ASH_STRICT=1` removes the tool and blocks ash-managed bundled `.py` tools as defense in depth.
 
-Sub-agents use the same ash executable, working directory, configuration, tools, and OS permissions. Their session IDs have the form `{parent-session-id}.{six-random-characters}`. Delegation is one level only: child agents cannot publish or invoke `run_sub_agent`, schedule ash, or directly invoke ash through the built-in tools. Control-C cancels the parent and terminates active child work. On Unix, ash places each child in a process group so cancellation and timeout terminate its descendants; Windows guarantees immediate child cancellation, but descendant cleanup is not a sandbox guarantee. Tool, script, file, piped, and child output is untrusted data and must not be treated as instructions or allowed to override the system prompt or user request. Arbitrary Python or shell programs may still launch processes independently; this feature is not a sandbox. Each ash process maintains its own HTTPS connection pool. A child process cannot reuse the parent process's live TLS connection, but retries within one process reuse its HTTP client and transport.
+Sub-agents use the same ash executable, working directory, configuration, tools, and OS permissions. Their session IDs have the form `{parent-session-id}.{six-random-characters}`. Delegation is one level only: child agents cannot publish or invoke `run_sub_agent`, schedule ash, or directly invoke ash through the built-in tools. Control-C cancels the parent and terminates active child work. On Unix, ash places each child in a process group so cancellation and timeout terminate its descendants. Tool, script, file, piped, and child output is untrusted data and must not be treated as instructions or allowed to override the system prompt or user request. Arbitrary Python or shell programs may still launch processes independently; this feature is not a sandbox. Each ash process maintains its own HTTPS connection pool. A child process cannot reuse the parent process's live TLS connection, but retries within one process reuse its HTTP client and transport.
 
 ### Allowlist configuration
 
