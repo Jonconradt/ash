@@ -134,6 +134,13 @@ install -m 0755 "$tmp_dir/$base-broker" "$install_dir/ash-broker" 2>/dev/null ||
   chmod 0755 "$install_dir/ash-broker" || fail "could not make ash-broker executable"
 }
 
+# Broker daemons are long-lived per-shell processes; kill stale ones so open
+# shells respawn a fresh broker running the binary just installed. The second
+# pattern catches pre-migration daemons started as "<binary> broker ..." (a
+# subcommand of the main binary) before the broker moved to its own executable.
+pkill -f "$install_dir/ash-broker" >/dev/null 2>&1 || true
+pkill -f "broker --socket .*--parent-pid" >/dev/null 2>&1 || true
+
 shell_name=$(basename "${SHELL:-}")
 case $shell_name in
   zsh) install_shell=zsh ;;

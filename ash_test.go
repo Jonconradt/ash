@@ -32,6 +32,7 @@ import (
 // TestMain keeps the suite from building real virtualenvs during install/upgrade tests.
 func TestMain(m *testing.M) {
 	provisionPythonEnv = func(io.Writer) {}
+	restartStaleBrokerDaemons = func(string) {}
 	os.Exit(m.Run())
 }
 

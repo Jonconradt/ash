@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptrace"
@@ -59,7 +60,26 @@ func aiTimeout() time.Duration {
 	return defaultAITimeout
 }
 
+// newBrokerLogger returns a JSON slog logger writing to w, matching the
+// structured logging convention ash.go uses (lowercase level, "message" key).
+// Kept as a minimal, self-contained duplicate of ash's support.go helper so
+// this binary never needs to import ash's own packages.
+func newBrokerLogger(w io.Writer) *slog.Logger {
+	return slog.New(slog.NewJSONHandler(w, &slog.HandlerOptions{
+		ReplaceAttr: func(groups []string, attr slog.Attr) slog.Attr {
+			if attr.Key == slog.MessageKey {
+				attr.Key = "message"
+			}
+			if attr.Key == slog.LevelKey {
+				attr.Value = slog.StringValue(strings.ToLower(attr.Value.String()))
+			}
+			return attr
+		},
+	}))
+}
+
 func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+	logger := newBrokerLogger(stderr)
 	var socket string
 	var parentPID int
 	for index := 0; index < len(args); index++ {
@@ -67,66 +87,66 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 		case "--socket":
 			index++
 			if index >= len(args) {
-				_, _ = fmt.Fprintln(stderr, "--socket requires a value")
+				logger.Error("--socket requires a value", "EID", "Hb4nRq2K")
 				return 2
 			}
 			socket = args[index]
 		case "--parent-pid":
 			index++
 			if index >= len(args) {
-				_, _ = fmt.Fprintln(stderr, "--parent-pid requires a value")
+				logger.Error("--parent-pid requires a value", "EID", "Wt7XmZ1p")
 				return 2
 			}
 			parsedPID, err := strconv.Atoi(args[index])
 			if err != nil || parsedPID <= 0 {
-				_, _ = fmt.Fprintln(stderr, "--parent-pid must be a positive integer")
+				logger.Error("--parent-pid must be a positive integer", "EID", "Qk3FbY8s")
 				return 2
 			}
 			parentPID = parsedPID
 		case "--lease":
 			index++
 			if index >= len(args) {
-				_, _ = fmt.Fprintln(stderr, "--lease requires a value")
+				logger.Error("--lease requires a value", "EID", "Zx9MdC4v")
 				return 2
 			}
 		default:
-			_, _ = fmt.Fprintf(stderr, "unknown broker option %q\n", args[index])
+			logger.Error(fmt.Sprintf("unknown broker option %q", args[index]), "EID", "Jp2VtR6w")
 			return 2
 		}
 	}
 	token := strings.TrimSpace(os.Getenv(brokerTokenEnv))
 	if socket == "" || token == "" || parentPID == 0 {
-		_, _ = fmt.Fprintln(stderr, "ash-broker requires --socket, --parent-pid, and ASH_BROKER_TOKEN")
+		logger.Error("ash-broker requires --socket, --parent-pid, and ASH_BROKER_TOKEN", "EID", "Nc5LpK9x")
 		return 2
 	}
 	endpoint := strings.TrimSpace(os.Getenv(aiEndpointEnv))
 	if endpoint == "" {
-		_, _ = fmt.Fprintln(stderr, "ash-broker requires a complete AI environment")
+		logger.Error("ash-broker requires a complete AI environment", "EID", "Ry8VqM3d")
 		return 2
 	}
 	endpointURL, err := url.Parse(endpoint)
 	if err != nil || endpointURL.Host == "" {
-		_, _ = fmt.Fprintln(stderr, "ash-broker requires a valid AI_ENDPOINT host")
+		logger.Error("ash-broker requires a valid AI_ENDPOINT host", "EID", "Ft6BwX2n")
 		return 2
 	}
 	allowedHost := endpointURL.Host
 	// #nosec G703 -- the broker socket path is supplied by the same-user shell setup.
 	if err := os.MkdirAll(filepath.Dir(socket), 0o700); err != nil {
-		_, _ = fmt.Fprintln(stderr, err)
+		logger.Error(fmt.Sprintf("failed to create broker socket directory: %v", err), "EID", "Vd4KpS7m")
 		return 1
 	}
 	dialCtx, cancelDial := context.WithTimeout(ctx, 50*time.Millisecond)
 	defer cancelDial()
 	if existing, dialErr := (&net.Dialer{}).DialContext(dialCtx, "unix", socket); dialErr == nil {
 		_ = existing.Close()
-		_, _ = fmt.Fprintln(stderr, "broker socket is already in use")
+		logger.Error("broker socket is already in use", "EID", "Xm2QwZ9k")
 		return 1
 	}
 	// #nosec G703 -- the broker socket path is supplied by the same-user shell setup.
 	_ = os.Remove(socket)
 	listener, listenErr := (&net.ListenConfig{}).Listen(ctx, "unix", socket)
 	if listenErr != nil {
-		_, _ = fmt.Fprintln(stderr, listenErr)
+		logger.Error(fmt.Sprintf("failed to listen on broker socket: %v", listenErr), "EID", "Bn7ZtL4p")
 		return 1
 	}
 	defer func() {
@@ -136,7 +156,7 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 	}()
 	// #nosec G703 -- the broker socket path is supplied by the same-user shell setup.
 	if err := os.Chmod(socket, 0o600); err != nil {
-		_, _ = fmt.Fprintln(stderr, err)
+		logger.Error(fmt.Sprintf("failed to secure broker socket permissions: %v", err), "EID", "Kw3RmV8t")
 		return 1
 	}
 	client := newBrokerHTTPClient()

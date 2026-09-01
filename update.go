@@ -17,6 +17,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
@@ -515,9 +516,22 @@ func installUpgradeArchive(content []byte, version string, options upgradeOption
 		}
 		return err
 	}
+	restartStaleBrokerDaemons(destinationDir)
 	provisionPythonEnv(stdout)
 	_, _ = fmt.Fprintf(stdout, "updated ash to %s at %s (commit %s)\n", version, destination, ashCommit)
 	return nil
+}
+
+// restartStaleBrokerDaemons kills any running ash-broker daemon (including
+// pre-migration daemons started as "<binary> broker ...") after an upgrade
+// replaces the binaries, so open shells respawn a fresh broker on next
+// invocation instead of continuing to run stale code indefinitely. Failures
+// (e.g. pkill unavailable, or no matching process) are ignored: this is a
+// best-effort nicety, not required for the upgrade itself to succeed.
+var restartStaleBrokerDaemons = func(destinationDir string) {
+	// #nosec G204 -- destinationDir is the fixed ~/.local/bin path, not attacker-controlled input.
+	_ = exec.Command("pkill", "-f", filepath.Join(destinationDir, "ash-broker")).Run()
+	_ = exec.Command("pkill", "-f", "broker --socket .*--parent-pid").Run()
 }
 
 func ensureUserLocalBinDir(home string) (string, error) {
