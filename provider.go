@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -20,13 +21,28 @@ type providerCapabilities struct {
 	SupportsNativeCaching bool
 }
 
+// providerAdapter is the minimal contract every provider implements.
 type providerAdapter interface {
 	Name() aiProvider
 	Capabilities() providerCapabilities
+}
+
+// byteProviderAdapter is implemented by adapters that build the raw HTTP
+// request/response themselves; chat() drives their retry loop directly.
+type byteProviderAdapter interface {
+	providerAdapter
 	Endpoint(baseURL string) string
 	BuildPayload(aiCfg aiConfig, messages []message, tools []toolDefinition) ([]byte, error)
 	ApplyHeaders(req *http.Request, aiCfg aiConfig)
 	ParseResponse(body []byte) (chatResponse, error)
+}
+
+// sdkProviderAdapter is implemented by adapters backed by an official provider
+// SDK client (constructed with newAshHTTPClient, which already gets retry and
+// broker support from ashRoundTripper) instead of hand-built HTTP requests.
+type sdkProviderAdapter interface {
+	providerAdapter
+	Send(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolDefinition) (chatResponse, error)
 }
 
 var providerRegistry = map[aiProvider]providerAdapter{

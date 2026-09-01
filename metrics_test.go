@@ -163,7 +163,7 @@ func TestExecutionMetricsConcurrentUpdates(t *testing.T) {
 func TestProviderResponseUsageIsNormalized(t *testing.T) {
 	tests := []struct {
 		name    string
-		adapter providerAdapter
+		adapter byteProviderAdapter
 		body    string
 		input   int
 		output  int
@@ -174,13 +174,6 @@ func TestProviderResponseUsageIsNormalized(t *testing.T) {
 			body:    `{"message":{"role":"assistant","content":"ok"},"prompt_eval_count":12,"eval_count":8}`,
 			input:   12,
 			output:  8,
-		},
-		{
-			name:    "openai",
-			adapter: openAIAdapter{},
-			body:    `{"output":[{"type":"message","content":[{"type":"output_text","text":"ok"}]}],"usage":{"input_tokens":30,"output_tokens":20}}`,
-			input:   30,
-			output:  20,
 		},
 		{
 			name:    "google",

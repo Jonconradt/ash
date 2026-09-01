@@ -142,11 +142,28 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 		return chatResponse{}, err
 	}
 
-	payload, err := adapter.BuildPayload(aiCfg, messages, tools)
+	if sdkAdapter, ok := adapter.(sdkProviderAdapter); ok {
+		slog.Debug("AI request", "request_id", requestIDFromContext(ctx), "provider", adapter.Name(), "sdk", true, "EID", "n6VbQ2xZ")
+		response, err := sdkAdapter.Send(ctx, aiCfg, messages, tools)
+		if err != nil {
+			return chatResponse{}, err
+		}
+		if metrics := executionMetricsFromContext(ctx); metrics != nil {
+			metrics.addTokenUsage(response.Usage.InputTokens, response.Usage.OutputTokens, response.Usage.Available)
+		}
+		return response, nil
+	}
+
+	byteAdapter, ok := adapter.(byteProviderAdapter)
+	if !ok {
+		return chatResponse{}, fmt.Errorf("provider %q has no request implementation", adapter.Name())
+	}
+
+	payload, err := byteAdapter.BuildPayload(aiCfg, messages, tools)
 	if err != nil {
 		return chatResponse{}, err
 	}
-	endpointURL := adapter.Endpoint(aiCfg.BaseURL)
+	endpointURL := byteAdapter.Endpoint(aiCfg.BaseURL)
 	slog.Debug("AI request", "request_id", requestIDFromContext(ctx), "url", endpointURL, "provider", adapter.Name(), "EID", "UqNZjp9I")
 	slog.Debug("AI request payload", "request_id", requestIDFromContext(ctx), "bytes", len(payload), "sha256", hashForLog(payload), "EID", "aPkzWTCJ")
 
@@ -159,7 +176,7 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 		if err != nil {
 			return chatResponse{}, err
 		}
-		adapter.ApplyHeaders(req, aiCfg)
+		byteAdapter.ApplyHeaders(req, aiCfg)
 
 		connectStarted := time.Now()
 		var resp *http.Response
@@ -174,7 +191,7 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 				if fallbackErr != nil {
 					err = fallbackErr
 				} else {
-					adapter.ApplyHeaders(fallbackReq, aiCfg)
+					byteAdapter.ApplyHeaders(fallbackReq, aiCfg)
 					resp, connectionReused, connectDuration, err = httpClientDoWithReuse(ctx, client, fallbackReq)
 				}
 			}
@@ -239,7 +256,7 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 			continue
 		}
 
-		parsed, err := adapter.ParseResponse(body)
+		parsed, err := byteAdapter.ParseResponse(body)
 		if err != nil {
 			if ctxErr := ctx.Err(); ctxErr != nil {
 				recordProcessing()
@@ -295,6 +312,7 @@ func httpClientDoWithReuse(ctx context.Context, client *http.Client, req *http.R
 			connectDuration = time.Since(started)
 		}
 	}}
+	// #nosec G704 -- req targets the user-configured AI_ENDPOINT, not attacker-controlled input.
 	response, err := client.Do(req.WithContext(httptrace.WithClientTrace(ctx, trace)))
 	mu.Lock()
 	defer mu.Unlock()

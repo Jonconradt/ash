@@ -1,76 +1,67 @@
 package main
 
 import (
-	"encoding/json"
-	"fmt"
-	"net/http"
+	"context"
+	"errors"
 	"strings"
+
+	openai "github.com/openai/openai-go/v2"
+	"github.com/openai/openai-go/v2/option"
+	"github.com/openai/openai-go/v2/packages/param"
+	"github.com/openai/openai-go/v2/responses"
 )
 
 type openAIAdapter struct{}
-
-type openAIResponsesRequest struct {
-	Model      string               `json:"model"`
-	Input      []map[string]any     `json:"input"`
-	Tools      []openAIFunctionTool `json:"tools,omitempty"`
-	ToolChoice string               `json:"tool_choice,omitempty"`
-	Metadata   map[string]string    `json:"metadata,omitempty"`
-}
-
-type openAIFunctionTool struct {
-	Type        string         `json:"type"`
-	Name        string         `json:"name"`
-	Description string         `json:"description,omitempty"`
-	Parameters  map[string]any `json:"parameters,omitempty"`
-}
-
-type openAIResponsesResponse struct {
-	Output []openAIOutputItem `json:"output"`
-	Error  *openAIErrorBody   `json:"error,omitempty"`
-	Usage  *openAIUsage       `json:"usage,omitempty"`
-}
-
-type openAIUsage struct {
-	InputTokens  int `json:"input_tokens"`
-	OutputTokens int `json:"output_tokens"`
-}
-
-type openAIOutputItem struct {
-	Type      string              `json:"type"`
-	ID        string              `json:"id,omitempty"`
-	CallID    string              `json:"call_id,omitempty"`
-	Name      string              `json:"name,omitempty"`
-	Arguments string              `json:"arguments,omitempty"`
-	Role      string              `json:"role,omitempty"`
-	Content   []openAIContentItem `json:"content,omitempty"`
-}
-
-type openAIContentItem struct {
-	Type string `json:"type"`
-	Text string `json:"text,omitempty"`
-}
-
-type openAIErrorBody struct {
-	Message string `json:"message"`
-}
 
 func (a openAIAdapter) Name() aiProvider {
 	return providerOpenAI
 }
 
 func (a openAIAdapter) Capabilities() providerCapabilities {
+	// OpenAI applies automatic prompt caching server-side for eligible
+	// requests; there is no client-controllable caching toggle to send.
 	return providerCapabilities{SupportsNativeCaching: true}
 }
 
-func (a openAIAdapter) Endpoint(baseURL string) string {
-	if strings.HasSuffix(strings.TrimRight(baseURL, "/"), "/v1") {
-		return strings.TrimRight(baseURL, "/") + "/responses"
+// openAIEndpoint normalizes baseURL to the SDK's expected `/v1`-rooted base.
+func openAIEndpoint(baseURL string) string {
+	trimmed := strings.TrimRight(baseURL, "/")
+	if strings.HasSuffix(trimmed, "/v1") {
+		return trimmed
 	}
-	return strings.TrimRight(baseURL, "/") + "/v1/responses"
+	return trimmed + "/v1"
 }
 
-func (a openAIAdapter) BuildPayload(aiCfg aiConfig, messages []message, tools []toolDefinition) ([]byte, error) {
-	input := make([]map[string]any, 0, len(messages))
+// Send implements sdkProviderAdapter using the official openai-go Responses API client.
+func (a openAIAdapter) Send(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolDefinition) (chatResponse, error) {
+	client := openai.NewClient(
+		option.WithBaseURL(openAIEndpoint(aiCfg.BaseURL)),
+		option.WithAPIKey(aiCfg.AuthToken),
+		option.WithHTTPClient(newAshHTTPClient()),
+		option.WithMaxRetries(0), // retries are handled by ashRoundTripper
+	)
+
+	params := responses.ResponseNewParams{
+		Model: aiCfg.Model,
+		Input: responses.ResponseNewParamsInputUnion{OfInputItemList: buildOpenAIInput(messages)},
+	}
+	if len(tools) > 0 {
+		params.Tools = buildOpenAITools(tools)
+	}
+
+	resp, err := client.Responses.New(ctx, params)
+	if err != nil {
+		var apiErr *openai.Error
+		if errors.As(err, &apiErr) {
+			return chatResponse{}, chatStatusError{StatusCode: apiErr.StatusCode, Body: apiErr.Message}
+		}
+		return chatResponse{}, err
+	}
+	return parseOpenAIResponse(resp), nil
+}
+
+func buildOpenAIInput(messages []message) responses.ResponseInputParam {
+	items := make(responses.ResponseInputParam, 0, len(messages))
 	for _, msg := range messages {
 		switch msg.Role {
 		case "tool":
@@ -81,85 +72,55 @@ func (a openAIAdapter) BuildPayload(aiCfg aiConfig, messages []message, tools []
 			if callID == "" {
 				continue
 			}
-			input = append(input, map[string]any{
-				"type":    "function_call_output",
-				"call_id": callID,
-				"output":  msg.Content,
-			})
+			items = append(items, responses.ResponseInputItemParamOfFunctionCallOutput(callID, msg.Content))
 		default:
 			if text := strings.TrimSpace(msg.Content); text != "" {
-				input = append(input, map[string]any{
-					"type": "message",
-					"role": msg.Role,
-					"content": []map[string]any{{
-						"type": "input_text",
-						"text": text,
-					}},
-				})
+				items = append(items, responses.ResponseInputItemParamOfMessage(text, openAIMessageRole(msg.Role)))
 			}
 			for _, call := range msg.ToolCalls {
 				callID := strings.TrimSpace(call.ID)
 				if callID == "" {
-					callID = fmt.Sprintf("call_%s", strings.ReplaceAll(call.Function.Name, " ", "_"))
+					callID = "call_" + strings.ReplaceAll(call.Function.Name, " ", "_")
 				}
-				input = append(input, map[string]any{
-					"type":      "function_call",
-					"call_id":   callID,
-					"name":      call.Function.Name,
-					"arguments": marshalJSONObject(call.Function.Arguments),
-				})
+				items = append(items, responses.ResponseInputItemParamOfFunctionCall(marshalJSONObject(call.Function.Arguments), callID, call.Function.Name))
 			}
 		}
 	}
+	return items
+}
 
-	request := openAIResponsesRequest{
-		Model: aiCfg.Model,
-		Input: input,
+func openAIMessageRole(role string) responses.EasyInputMessageRole {
+	switch role {
+	case "system":
+		return responses.EasyInputMessageRoleSystem
+	case "assistant":
+		return responses.EasyInputMessageRoleAssistant
+	default:
+		return responses.EasyInputMessageRoleUser
 	}
-	if len(tools) > 0 {
-		request.Tools = make([]openAIFunctionTool, 0, len(tools))
-		for _, tool := range tools {
-			request.Tools = append(request.Tools, openAIFunctionTool{
-				Type:        "function",
-				Name:        tool.Function.Name,
-				Description: tool.Function.Description,
-				Parameters:  tool.Function.Parameters,
-			})
+}
+
+func buildOpenAITools(tools []toolDefinition) []responses.ToolUnionParam {
+	out := make([]responses.ToolUnionParam, 0, len(tools))
+	for _, tool := range tools {
+		fn := responses.ToolParamOfFunction(tool.Function.Name, tool.Function.Parameters, false)
+		if tool.Function.Description != "" {
+			fn.OfFunction.Description = param.NewOpt(tool.Function.Description)
 		}
-		request.ToolChoice = "auto"
+		out = append(out, fn)
 	}
-
-	if shouldUseProviderNativeCaching(aiCfg, a) {
-		request.Metadata = map[string]string{"cache_preference": "provider-default"}
-	}
-
-	return json.Marshal(request)
+	return out
 }
 
-func (a openAIAdapter) ApplyHeaders(req *http.Request, aiCfg aiConfig) {
-	req.Header.Set("Content-Type", "application/json")
-	if aiCfg.Authorization != "" {
-		req.Header.Set("Authorization", aiCfg.Authorization)
-	}
-}
-
-func (a openAIAdapter) ParseResponse(body []byte) (chatResponse, error) {
-	var parsed openAIResponsesResponse
-	if err := json.Unmarshal(body, &parsed); err != nil {
-		return chatResponse{}, err
-	}
-	if parsed.Error != nil && strings.TrimSpace(parsed.Error.Message) != "" {
-		return chatResponse{Error: parsed.Error.Message}, nil
-	}
-
+func parseOpenAIResponse(resp *responses.Response) chatResponse {
 	assistant := message{Role: "assistant"}
 	textParts := make([]string, 0, 2)
-	for _, item := range parsed.Output {
+	for _, item := range resp.Output {
 		switch item.Type {
 		case "message":
 			for _, content := range item.Content {
-				if (content.Type == "output_text" || content.Type == "text") && strings.TrimSpace(content.Text) != "" {
-					textParts = append(textParts, content.Text)
+				if text := strings.TrimSpace(content.Text); text != "" {
+					textParts = append(textParts, text)
 				}
 			}
 		case "function_call":
@@ -175,13 +136,12 @@ func (a openAIAdapter) ParseResponse(body []byte) (chatResponse, error) {
 	}
 	assistant.Content = strings.TrimSpace(strings.Join(textParts, "\n"))
 
-	result := chatResponse{Message: assistant}
-	if parsed.Usage != nil {
-		result.Usage = chatUsage{
-			InputTokens:  parsed.Usage.InputTokens,
-			OutputTokens: parsed.Usage.OutputTokens,
-			Available:    true,
-		}
+	return chatResponse{
+		Message: assistant,
+		Usage: chatUsage{
+			InputTokens:  int(resp.Usage.InputTokens),
+			OutputTokens: int(resp.Usage.OutputTokens),
+			Available:    resp.Usage.InputTokens > 0 || resp.Usage.OutputTokens > 0,
+		},
 	}
-	return result, nil
 }

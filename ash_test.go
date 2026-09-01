@@ -464,13 +464,10 @@ func TestChatAddsAuthorizationHeader(t *testing.T) {
 func TestChatOpenAIResponsesAdapter(t *testing.T) {
 	var gotPath string
 	var gotAuth string
-	var gotBody string
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		gotPath = r.URL.Path
 		gotAuth = r.Header.Get("Authorization")
-		payload, _ := io.ReadAll(r.Body)
-		gotBody = string(payload)
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"done"}]},{"type":"function_call","call_id":"call_test_1","name":"run_unix_command","arguments":"{\"command\":\"ls\"}"}]}`))
 	}))
@@ -480,6 +477,7 @@ func TestChatOpenAIResponsesAdapter(t *testing.T) {
 		BaseURL:          srv.URL + "/v1",
 		Model:            "gpt-4.1-mini",
 		Authorization:    "Bearer test-key",
+		AuthToken:        "test-key",
 		Provider:         providerOpenAI,
 		UseNativeCaching: true,
 	}
@@ -494,9 +492,6 @@ func TestChatOpenAIResponsesAdapter(t *testing.T) {
 	if gotAuth != "Bearer test-key" {
 		t.Fatalf("unexpected auth header: got %q", gotAuth)
 	}
-	if !strings.Contains(gotBody, `"cache_preference":"provider-default"`) {
-		t.Fatalf("expected default cache hint in payload, got %s", gotBody)
-	}
 	if resp.Message.Content != "done" {
 		t.Fatalf("unexpected content: got %q", resp.Message.Content)
 	}
@@ -508,6 +503,72 @@ func TestChatOpenAIResponsesAdapter(t *testing.T) {
 	}
 	if resp.Message.ToolCalls[0].Function.Name != "run_unix_command" {
 		t.Fatalf("unexpected tool call name: got %q", resp.Message.ToolCalls[0].Function.Name)
+	}
+}
+
+func TestChatOpenAIAdapterMapsErrorStatus(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusUnauthorized)
+		_, _ = w.Write([]byte(`{"error":{"message":"invalid api key","type":"invalid_request_error","code":"invalid_api_key"}}`))
+	}))
+	defer srv.Close()
+
+	cfg := aiConfig{
+		BaseURL:       srv.URL + "/v1",
+		Model:         "gpt-4.1-mini",
+		Authorization: "Bearer bad-key",
+		AuthToken:     "bad-key",
+		Provider:      providerOpenAI,
+	}
+	t.Setenv("ASH_RETRY_MAX_ATTEMPTS", "1")
+	_, err := chat(context.Background(), cfg, []message{{Role: "user", Content: "hi"}}, nil)
+	if err == nil {
+		t.Fatal("expected an error for a 401 response")
+	}
+	var statusErr chatStatusError
+	if !errors.As(err, &statusErr) {
+		t.Fatalf("expected chatStatusError, got %T: %v", err, err)
+	}
+	if statusErr.StatusCode != http.StatusUnauthorized {
+		t.Fatalf("StatusCode = %d, want 401", statusErr.StatusCode)
+	}
+}
+
+func TestChatOpenAIAdapterCancelsPromptly(t *testing.T) {
+	release := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		<-release
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer func() {
+		close(release)
+		srv.Close()
+	}()
+
+	cfg := aiConfig{
+		BaseURL:       srv.URL + "/v1",
+		Model:         "gpt-4.1-mini",
+		Authorization: "Bearer test-key",
+		AuthToken:     "test-key",
+		Provider:      providerOpenAI,
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	result := make(chan error, 1)
+	go func() {
+		_, err := chat(ctx, cfg, []message{{Role: "user", Content: "hi"}}, nil)
+		result <- err
+	}()
+
+	time.Sleep(50 * time.Millisecond)
+	cancel()
+
+	select {
+	case err := <-result:
+		if err == nil {
+			t.Fatal("expected an error after context cancellation")
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("chat did not return promptly after context cancellation")
 	}
 }
 
