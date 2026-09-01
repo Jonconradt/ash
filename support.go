@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -652,11 +653,19 @@ func isScheduledTaskRun() bool {
 	return raw == "1" || raw == "true" || raw == "yes"
 }
 
-// cleanupHistoryRetention removes old history files until the retention budget is met.
-func cleanupHistoryRetention(maxAge, budget time.Duration) {
+// cleanupWorkspaceRetention sweeps aged history and broker runtime files, sharing one
+// time budget so a slow filesystem cannot stall exit twice over.
+func cleanupWorkspaceRetention(maxAge, budget time.Duration) {
 	if maxAge <= 0 || budget <= 0 {
 		return
 	}
+	deadline := timeNow().Add(budget)
+	cleanupHistoryRetention(maxAge, deadline)
+	cleanupRuntimeRetention(maxAge, deadline)
+}
+
+// cleanupHistoryRetention removes history files older than maxAge until the deadline passes.
+func cleanupHistoryRetention(maxAge time.Duration, deadline time.Time) {
 	home, err := osUserHomeDir()
 	if err != nil {
 		return
@@ -667,7 +676,6 @@ func cleanupHistoryRetention(maxAge, budget time.Duration) {
 		return
 	}
 
-	deadline := timeNow().Add(budget)
 	cutoff := timeNow().Add(-maxAge)
 	for _, entry := range entries {
 		if timeNow().After(deadline) {
@@ -685,6 +693,59 @@ func cleanupHistoryRetention(maxAge, budget time.Duration) {
 		}
 		_ = os.Remove(filepath.Join(historyDir, entry.Name()))
 	}
+}
+
+// cleanupRuntimeRetention removes broker lease, pid, and socket files left behind by shells
+// that exited without running their shutdown trap. A socket with a live listener is kept
+// regardless of age; the broker ignores the lease file, so removing one is always safe.
+func cleanupRuntimeRetention(maxAge time.Duration, deadline time.Time) {
+	home, err := osUserHomeDir()
+	if err != nil {
+		return
+	}
+	runtimeDir := filepath.Join(home, ashWorkspaceDirName, runtimeDirName)
+	entries, err := os.ReadDir(runtimeDir)
+	if err != nil {
+		return
+	}
+
+	cutoff := timeNow().Add(-maxAge)
+	for _, entry := range entries {
+		if timeNow().After(deadline) {
+			return
+		}
+		if entry.IsDir() {
+			continue
+		}
+		extension := filepath.Ext(entry.Name())
+		if extension != ".lease" && extension != ".pid" && extension != ".sock" {
+			continue
+		}
+		info, infoErr := entry.Info()
+		if infoErr != nil {
+			continue
+		}
+		if info.ModTime().After(cutoff) {
+			continue
+		}
+		path := filepath.Join(runtimeDir, entry.Name())
+		if extension == ".sock" && brokerSocketAlive(path) {
+			continue
+		}
+		_ = os.Remove(path)
+	}
+}
+
+// brokerSocketAlive reports whether a broker is still listening on the given socket path.
+func brokerSocketAlive(path string) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), brokerSocketProbeTimeout)
+	defer cancel()
+	connection, err := (&net.Dialer{}).DialContext(ctx, "unix", path)
+	if err != nil {
+		return false
+	}
+	_ = connection.Close()
+	return true
 }
 
 // loadHistory reads chat history from the provided JSON file path.

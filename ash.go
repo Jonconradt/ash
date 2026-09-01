@@ -49,6 +49,8 @@ const (
 	sessionIDEnvName                  = "SESSION_ID"
 	scheduledTaskEnvName              = "ASH_SCHEDULED_TASK"
 	historyDirName                    = "history"
+	runtimeDirName                    = "runtime"
+	brokerSocketProbeTimeout          = 50 * time.Millisecond
 	systemFileName                    = ".ash_system"
 	toolsFileName                     = ".ash_tools"
 	ashWorkspaceDirName               = ".ash"
@@ -148,7 +150,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 
 	configureDebugLogging()
-	defer cleanupHistoryRetention(defaultHistoryRetention, defaultHistoryCleanupBudget)
+	defer cleanupWorkspaceRetention(defaultHistoryRetention, defaultHistoryCleanupBudget)
 	defer func() {
 		if root, err := ashScratchRoot(); err == nil {
 			if _, err := cleanupStaleScratchDirs(root, timeNow()); err != nil {

@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -2308,6 +2309,82 @@ func TestCleanupStaleScratchDirs(t *testing.T) {
 	}
 	if _, err := os.Stat(staleDir); !os.IsNotExist(err) {
 		t.Fatalf("expected stale scratch dir to be removed, got err=%v", err)
+	}
+}
+
+func TestCleanupWorkspaceRetentionSweepsHistoryAndRuntime(t *testing.T) {
+	// Not t.TempDir(): its long path overflows the ~104 byte sockaddr_un limit on macOS.
+	home, err := os.MkdirTemp("/tmp", "ash-sweep-")
+	if err != nil {
+		t.Fatalf("mkdtemp: %v", err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(home) })
+	originalHome := osUserHomeDir
+	osUserHomeDir = func() (string, error) { return home, nil }
+	t.Cleanup(func() { osUserHomeDir = originalHome })
+
+	historyDir := filepath.Join(home, ashWorkspaceDirName, historyDirName)
+	runtimeDir := filepath.Join(home, ashWorkspaceDirName, runtimeDirName)
+	for _, dir := range []string{historyDir, runtimeDir} {
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			t.Fatalf("mkdir %s: %v", dir, err)
+		}
+	}
+
+	old := time.Now().Add(-30 * 24 * time.Hour)
+	aged := map[string]string{
+		filepath.Join(historyDir, "old.json"):  "history",
+		filepath.Join(runtimeDir, "old.lease"): "lease",
+		filepath.Join(runtimeDir, "old.pid"):   "pid",
+	}
+	for path, contents := range aged {
+		if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+			t.Fatalf("write %s: %v", path, err)
+		}
+		if err := os.Chtimes(path, old, old); err != nil {
+			t.Fatalf("age %s: %v", path, err)
+		}
+	}
+
+	// An aged socket with nothing listening is debris; a live one must survive regardless of age.
+	deadSocket := filepath.Join(runtimeDir, "dead.sock")
+	if err := os.WriteFile(deadSocket, nil, 0o600); err != nil {
+		t.Fatalf("write dead socket: %v", err)
+	}
+	if err := os.Chtimes(deadSocket, old, old); err != nil {
+		t.Fatalf("age dead socket: %v", err)
+	}
+
+	liveSocket := filepath.Join(runtimeDir, "live.sock")
+	listener, listenErr := (&net.ListenConfig{}).Listen(context.Background(), "unix", liveSocket)
+	if listenErr != nil {
+		t.Fatalf("listen on live socket: %v", listenErr)
+	}
+	defer func() { _ = listener.Close() }()
+	if err := os.Chtimes(liveSocket, old, old); err != nil {
+		t.Fatalf("age live socket: %v", err)
+	}
+
+	keep := filepath.Join(historyDir, "recent.json")
+	if err := os.WriteFile(keep, []byte("recent"), 0o600); err != nil {
+		t.Fatalf("write recent history: %v", err)
+	}
+
+	cleanupWorkspaceRetention(defaultHistoryRetention, defaultHistoryCleanupBudget)
+
+	for path := range aged {
+		if _, err := os.Stat(path); !os.IsNotExist(err) {
+			t.Errorf("expected %s to be swept, got err=%v", path, err)
+		}
+	}
+	if _, err := os.Stat(deadSocket); !os.IsNotExist(err) {
+		t.Errorf("expected dead socket to be swept, got err=%v", err)
+	}
+	if _, err := os.Stat(liveSocket); err != nil {
+		t.Errorf("expected live socket to survive, got %v", err)
+	}
+	if _, err := os.Stat(keep); err != nil {
+		t.Errorf("expected recent history to survive, got %v", err)
 	}
 }
 
