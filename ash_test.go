@@ -4146,6 +4146,9 @@ func TestZshRoutingPolicy(t *testing.T) {
 }
 
 func TestRun(t *testing.T) {
+	t.Setenv("ASH_VERBOSE", "")
+	t.Setenv("ASH_STREAM", "")
+	t.Setenv(ashEnvAlwaysOpenAIAPI, "")
 	originalCwd, err := os.Getwd()
 	if err != nil {
 		t.Fatalf("Getwd failed: %v", err)

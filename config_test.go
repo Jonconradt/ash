@@ -6,6 +6,7 @@ import (
 )
 
 func TestParseAIConfigFromEnv(t *testing.T) {
+	t.Setenv(ashEnvAlwaysOpenAIAPI, "")
 	tests := []struct {
 		name           string
 		env            map[string]string
@@ -183,6 +184,7 @@ func TestParseAIConfigFromEnv(t *testing.T) {
 			t.Setenv("AI_AUTH_TOKEN", "")
 			t.Setenv("AI_PROVIDER", "")
 			t.Setenv("AI_CACHE", "")
+			t.Setenv(ashEnvAlwaysOpenAIAPI, "")
 			t.Setenv("SHELL", "")
 			for k, v := range tt.env {
 				t.Setenv(k, v)

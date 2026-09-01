@@ -36,6 +36,9 @@ func TestFormatAssistantOutputGolden(t *testing.T) {
 }
 
 func TestRunGoldenFailurePromptDirectoryAndExecutables(t *testing.T) {
+	t.Setenv("ASH_VERBOSE", "")
+	t.Setenv("ASH_STREAM", "")
+	t.Setenv(ashEnvAlwaysOpenAIAPI, "")
 	originalRunner := toolCommandRunner
 	originalRenderer := markdownRenderer
 	originalCwd, err := os.Getwd()
