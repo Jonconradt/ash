@@ -189,6 +189,22 @@ func (m *executionMetrics) addTokenUsage(inputTokens, outputTokens int, availabl
 	m.outputTokensAvailable = true
 }
 
+// recordAIResponseMetrics folds one completed AI call into the dashboard: its
+// provider-reported token usage, plus its wall time minus whatever connect time
+// the transport recorded during the same call (which is reported separately).
+func recordAIResponseMetrics(ctx context.Context, usage chatUsage, startedAt time.Time, connectBefore time.Duration) {
+	metrics := executionMetricsFromContext(ctx)
+	if metrics == nil {
+		return
+	}
+	metrics.addTokenUsage(usage.InputTokens, usage.OutputTokens, usage.Available)
+	processing := time.Since(startedAt) - (metrics.stageDuration(metricsStageConnect) - connectBefore)
+	if processing < 0 {
+		processing = 0
+	}
+	metrics.addStageDuration(metricsStageAIProcessing, processing)
+}
+
 func (m *executionMetrics) setConnectionReused(reused bool) {
 	if m == nil {
 		return

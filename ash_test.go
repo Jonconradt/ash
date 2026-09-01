@@ -692,7 +692,9 @@ func TestChatStreamOpenAIRealSSE(t *testing.T) {
 		Provider:      providerOpenAI,
 	}
 	var deltas []string
-	resp, err := chatStream(context.Background(), cfg, []message{{Role: "user", Content: "hi"}}, nil, func(d streamDelta) {
+	metrics := newExecutionMetrics(time.Now())
+	ctx := withExecutionMetrics(context.Background(), metrics)
+	resp, err := chatStream(ctx, cfg, []message{{Role: "user", Content: "hi"}}, nil, func(d streamDelta) {
 		deltas = append(deltas, d.TextDelta)
 	})
 	if err != nil {
@@ -706,6 +708,45 @@ func TestChatStreamOpenAIRealSSE(t *testing.T) {
 	}
 	if !resp.Usage.Available || resp.Usage.InputTokens != 3 || resp.Usage.OutputTokens != 2 {
 		t.Fatalf("unexpected usage: %+v", resp.Usage)
+	}
+	snapshot := metrics.snapshot()
+	if !snapshot.InputTokensAvailable || snapshot.InputTokens != 3 || snapshot.OutputTokens != 2 {
+		t.Fatalf("streaming path did not record token usage in metrics: %+v", snapshot)
+	}
+	if metrics.stageDuration(metricsStageAIProcessing) <= 0 {
+		t.Fatal("streaming path did not record AI processing duration")
+	}
+}
+
+func TestChatSDKPathRecordsProcessingAndTokenMetrics(t *testing.T) {
+	originalIsRealOpenAIHost := isRealOpenAIHost
+	isRealOpenAIHost = func(string) bool { return true }
+	t.Cleanup(func() { isRealOpenAIHost = originalIsRealOpenAIHost })
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"resp_1","output":[{"type":"message","role":"assistant","content":[{"type":"output_text","text":"ok"}]}],"usage":{"input_tokens":11,"output_tokens":7}}`))
+	}))
+	defer srv.Close()
+
+	cfg := aiConfig{
+		BaseURL:       srv.URL + "/v1",
+		Model:         "gpt-4.1-mini",
+		Authorization: "Bearer test-key",
+		AuthToken:     "test-key",
+		Provider:      providerOpenAI,
+	}
+	metrics := newExecutionMetrics(time.Now())
+	ctx := withExecutionMetrics(context.Background(), metrics)
+	if _, err := chat(ctx, cfg, []message{{Role: "user", Content: "hi"}}, nil); err != nil {
+		t.Fatalf("chat returned error: %v", err)
+	}
+	snapshot := metrics.snapshot()
+	if !snapshot.InputTokensAvailable || snapshot.InputTokens != 11 || snapshot.OutputTokens != 7 {
+		t.Fatalf("SDK path did not record token usage in metrics: %+v", snapshot)
+	}
+	if metrics.stageDuration(metricsStageAIProcessing) <= 0 {
+		t.Fatal("SDK path did not record AI processing duration")
 	}
 }
 

@@ -157,7 +157,14 @@ func chatStream(ctx context.Context, aiCfg aiConfig, messages []message, tools [
 			slog.Debug("AI streaming mode", "request_id", requestIDFromContext(ctx), "provider", aiCfg.Provider, "stream_requested", true, "stream_adapter_selected", false, "stream_used", false, "reason", "adapter_lookup_failed", "EID", "F7Kq3PzL")
 		} else if streamAdapter, ok := adapter.(streamingProviderAdapter); ok {
 			slog.Debug("AI streaming mode", "request_id", requestIDFromContext(ctx), "provider", adapter.Name(), "stream_requested", true, "stream_adapter_selected", true, "EID", "F7Kq3PzL")
-			return streamAdapter.SendStream(ctx, aiCfg, messages, tools, onDelta)
+			started := time.Now()
+			connectBefore := executionMetricsFromContext(ctx).stageDuration(metricsStageConnect)
+			response, err := streamAdapter.SendStream(ctx, aiCfg, messages, tools, onDelta)
+			if err != nil {
+				return chatResponse{}, err
+			}
+			recordAIResponseMetrics(ctx, response.Usage, started, connectBefore)
+			return response, nil
 		} else {
 			slog.Debug("AI streaming mode", "request_id", requestIDFromContext(ctx), "provider", adapter.Name(), "stream_requested", true, "stream_adapter_selected", false, "stream_used", false, "reason", "adapter_unsupported", "EID", "F7Kq3PzL")
 		}
@@ -185,13 +192,13 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 
 	if sdkAdapter, ok := adapter.(sdkProviderAdapter); ok {
 		slog.Debug("AI request", "request_id", requestIDFromContext(ctx), "provider", adapter.Name(), "sdk", true, "EID", "n6VbQ2xZ")
+		started := time.Now()
+		connectBefore := executionMetricsFromContext(ctx).stageDuration(metricsStageConnect)
 		response, err := sdkAdapter.Send(ctx, aiCfg, messages, tools)
 		if err != nil {
 			return chatResponse{}, err
 		}
-		if metrics := executionMetricsFromContext(ctx); metrics != nil {
-			metrics.addTokenUsage(response.Usage.InputTokens, response.Usage.OutputTokens, response.Usage.Available)
-		}
+		recordAIResponseMetrics(ctx, response.Usage, started, connectBefore)
 		return response, nil
 	}
 
