@@ -102,5 +102,9 @@ func brokerDo(ctx context.Context, req *http.Request) (*http.Response, bool, err
 	if response.Error != "" {
 		return nil, false, errors.New(response.Error)
 	}
-	return &http.Response{StatusCode: response.Status, Status: strconv.Itoa(response.Status), Body: io.NopCloser(strings.NewReader(string(response.Body))), Header: make(http.Header), Request: req}, response.Reused, nil
+	header := make(http.Header)
+	if response.ContentType != "" {
+		header.Set("Content-Type", response.ContentType)
+	}
+	return &http.Response{StatusCode: response.Status, Status: strconv.Itoa(response.Status), Body: io.NopCloser(strings.NewReader(string(response.Body))), Header: header, Request: req}, response.Reused, nil
 }

@@ -226,7 +226,7 @@ func handleBrokerConn(ctx context.Context, conn net.Conn, token string, client *
 			case len(body) > brokerproto.MaxBody:
 				err = errors.New("broker response exceeds limit")
 			default:
-				err = brokerproto.WriteFrame(conn, mustBrokerJSON(brokerproto.Response{Version: brokerproto.Version, Status: httpResponse.StatusCode, Reused: requestReused, Body: body}))
+				err = brokerproto.WriteFrame(conn, mustBrokerJSON(brokerproto.Response{Version: brokerproto.Version, Status: httpResponse.StatusCode, Reused: requestReused, ContentType: httpResponse.Header.Get("Content-Type"), Body: body}))
 			}
 		}
 	}

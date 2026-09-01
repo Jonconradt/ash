@@ -1,4 +1,4 @@
-.PHONY: all verify build config lint site-lint yaml-lint python-lint markdown-lint sync-route-words test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install setup-hooks version release release-check release-clean release-build release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one release-checksums
+.PHONY: all verify build config lint site-lint yaml-lint python-lint markdown-lint sync-route-words test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install setup-hooks version release release-check release-clean release-build release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one release-checksums restart-broker
 
 SHELL := /bin/bash
 
@@ -69,6 +69,16 @@ build: lint test
 	@mkdir -p "$(LOCAL_BIN_DIR)"
 	@go build -o "$(LOCAL_BINARY_PATH)" -ldflags "-X main.ashVersion=$(BUILD_VERSION) -X main.ashCommit=$(BUILD_COMMIT) -X main.ashDevelopmentBuild=true" .
 	@go build -o "$(LOCAL_BIN_DIR)/ash-broker" ./cmd/ash-broker
+	@$(MAKE) restart-broker
+
+# Broker daemons are long-lived per-shell processes; kill stale ones so open
+# shells respawn a fresh broker running the binary just built. The second
+# pattern catches pre-migration daemons started as "<binary> broker ..." (a
+# subcommand of the main binary, possibly a renamed backup like ash.old)
+# before the broker moved to its own executable.
+restart-broker:
+	@pkill -f "$(LOCAL_BIN_DIR)/ash-broker" 2>/dev/null || true
+	@pkill -f "broker --socket .*--parent-pid" 2>/dev/null || true
 
 lint: site-lint yaml-lint python-lint markdown-lint
 	@go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run ./...
@@ -128,6 +138,7 @@ install: test lint gosec
 	@mkdir -p "$(LOCAL_BIN_DIR)"
 	@go build -o "$(LOCAL_BINARY_PATH)" -ldflags "-X main.ashVersion=$(BUILD_VERSION) -X main.ashCommit=$(BUILD_COMMIT) -X main.ashDevelopmentBuild=true" .
 	@go build -o "$(LOCAL_BIN_DIR)/ash-broker" ./cmd/ash-broker
+	@$(MAKE) restart-broker
 	@"$(LOCAL_BINARY_PATH)" install --shell bash --overwrite
 
 version: release-check release-artifacts

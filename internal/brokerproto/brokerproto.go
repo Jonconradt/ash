@@ -30,11 +30,12 @@ type Request struct {
 
 // Response is the payload the broker sends back to a client.
 type Response struct {
-	Version uint16 `json:"version"`
-	Status  int    `json:"status"`
-	Reused  bool   `json:"reused,omitempty"`
-	Body    []byte `json:"body,omitempty"`
-	Error   string `json:"error,omitempty"`
+	Version     uint16 `json:"version"`
+	Status      int    `json:"status"`
+	Reused      bool   `json:"reused,omitempty"`
+	ContentType string `json:"content_type,omitempty"`
+	Body        []byte `json:"body,omitempty"`
+	Error       string `json:"error,omitempty"`
 }
 
 // HeaderAllowed reports whether name may be forwarded through the broker.
