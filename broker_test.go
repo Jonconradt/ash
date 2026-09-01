@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -13,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestBrokerFrameLimit(t *testing.T) {
@@ -107,6 +109,62 @@ func TestBrokerRoundTripReusesConfiguredTransport(t *testing.T) {
 	}
 	if _, err := os.Stat(socket); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestBrokerDoReturnsPromptlyOnContextCancel(t *testing.T) {
+	socket := "/tmp/ash-broker-test-cancel-" + strconv.Itoa(os.Getpid()) + ".sock"
+	_ = os.Remove(socket)
+	t.Cleanup(func() { _ = os.Remove(socket) })
+	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "unix", socket)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = listener.Close() }()
+
+	serverReadRequest := make(chan struct{})
+	releaseServer := make(chan struct{})
+	defer close(releaseServer)
+	go func() {
+		connection, acceptErr := listener.Accept()
+		if acceptErr != nil {
+			return
+		}
+		defer func() { _ = connection.Close() }()
+		_, _ = readBrokerFrame(connection)
+		close(serverReadRequest)
+		<-releaseServer
+	}()
+
+	t.Setenv(brokerSocketEnv, socket)
+	t.Setenv(brokerTokenEnv, "test-token")
+	ctx, cancel := context.WithCancel(context.Background())
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://api.example.com/v1/chat", strings.NewReader("{}"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Authorization", "Bearer test")
+
+	result := make(chan error, 1)
+	go func() {
+		_, _, err := brokerDo(ctx, request)
+		result <- err
+	}()
+
+	select {
+	case <-serverReadRequest:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for broker request frame")
+	}
+	cancel()
+
+	select {
+	case err := <-result:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("expected context.Canceled, got %v", err)
+		}
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("brokerDo did not return promptly after context cancellation")
 	}
 }
 

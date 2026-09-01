@@ -84,14 +84,29 @@ func brokerDo(ctx context.Context, req *http.Request) (*http.Response, bool, err
 		return nil, false, err
 	}
 	defer func() { _ = conn.Close() }()
+	brokerDone := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			_ = conn.Close()
+		case <-brokerDone:
+		}
+	}()
+	defer close(brokerDone)
 	if deadline, ok := ctx.Deadline(); ok {
 		_ = conn.SetDeadline(deadline)
 	}
 	if err := writeBrokerFrame(conn, payload); err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, false, ctxErr
+		}
 		return nil, false, err
 	}
 	responsePayload, err := readBrokerFrame(conn)
 	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return nil, false, ctxErr
+		}
 		return nil, false, err
 	}
 	var response brokerResponse
