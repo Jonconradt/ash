@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
 	"time"
 )
@@ -89,6 +90,7 @@ func ashRoundTripAttempt(ctx context.Context, client *http.Client, req *http.Req
 		if err == nil {
 			return resp, reused, 0, nil
 		}
+		slog.Debug("broker request failed, falling back to direct dial", "request_id", requestIDFromContext(ctx), "error", err, "EID", "Lp8xKd3W")
 		fallbackReq, buildErr := http.NewRequestWithContext(ctx, req.Method, req.URL.String(), bytes.NewReader(bodyBytes)) // #nosec G704 -- fallbackReq targets the same user-configured AI_ENDPOINT as req, not attacker-controlled input.
 		if buildErr != nil {
 			return nil, false, 0, buildErr

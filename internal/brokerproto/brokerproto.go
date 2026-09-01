@@ -39,12 +39,14 @@ type Response struct {
 
 // HeaderAllowed reports whether name may be forwarded through the broker.
 func HeaderAllowed(name string) bool {
-	switch strings.ToLower(name) {
-	case "authorization", "content-type", "accept", "user-agent", "anthropic-version", "x-api-key":
+	lower := strings.ToLower(name)
+	switch lower {
+	case "authorization", "content-type", "accept", "user-agent", "anthropic-version", "x-api-key", "x-goog-api-key":
 		return true
-	default:
-		return false
 	}
+	// AWS SigV4 covers these SDK-generated headers, so dropping them would
+	// invalidate the signature the Bedrock adapter already computed.
+	return strings.HasPrefix(lower, "x-amz-") || strings.HasPrefix(lower, "amz-sdk-")
 }
 
 // URLAllowed reports whether rawURL is a well-formed http(s) URL targeting allowedHost.

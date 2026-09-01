@@ -106,6 +106,40 @@ func TestBrokerRoundTripReusesConfiguredTransport(t *testing.T) {
 	}
 }
 
+func TestBrokerDoDropsSDKTelemetryHeadersInsteadOfFailing(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.Header.Get("Authorization") != "Bearer test" {
+			t.Errorf("authorization header = %q, want forwarded", request.Header.Get("Authorization"))
+		}
+		if got := request.Header.Get("X-Stainless-Lang"); got != "" {
+			t.Errorf("X-Stainless-Lang = %q, want dropped", got)
+		}
+		_, _ = writer.Write([]byte(`{"ok":true}`))
+	}))
+	defer server.Close()
+
+	socket := "/tmp/ash-broker-test-headers-" + strconv.Itoa(os.Getpid()) + ".sock"
+	fakeBrokerListener(t, socket)
+
+	t.Setenv(brokerSocketEnv, socket)
+	t.Setenv(brokerTokenEnv, "test-token")
+	request, err := http.NewRequestWithContext(context.Background(), http.MethodPost, server.URL, strings.NewReader("{}"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Authorization", "Bearer test")
+	request.Header.Set("X-Stainless-Lang", "go")
+	request.Header.Set("X-Stainless-Retry-Count", "0")
+	response, _, err := brokerDo(context.Background(), request)
+	if err != nil {
+		t.Fatalf("brokerDo returned %v, want telemetry headers dropped and request forwarded", err)
+	}
+	defer func() { _ = response.Body.Close() }()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d, want 200", response.StatusCode)
+	}
+}
+
 func TestBrokerDoReturnsPromptlyOnContextCancel(t *testing.T) {
 	socket := "/tmp/ash-broker-test-cancel-" + strconv.Itoa(os.Getpid()) + ".sock"
 	_ = os.Remove(socket)

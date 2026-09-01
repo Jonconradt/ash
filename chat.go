@@ -228,6 +228,7 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 		if brokerConfigured() {
 			resp, connectionReused, err = brokerDo(ctx, req)
 			if err != nil {
+				slog.Debug("broker request failed, falling back to direct dial", "request_id", requestIDFromContext(ctx), "error", err, "EID", "Zt6nHq2V")
 				fallbackReq, fallbackErr := http.NewRequestWithContext(ctx, http.MethodPost, endpointURL, bytes.NewReader(payload))
 				if fallbackErr != nil {
 					err = fallbackErr

@@ -6,11 +6,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -40,12 +41,22 @@ func brokerDo(ctx context.Context, req *http.Request) (*http.Response, bool, err
 	if len(body) > brokerproto.MaxBody {
 		return nil, false, errors.New("broker request body exceeds limit")
 	}
+	// Provider SDKs attach telemetry headers (x-stainless-*, x-fern-*, ...) that
+	// the broker deliberately does not forward. Drop them like the broker server
+	// does instead of failing the request, which would silently fall back to a
+	// fresh direct dial and defeat connection reuse.
 	headers := make(map[string]string, len(req.Header))
+	var dropped []string
 	for name, values := range req.Header {
 		if len(values) != 1 || !brokerproto.HeaderAllowed(name) {
-			return nil, false, fmt.Errorf("broker header %q is not allowed", name)
+			dropped = append(dropped, name)
+			continue
 		}
 		headers[name] = values[0]
+	}
+	if len(dropped) > 0 {
+		sort.Strings(dropped)
+		slog.Debug("broker dropped unsupported headers", "request_id", requestIDFromContext(ctx), "headers", strings.Join(dropped, ","), "EID", "Qm4vRb7T")
 	}
 	payload, err := json.Marshal(brokerproto.Request{Version: brokerproto.Version, Token: token, URL: req.URL.String(), Headers: headers, Body: body})
 	if err != nil {
