@@ -709,6 +709,83 @@ func TestChatStreamOpenAIRealSSE(t *testing.T) {
 	}
 }
 
+func TestVerboseSessionLogReportsOllamaOpenAIAPIAndStreamRequest(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SESSION_ID", "")
+	t.Setenv("ASH_VERBOSE", "true")
+	t.Setenv(ashEnvAlwaysOpenAIAPI, "on")
+	t.Setenv("ASH_STREAM", "yes")
+	t.Setenv(aiEnvEndpoint, "http://localhost:11434")
+	t.Setenv(aiEnvModel, "llama3.1")
+
+	originalChatStreamExecutor := chatStreamExecutor
+	chatStreamExecutor = func(context.Context, aiConfig, []message, []toolDefinition, func(streamDelta)) (chatResponse, error) {
+		return chatResponse{Message: message{Role: "assistant", Content: "ok"}}, nil
+	}
+	t.Cleanup(func() { chatStreamExecutor = originalChatStreamExecutor })
+
+	var stdout bytes.Buffer
+	var stderr syncBuffer
+	if code := run([]string{"hello"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("run returned %d, stderr=%q", code, stderr.String())
+	}
+
+	record := findDebugLogRecord(t, stderr.String(), "ash session started")
+	if record["provider"] != string(providerOpenAI) {
+		t.Fatalf("expected redirected provider %q, got %#v", providerOpenAI, record["provider"])
+	}
+	if record["ollama_openai_api"] != true {
+		t.Fatalf("expected ollama_openai_api=true, got %#v", record["ollama_openai_api"])
+	}
+	if record["stream_requested"] != true {
+		t.Fatalf("expected stream_requested=true, got %#v", record["stream_requested"])
+	}
+}
+
+func TestChatStreamVerboseLogReportsUnsupportedFallback(t *testing.T) {
+	originalWriter := debugWriter
+	originalJSON := debugJSONLogging
+	originalChatExecutor := chatExecutor
+	t.Cleanup(func() {
+		debugWriter = originalWriter
+		debugJSONLogging = originalJSON
+		chatExecutor = originalChatExecutor
+	})
+
+	var logs bytes.Buffer
+	debugWriter = &logs
+	debugJSONLogging = true
+	t.Setenv("ASH_VERBOSE", "1")
+	t.Setenv("ASH_STREAM", "1")
+	chatExecutor = func(context.Context, aiConfig, []message, []toolDefinition) (chatResponse, error) {
+		return chatResponse{Message: message{Role: "assistant", Content: "ok"}}, nil
+	}
+	configureDebugLogging()
+
+	_, err := chatStream(context.Background(), aiConfig{Provider: providerGoogle}, nil, nil, nil)
+	if err != nil {
+		t.Fatalf("chatStream returned error: %v", err)
+	}
+
+	record := findDebugLogRecord(t, logs.String(), "AI streaming mode")
+	if record["stream_requested"] != true || record["stream_used"] != false || record["reason"] != "adapter_unsupported" {
+		t.Fatalf("unexpected streaming fallback record: %#v", record)
+	}
+}
+
+func findDebugLogRecord(t *testing.T, logs, message string) map[string]any {
+	t.Helper()
+	for _, line := range strings.Split(strings.TrimSpace(logs), "\n") {
+		var record map[string]any
+		if err := json.Unmarshal([]byte(line), &record); err == nil && record["message"] == message {
+			return record
+		}
+	}
+	t.Fatalf("debug log record %q not found in %q", message, logs)
+	return nil
+}
+
 func TestChatGoogleAdapter(t *testing.T) {
 	var gotPath string
 	var gotAPIKeyHeader string

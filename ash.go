@@ -148,7 +148,6 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 
 	configureDebugLogging()
-	slog.Debug("ash session started", "session_id", sessionID, "version", executionDashboardVersion(), "EID", "vN2wSb8Q")
 	defer cleanupHistoryRetention(defaultHistoryRetention, defaultHistoryCleanupBudget)
 	defer func() {
 		if root, err := ashScratchRoot(); err == nil {
@@ -163,6 +162,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		_, _ = fmt.Fprintf(stderr, "Configuration error:\n\n%s\n", err)
 		return 1
 	}
+	slog.Debug("ash session started", "session_id", sessionID, "version", executionDashboardVersion(), "provider", aiCfg.Provider, "ollama_openai_api", aiCfg.OllamaOpenAIAPI, "stream_requested", streamingEnabled(), "EID", "vN2wSb8Q")
 
 	if recommendation, err := installRecommendation(); err == nil && recommendation != "" {
 		slog.Info(recommendation, "EID", "Ss6EkIfE")

@@ -124,9 +124,14 @@ esac
 mkdir -p "$install_dir" || fail "could not create installation directory $install_dir"
 tar -xzf "$tmp_dir/$asset" -C "$tmp_dir" || fail "could not extract $asset"
 [ -f "$tmp_dir/$base" ] || fail "release archive did not contain $base"
+[ -f "$tmp_dir/$base-broker" ] || fail "release archive did not contain $base-broker"
 install -m 0755 "$tmp_dir/$base" "$install_dir/ash" 2>/dev/null || {
   cp "$tmp_dir/$base" "$install_dir/ash" || fail "could not install ash to $install_dir"
   chmod 0755 "$install_dir/ash" || fail "could not make ash executable"
+}
+install -m 0755 "$tmp_dir/$base-broker" "$install_dir/ash-broker" 2>/dev/null || {
+  cp "$tmp_dir/$base-broker" "$install_dir/ash-broker" || fail "could not install ash-broker to $install_dir"
+  chmod 0755 "$install_dir/ash-broker" || fail "could not make ash-broker executable"
 }
 
 shell_name=$(basename "${SHELL:-}")

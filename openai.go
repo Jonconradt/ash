@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"log/slog"
 	"net/url"
 	"strings"
 
@@ -87,8 +88,10 @@ func sendOpenAIResponses(ctx context.Context, client openai.Client, aiCfg aiConf
 // streaming support there is unverified/inconsistent across servers.
 func (a openAIAdapter) SendStream(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolDefinition, onDelta func(streamDelta)) (chatResponse, error) {
 	if !isRealOpenAIHost(aiCfg.BaseURL) {
+		slog.Debug("AI streaming transport", "request_id", requestIDFromContext(ctx), "provider", a.Name(), "stream_used", false, "reason", "responses_api_unavailable", "EID", "Q4mX8sLn")
 		return a.Send(ctx, aiCfg, messages, tools)
 	}
+	slog.Debug("AI streaming transport", "request_id", requestIDFromContext(ctx), "provider", a.Name(), "stream_used", true, "transport", "responses_sse", "EID", "Q4mX8sLn")
 
 	client := openai.NewClient(
 		option.WithBaseURL(openAIEndpoint(aiCfg.BaseURL)),

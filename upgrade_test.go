@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -235,6 +236,65 @@ func TestExtractUpgradeArchiveRejectsUnsafeEntries(t *testing.T) {
 	}
 	if err := extractUpgradeArchive(archive.Bytes(), t.TempDir()); err == nil {
 		t.Fatal("extractUpgradeArchive() accepted traversal entry")
+	}
+}
+
+func TestInstallUpgradeArchiveInstallsAshAndBroker(t *testing.T) {
+	var archive bytes.Buffer
+	gzipWriter := gzip.NewWriter(&archive)
+	tarWriter := tar.NewWriter(gzipWriter)
+	ash := []byte("#!/bin/sh\nmkdir -p \"$2\"\nfor asset in .ash_env .ash_tools .ash_bashrc .ash_zshrc .ash_system; do\n  printf candidate > \"$2/$asset\"\ndone\n")
+	broker := []byte("new ash-broker binary")
+	for _, entry := range []struct {
+		name string
+		data []byte
+	}{
+		{name: "ash", data: ash},
+		{name: "ash-broker", data: broker},
+	} {
+		if err := tarWriter.WriteHeader(&tar.Header{Name: entry.name, Mode: 0o755, Size: int64(len(entry.data))}); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := tarWriter.Write(entry.data); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := tarWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gzipWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	home := t.TempDir()
+	originalHome := osUserHomeDir
+	osUserHomeDir = func() (string, error) { return home, nil }
+	t.Cleanup(func() { osUserHomeDir = originalHome })
+	originalProvisionPythonEnv := provisionPythonEnv
+	provisionPythonEnv = func(io.Writer) {}
+	t.Cleanup(func() { provisionPythonEnv = originalProvisionPythonEnv })
+
+	if err := installUpgradeArchive(archive.Bytes(), "v1.2.3", upgradeOptions{replace: true}, &bytes.Buffer{}); err != nil {
+		t.Fatalf("installUpgradeArchive() error = %v", err)
+	}
+	for path, want := range map[string][]byte{
+		filepath.Join(home, ".local", "bin", "ash"):        ash,
+		filepath.Join(home, ".local", "bin", "ash-broker"): broker,
+	} {
+		got, err := os.ReadFile(path)
+		if err != nil {
+			t.Fatalf("read %s: %v", path, err)
+		}
+		if !bytes.Equal(got, want) {
+			t.Errorf("%s content = %q, want %q", path, got, want)
+		}
+		info, err := os.Stat(path)
+		if err != nil {
+			t.Fatalf("stat %s: %v", path, err)
+		}
+		if info.Mode().Perm() != 0o755 {
+			t.Errorf("%s mode = %o, want 755", path, info.Mode().Perm())
+		}
 	}
 }
 

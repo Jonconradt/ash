@@ -124,9 +124,11 @@ staticcheck:
 		echo "staticcheck not installed; skipping"; \
 	fi
 
-install: test lint  gosec 
-	@go install ./...
-	@ash install --shell bash --overwrite
+install: test lint gosec
+	@mkdir -p "$(LOCAL_BIN_DIR)"
+	@go build -o "$(LOCAL_BINARY_PATH)" -ldflags "-X main.ashVersion=$(BUILD_VERSION) -X main.ashCommit=$(BUILD_COMMIT) -X main.ashDevelopmentBuild=true" .
+	@go build -o "$(LOCAL_BIN_DIR)/ash-broker" ./cmd/ash-broker
+	@"$(LOCAL_BINARY_PATH)" install --shell bash --overwrite
 
 version: release-check release-artifacts
 

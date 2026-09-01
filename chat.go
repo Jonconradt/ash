@@ -150,13 +150,19 @@ func randomCloudServer500Message() string {
 // produced. The fallback path goes through the chatExecutor var (not chat directly) so tests
 // that stub chatExecutor keep working unchanged when streaming is disabled (the default).
 func chatStream(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolDefinition, onDelta func(streamDelta)) (chatResponse, error) {
-	if streamingEnabled() {
+	streamRequested := streamingEnabled()
+	if streamRequested {
 		adapter, err := adapterForProvider(aiCfg.Provider)
-		if err == nil {
-			if streamAdapter, ok := adapter.(streamingProviderAdapter); ok {
-				return streamAdapter.SendStream(ctx, aiCfg, messages, tools, onDelta)
-			}
+		if err != nil {
+			slog.Debug("AI streaming mode", "request_id", requestIDFromContext(ctx), "provider", aiCfg.Provider, "stream_requested", true, "stream_adapter_selected", false, "stream_used", false, "reason", "adapter_lookup_failed", "EID", "F7Kq3PzL")
+		} else if streamAdapter, ok := adapter.(streamingProviderAdapter); ok {
+			slog.Debug("AI streaming mode", "request_id", requestIDFromContext(ctx), "provider", adapter.Name(), "stream_requested", true, "stream_adapter_selected", true, "EID", "F7Kq3PzL")
+			return streamAdapter.SendStream(ctx, aiCfg, messages, tools, onDelta)
+		} else {
+			slog.Debug("AI streaming mode", "request_id", requestIDFromContext(ctx), "provider", adapter.Name(), "stream_requested", true, "stream_adapter_selected", false, "stream_used", false, "reason", "adapter_unsupported", "EID", "F7Kq3PzL")
 		}
+	} else {
+		slog.Debug("AI streaming mode", "request_id", requestIDFromContext(ctx), "provider", aiCfg.Provider, "stream_requested", false, "stream_adapter_selected", false, "stream_used", false, "reason", "disabled", "EID", "F7Kq3PzL")
 	}
 	response, err := chatExecutor(ctx, aiCfg, messages, tools)
 	if err != nil {

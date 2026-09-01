@@ -40,6 +40,7 @@ type aiConfig struct {
 	AuthToken        string
 	Provider         aiProvider
 	UseNativeCaching bool
+	OllamaOpenAIAPI  bool
 }
 
 // parseAIConfigFromEnv parses and validates input values.
@@ -64,7 +65,8 @@ func parseAIConfigFromEnv() (aiConfig, error) {
 	if err != nil {
 		return aiConfig{}, err
 	}
-	if provider == providerOllama && alwaysUseOpenAIAPIForOllama() {
+	ollamaOpenAIAPI := provider == providerOllama && alwaysUseOpenAIAPIForOllama()
+	if ollamaOpenAIAPI {
 		provider = providerOpenAI
 	}
 
@@ -88,6 +90,7 @@ func parseAIConfigFromEnv() (aiConfig, error) {
 		HistoryKey:       fmt.Sprintf("%s/%s", baseURL, model),
 		Provider:         provider,
 		UseNativeCaching: useCaching,
+		OllamaOpenAIAPI:  ollamaOpenAIAPI,
 	}
 	if authToken != "" {
 		cfg.Authorization = "Bearer " + authToken
