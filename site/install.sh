@@ -124,15 +124,21 @@ esac
 mkdir -p "$install_dir" || fail "could not create installation directory $install_dir"
 tar -xzf "$tmp_dir/$asset" -C "$tmp_dir" || fail "could not extract $asset"
 [ -f "$tmp_dir/$base" ] || fail "release archive did not contain $base"
-[ -f "$tmp_dir/$base-broker" ] || fail "release archive did not contain $base-broker"
 install -m 0755 "$tmp_dir/$base" "$install_dir/ash" 2>/dev/null || {
   cp "$tmp_dir/$base" "$install_dir/ash" || fail "could not install ash to $install_dir"
   chmod 0755 "$install_dir/ash" || fail "could not make ash executable"
 }
-install -m 0755 "$tmp_dir/$base-broker" "$install_dir/ash-broker" 2>/dev/null || {
-  cp "$tmp_dir/$base-broker" "$install_dir/ash-broker" || fail "could not install ash-broker to $install_dir"
-  chmod 0755 "$install_dir/ash-broker" || fail "could not make ash-broker executable"
-}
+
+# This installer is published from the site branch and must cope with whichever
+# release is currently latest, including ones cut before the broker binary split.
+if [ -f "$tmp_dir/$base-broker" ]; then
+  install -m 0755 "$tmp_dir/$base-broker" "$install_dir/ash-broker" 2>/dev/null || {
+    cp "$tmp_dir/$base-broker" "$install_dir/ash-broker" || fail "could not install ash-broker to $install_dir"
+    chmod 0755 "$install_dir/ash-broker" || fail "could not make ash-broker executable"
+  }
+else
+  printf 'ash installer: %s does not ship ash-broker; connection reuse will be disabled\n' "$tag" >&2
+fi
 
 # Broker daemons are long-lived per-shell processes; kill stale ones so open
 # shells respawn a fresh broker running the binary just installed. The second

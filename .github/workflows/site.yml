@@ -5,6 +5,10 @@ on:
     paths:
       - 'site/**'
       - '.github/workflows/site.yml'
+  # Releases may be cut from a branch other than main; redeploy from the tag so the
+  # published install.sh always matches the release it downloads.
+  release:
+    types: [published]
   workflow_dispatch:
 permissions:
   contents: read
