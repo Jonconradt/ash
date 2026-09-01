@@ -11,13 +11,17 @@ The CLI entry point in [ash.go](ash.go) initializes configuration, loads the sys
 
 ## Key subsystems
 
-- [chat.go](chat.go): request/response handling, transient retry logic, and transport-level error translation.
+- [chat.go](chat.go): request/response handling (`chat`/`chatStream`), the `message`/`chatResponse`/`attachment` data model, and dispatch to the per-provider adapter registry.
+- [ai_transport.go](ai_transport.go): shared `http.RoundTripper` (`ashRoundTripper`) used by every SDK-based adapter's `http.Client` — implements broker-fallback, retry/backoff, and metrics once, instead of per-adapter.
 - [runner.go](runner.go): tool-loop orchestration, task state, and observation tracking.
+- [ash_attachments.go](ash_attachments.go): `--attach` CLI flag parsing, attachment loading/MIME-sniffing/size limits, and writing model-returned attachments to disk.
 - [tools.go](tools.go): tool definitions and local tool execution shim.
 - [support.go](support.go): logging, history lifecycle, file-system helpers, and debug output.
 - [install.go](install.go): shell wrapper installation and workspace initialization.
 - [ai_autoconfig.go](ai_autoconfig.go): cloud provider/local server auto-detection and model-listing prompts used by `ash install`.
-- [provider.go](provider.go): provider adapter registry (`ollama`, `openai`, `google`, `anthropic`) and per-provider request/response translation.
+- [provider.go](provider.go): provider adapter registry (`ollama`, `openai`, `google`, `anthropic`, `cohere`, `bedrock`) and the adapter interface tiers: `providerAdapter` (base), `byteProviderAdapter` (raw HTTP, used only by `ollamaAdapter`), `sdkProviderAdapter` (official SDK-based `Send`, used by every other adapter), `streamingProviderAdapter` (adds `SendStream`, currently implemented only by [openai.go](openai.go)).
+- [openai.go](openai.go), [google.go](google.go), [anthropic.go](anthropic.go), [cohere.go](cohere.go), [bedrock.go](bedrock.go): per-provider adapters built on each vendor's official Go SDK, all sharing the `ai_transport.go` HTTP client so retries/broker-fallback/metrics stay consistent across providers.
+- [broker.go](broker.go): client-side broker connection logic used by the main `ash` binary; the broker server itself lives in the separate [cmd/ash-broker](cmd/ash-broker) binary (see [internal/brokerproto](internal/brokerproto) for the shared wire types) so the broker has no dependency on any AI provider SDK.
 - [snooze.go](snooze.go): persistent expiry state for pausing automatic shell routing.
 
 ## Operational notes

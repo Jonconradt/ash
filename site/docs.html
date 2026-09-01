@@ -62,8 +62,8 @@ ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></pre>
         <section id="commands">
           <h2>Commands</h2>
           <dl>
-            <dt><code>ash [text ...]</code></dt>
-            <dd>Run a single assistant request.</dd>
+            <dt><code>ash [--attach path]... [text ...]</code></dt>
+            <dd>Run a single assistant request. <code>--attach</code> attaches a file (image or document) to the request; repeatable. Size-limited by <code>ASH_ATTACHMENT_MAX_BYTES</code> and currently sent on the wire only to OpenAI-compatible providers.</dd>
             <dt><code>ash install [--shell bash|zsh] [--dry-run]</code></dt>
             <dd>Install or update shell integration. When <code>--shell</code> is omitted, the current shell is used when possible. <code>--dry-run</code> previews changes without writing. When interactive, install also auto-configures <code>AI_ENDPOINT</code>, <code>AI_MODEL</code>, and <code>AI_AUTH_TOKEN</code>: it prefers an already-set cloud provider API key (OpenAI, Anthropic, Google Gemini, Azure OpenAI, Mistral, Cohere, Groq, xAI, DeepSeek, Together AI, OpenRouter, or HuggingFace), then a running local inference server (Ollama, LM Studio, llama.cpp/MLX/LocalAI, vLLM, text-generation-webui, Jan, or GPT4All), and otherwise prompts with a numbered provider menu. The model is chosen from the endpoint's model list when available.</dd>
             <dt><code>ash snooze [duration|off]</code></dt>
@@ -80,8 +80,10 @@ ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></pre>
             <dt><code>AI_CACHE</code></dt><dd>Optional provider-native cache toggle. Enabled by default when supported; use <code>off</code> or <code>false</code> to disable.</dd>
             <dt><code>AI_ENDPOINT</code></dt><dd>Required base URL for the chat API endpoint.</dd>
             <dt><code>AI_MODEL</code></dt><dd>Required model name sent to the endpoint.</dd>
-            <dt><code>AI_PROVIDER</code></dt><dd>Optional provider override: <code>anthropic</code>, <code>gemini</code>, <code>google</code>, <code>ollama</code>, or <code>openai</code>. When unset, ash detects the provider from the endpoint.</dd>
+            <dt><code>AI_PROVIDER</code></dt><dd>Optional provider override: <code>anthropic</code>, <code>bedrock</code>, <code>cohere</code>, <code>gemini</code>, <code>google</code>, <code>ollama</code>, or <code>openai</code>. When unset, ash detects the provider from the endpoint.</dd>
             <dt><code>AI_TIMEOUT</code></dt><dd>Optional request timeout. Default: <code>3m</code>.</dd>
+            <dt><code>ASH_ALWAYS_OPENAI_API</code></dt><dd>Optional testing toggle. When true-like, routes the <code>ollama</code> provider through the OpenAI-compatible SDK adapter instead of its hand-rolled implementation. Default: off.</dd>
+            <dt><code>ASH_ATTACHMENT_MAX_BYTES</code></dt><dd>Optional maximum size in bytes for a file passed via <code>--attach</code>. Default: <code>10485760</code> (10 MiB).</dd>
             <dt><code>ASH_HISTORY_MAX</code></dt><dd>Optional maximum history messages per key. Default: <code>40</code>.</dd>
             <dt><code>ASH_LOG_FILE</code></dt><dd>Optional debug log path when verbose logging is enabled.</dd>
             <dt><code>ASH_LOG_MAX_BYTES</code></dt><dd>Optional maximum log size before rotation. Default: <code>1048576</code>.</dd>
@@ -91,6 +93,7 @@ ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></pre>
             <dt><code>ASH_RETRY_BASE_DELAY</code></dt><dd>Optional retry backoff base delay. Default: <code>250ms</code>.</dd>
             <dt><code>ASH_RETRY_MAX_ATTEMPTS</code></dt><dd>Optional retryable request attempts. Default: <code>3</code>.</dd>
             <dt><code>ASH_SCHEDULED_TASK</code></dt><dd>Internal scheduler flag used by ash-managed invocations.</dd>
+            <dt><code>ASH_STREAM</code></dt><dd>Optional toggle. When true-like, streams the response from providers whose adapter supports it (currently OpenAI only). Default: off.</dd>
             <dt><code>ASH_TASK_MAX</code></dt><dd>Optional cap on execution tasks derived from a request. Default: <code>6</code>.</dd>
             <dt><code>ASH_TASK_STALL_ROUNDS</code></dt><dd>Optional assistant stall rounds before stopping. Default: <code>2</code>.</dd>
             <dt><code>ASH_TOOL_ALLOWLIST</code></dt><dd>Optional comma-separated executable allowlist for <code>run_unix_command</code>. Otherwise <code>~/.ash/.ash_tools</code> is used when present; this override does not expand internal Ash tokens.</dd>

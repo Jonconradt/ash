@@ -28,7 +28,7 @@ What if I am on MacOS and I want the results in my clipboard? Add pbcopy to .ash
 
 Where is the system prompt? Put your system prompt in ~/.ash/.ash_system. It supports replacement of environment variables.
 
-Does this support Ollama, OpenAI, Google, Anthropic? Yes, plus Azure OpenAI, Mistral, Cohere, Groq, xAI, DeepSeek, Together AI, OpenRouter, and HuggingFace. During install, ash auto-detects an already-configured provider key or a local server; otherwise it shows a numbered menu so you can pick a provider (or enter a custom URL) and supply your app key. The app key will be added to ~/.ash/.ash_env
+Does this support Ollama, OpenAI, Google, Anthropic? Yes, plus Azure OpenAI, Mistral, Cohere, Groq, xAI, DeepSeek, Together AI, OpenRouter, HuggingFace, and AWS Bedrock. During install, ash auto-detects an already-configured provider key or a local server; otherwise it shows a numbered menu so you can pick a provider (or enter a custom URL) and supply your app key. The app key will be added to ~/.ash/.ash_env
 
 Is this thing secure and safe? It really depends on how bold you are. It runs as your user so it can read your files, but it is limited in the commands it can execute, but it can execute python (if you allow it). If you allow curl or wget and are running a naive model you could end up executing more than you wanted.
 
@@ -36,10 +36,12 @@ Is this thing secure and safe? It really depends on how bold you are. It runs as
 
 - Uses `AI_ENDPOINT` and `AI_MODEL` to target local or cloud provider endpoints
 - Uses bearer authentication automatically when `AI_AUTH_TOKEN` is set
-- Auto-detects provider adapters (`ollama`, `openai`, `google`, `anthropic`) from endpoint
+- Auto-detects provider adapters (`ollama`, `openai`, `google`, `anthropic`, `cohere`, `bedrock`) from endpoint
 - `ash install` auto-configures from an already-set cloud provider API key or a running local inference server, and offers a numbered model picker
 - Supports optional `AI_PROVIDER` override for advanced routing control
 - Uses provider-native tool calling through per-provider adapters
+- Can attach files (images or documents) to a request with `--attach <path>` (repeatable); currently encoded on the wire for OpenAI-compatible providers
+- Optional streaming responses via `ASH_STREAM` for providers whose adapter supports it (currently OpenAI only)
 - Enables provider-native caching by default when supported
 - Shows an ANSI-friendly thinking indicator while waiting for the AI response
 - Supports `Ctrl-C` to abort an in-flight request
@@ -227,6 +229,7 @@ Optional advanced overrides:
 ```bash
 export AI_PROVIDER="openai"   # optional: ollama|openai|google|anthropic|gemini
 export AI_CACHE="off"         # optional: on by default when provider supports native caching
+export ASH_STREAM="off"       # optional: stream responses when the provider adapter supports it (currently OpenAI only)
 ```
 
 Pipeline examples:
@@ -251,6 +254,8 @@ Common `AI_ENDPOINT` values:
 - Together AI (OpenAI-compatible): `https://api.together.xyz/v1`
 - OpenRouter (OpenAI-compatible): `https://openrouter.ai/api/v1`
 - HuggingFace Router (OpenAI-compatible): `https://router.huggingface.co/v1`
+- Cohere (native SDK): `https://api.cohere.com`
+- AWS Bedrock (native SDK, Converse API): `https://bedrock-runtime.<region>.amazonaws.com` — uses the AWS credential chain (env vars, `~/.aws/credentials`, SSO, instance role) for SigV4 signing; `AI_AUTH_TOKEN` is still required by ash's generic cloud-endpoint validation but is unused by Bedrock itself, so set any placeholder value.
 
 Notes:
 
@@ -266,7 +271,11 @@ Notes:
 - `AI_MODEL` (required): Model name sent to the endpoint.
 - `AI_AUTH_TOKEN` (optional): When set, sent as a bearer token. Required for cloud endpoints.
 - `AI_PROVIDER` (optional): Override auto-detected provider (`ollama`, `openai`, `google`, `gemini`, `anthropic`).
+  Also accepts `cohere` and `bedrock` for the native SDK-based adapters (auto-detected from `api.cohere.com`/`bedrock-runtime.*.amazonaws.com` when not set explicitly).
 - `AI_CACHE` (optional): Enable or disable provider-native caching (`true/false`). Default `true`.
+- `ASH_ALWAYS_OPENAI_API` (optional): When true-like, routes the `ollama` provider through the OpenAI-compatible SDK adapter instead of its hand-rolled implementation. Default off.
+- `ASH_STREAM` (optional): When true-like, streams the response from providers whose adapter supports it (currently OpenAI only). Default off; has no visible effect on output today (see [docs/ash.1](docs/ash.1)).
+- `ASH_ATTACHMENT_MAX_BYTES` (optional): Max size in bytes for a file passed via `--attach`. Default 10485760 (10 MiB).
 - `AI` (legacy, unsupported): Deprecated and rejected; use `AI_ENDPOINT` and `AI_MODEL`.
 - `AI_TIMEOUT` (optional): AI request timeout. Default `3m`.
 - `ASH_HISTORY_MAX` (optional): Max retained history messages per key. Default `40`.
