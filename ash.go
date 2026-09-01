@@ -108,7 +108,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runSnooze(args[1:], stdout, stderr)
 	}
 	if args[0] == "broker" {
-		return runBroker(args[1:], stdout, stderr)
+		_, _ = fmt.Fprintln(stderr, "ash broker has moved to a separate binary; run 'ash-broker' instead")
+		return 1
 	}
 	if args[0] == "route" {
 		return runRoute(args[1:], stdout, stderr)

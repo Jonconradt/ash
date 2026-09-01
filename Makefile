@@ -68,6 +68,7 @@ sync-route-words:
 build: lint test
 	@mkdir -p "$(LOCAL_BIN_DIR)"
 	@go build -o "$(LOCAL_BINARY_PATH)" -ldflags "-X main.ashVersion=$(BUILD_VERSION) -X main.ashCommit=$(BUILD_COMMIT) -X main.ashDevelopmentBuild=true" .
+	@go build -o "$(LOCAL_BIN_DIR)/ash-broker" ./cmd/ash-broker
 
 lint: site-lint yaml-lint python-lint markdown-lint
 	@go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run ./...
@@ -154,10 +155,12 @@ release-clean:
 release-build:
 	@mkdir -p "$(RELEASE_OUTPUT_DIR)"
 	GOOS=darwin GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.ashVersion=$(RELEASE_VERSION) -X main.ashCommit=$(RELEASE_COMMIT)" -o "$(RELEASE_OUTPUT_DIR)/$(APP_NAME)" .
+	GOOS=darwin GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "$(RELEASE_OUTPUT_DIR)/$(APP_NAME)-broker" ./cmd/ash-broker
 
 release-build-one:
 	@mkdir -p "$(RELEASE_OUTPUT_DIR)"
 	GOOS=$(RELEASE_GOOS) GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.ashVersion=$(RELEASE_VERSION) -X main.ashCommit=$(RELEASE_COMMIT)" -o "$(RELEASE_BINARY_PATH)" .
+	GOOS=$(RELEASE_GOOS) GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "$(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)-broker" ./cmd/ash-broker
 
 release-pkg:
 	@mkdir -p "$(RELEASE_PACKAGE_DIR)"
@@ -217,9 +220,10 @@ release-pkg-one:
 			tmp_dir="$$(mktemp -d)"; \
 			trap 'rm -rf "$$tmp_dir"' EXIT; \
 			cp "$(RELEASE_BINARY_PATH)" "$$tmp_dir/$(notdir $(RELEASE_BINARY_PATH))"; \
+			cp "$(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)-broker" "$$tmp_dir/$(notdir $(RELEASE_BINARY_PATH))-broker"; \
 			mkdir -p "$$tmp_dir/$(TARBALL_MAN_PATH)"; \
 			install -m 0644 "$(MAN_PAGE_PATH)" "$$tmp_dir/$(TARBALL_MAN_PATH)/$(APP_NAME).1"; \
-			tar -C "$$tmp_dir" -czf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" "$(notdir $(RELEASE_BINARY_PATH))" "$(TARBALL_MAN_PATH)/$(APP_NAME).1"; \
+			tar -C "$$tmp_dir" -czf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" "$(notdir $(RELEASE_BINARY_PATH))" "$(notdir $(RELEASE_BINARY_PATH))-broker" "$(TARBALL_MAN_PATH)/$(APP_NAME).1"; \
 			;; \
 		*) \
 			echo "unsupported RELEASE_FORMAT=$(RELEASE_FORMAT)"; \
@@ -263,6 +267,7 @@ release-validate-one:
 			;; \
 		tar.gz) \
 			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^$(notdir $(RELEASE_BINARY_PATH))$$"; \
+			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^$(notdir $(RELEASE_BINARY_PATH))-broker$$"; \
 			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^$(TARBALL_MAN_PATH)/$(APP_NAME)\.1$$"; \
 			shasum -a 256 "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" > "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz.sha256"; \
 			;; \

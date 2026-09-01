@@ -29,7 +29,7 @@ _ash_ensure_broker() {
 	# pid is handed back through a file because $! is not visible to the parent.
 	local pid_path="$runtime_dir/${SESSION_ID:-shell}.pid"
 	local parent_pid="$BASHPID"
-	( ASH_BROKER_TOKEN="$token" command ash broker --socket "$socket_path" --parent-pid "$parent_pid" --lease "$lease_path" </dev/null >/dev/null 2>&1 & printf '%s' "$!" > "$pid_path" )
+	( ASH_BROKER_TOKEN="$token" command ash-broker --socket "$socket_path" --parent-pid "$parent_pid" --lease "$lease_path" </dev/null >/dev/null 2>&1 & printf '%s' "$!" > "$pid_path" )
 	local broker_pid
 	broker_pid="$(cat "$pid_path" 2>/dev/null)"
 	rm -f "$pid_path" 2>/dev/null

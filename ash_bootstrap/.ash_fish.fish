@@ -35,7 +35,7 @@ function _ash_ensure_broker
 
 	begin
 		set -lx ASH_BROKER_TOKEN "$token"
-		command ash broker --socket "$socket_path" --parent-pid "$parent_pid" --lease "$lease_path" </dev/null >/dev/null 2>&1
+		command ash-broker --socket "$socket_path" --parent-pid "$parent_pid" --lease "$lease_path" </dev/null >/dev/null 2>&1
 	end &
 	set -l broker_pid $last_pid
 	disown "$broker_pid" 2>/dev/null; or true

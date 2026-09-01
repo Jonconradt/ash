@@ -4,57 +4,77 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
 	"time"
+
+	"ash/internal/brokerproto"
 )
 
-func TestBrokerFrameLimit(t *testing.T) {
-	if _, err := readBrokerFrame(strings.NewReader("\xff\xff\xff\xff")); err == nil {
-		t.Fatal("expected oversized frame to be rejected")
+// fakeBrokerListener starts a minimal test-double broker that decodes one brokerproto.Request
+// per connection, performs the real HTTP call, and encodes the brokerproto.Response back. It
+// exists so this package's tests can exercise brokerDo's wire behavior without importing
+// cmd/ash-broker (a separate, non-importable package main).
+func fakeBrokerListener(t *testing.T, socket string) net.Listener {
+	t.Helper()
+	_ = os.Remove(socket)
+	t.Cleanup(func() { _ = os.Remove(socket) })
+	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "unix", socket)
+	if err != nil {
+		t.Fatal(err)
 	}
-}
-
-func TestRunBrokerRequiresParentPID(t *testing.T) {
-	t.Setenv(brokerTokenEnv, "test-token")
-	var stdout, stderr strings.Builder
-	if code := runBroker([]string{"--socket", filepath.Join(t.TempDir(), "broker.sock")}, &stdout, &stderr); code != 2 {
-		t.Fatalf("runBroker without parent PID = %d, want 2", code)
-	}
-	if !strings.Contains(stderr.String(), "--parent-pid") {
-		t.Fatalf("expected parent PID error, got %q", stderr.String())
-	}
-}
-
-func TestBrokerParentAlive(t *testing.T) {
-	if !brokerParentAlive(os.Getpid()) {
-		t.Fatal("expected current process to be alive")
-	}
-	if brokerParentAlive(0) {
-		t.Fatal("expected zero PID to be rejected")
-	}
-}
-
-func TestBrokerHTTPClientRetainsBoundedIdleConnections(t *testing.T) {
-	client := newBrokerHTTPClient()
-	transport, ok := client.Transport.(*http.Transport)
-	if !ok {
-		t.Fatalf("transport = %T, want *http.Transport", client.Transport)
-	}
-	if transport.IdleConnTimeout != 0 {
-		t.Fatalf("IdleConnTimeout = %s, want 0", transport.IdleConnTimeout)
-	}
-	if transport.MaxIdleConns != 32 || transport.MaxIdleConnsPerHost != 8 || transport.MaxConnsPerHost != 16 {
-		t.Fatalf("unexpected broker connection limits: idle=%d idle_per_host=%d per_host=%d", transport.MaxIdleConns, transport.MaxIdleConnsPerHost, transport.MaxConnsPerHost)
-	}
+	t.Cleanup(func() { _ = listener.Close() })
+	go func() {
+		for {
+			conn, acceptErr := listener.Accept()
+			if acceptErr != nil {
+				return
+			}
+			go func() {
+				defer func() { _ = conn.Close() }()
+				payload, readErr := brokerproto.ReadFrame(conn)
+				if readErr != nil {
+					return
+				}
+				var request brokerproto.Request
+				if json.Unmarshal(payload, &request) != nil {
+					return
+				}
+				httpRequest, reqErr := http.NewRequestWithContext(context.Background(), http.MethodPost, request.URL, strings.NewReader(string(request.Body)))
+				if reqErr != nil {
+					return
+				}
+				for name, value := range request.Headers {
+					httpRequest.Header.Set(name, value)
+				}
+				httpResponse, doErr := http.DefaultClient.Do(httpRequest)
+				if doErr != nil {
+					return
+				}
+				defer func() { _ = httpResponse.Body.Close() }()
+				body := make([]byte, 0, 256)
+				buf := make([]byte, 256)
+				for {
+					n, readErr := httpResponse.Body.Read(buf)
+					body = append(body, buf[:n]...)
+					if readErr != nil {
+						break
+					}
+				}
+				responsePayload, _ := json.Marshal(brokerproto.Response{Version: brokerproto.Version, Status: httpResponse.StatusCode, Body: body})
+				_ = brokerproto.WriteFrame(conn, responsePayload)
+			}()
+		}
+	}()
+	return listener
 }
 
 func TestBrokerRoundTripReusesConfiguredTransport(t *testing.T) {
@@ -66,34 +86,11 @@ func TestBrokerRoundTripReusesConfiguredTransport(t *testing.T) {
 	}))
 	defer server.Close()
 
-	serverURL, err := url.Parse(server.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
-	allowedHost := serverURL.Host
-
 	socket := "/tmp/ash-broker-test-" + strconv.Itoa(os.Getpid()) + ".sock"
-	_ = os.Remove(socket)
-	t.Cleanup(func() { _ = os.Remove(socket) })
-	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "unix", socket)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = listener.Close() }()
-	token := "test-token"
-	client := newBrokerHTTPClient()
-	go func() {
-		for {
-			connection, acceptErr := listener.Accept()
-			if acceptErr != nil {
-				return
-			}
-			go handleBrokerConn(context.Background(), connection, token, client, allowedHost)
-		}
-	}()
+	fakeBrokerListener(t, socket)
 
 	t.Setenv(brokerSocketEnv, socket)
-	t.Setenv(brokerTokenEnv, token)
+	t.Setenv(brokerTokenEnv, "test-token")
 	request, err := http.NewRequestWithContext(context.Background(), http.MethodPost, server.URL, strings.NewReader("{}"))
 	if err != nil {
 		t.Fatal(err)
@@ -106,9 +103,6 @@ func TestBrokerRoundTripReusesConfiguredTransport(t *testing.T) {
 	defer func() { _ = response.Body.Close() }()
 	if response.StatusCode != http.StatusOK {
 		t.Fatalf("status = %d, want 200", response.StatusCode)
-	}
-	if _, err := os.Stat(socket); err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -131,7 +125,7 @@ func TestBrokerDoReturnsPromptlyOnContextCancel(t *testing.T) {
 			return
 		}
 		defer func() { _ = connection.Close() }()
-		_, _ = readBrokerFrame(connection)
+		_, _ = brokerproto.ReadFrame(connection)
 		close(serverReadRequest)
 		<-releaseServer
 	}()
@@ -165,50 +159,6 @@ func TestBrokerDoReturnsPromptlyOnContextCancel(t *testing.T) {
 		}
 	case <-time.After(500 * time.Millisecond):
 		t.Fatal("brokerDo did not return promptly after context cancellation")
-	}
-}
-
-func TestBrokerURLAllowedPinsToConfiguredHost(t *testing.T) {
-	if brokerURLAllowed("https://api.example.com/v1/chat", "api.example.com") != true {
-		t.Fatal("expected matching host to be allowed")
-	}
-	if brokerURLAllowed("https://attacker.example.com/v1/chat", "api.example.com") {
-		t.Fatal("expected mismatched host to be rejected")
-	}
-	if brokerURLAllowed("https://user@api.example.com/v1/chat", "api.example.com") {
-		t.Fatal("expected embedded userinfo to be rejected")
-	}
-}
-
-func TestHandleBrokerConnRejectsUnconfiguredHost(t *testing.T) {
-	socket := "/tmp/ash-broker-test-host-" + strconv.Itoa(os.Getpid()) + ".sock"
-	_ = os.Remove(socket)
-	t.Cleanup(func() { _ = os.Remove(socket) })
-	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "unix", socket)
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = listener.Close() }()
-	token := "test-token"
-	client := newBrokerHTTPClient()
-	go func() {
-		for {
-			connection, acceptErr := listener.Accept()
-			if acceptErr != nil {
-				return
-			}
-			go handleBrokerConn(context.Background(), connection, token, client, "api.example.com")
-		}
-	}()
-
-	t.Setenv(brokerSocketEnv, socket)
-	t.Setenv(brokerTokenEnv, token)
-	request, err := http.NewRequestWithContext(context.Background(), http.MethodPost, "https://attacker.example.com/v1/chat", strings.NewReader("{}"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, _, err := brokerDo(context.Background(), request); err == nil {
-		t.Fatal("expected request to unconfigured host to be rejected")
 	}
 }
 

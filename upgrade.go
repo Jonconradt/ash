@@ -500,6 +500,13 @@ func installUpgradeArchive(content []byte, version string, options upgradeOption
 	if err := replaceUpgradeFile(binaryPath, destination, 0o755); err != nil {
 		return err
 	}
+	// The ash-broker binary is optional in the archive so older release tarballs
+	// (and minimal test fixtures) without one still update successfully.
+	if brokerPath, brokerErr := findUpgradeBrokerBinary(staging); brokerErr == nil {
+		if err := replaceUpgradeFile(brokerPath, filepath.Join(destinationDir, "ash-broker"), 0o755); err != nil {
+			return err
+		}
+	}
 	if err := syncUpgradeAssets(candidateAssets, options, stdout); err != nil {
 		if hadPreviousBinary {
 			_ = writeUpgradeAsset(destination, previousBinary, false)
@@ -781,6 +788,9 @@ func findUpgradeBinary(root, expectedName string) (string, error) {
 			return err
 		}
 		name := filepath.Base(path)
+		if strings.HasSuffix(name, "-broker") {
+			return nil
+		}
 		if info.Mode().IsRegular() && (name == expectedName || name == "ash" || strings.HasPrefix(name, "ash-v")) {
 			matches = append(matches, path)
 		}
@@ -791,6 +801,28 @@ func findUpgradeBinary(root, expectedName string) (string, error) {
 	}
 	if len(matches) != 1 {
 		return "", fmt.Errorf("archive contains %d executable ash files, expected exactly one", len(matches))
+	}
+	return matches[0], nil
+}
+
+// findUpgradeBrokerBinary locates the optional ash-broker executable in an extracted archive.
+func findUpgradeBrokerBinary(root string) (string, error) {
+	var matches []string
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		name := filepath.Base(path)
+		if info.Mode().IsRegular() && (name == "ash-broker" || strings.HasSuffix(name, "-broker")) {
+			matches = append(matches, path)
+		}
+		return nil
+	})
+	if err != nil {
+		return "", err
+	}
+	if len(matches) != 1 {
+		return "", fmt.Errorf("archive contains %d ash-broker executable candidates, expected exactly one", len(matches))
 	}
 	return matches[0], nil
 }
