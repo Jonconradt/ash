@@ -1,6 +1,10 @@
 # Environment variables 
 .env
 
+# Personal dev-time ash workspace files (picked up from cwd if present)
+/.ash_system
+/.ash_tools
+
 # Build artifacts
 dist/
 coverage.out

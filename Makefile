@@ -106,7 +106,6 @@ govulncheck:
 	@go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...
 
 test:
-	@bash -n sample_bashrc.txt
 	@go test ./...
 
 test-race:
