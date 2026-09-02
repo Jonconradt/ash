@@ -11,6 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"ash/internal/model"
 )
 
 type metricsStage string
@@ -21,11 +23,7 @@ const (
 	metricsStageAIProcessing metricsStage = "ai_processing"
 )
 
-type chatUsage struct {
-	InputTokens  int
-	OutputTokens int
-	Available    bool
-}
+type chatUsage = model.ChatUsage
 
 type executionMetrics struct {
 	mu                    sync.RWMutex

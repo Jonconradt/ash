@@ -13,6 +13,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"ash/internal/workspace"
 )
 
 var (
@@ -53,7 +55,7 @@ const (
 	brokerSocketProbeTimeout          = 50 * time.Millisecond
 	systemFileName                    = ".ash_system"
 	toolsFileName                     = ".ash_tools"
-	ashWorkspaceDirName               = ".ash"
+	ashWorkspaceDirName               = workspace.DirName
 	inventoryFileName                 = "inventory.md"
 	schedulerLogDirName               = "logs"
 	launchAgentsDirName               = "launchagents"

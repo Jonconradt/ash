@@ -13,39 +13,21 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"ash/internal/model"
 )
 
-type message struct {
-	Role        string       `json:"role"`
-	Content     string       `json:"content"`
-	ToolCalls   []toolCall   `json:"tool_calls,omitempty"`
-	ToolName    string       `json:"tool_name,omitempty"`
-	ToolCallID  string       `json:"tool_call_id,omitempty"`
-	Attachments []attachment `json:"attachments,omitempty"`
-}
-
-// attachment is a binary file (image or document) attached to a message, either
-// supplied by the user (--attach/@path) or returned by a tool result.
-type attachment struct {
-	MimeType string `json:"mime_type"`
-	FileName string `json:"file_name,omitempty"`
-	Data     []byte `json:"-"`
-}
-
-type chatRequest struct {
-	Model      string           `json:"model"`
-	Messages   []message        `json:"messages"`
-	Tools      []toolDefinition `json:"tools,omitempty"`
-	ToolChoice string           `json:"tool_choice,omitempty"`
-	Stream     bool             `json:"stream"`
-}
-
-type chatResponse struct {
-	Message     message      `json:"message"`
-	Error       string       `json:"error"`
-	Usage       chatUsage    `json:"-"`
-	Attachments []attachment `json:"-"`
-}
+// Shared wire-level chat/tool types live in internal/model so provider adapter
+// packages can depend on them without importing this package; these aliases
+// keep every existing lowercase call site in internal/app unchanged.
+type message = model.Message
+type attachment = model.Attachment
+type chatRequest = model.ChatRequest
+type chatResponse = model.ChatResponse
+type toolDefinition = model.ToolDefinition
+type toolFunctionDefinition = model.ToolFunctionDefinition
+type toolCall = model.ToolCall
+type toolFunctionCall = model.ToolFunctionCall
 
 type chatStatusError struct {
 	StatusCode int
@@ -55,29 +37,6 @@ type chatStatusError struct {
 // Error returns the HTTP status code and response body as a formatted error string.
 func (e chatStatusError) Error() string {
 	return fmt.Sprintf("status %d: %s", e.StatusCode, strings.TrimSpace(e.Body))
-}
-
-type toolDefinition struct {
-	Type     string                 `json:"type"`
-	Function toolFunctionDefinition `json:"function"`
-}
-
-type toolFunctionDefinition struct {
-	Name        string         `json:"name"`
-	Description string         `json:"description"`
-	Parameters  map[string]any `json:"parameters"`
-}
-
-type toolCall struct {
-	ID       string           `json:"id,omitempty"`
-	Type     string           `json:"type,omitempty"`
-	Function toolFunctionCall `json:"function"`
-}
-
-type toolFunctionCall struct {
-	Index     *int           `json:"index,omitempty"`
-	Name      string         `json:"name"`
-	Arguments map[string]any `json:"arguments"`
 }
 
 var cloudBusy503Messages = []string{

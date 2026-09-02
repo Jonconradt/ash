@@ -28,6 +28,8 @@ import (
 	"time"
 
 	"github.com/charmbracelet/glamour"
+
+	"ash/internal/workspace"
 )
 
 type historyData struct {
@@ -1388,7 +1390,7 @@ func ashWorkspaceDir() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(home, ashWorkspaceDirName), nil
+	return workspace.Root(home), nil
 }
 
 // ashScratchRoot returns the canonical scratch directory under the user's ash workspace.
