@@ -25,6 +25,8 @@ import (
 	"strings"
 	"time"
 
+	"ash/internal/uistyle"
+
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	rekorV1 "github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1"
 	sigstoreBundle "github.com/sigstore/sigstore-go/pkg/bundle"
@@ -898,10 +900,10 @@ func replaceUpgradeFile(source, destination string, mode os.FileMode) error {
 }
 
 func promptUpgradeAsset(reader *bufio.Reader, writer io.Writer, path string) (byte, error) {
-	printMenuTitle(writer, "Customized configuration")
-	printHint(writer, path)
-	printHint(writer, "[r]eplace  [b]ackup and replace  [s]kip (default: skip)")
-	printPrompt(writer, "Choose")
+	uistyle.PrintMenuTitle(writer, "Customized configuration")
+	uistyle.PrintHint(writer, path)
+	uistyle.PrintHint(writer, "[r]eplace  [b]ackup and replace  [s]kip (default: skip)")
+	uistyle.PrintPrompt(writer, "Choose")
 	line, err := reader.ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
 		return 's', err

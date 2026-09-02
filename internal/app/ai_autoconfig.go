@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"ash/internal/uistyle"
 )
 
 // probeTimeout bounds local service discovery so a closed/filtered port cannot stall install.
@@ -209,15 +211,15 @@ func fetchAvailableModels(provider aiProvider, baseURL, authToken string) ([]str
 
 // promptSelectModel displays a numeric menu of models and returns the chosen (or manually entered) model name.
 func promptSelectModel(reader *bufio.Reader, stdout io.Writer, models []string) (string, error) {
-	printMenuTitle(stdout, "Select a model:")
+	uistyle.PrintMenuTitle(stdout, "Select a model:")
 	for i, m := range models {
-		printMenuItem(stdout, i+1, m, "")
+		uistyle.PrintMenuItem(stdout, i+1, m, "")
 	}
 	customIdx := len(models) + 1
-	printMenuItem(stdout, customIdx, "Enter a custom model name", "")
+	uistyle.PrintMenuItem(stdout, customIdx, "Enter a custom model name", "")
 
 	for {
-		printPrompt(stdout, aiEnvModel)
+		uistyle.PrintPrompt(stdout, aiEnvModel)
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			return "", err
@@ -234,7 +236,7 @@ func promptSelectModel(reader *bufio.Reader, stdout io.Writer, models []string) 
 				return promptNonEmpty(reader, stdout, aiEnvModel)
 			}
 		}
-		printError(stdout, "invalid selection, enter a menu number")
+		uistyle.PrintError(stdout, "invalid selection, enter a menu number")
 	}
 }
 
@@ -250,12 +252,12 @@ func promptModelForEndpoint(reader *bufio.Reader, stdout io.Writer, provider aiP
 
 // promptSelectDetectedProvider displays a numeric menu of detected cloud providers and returns the chosen one.
 func promptSelectDetectedProvider(reader *bufio.Reader, stdout io.Writer, detected []detectedCloudProvider) (detectedCloudProvider, error) {
-	printMenuTitle(stdout, "Multiple cloud AI provider credentials detected:")
+	uistyle.PrintMenuTitle(stdout, "Multiple cloud AI provider credentials detected:")
 	for i, d := range detected {
-		printMenuItem(stdout, i+1, d.Name, "")
+		uistyle.PrintMenuItem(stdout, i+1, d.Name, "")
 	}
 	for {
-		printPrompt(stdout, "Select provider")
+		uistyle.PrintPrompt(stdout, "Select provider")
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			return detectedCloudProvider{}, err
@@ -264,7 +266,7 @@ func promptSelectDetectedProvider(reader *bufio.Reader, stdout io.Writer, detect
 		if convErr == nil && idx >= 1 && idx <= len(detected) {
 			return detected[idx-1], nil
 		}
-		printError(stdout, "invalid selection, enter a menu number")
+		uistyle.PrintError(stdout, "invalid selection, enter a menu number")
 	}
 }
 
@@ -287,12 +289,12 @@ func resolveOllamaCloudSelection(reader *bufio.Reader, stdout io.Writer, baseURL
 		return baseURL, authToken, nil
 	}
 
-	printHint(stdout, fmt.Sprintf("%q is an Ollama cloud model; using %s, which requires an API key.", model, ollamaCloudEndpoint))
+	uistyle.PrintHint(stdout, fmt.Sprintf("%q is an Ollama cloud model; using %s, which requires an API key.", model, ollamaCloudEndpoint))
 	if authToken == "" {
 		authToken = strings.TrimSpace(os.Getenv("OLLAMA_API_KEY"))
 	}
 	if authToken == "" {
-		printHint(stdout, "Create a key at https://ollama.com/settings/keys")
+		uistyle.PrintHint(stdout, "Create a key at https://ollama.com/settings/keys")
 		var err error
 		authToken, err = promptNonEmpty(reader, stdout, aiEnvAuthToken)
 		if err != nil {
@@ -343,12 +345,12 @@ func promptInstallEnvValuesAuto(reader *bufio.Reader, stdout io.Writer) (map[str
 				return nil, err
 			}
 		}
-		printSuccess(stdout, fmt.Sprintf("Detected %s credentials; configuring ash automatically.", chosen.Name))
+		uistyle.PrintSuccess(stdout, fmt.Sprintf("Detected %s credentials; configuring ash automatically.", chosen.Name))
 		return finishAutoConfigure(reader, stdout, chosen.Endpoint, chosen.AuthToken)
 	}
 
 	if local := detectLocalAIService(); local != nil {
-		printSuccess(stdout, fmt.Sprintf("Detected local AI server (%s); configuring ash automatically.", local.Name))
+		uistyle.PrintSuccess(stdout, fmt.Sprintf("Detected local AI server (%s); configuring ash automatically.", local.Name))
 		return finishAutoConfigure(reader, stdout, local.BaseURL, "")
 	}
 

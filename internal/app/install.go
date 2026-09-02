@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"ash/internal/uistyle"
 )
 
 const (
@@ -216,10 +218,10 @@ func maybeAdoptBundledAllowlistEntries(stdout io.Writer, dryRun bool) error {
 	if err != nil || len(missing) == 0 {
 		return err
 	}
-	printMenuTitle(stdout, "Update tool policy")
-	printHint(stdout, "New bundled entries: "+strings.Join(missing, ", "))
-	printHint(stdout, "Your existing policy is preserved unless you approve this addition.")
-	printPrompt(stdout, "Add entries to .ash_tools? [y/N]")
+	uistyle.PrintMenuTitle(stdout, "Update tool policy")
+	uistyle.PrintHint(stdout, "New bundled entries: "+strings.Join(missing, ", "))
+	uistyle.PrintHint(stdout, "Your existing policy is preserved unless you approve this addition.")
+	uistyle.PrintPrompt(stdout, "Add entries to .ash_tools? [y/N]")
 	answer, err := bufio.NewReader(os.Stdin).ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
 		return err
@@ -228,10 +230,10 @@ func maybeAdoptBundledAllowlistEntries(stdout io.Writer, dryRun bool) error {
 		if err := syncAllowlistAdditions(path, baseline, stdout); err != nil {
 			return err
 		}
-		printSuccess(stdout, "Updated .ash_tools with bundled entries")
+		uistyle.PrintSuccess(stdout, "Updated .ash_tools with bundled entries")
 		return nil
 	}
-	printHint(stdout, "Kept existing .ash_tools policy")
+	uistyle.PrintHint(stdout, "Kept existing .ash_tools policy")
 	return nil
 }
 
@@ -249,8 +251,8 @@ func maybeConfigureInstallEnv(stdout, stderr io.Writer, dryRun bool) error {
 		return nil
 	}
 	if !shouldPromptInstallEnv() {
-		printHint(stdout, "AI provider not configured automatically: this shell session is not interactive (for example, running through 'curl | sh').")
-		printHint(stdout, "Open a new terminal and run 'ash install' again to pick a provider and model, or set AI_ENDPOINT, AI_MODEL, and AI_AUTH_TOKEN manually.")
+		uistyle.PrintHint(stdout, "AI provider not configured automatically: this shell session is not interactive (for example, running through 'curl | sh').")
+		uistyle.PrintHint(stdout, "Open a new terminal and run 'ash install' again to pick a provider and model, or set AI_ENDPOINT, AI_MODEL, and AI_AUTH_TOKEN manually.")
 		return nil
 	}
 
@@ -373,7 +375,7 @@ func ashEnvFilePath() (string, error) {
 
 // promptInstallEnvValues collects the AI endpoint and authentication values needed to create a managed ash environment file.
 func promptInstallEnvValues(reader *bufio.Reader, stdout io.Writer) (map[string]string, error) {
-	printMenuTitle(stdout, "Configure ash environment values")
+	uistyle.PrintMenuTitle(stdout, "Configure ash environment values")
 	endpoint, err := promptEndpointWithPresets(reader, stdout)
 	if err != nil {
 		return nil, err
@@ -424,14 +426,14 @@ func promptInstallEnvValues(reader *bufio.Reader, stdout io.Writer) (map[string]
 
 // promptEndpointWithPresets prompts for an AI endpoint, accepting either a preset choice or a custom URL.
 func promptEndpointWithPresets(reader *bufio.Reader, stdout io.Writer) (string, error) {
-	printMenuTitle(stdout, "Select AI endpoint preset or enter a custom URL:")
+	uistyle.PrintMenuTitle(stdout, "Select AI endpoint preset or enter a custom URL:")
 	for i, preset := range installEndpointPresets {
-		printMenuItem(stdout, i+1, preset.Name, preset.URL)
+		uistyle.PrintMenuItem(stdout, i+1, preset.Name, preset.URL)
 	}
-	printHint(stdout, "Enter a menu number above, or paste a full http(s) URL directly.")
+	uistyle.PrintHint(stdout, "Enter a menu number above, or paste a full http(s) URL directly.")
 
 	for {
-		printPrompt(stdout, aiEnvEndpoint)
+		uistyle.PrintPrompt(stdout, aiEnvEndpoint)
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			return "", err
@@ -446,7 +448,7 @@ func promptEndpointWithPresets(reader *bufio.Reader, stdout io.Writer) (string, 
 					return preset.URL, nil
 				}
 				for {
-					printPrompt(stdout, aiEnvEndpoint+" (custom URL)")
+					uistyle.PrintPrompt(stdout, aiEnvEndpoint+" (custom URL)")
 					customLine, customErr := reader.ReadString('\n')
 					if customErr != nil {
 						return "", customErr
@@ -458,21 +460,21 @@ func promptEndpointWithPresets(reader *bufio.Reader, stdout io.Writer) (string, 
 					if _, _, _, parseErr := parseAIEndpoint(custom); parseErr == nil {
 						return strings.TrimRight(custom, "/"), nil
 					}
-					printError(stdout, "invalid endpoint, enter a full http(s) URL")
+					uistyle.PrintError(stdout, "invalid endpoint, enter a full http(s) URL")
 				}
 			}
 		}
 		if _, _, _, parseErr := parseAIEndpoint(input); parseErr == nil {
 			return strings.TrimRight(input, "/"), nil
 		}
-		printError(stdout, "invalid endpoint, enter a preset number or full http(s) URL")
+		uistyle.PrintError(stdout, "invalid endpoint, enter a preset number or full http(s) URL")
 	}
 }
 
 // promptNonEmpty reads a non-empty value from the user for the provided prompt key.
 func promptNonEmpty(reader *bufio.Reader, stdout io.Writer, key string) (string, error) {
 	for {
-		printPrompt(stdout, key)
+		uistyle.PrintPrompt(stdout, key)
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			return "", err
@@ -486,7 +488,7 @@ func promptNonEmpty(reader *bufio.Reader, stdout io.Writer, key string) (string,
 
 // promptOptional reads an optional value from the user for the provided prompt key.
 func promptOptional(reader *bufio.Reader, stdout io.Writer, key string) (string, error) {
-	printPrompt(stdout, key)
+	uistyle.PrintPrompt(stdout, key)
 	line, err := reader.ReadString('\n')
 	if err != nil {
 		return "", err
