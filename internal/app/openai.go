@@ -91,7 +91,7 @@ func (a openAIAdapter) SendStream(ctx context.Context, aiCfg aiConfig, messages 
 		slog.Debug("AI streaming transport", "request_id", requestIDFromContext(ctx), "provider", a.Name(), "stream_used", false, "reason", "responses_api_unavailable", "EID", "Q4mX8sLn")
 		return a.Send(ctx, aiCfg, messages, tools)
 	}
-	slog.Debug("AI streaming transport", "request_id", requestIDFromContext(ctx), "provider", a.Name(), "stream_used", true, "transport", "responses_sse", "EID", "Q4mX8sLn")
+	slog.Debug("AI streaming transport", "request_id", requestIDFromContext(ctx), "provider", a.Name(), "stream_used", true, "transport", "responses_sse", "EID", "IsdJ2cgq")
 
 	client := openai.NewClient(
 		option.WithBaseURL(openAIEndpoint(aiCfg.BaseURL)),
