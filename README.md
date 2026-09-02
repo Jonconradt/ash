@@ -87,7 +87,7 @@ make release RELEASE_VERSION=v1.2.3
 - `make install` runs `go install ./...`
 - `make verify` runs strict checks (tests, race, coverage gate, vet, staticcheck, gosec, govulncheck)
 - `make sync-route-words` regenerates the ambiguous-word block in the shell assets from
-  `ash_bootstrap/route_words.txt`, the canonical list. Edit only that file; a test fails if
+  `internal/app/ash_bootstrap/route_words.txt`, the canonical list. Edit only that file; a test fails if
   the generated blocks are stale
 - `make version` runs quality checks and builds installer artifacts for the selected host/targets
 - `make release` runs quality checks, builds an arm64 macOS `.pkg`, validates it,
@@ -415,8 +415,8 @@ snooze-aware integration.
 
 Installer implementation is split per shell target for maintainability:
 
-- `bash_install.go`
-- `zsh_install.go`
+- `internal/app/bash_install.go`
+- `internal/app/zsh_install.go`
 
 When enabled, `ash` logs structured diagnostics with Go's standard-library `log/slog` and prints an execution timing dashboard before exit. Logs include bounded metadata such as request IDs, statuses, durations, and sizes, but do not include prompts, credentials, raw tool arguments, or raw tool output.
 

@@ -63,11 +63,11 @@ config:
 verify: test test-race test-cover vet staticcheck security test-fuzz benchmark
 
 sync-route-words:
-	@go run . --internal-sync-route-words
+	@go run ./cmd/ash --internal-sync-route-words
 
 build: lint test
 	@mkdir -p "$(LOCAL_BIN_DIR)"
-	@go build -o "$(LOCAL_BINARY_PATH)" -ldflags "-X main.ashVersion=$(BUILD_VERSION) -X main.ashCommit=$(BUILD_COMMIT) -X main.ashDevelopmentBuild=true" .
+	@go build -o "$(LOCAL_BINARY_PATH)" -ldflags "-X ash/internal/app.ashVersion=$(BUILD_VERSION) -X ash/internal/app.ashCommit=$(BUILD_COMMIT) -X ash/internal/app.ashDevelopmentBuild=true" ./cmd/ash
 	@go build -o "$(LOCAL_BIN_DIR)/ash-broker" ./cmd/ash-broker
 	@$(MAKE) restart-broker
 
@@ -91,8 +91,8 @@ yaml-lint:
 	@go run github.com/google/yamlfmt/cmd/yamlfmt@latest -lint .github/workflows/*.yml
 
 python-lint:
-	@uvx ruff@$(RUFF_VERSION) check ash_bootstrap/tools
-	@uvx ruff@$(RUFF_VERSION) format --check ash_bootstrap/tools
+	@uvx ruff@$(RUFF_VERSION) check internal/app/ash_bootstrap/tools
+	@uvx ruff@$(RUFF_VERSION) format --check internal/app/ash_bootstrap/tools
 
 markdown-lint:
 	@npx --yes markdownlint-cli2@$(MARKDOWNLINT_CLI2_VERSION) README.md ARCHITECTURE.md CONTRIBUTING.md SECURITY.md AGENTS.md scripts/eid-injector/README.md
@@ -117,7 +117,7 @@ test-cover:
 	@go tool cover -func=coverage.out | awk '/^total:/ {gsub("%", "", $$3); if ($$3 + 0 < $(COVERAGE_MIN)) {printf("coverage %.1f%% is below %s%%\n", $$3, "$(COVERAGE_MIN)"); exit 1} else {printf("coverage %.1f%% meets %s%%\n", $$3, "$(COVERAGE_MIN)")}}'
 
 test-fuzz:
-	@go test -fuzz=Fuzz -fuzztime=$(FUZZ_TIME) .
+	@go test -fuzz=Fuzz -fuzztime=$(FUZZ_TIME) ./internal/app
 
 benchmark:
 	@go test -bench=. -benchmem ./...
@@ -136,7 +136,7 @@ staticcheck:
 
 install: test lint gosec
 	@mkdir -p "$(LOCAL_BIN_DIR)"
-	@go build -o "$(LOCAL_BINARY_PATH)" -ldflags "-X main.ashVersion=$(BUILD_VERSION) -X main.ashCommit=$(BUILD_COMMIT) -X main.ashDevelopmentBuild=true" .
+	@go build -o "$(LOCAL_BINARY_PATH)" -ldflags "-X ash/internal/app.ashVersion=$(BUILD_VERSION) -X ash/internal/app.ashCommit=$(BUILD_COMMIT) -X ash/internal/app.ashDevelopmentBuild=true" ./cmd/ash
 	@go build -o "$(LOCAL_BIN_DIR)/ash-broker" ./cmd/ash-broker
 	@$(MAKE) restart-broker
 	@"$(LOCAL_BINARY_PATH)" install --shell bash --overwrite
@@ -167,12 +167,12 @@ release-clean:
 
 release-build:
 	@mkdir -p "$(RELEASE_OUTPUT_DIR)"
-	GOOS=darwin GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.ashVersion=$(RELEASE_VERSION) -X main.ashCommit=$(RELEASE_COMMIT)" -o "$(RELEASE_OUTPUT_DIR)/$(APP_NAME)" .
+	GOOS=darwin GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X ash/internal/app.ashVersion=$(RELEASE_VERSION) -X ash/internal/app.ashCommit=$(RELEASE_COMMIT)" -o "$(RELEASE_OUTPUT_DIR)/$(APP_NAME)" ./cmd/ash
 	GOOS=darwin GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "$(RELEASE_OUTPUT_DIR)/$(APP_NAME)-broker" ./cmd/ash-broker
 
 release-build-one:
 	@mkdir -p "$(RELEASE_OUTPUT_DIR)"
-	GOOS=$(RELEASE_GOOS) GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.ashVersion=$(RELEASE_VERSION) -X main.ashCommit=$(RELEASE_COMMIT)" -o "$(RELEASE_BINARY_PATH)" .
+	GOOS=$(RELEASE_GOOS) GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X ash/internal/app.ashVersion=$(RELEASE_VERSION) -X ash/internal/app.ashCommit=$(RELEASE_COMMIT)" -o "$(RELEASE_BINARY_PATH)" ./cmd/ash
 	GOOS=$(RELEASE_GOOS) GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "$(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)-broker" ./cmd/ash-broker
 
 release-pkg:
