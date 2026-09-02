@@ -95,7 +95,7 @@ python-lint:
 	@uvx ruff@$(RUFF_VERSION) format --check internal/app/ash_bootstrap/tools
 
 markdown-lint:
-	@npx --yes markdownlint-cli2@$(MARKDOWNLINT_CLI2_VERSION) README.md ARCHITECTURE.md CONTRIBUTING.md SECURITY.md AGENTS.md scripts/eid-injector/README.md internal/app/README.md internal/app/ash_bootstrap/README.md site/README.md
+	@npx --yes markdownlint-cli2@$(MARKDOWNLINT_CLI2_VERSION) "**/*.md" "!dist/**" "!node_modules/**"
 
 security: gosec govulncheck
 
