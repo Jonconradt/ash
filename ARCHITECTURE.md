@@ -8,6 +8,17 @@
   is intentionally still one package rather than split by domain (provider, chat, metrics,
   attachments, shell install) — those areas share wire-level types and context-threaded state
   that would need a larger redesign to split safely; see "Known interim state" below.
+- [internal/model](internal/model): shared wire-level chat/tool types (`Message`, `Attachment`,
+  `ChatResponse`, `ToolDefinition`, etc.), kept dependency-free so a future `internal/provider`
+  package could depend on them without importing `internal/app`. `internal/app` currently
+  re-exposes these as lowercase type aliases (`type message = model.Message`) so none of its
+  existing call sites needed to change.
+- [internal/workspace](internal/workspace): pure `Root(home string) string` path-join helper
+  for the `~/.ash` workspace directory layout; `internal/app`'s `ashWorkspaceDir()` still
+  resolves `$HOME` itself (via its existing test-stub var) and delegates only the path join.
+- [internal/uistyle](internal/uistyle): lipgloss-based styled print helpers for interactive
+  install prompts (`PrintMenuTitle`, `PrintSuccess`, etc.) — the one fully standalone piece of
+  the install UI, with no dependency on anything else in `internal/app`.
 - [internal/brokerproto](internal/brokerproto): wire protocol shared by the `ash` client and
   the `ash-broker` server.
 
@@ -22,12 +33,21 @@ The CLI entry point in [internal/app/ash.go](internal/app/ash.go) initializes co
 
 ## Key subsystems
 
-- [chat.go](internal/app/chat.go): request/response handling (`chat`/`chatStream`), the `message`/`chatResponse`/`attachment` data model, and dispatch to the per-provider adapter registry.
+- [chat.go](internal/app/chat.go): request/response handling (`chat`/`chatStream`) and dispatch to the per-provider adapter registry; the `message`/`chatResponse`/`attachment` data model itself lives in [internal/model](internal/model).
 - [ai_transport.go](internal/app/ai_transport.go): shared `http.RoundTripper` (`ashRoundTripper`) used by every SDK-based adapter's `http.Client` — implements broker-fallback, retry/backoff, and metrics once, instead of per-adapter.
 - [runner.go](internal/app/runner.go): tool-loop orchestration, task state, and observation tracking.
 - [ash_attachments.go](internal/app/ash_attachments.go): `--attach` CLI flag parsing, attachment loading/MIME-sniffing/size limits, and writing model-returned attachments to disk.
 - [tools.go](internal/app/tools.go): tool definitions and local tool execution shim.
-- [support.go](internal/app/support.go): logging, history lifecycle, file-system helpers, and debug output.
+- What used to be one ~1860-line `support.go` is now split by topic (same `app` package, no
+  exported-surface changes): [support.go](internal/app/support.go) (core types and the
+  package-level test-stub var seam), [exec.go](internal/app/exec.go) (tool/subagent process
+  execution), [security.go](internal/app/security.go) (prompt-injection detection and
+  sanitization), [debuglog.go](internal/app/debuglog.go) (structured + rotating debug
+  logging), [history.go](internal/app/history.go) (history persistence and retention
+  cleanup), [scheduler.go](internal/app/scheduler.go) (cron/launchd scheduling for
+  `schedule_future_prompt`), [paths.go](internal/app/paths.go) (workspace/scratch path
+  resolution), [output.go](internal/app/output.go) (markdown rendering, spinner, output
+  formatting).
 - [install.go](internal/app/install.go): shell wrapper installation and workspace initialization.
 - [ai_autoconfig.go](internal/app/ai_autoconfig.go): cloud provider/local server auto-detection and model-listing prompts used by `ash install`.
 - [provider.go](internal/app/provider.go): provider adapter registry (`ollama`, `openai`, `google`, `anthropic`, `cohere`, `bedrock`) and the adapter interface tiers: `providerAdapter` (base), `byteProviderAdapter` (raw HTTP, used only by `ollamaAdapter`), `sdkProviderAdapter` (official SDK-based `Send`, used by every other adapter), `streamingProviderAdapter` (adds `SendStream`, currently implemented only by [openai.go](internal/app/openai.go)).
@@ -40,18 +60,24 @@ The CLI entry point in [internal/app/ash.go](internal/app/ash.go) initializes co
 `internal/app` is a single package holding several domains that would ideally be their own
 packages, kept together for now because they share state across a would-be package boundary:
 
-- Provider adapters, `chat.go`'s `message`/`chatResponse`/`attachment` types, and `config.go`'s
-  env parsing all share those wire-level types directly.
+- Provider adapters directly call `ai_transport.go`'s `newAshHTTPClient()` and
+  `requestIDFromContext()`, which are themselves wired into `executionMetrics`, the broker
+  client (`broker.go`), and retry/timeout config — this is core app transport infrastructure,
+  not a provider-only concern. Splitting provider adapters into their own package cleanly
+  requires threading an injected `*http.Client`/request-ID dependency through the adapter
+  interface first (a moderately-sized redesign, deliberately deferred; see git history for the
+  2026-09-01 reorganization notes on why `internal/provider` was not extracted this pass).
 - `executionMetrics` (metrics.go) is threaded through `context.Context` across `chat.go`,
   `runner.go`, `tools.go`, and `ash.go` — a control-flow coupling, not just a data dependency.
-- Several files (`snooze.go`, `python_env.go`, `ash_attachments.go`) call the package-level
-  `ashWorkspaceDir()` helper and rely on package-level test-stub function variables
-  (`osReadFile`, `timeNow`, `execCommandContext`, etc. in `support.go`) for test seams — a
-  pattern that works within one package but doesn't cross package boundaries cleanly.
+- Several files (`snooze.go`, `python_env.go`, `ash_attachments.go`) rely on package-level
+  test-stub function variables (`osReadFile`, `timeNow`, `execCommandContext`, etc., now in
+  `support.go`/`exec.go`) for test seams — a pattern that works within one package but doesn't
+  cross package boundaries cleanly.
 
 This is intentional scope control for the cmd/+internal/ layout migration, not an oversight.
-A future pass could introduce a small `Workspace`/`Clock` interface to replace the global
-stub vars and unblock splitting these into real packages (e.g. `internal/provider`,
+A future pass could introduce a small `Workspace`/`Clock` interface (a start already exists in
+[internal/workspace](internal/workspace)) and an injected HTTP client/logger for provider
+adapters, to unblock splitting these into real packages (e.g. `internal/provider`,
 `internal/metrics`) without import cycles or duplicated test seams. New code should avoid
 adding to the global-stub-var pattern; prefer constructor/parameter-injected dependencies.
 
