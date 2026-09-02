@@ -435,3 +435,37 @@ func TestDetectAIProviderAndCloudHostClassification(t *testing.T) {
 		t.Fatalf("public hostname should be classified as cloud")
 	}
 }
+
+func TestIsCloudAIHostLANExemption(t *testing.T) {
+	lanHosts := []string{"brain.local", "192.168.1.50", "10.0.0.5", "172.16.0.1", "fd12:3456:789a::1"}
+
+	t.Run("not strict: LAN hosts are exempt", func(t *testing.T) {
+		t.Setenv("ASH_STRICT", "")
+		for _, host := range lanHosts {
+			if isCloudAIHost(host) {
+				t.Fatalf("expected %q to not be classified as cloud", host)
+			}
+		}
+		if !isCloudAIHost("api.example.com") {
+			t.Fatalf("public hostname should still be classified as cloud")
+		}
+		if !isCloudAIHost("8.8.8.8") {
+			t.Fatalf("public IP should still be classified as cloud")
+		}
+	})
+
+	t.Run("strict: LAN hosts require https/token like any other cloud host", func(t *testing.T) {
+		t.Setenv("ASH_STRICT", "true")
+		for _, host := range lanHosts {
+			if !isCloudAIHost(host) {
+				t.Fatalf("expected %q to be classified as cloud under ASH_STRICT", host)
+			}
+		}
+		if isCloudAIHost("localhost") {
+			t.Fatalf("localhost should remain exempt even under ASH_STRICT")
+		}
+		if isCloudAIHost("127.0.0.1") {
+			t.Fatalf("loopback should remain exempt even under ASH_STRICT")
+		}
+	})
+}

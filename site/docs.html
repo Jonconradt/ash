@@ -76,7 +76,7 @@ ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></pre>
         <section id="environment">
           <h2>Environment</h2>
           <dl> <!-- Always sort the list alphabetically by the first code block, the environment variable name -->
-            <dt><code>AI_AUTH_TOKEN</code></dt><dd>Optional bearer token. When set, it is sent as bearer authentication and is required for cloud endpoints.</dd>
+            <dt><code>AI_AUTH_TOKEN</code></dt><dd>Optional bearer token. When set, it is sent as bearer authentication and is required for cloud endpoints. Private/LAN addresses (RFC1918 IPv4, IPv6 ULA) and <code>.local</code> mDNS hostnames are treated as non-cloud (like <code>localhost</code>) unless <code>ASH_STRICT=1</code> is set.</dd>
             <dt><code>AI_CACHE</code></dt><dd>Optional provider-native cache toggle. Enabled by default when supported; use <code>off</code> or <code>false</code> to disable.</dd>
             <dt><code>AI_ENDPOINT</code></dt><dd>Required base URL for the chat API endpoint.</dd>
             <dt><code>AI_MODEL</code></dt><dd>Required model name sent to the endpoint.</dd>

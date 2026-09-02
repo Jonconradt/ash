@@ -259,7 +259,7 @@ Common `AI_ENDPOINT` values:
 
 Notes:
 
-- Cloud endpoints are inferred when the host is not `localhost` or `127.0.0.1`.
+- Cloud endpoints are inferred when the host is not `localhost`, `127.0.0.1`, a private/LAN address (RFC1918 IPv4, IPv6 ULA), or a `.local` mDNS hostname. Set `ASH_STRICT=1` to treat only `localhost`/loopback as non-cloud (private/LAN hosts then require `https` and `AI_AUTH_TOKEN` like any other cloud endpoint).
 - Cloud endpoints must use `https` and require `AI_AUTH_TOKEN`; tokens are sent as bearer auth.
 - Provider detection is automatic by endpoint host/path; use `AI_PROVIDER` only when you need to override.
 - `AI_CACHE` defaults to enabled. Use `AI_CACHE=off` to disable provider-native caching.

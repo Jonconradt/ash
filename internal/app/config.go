@@ -219,7 +219,9 @@ func parseAIEndpoint(value string) (baseURL string, host string, scheme string, 
 	return baseURL, host, scheme, nil
 }
 
-// isCloudAIHost reports whether the condition is true.
+// isCloudAIHost reports whether the condition is true. Private/LAN addresses
+// (RFC1918 IPv4, IPv6 ULA) and .local mDNS hostnames are treated as non-cloud
+// unless ASH_STRICT is enabled, in which case only localhost/loopback are exempt.
 func isCloudAIHost(host string) bool {
 	h := strings.TrimSpace(strings.ToLower(host))
 	if h == "localhost" {
@@ -227,9 +229,18 @@ func isCloudAIHost(host string) bool {
 	}
 	ip := net.ParseIP(h)
 	if ip == nil {
+		if !strictSecurityModeEnabled() && strings.HasSuffix(h, ".local") {
+			return false
+		}
 		return true
 	}
-	return !ip.IsLoopback()
+	if ip.IsLoopback() {
+		return false
+	}
+	if !strictSecurityModeEnabled() && ip.IsPrivate() {
+		return false
+	}
+	return true
 }
 
 // readSystemPrompt reads data from the filesystem.

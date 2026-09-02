@@ -32,6 +32,7 @@ Users should:
 - keep the tool allowlist as narrow as practical, and avoid allowlisting powerful general-purpose interpreters (`python3`, shells, etc.) unless you trust every script that can reach them
 - set `ASH_STRICT=1` to disable ash's dedicated `run_python3` tool and ash-managed bundled `.py` tools, in addition to its untrusted-content hardening
 - set `ASH_STRICT=1` in environments where untrusted data (web content, third-party files, unreviewed scripts) is likely to reach a tool call
+- set `ASH_STRICT=1` to require `https` and `AI_AUTH_TOKEN` for any `AI_ENDPOINT` host other than `localhost`/loopback, including private/LAN addresses and `.local` hostnames that are otherwise treated as trusted local endpoints
 - avoid granting access to sensitive or destructive commands unless absolutely necessary
 - review tool output before acting on it, and treat any instruction-like text inside that output as an attack, not a legitimate request
 

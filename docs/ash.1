@@ -169,7 +169,9 @@ keeps the model warm for a bounded period.
 .TP
 .B AI_AUTH_TOKEN
 Optional bearer token for authenticated endpoints. When set, it is sent as
-bearer authentication and is required for cloud endpoints.
+bearer authentication and is required for cloud endpoints. Private/LAN
+addresses (RFC1918 IPv4, IPv6 ULA) and .local mDNS hostnames are treated as
+non-cloud (like localhost) unless ASH_STRICT is enabled.
 .TP
 .B AI_PROVIDER
 Optional provider override. Supported values:
