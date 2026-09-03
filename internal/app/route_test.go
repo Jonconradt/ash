@@ -18,6 +18,18 @@ func TestShouldRoutePrompt(t *testing.T) {
 		{"in the beginning was the word", true},
 		{"for the love of god explain this", true},
 		{"at remind me to call", true},
+		{"say something witty", true},
+		{"may I use your API", true},
+		{"might this cause issues", true},
+		{"must we deploy now", true},
+		{"shall we continue", true},
+		{"ought we to wait", true},
+		{"whom should I ask", true},
+		{"whose file is this", true},
+		{"whence did this custom begin", true},
+		{"whither should we go", true},
+		{"what's the weather", true},
+		{"where's my file", true},
 		{"Tell me about Go?", true},
 
 		{"which ls", false},
@@ -26,6 +38,10 @@ func TestShouldRoutePrompt(t *testing.T) {
 		{"type ls", false},
 		{"at 5pm", false},
 		{"at now", false},
+		{"say -v Alex hello", false},
+		{"say --version", false},
+		{"say", false},
+		{"may -v", false},
 		{"which /usr/bin/env", false},
 		{"write /tmp/file", false},
 		{"", false},
@@ -74,9 +90,26 @@ func TestAmbiguousRouteWordsLoadedFromCanonicalFile(t *testing.T) {
 	if !sort.StringsAreSorted(ambiguousRouteWords) {
 		t.Fatalf("expected sorted route words, got %v", ambiguousRouteWords)
 	}
-	for _, want := range []string{"what", "which", "time"} {
+	for _, want := range []string{"say", "what", "which", "time"} {
 		if sort.SearchStrings(ambiguousRouteWords, want) >= len(ambiguousRouteWords) {
 			t.Errorf("expected %q in route words", want)
+		}
+	}
+}
+
+func TestFishSayRoutingPolicyMatchesGo(t *testing.T) {
+	content, err := readEmbeddedBootstrapAsset("ash_bootstrap/.ash_fish.fish")
+	if err != nil {
+		t.Fatalf("read embedded fish asset: %v", err)
+	}
+	asset := string(content)
+	for _, want := range []string{
+		"case say",
+		"case out something a an the please why how when where who what can could should would",
+		"function say; _ash_route_or_delegate_say say $argv; end",
+	} {
+		if !strings.Contains(asset, want) {
+			t.Errorf("fish asset missing say routing fragment %q", want)
 		}
 	}
 }

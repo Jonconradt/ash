@@ -61,7 +61,7 @@ _ash_prompt_processing_enabled() {
 
 typeset -gA _ash_ambiguous_words
 # >>> ash route words >>>
-_ash_ambiguous_words=(at 1 for 1 in 1 test 1 time 1 type 1 what 1 where 1 which 1 who 1 write 1)
+_ash_ambiguous_words=(at 1 for 1 in 1 say 1 test 1 time 1 type 1 what 1 where 1 which 1 who 1 write 1)
 # <<< ash route words <<<
 
 # Guards are ordered cheapest-first and stay fork-free so real commands are never slowed down.
@@ -88,7 +88,11 @@ _ash_accept_line() {
 		_ash_ensure_broker >/dev/null 2>&1
 		[[ -n "${ASH_BROKER_LEASE:-}" ]] && touch "$ASH_BROKER_LEASE"
 		# Requoting the whole line keeps globs, reserved words, and a trailing ? away from zsh.
-		BUFFER="ash ${(q-)BUFFER}"
+		if [[ "${BUFFER%%[[:space:]]*}" == say ]] && command -v say >/dev/null 2>&1; then
+			BUFFER="ash --say ${(q-)BUFFER}"
+		else
+			BUFFER="ash ${(q-)BUFFER}"
+		fi
 	fi
 	zle "$_ash_orig_accept_line" -- "$@"
 }

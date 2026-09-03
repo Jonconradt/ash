@@ -22,6 +22,22 @@ What if the AI needs temporary notes, plans, script fragments, or small working 
 
 What if you want something to happen on a schedule or in the future? Ash can create systems jobs that run once or recur.
 
+Natural-language routing recognizes modern question starters including `what`,
+`which`, `who`, `whom`, `whose`, `where`, `when`, `why`, and `how`, together
+with common auxiliary and modal forms such as `is`, `are`, `do`, `can`, `will`,
+`may`, `might`, `must`, `shall`, and `ought`. Common contractions such as
+`what's`, `who's`, `where's`, and `how's` are also recognized. Archaic forms
+such as `whence` and `whither` are recognized as well.
+
+On macOS, a natural-language request beginning with `say` can use the native
+text-to-speech command. For example, `say something witty` sends the request to
+ash and speaks the successful response. Native command forms such as
+`say -v Alex hello` and `say --version` continue to run normally. Ash errors and
+diagnostics remain text, and the feature falls back to normal text output when
+the native `say` command is unavailable. Use text output when speech would be
+inappropriate for accessibility, privacy, or automation reasons by setting
+`ASH_SAY_TEXT=1`.
+
 What if I want to run a unix command that looks like a prompt, e.g. which ash? You can snooze ash with "ash snooze 5m" and it will not interpret your command line as a prompt.
 
 What if I am on MacOS and I want the results in my clipboard? Add pbcopy to .ash_tools. If you forget, ask the AI because it knows what to do.

@@ -72,6 +72,7 @@ func TestBashPrefilterNeverRejectsRoutablePrompts(t *testing.T) {
 		"For this error what should I do",
 		"at remind me tomorrow",
 		"which file is bigger?",
+		"say something witty",
 		"test is this thing on?",
 		"type is this a question?",
 	}
@@ -99,6 +100,8 @@ func TestBashPrefilterSkipsSubprocessForRealCommands(t *testing.T) {
 		"type -a ls",
 		"what /usr/bin/what",
 		"at 5pm",
+		"say -v Alex hello",
+		"say --version",
 	}
 
 	for _, line := range cases {

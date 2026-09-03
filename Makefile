@@ -63,7 +63,7 @@ config:
 verify: test test-race test-cover vet staticcheck security test-fuzz benchmark
 
 sync-route-words:
-	@go run ./cmd/ash --internal-sync-route-words
+	@cd internal/app && go run ../../cmd/ash --internal-sync-route-words
 
 build: lint test
 	@mkdir -p "$(LOCAL_BIN_DIR)"

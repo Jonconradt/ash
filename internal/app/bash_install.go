@@ -70,6 +70,7 @@ _ash_should_route() {
 	local natural_wrapper=0
 	case "$cmd_lower" in
 		what|which|who|where|at|in|for|write) natural_wrapper=1 ;;
+		what|which|who|where|at|in|for|write|say) natural_wrapper=1 ;;
 	esac
 
   [[ $argc -eq 0 ]] && return 1
@@ -123,7 +124,7 @@ _ash_should_route() {
   local first
   first="$(printf '%s' "${args[0]}" | tr '[:upper:]' '[:lower:]')"
   case "$first" in
-    is|are|am|do|does|did|can|could|should|would|will|why|how|when|where|who)
+	    is|are|am|do|does|did|can|could|should|would|will|shall|may|might|must|ought|why|how|when|where|who|whom|whose)
 			if [[ $argc -ge 2 ]]; then
 				if [[ $has_path_like -eq 0 || ( $natural_wrapper -eq 1 && $argc -ge 3 ) ]]; then
 					return 0
@@ -180,7 +181,7 @@ _ash_should_route() {
 				first_token="$(printf '%s' "${args[0]}" | tr '[:upper:]' '[:lower:]')"
 				first_token="${first_token%%[?!.,:;]}"
 				case "$first_token" in
-					this|that|these|those|the|a|an|my|our|your|please|what|when|how|why|who|where|is|are|do|can|should|would)
+					this|that|these|those|the|a|an|my|our|your|please|what|when|how|why|who|where|whom|whose|is|are|do|can|could|should|would|will|shall|may|might|must|ought)
 						return 0
 						;;
 				esac
@@ -231,6 +232,24 @@ _ash_route_or_delegate_builtin() {
   builtin "$builtin_name" "$@"
 }
 
+_ash_route_or_delegate_say() {
+  local cmd="$1"
+  shift
+	if ! _ash_prompt_processing_enabled; then
+		command "$cmd" "$@"
+		return $?
+	fi
+  if _ash_should_route "$cmd" "$@"; then
+		if command -v say >/dev/null 2>&1; then
+			ash --say "$cmd" "$@"
+			return $?
+		fi
+		ash "$cmd" "$@"
+		return $?
+	fi
+  command "$cmd" "$@"
+}
+
 what()  { _ash_route_or_delegate what  "$@"; }
 What()  { _ash_route_or_delegate What  "$@"; }
 write() { _ash_route_or_delegate write "$@"; }
@@ -239,8 +258,8 @@ which() { _ash_route_or_delegate which "$@"; }
 Which() { _ash_route_or_delegate Which "$@"; }
 who()   { _ash_route_or_delegate who   "$@"; }
 Who()   { _ash_route_or_delegate Who   "$@"; }
-say()   { _ash_route_or_delegate say   "$@"; }
-Say()   { _ash_route_or_delegate Say   "$@"; }
+say()   { _ash_route_or_delegate_say say   "$@"; }
+Say()   { _ash_route_or_delegate_say Say   "$@"; }
 at()    { _ash_route_or_delegate at    "$@"; }
 At()    { _ash_route_or_delegate At    "$@"; }
 In()    { _ash_route_or_delegate In    "$@"; }

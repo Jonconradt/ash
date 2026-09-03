@@ -140,7 +140,7 @@ function _ash_should_route
 
 	set -l first (_ash_trim_trailing_punctuation "$argv[1]" | string lower)
 	switch "$first"
-		case is are am do does did can could should would will why how when where who
+		case is are am do does did can could should would will shall may might must ought why how when where who whom whose
 			if test "$argc" -ge 2
 				if test "$has_path_like" -eq 0; or begin; test "$natural_wrapper" -eq 1; and test "$argc" -ge 3; end
 					return 0
@@ -164,7 +164,7 @@ function _ash_should_route
 				end
 				for index in (command seq 2 "$limit")
 					switch (_ash_trim_trailing_punctuation "$argv[$index]" | string lower)
-						case is are am do does did can could should would will why how when where who if
+						case is are am do does did can could should would will shall may might must ought why how when where who whom whose if
 							return 0
 					end
 				end
@@ -179,7 +179,7 @@ function _ash_should_route
 		case in for
 			if test "$argc" -ge 2
 				switch (_ash_trim_trailing_punctuation "$argv[1]" | string lower)
-					case this that these those the a an my our your please what when how why who where is are do can should would
+					case this that these those the a an my our your please what when how why who where whom whose is are do can could should would will shall may might must ought
 						return 0
 				end
 			end
@@ -209,6 +209,24 @@ function _ash_route_or_delegate
 	command "$cmd" $argv
 end
 
+function _ash_route_or_delegate_say
+	set -l cmd "$argv[1]"
+	set -e argv[1]
+	if not _ash_prompt_processing_enabled
+		command "$cmd" $argv
+		return $status
+	end
+	if _ash_should_route "$cmd" $argv
+		if command -q say
+			command ash --say "$cmd" $argv
+			return $status
+		end
+		command ash "$cmd" $argv
+		return $status
+	end
+	command "$cmd" $argv
+end
+
 function what; _ash_route_or_delegate what $argv; end
 function What; _ash_route_or_delegate What $argv; end
 function write; _ash_route_or_delegate write $argv; end
@@ -217,8 +235,8 @@ function which; _ash_route_or_delegate which $argv; end
 function Which; _ash_route_or_delegate Which $argv; end
 function who; _ash_route_or_delegate who $argv; end
 function Who; _ash_route_or_delegate Who $argv; end
-function say; _ash_route_or_delegate say $argv; end
-function Say; _ash_route_or_delegate Say $argv; end
+function say; _ash_route_or_delegate_say say $argv; end
+function Say; _ash_route_or_delegate_say Say $argv; end
 function at; _ash_route_or_delegate at $argv; end
 function At; _ash_route_or_delegate At $argv; end
 function In; _ash_route_or_delegate In $argv; end

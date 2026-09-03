@@ -27,6 +27,32 @@ When no positional text is provided,
 .B ash
 reads prompt text from non-interactive standard input.
 .PP
+On macOS, a natural-language shell request beginning with
+.B say
+speaks the successful assistant response with the native text-to-speech command.
+Native command forms such as
+.B say -v Alex hello
+remain native commands. Errors and diagnostics are not spoken. If the native
+.B say
+command is unavailable, ash displays the response as text instead.
+Set
+.B ASH_SAY_TEXT=1
+to force text output for accessibility, privacy, or automation.
+.PP
+Natural-language routing recognizes modern interrogatives including
+.BR what , which , who , whom , whose , where , when , why ,
+and
+.BR how ,
+as well as common auxiliary and modal forms. Common contractions such as
+.BR what's , who's , where's ,
+and
+.B how's
+and archaic forms such as
+.B whence
+and
+.B whither
+are recognized as well.
+.PP
 The
 .B install
 subcommand adds a managed integration block to shell startup files.

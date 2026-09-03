@@ -83,7 +83,7 @@ command_not_found_handle() {
 # Question words that can open the second position of a natural-language line.
 _ash_leading_question_word() {
 	case "$1" in
-		[Ii][Ss]|[Aa][Rr][Ee]|[Aa][Mm]|[Dd][Oo]|[Dd][Oo][Ee][Ss]|[Dd][Ii][Dd]|[Cc][Aa][Nn]|[Cc][Oo][Uu][Ll][Dd]|[Ss][Hh][Oo][Uu][Ll][Dd]|[Ww][Oo][Uu][Ll][Dd]|[Ww][Ii][Ll][Ll]|[Ww][Hh][Yy]|[Hh][Oo][Ww]|[Ww][Hh][Ee][Nn]|[Ww][Hh][Ee][Rr][Ee]|[Ww][Hh][Oo])
+		[Ii][Ss]|[Aa][Rr][Ee]|[Aa][Mm]|[Dd][Oo]|[Dd][Oo][Ee][Ss]|[Dd][Ii][Dd]|[Cc][Aa][Nn]|[Cc][Oo][Uu][Ll][Dd]|[Ss][Hh][Oo][Uu][Ll][Dd]|[Ww][Oo][Uu][Ll][Dd]|[Ww][Ii][Ll][Ll]|[Ss][Hh][Aa][Ll][Ll]|[Mm][Aa][Yy]|[Mm][Ii][Gg][Hh][Tt]|[Mm][Uu][Ss][Tt]|[Oo][Uu][Gg][Hh][Tt]|[Ww][Hh][Yy]|[Hh][Oo][Ww]|[Ww][Hh][Ee][Nn]|[Ww][Hh][Ee][Rr][Ee]|[Ww][Hh][Oo]|[Ww][Hh][Oo][Mm]|[Ww][Hh][Oo][Ss][Ee])
 			return 0
 			;;
 	esac
@@ -106,6 +106,7 @@ _ash_should_route() {
 
 	case "$cmd" in
 		what|What|which|Which|who|Who|where|Where|at|At|in|In|for|For|write|Write) ;;
+		what|What|which|Which|who|Who|where|Where|at|At|in|In|for|For|write|Write|say|Say) ;;
 		*)
 			local last="${!argc}"
 			[[ "$last" == *\? ]] || _ash_leading_question_word "$1" || return 1
@@ -147,6 +148,24 @@ _ash_route_or_delegate_builtin() {
   builtin "$builtin_name" "$@"
 }
 
+_ash_route_or_delegate_say() {
+	local cmd="$1"
+	shift
+	if ! _ash_prompt_processing_enabled; then
+		command "$cmd" "$@"
+		return $?
+	fi
+	if _ash_should_route "$cmd" "$@"; then
+		if command -v say >/dev/null 2>&1; then
+			ash --say "$cmd" "$@"
+			return $?
+		fi
+		ash "$cmd" "$@"
+		return $?
+	fi
+	command "$cmd" "$@"
+}
+
 what()  { _ash_route_or_delegate what  "$@"; }
 What()  { _ash_route_or_delegate What  "$@"; }
 write() { _ash_route_or_delegate write "$@"; }
@@ -155,8 +174,8 @@ which() { _ash_route_or_delegate which "$@"; }
 Which() { _ash_route_or_delegate Which "$@"; }
 who()   { _ash_route_or_delegate who   "$@"; }
 Who()   { _ash_route_or_delegate Who   "$@"; }
-say()   { _ash_route_or_delegate say   "$@"; }
-Say()   { _ash_route_or_delegate Say   "$@"; }
+say()   { _ash_route_or_delegate_say say   "$@"; }
+Say()   { _ash_route_or_delegate_say Say   "$@"; }
 at()    { _ash_route_or_delegate at    "$@"; }
 At()    { _ash_route_or_delegate At    "$@"; }
 In()    { _ash_route_or_delegate In    "$@"; }

@@ -82,7 +82,24 @@ func runSyncRouteWords(stdout, stderr io.Writer) int {
 
 var routeQuestionWords = map[string]struct{}{
 	"is": {}, "are": {}, "am": {}, "do": {}, "does": {}, "did": {}, "can": {}, "could": {},
-	"should": {}, "would": {}, "will": {}, "why": {}, "how": {}, "when": {}, "where": {}, "who": {},
+	"should": {}, "would": {}, "will": {}, "shall": {}, "may": {}, "might": {}, "must": {}, "ought": {},
+	"why": {}, "how": {}, "when": {}, "where": {}, "who": {}, "whom": {}, "whose": {}, "whence": {}, "whither": {},
+}
+
+func normalizeQuestionToken(token string) string {
+	token = trimPromptPunctuation(strings.ToLower(token))
+	switch token {
+	case "what's":
+		return "what"
+	case "who's":
+		return "who"
+	case "where's":
+		return "where"
+	case "how's":
+		return "how"
+	default:
+		return token
+	}
 }
 
 // runRoute answers whether a raw command line should be routed to ash as a prompt.
@@ -153,14 +170,14 @@ func shouldRoutePrompt(line string) bool {
 		return true
 	}
 
-	first := strings.ToLower(args[0])
+	first := normalizeQuestionToken(args[0])
 	if _, ok := routeQuestionWords[first]; ok && argc >= 2 {
 		if !hasPathLike || (naturalWrapper && argc >= 3) {
 			return true
 		}
 	}
 
-	firstToken := trimPromptPunctuation(first)
+	firstToken := first
 	switch cmdLower {
 	case "write":
 		if argc >= 2 {
@@ -169,6 +186,17 @@ func shouldRoutePrompt(line string) bool {
 				return true
 			}
 		}
+	case "say":
+		if argc >= 2 {
+			switch firstToken {
+			case "out", "something", "a", "an", "the", "please", "why", "how", "when", "where", "who", "what", "can", "could", "should", "would":
+				return true
+			}
+		}
+	case "may", "might", "must", "shall", "ought", "whom", "whose", "whence", "whither", "what's", "who's", "where's", "how's":
+		if argc >= 2 && !hasPathLike {
+			return true
+		}
 	case "what", "which", "who", "where":
 		if argc >= 3 {
 			limit := 4
@@ -176,7 +204,7 @@ func shouldRoutePrompt(line string) bool {
 				limit = argc
 			}
 			for i := 1; i < limit; i++ {
-				token := trimPromptPunctuation(strings.ToLower(args[i]))
+				token := normalizeQuestionToken(args[i])
 				if _, ok := routeQuestionWords[token]; ok {
 					return true
 				}
@@ -189,7 +217,7 @@ func shouldRoutePrompt(line string) bool {
 		if argc >= 2 {
 			switch firstToken {
 			case "this", "that", "these", "those", "the", "a", "an", "my", "our", "your", "please",
-				"what", "when", "how", "why", "who", "where", "is", "are", "do", "can", "should", "would":
+				"what", "when", "how", "why", "who", "where", "whom", "whose", "is", "are", "do", "can", "could", "should", "would", "will", "shall", "may", "might", "must", "ought":
 				return true
 			}
 		}

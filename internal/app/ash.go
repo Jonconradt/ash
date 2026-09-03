@@ -76,11 +76,15 @@ func Run(args []string, stdout, stderr io.Writer) int {
 
 // run runs the requested operation.
 func run(args []string, stdout, stderr io.Writer) int {
+	voiceMode := len(args) > 0 && args[0] == "--say" && !speechTextOutputEnabled()
+	if voiceMode {
+		args = args[1:]
+	}
 	metrics := newExecutionMetrics(timeNow())
 	summaryRequestID := ""
 	defer func() {
 		metrics.finish(timeNow())
-		if verboseLoggingEnabled() {
+		if verboseLoggingEnabled() && !voiceMode {
 			logExecutionSummary(summaryRequestID, metrics)
 			_, _ = io.WriteString(stdout, renderExecutionDashboard(metrics, writerIsTerminal(stdout)))
 		}
@@ -256,7 +260,19 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 
 	slog.Debug("assistant final reply", "request_id", requestIDFromContext(ctx), "bytes", len(assistantReply), "sha256", hashForLog([]byte(assistantReply)), "EID", "jzszDMVF")
-	_, _ = fmt.Fprint(stdout, renderAssistantOutput(assistantReply, writerIsTerminal(stdout)))
+	if voiceMode {
+		spoken, speakErr := speakAssistantReply(ctx, assistantReply, stdout, stderr)
+		if speakErr != nil {
+			_, _ = fmt.Fprintf(stderr, "say: text-to-speech failed: %v\n", speakErr)
+			return 1
+		}
+		if !spoken {
+			_, _ = fmt.Fprintln(stderr, "say: native text-to-speech command not found; displaying response")
+			_, _ = fmt.Fprint(stdout, renderAssistantOutput(assistantReply, writerIsTerminal(stdout)))
+		}
+	} else {
+		_, _ = fmt.Fprint(stdout, renderAssistantOutput(assistantReply, writerIsTerminal(stdout)))
+	}
 
 	if replyAttachments := finalAssistantAttachments(updatedMessages); len(replyAttachments) > 0 {
 		if scratchRoot, scratchErr := ashScratchRoot(); scratchErr == nil {
@@ -265,7 +281,11 @@ func run(args []string, stdout, stderr io.Writer) int {
 				slog.Warn(fmt.Sprintf("failed to save returned attachments: %v", writeErr), "EID", "b3Kx9Qmz")
 			} else {
 				for _, path := range written {
-					_, _ = fmt.Fprintf(stdout, "Saved attachment: %s\n", path)
+					attachmentOutput := stdout
+					if voiceMode {
+						attachmentOutput = stderr
+					}
+					_, _ = fmt.Fprintf(attachmentOutput, "Saved attachment: %s\n", path)
 				}
 			}
 		}
