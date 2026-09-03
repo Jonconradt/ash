@@ -81,7 +81,7 @@ if ! [[ "$interval" =~ ^[0-9]+$ ]] || [[ "$interval" -lt 1 ]]; then
   exit 1
 fi
 
-spinner_frames='|/-\'
+spinner_frames="|/-\\"
 spinner_index=0
 use_tui=0
 if [[ -t 1 && "$once" != "1" ]]; then
@@ -101,7 +101,21 @@ for asset in \
   "ash-${tag}-linux-amd64.tar.gz" \
   "ash-${tag}-linux-arm64.tar.gz" \
   "ash-${tag}-freebsd-amd64.tar.gz" \
-  "ash-${tag}-freebsd-arm64.tar.gz"; do
+  "ash-${tag}-freebsd-arm64.tar.gz" \
+  "ash-${tag}-darwin-amd64.pkg.sha256" \
+  "ash-${tag}-darwin-arm64.pkg.sha256" \
+  "ash-${tag}-darwin-amd64.tar.gz.sha256" \
+  "ash-${tag}-darwin-arm64.tar.gz.sha256" \
+  "ash-${tag}-linux-amd64.deb.sha256" \
+  "ash-${tag}-linux-arm64.deb.sha256" \
+  "ash-${tag}-linux-amd64.rpm.sha256" \
+  "ash-${tag}-linux-arm64.rpm.sha256" \
+  "ash-${tag}-linux-amd64.tar.gz.sha256" \
+  "ash-${tag}-linux-arm64.tar.gz.sha256" \
+  "ash-${tag}-freebsd-amd64.tar.gz.sha256" \
+  "ash-${tag}-freebsd-arm64.tar.gz.sha256" \
+  "SHA256SUMS" \
+  "SHA256SUMS.sigstore.json"; do
   expected_assets+=("$asset")
 done
 
@@ -334,6 +348,13 @@ def truncate(text: str, width: int) -> str:
     return text[: width - 3] + "..."
 
 
+def active_step(job: dict) -> str:
+    for step in job.get("steps") or []:
+        if (step.get("status") or "").lower() == "in_progress":
+            return step.get("name") or "unnamed step"
+    return ""
+
+
 def parse_json(raw: str):
     raw = raw.strip()
     if not raw:
@@ -428,8 +449,10 @@ if jobs:
         completed = job.get("completedAt") or ""
         label, color = status_label(job.get("status", ""), job.get("conclusion", ""))
         timing = completed or started or "pending"
+        step = active_step(job)
+        detail = f" :: {step}" if step else ""
         lines.append(
-            f"- {truncate(name, name_width):<{name_width}} {colorize(label, color):<24} {truncate(timing, 26)}"
+          f"- {truncate(name, name_width):<{name_width}} {colorize(label, color):<24} {truncate(timing, 26)}{detail}"
         )
 else:
     lines.append("- Workflow has not reported jobs yet")
