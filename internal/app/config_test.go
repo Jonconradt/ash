@@ -310,7 +310,6 @@ func TestParseAIEndpointValidation(t *testing.T) {
 		wantErr string
 	}{
 		{name: "invalid URL encoding", input: "http://%zz", wantErr: "%zz"},
-		{name: "missing scheme", input: "localhost:11434", wantErr: "scheme must be http or https"},
 		{name: "unsupported scheme", input: "ftp://example.com", wantErr: "scheme must be http or https"},
 		{name: "missing host", input: "https:///v1", wantErr: "host is required"},
 		{name: "query not allowed", input: "https://api.example.com/v1?x=1", wantErr: "must not include query or fragment"},
@@ -325,6 +324,41 @@ func TestParseAIEndpointValidation(t *testing.T) {
 			}
 			if !strings.Contains(err.Error(), tt.wantErr) {
 				t.Fatalf("expected error containing %q, got %q", tt.wantErr, err.Error())
+			}
+		})
+	}
+}
+
+// TestParseAIEndpointSchemeDefaulting covers AI_ENDPOINT values that omit a
+// scheme: local/LAN/bare hostnames default to http, everything else to https.
+func TestParseAIEndpointSchemeDefaulting(t *testing.T) {
+	tests := []struct {
+		name       string
+		input      string
+		wantScheme string
+		wantHost   string
+	}{
+		{name: "bare localhost:port", input: "localhost:11434", wantScheme: "http", wantHost: "localhost"},
+		{name: "bare single-label hostname", input: "brain:11434", wantScheme: "http", wantHost: "brain"},
+		{name: "bare .local hostname", input: "brain.local:11434", wantScheme: "http", wantHost: "brain.local"},
+		{name: "bare private IP", input: "192.168.1.3:11434", wantScheme: "http", wantHost: "192.168.1.3"},
+		{name: "bare public hostname", input: "api.example.com", wantScheme: "https", wantHost: "api.example.com"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			baseURL, host, scheme, err := parseAIEndpoint(tt.input)
+			if err != nil {
+				t.Fatalf("parseAIEndpoint(%q) returned error: %v", tt.input, err)
+			}
+			if scheme != tt.wantScheme {
+				t.Fatalf("scheme mismatch: got %q want %q", scheme, tt.wantScheme)
+			}
+			if host != tt.wantHost {
+				t.Fatalf("host mismatch: got %q want %q", host, tt.wantHost)
+			}
+			if !strings.HasPrefix(baseURL, tt.wantScheme+"://") {
+				t.Fatalf("baseURL scheme mismatch: got %q", baseURL)
 			}
 		})
 	}

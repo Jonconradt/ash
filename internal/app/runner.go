@@ -43,6 +43,7 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 	observations := make([]toolObservation, 0, 8)
 	stallRounds := 0
 	forcedToolRetryUsed := false
+	emptyReplyRetryUsed := false
 	repeatLimit := toolRepeatLimit()
 	lastCallSignature := ""
 	repeatCount := 0
@@ -89,6 +90,20 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 
 		if len(assistant.ToolCalls) == 0 {
 			slog.Debug("Assistant returned no tool calls", "request_id", requestIDFromContext(ctx), "EID", "lEPk12rd")
+			// A reply that is only thinking output is not an answer; nudge once,
+			// then fail loudly instead of printing reasoning or nothing at all.
+			if strings.TrimSpace(assistant.Content) == "" && strings.TrimSpace(assistant.Reasoning) != "" {
+				if emptyReplyRetryUsed {
+					return "", nil, errors.New("model produced no answer (only internal reasoning); try a different AI_MODEL or a larger server context window")
+				}
+				emptyReplyRetryUsed = true
+				slog.Debug("Assistant reply had no content, requesting a final answer", "request_id", requestIDFromContext(ctx), "reasoning_bytes", len(assistant.Reasoning), "EID", "Zt5rQw2K")
+				messages = append(messages, message{
+					Role:    "system",
+					Content: "Your previous turn produced no answer. Do not reply with internal reasoning. Reply now with the final answer as the assistant message content, or call a tool.",
+				})
+				continue
+			}
 			if hasPendingExecutionTasks(tasks) {
 				stallRounds++
 			} else {

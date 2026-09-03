@@ -2403,6 +2403,74 @@ func TestWorkspaceWriteRejectsPathTraversal(t *testing.T) {
 	}
 }
 
+// TestRunToolLoopReasoningOnlyReply covers servers (e.g. Ollama's
+// OpenAI-compatible endpoint) that return thinking output with empty content:
+// ash must ask again for a real answer rather than printing the reasoning.
+func TestRunToolLoopReasoningOnlyReply(t *testing.T) {
+	originalChatStreamExecutor := chatStreamExecutor
+	t.Cleanup(func() { chatStreamExecutor = originalChatStreamExecutor })
+
+	calls := 0
+	chatStreamExecutor = func(_ context.Context, _ aiConfig, msgs []message, _ []toolDefinition, _ func(streamDelta)) (chatResponse, error) {
+		calls++
+		if calls == 1 {
+			return chatResponse{Message: message{Role: "assistant", Reasoning: "I should check the sockets."}}, nil
+		}
+		if msgs[len(msgs)-2].Role != "system" {
+			t.Fatalf("expected retry nudge before the trailing message, got %#v", msgs)
+		}
+		return chatResponse{Message: message{Role: "assistant", Content: "done"}}, nil
+	}
+
+	shim := localToolShim{allowlist: map[string]struct{}{"ls": {}}}
+	final, _, err := runToolLoop(context.Background(), testAIConfig("http://example.invalid", "model"), "list files", []message{{Role: "user", Content: "list files"}}, shim)
+	if err != nil {
+		t.Fatalf("runToolLoop returned error: %v", err)
+	}
+	if final != "done" {
+		t.Fatalf("expected %q, got %q", "done", final)
+	}
+	if calls != 2 {
+		t.Fatalf("expected 2 chat calls, got %d", calls)
+	}
+}
+
+func TestRunToolLoopReasoningOnlyReplyTwiceFails(t *testing.T) {
+	originalChatStreamExecutor := chatStreamExecutor
+	t.Cleanup(func() { chatStreamExecutor = originalChatStreamExecutor })
+
+	chatStreamExecutor = func(context.Context, aiConfig, []message, []toolDefinition, func(streamDelta)) (chatResponse, error) {
+		return chatResponse{Message: message{Role: "assistant", Reasoning: "thinking"}}, nil
+	}
+
+	shim := localToolShim{allowlist: map[string]struct{}{"ls": {}}}
+	_, _, err := runToolLoop(context.Background(), testAIConfig("http://example.invalid", "model"), "list files", []message{{Role: "user", Content: "list files"}}, shim)
+	if err == nil || !strings.Contains(err.Error(), "only internal reasoning") {
+		t.Fatalf("expected reasoning-only error, got %v", err)
+	}
+}
+
+func TestOpenAIReasoningText(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{name: "empty", raw: "", want: ""},
+		{name: "invalid json", raw: "{", want: ""},
+		{name: "no reasoning", raw: `{"role":"assistant","content":"hi"}`, want: ""},
+		{name: "reasoning", raw: `{"role":"assistant","content":"","reasoning":"  thought  "}`, want: "thought"},
+		{name: "reasoning_content", raw: `{"role":"assistant","reasoning_content":"thought"}`, want: "thought"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := openAIReasoningText(tt.raw); got != tt.want {
+				t.Fatalf("openAIReasoningText(%q) = %q, want %q", tt.raw, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestRunToolLoop(t *testing.T) {
 	originalRunner := toolCommandRunner
 	t.Cleanup(func() { toolCommandRunner = originalRunner })

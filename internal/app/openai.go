@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/url"
@@ -377,6 +378,12 @@ func parseOpenAIChatCompletion(resp *openai.ChatCompletion) chatResponse {
 				},
 			})
 		}
+		if assistant.Content == "" && len(assistant.ToolCalls) == 0 {
+			if reasoning := openAIReasoningText(choice.RawJSON()); reasoning != "" {
+				slog.Debug("Assistant returned reasoning without content", "bytes", len(reasoning), "EID", "pQ3nWk7T")
+				assistant.Reasoning = reasoning
+			}
+		}
 	}
 
 	return chatResponse{
@@ -387,4 +394,25 @@ func parseOpenAIChatCompletion(resp *openai.ChatCompletion) chatResponse {
 			Available:    resp.Usage.PromptTokens > 0 || resp.Usage.CompletionTokens > 0,
 		},
 	}
+}
+
+// openAIReasoningText extracts thinking output from the non-standard
+// `reasoning`/`reasoning_content` fields that OpenAI-compatible servers such as
+// Ollama and vLLM emit; some models fill only those and leave `content` empty,
+// which would otherwise surface to the user as a silent, empty reply.
+func openAIReasoningText(raw string) string {
+	if strings.TrimSpace(raw) == "" {
+		return ""
+	}
+	var payload struct {
+		Reasoning        string `json:"reasoning"`
+		ReasoningContent string `json:"reasoning_content"`
+	}
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		return ""
+	}
+	if text := strings.TrimSpace(payload.Reasoning); text != "" {
+		return text
+	}
+	return strings.TrimSpace(payload.ReasoningContent)
 }

@@ -11,6 +11,9 @@ type Message struct {
 	ToolName    string       `json:"tool_name,omitempty"`
 	ToolCallID  string       `json:"tool_call_id,omitempty"`
 	Attachments []Attachment `json:"attachments,omitempty"`
+	// Reasoning holds thinking output some servers return alongside an empty
+	// Content; it is never sent back to a provider or shown as the reply.
+	Reasoning string `json:"-"`
 }
 
 // Attachment is a binary file (image or document) attached to a message, either

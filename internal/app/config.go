@@ -195,15 +195,25 @@ func detectAIProvider(baseURL string, host string) aiProvider {
 	return providerOllama
 }
 
-// parseAIEndpoint parses and validates input values.
+// parseAIEndpoint parses and validates input values. If value omits a
+// scheme (e.g. "localhost:11434"), the scheme defaults to http for local/LAN
+// hosts and https for everything else, so local ollama servers need not
+// spell out "http://".
 func parseAIEndpoint(value string) (baseURL string, host string, scheme string, err error) {
-	u, err := url.Parse(value)
+	raw := strings.TrimSpace(value)
+	hasScheme := strings.Contains(raw, "://")
+	parseValue := raw
+	if !hasScheme {
+		parseValue = "http://" + raw
+	}
+
+	u, err := url.Parse(parseValue)
 	if err != nil {
 		return "", "", "", err
 	}
 
 	scheme = strings.ToLower(strings.TrimSpace(u.Scheme))
-	if scheme != "http" && scheme != "https" {
+	if hasScheme && scheme != "http" && scheme != "https" {
 		return "", "", "", errors.New("AI_ENDPOINT scheme must be http or https")
 	}
 	host = strings.TrimSpace(u.Hostname())
@@ -214,14 +224,24 @@ func parseAIEndpoint(value string) (baseURL string, host string, scheme string, 
 		return "", "", "", errors.New("AI_ENDPOINT must not include query or fragment")
 	}
 
+	if !hasScheme {
+		if isCloudAIHost(host) {
+			scheme = "https"
+		} else {
+			scheme = "http"
+		}
+	}
+
 	cleanPath := strings.TrimRight(strings.TrimSpace(u.Path), "/")
 	baseURL = fmt.Sprintf("%s://%s%s", scheme, u.Host, cleanPath)
 	return baseURL, host, scheme, nil
 }
 
 // isCloudAIHost reports whether the condition is true. Private/LAN addresses
-// (RFC1918 IPv4, IPv6 ULA) and .local mDNS hostnames are treated as non-cloud
-// unless ASH_STRICT is enabled, in which case only localhost/loopback are exempt.
+// (RFC1918 IPv4, IPv6 ULA), .local mDNS hostnames, and bare single-label
+// hostnames (e.g. "brain", resolved via mDNS/NetBIOS/hosts file rather than
+// public DNS) are treated as non-cloud unless ASH_STRICT is enabled, in which
+// case only localhost/loopback are exempt.
 func isCloudAIHost(host string) bool {
 	h := strings.TrimSpace(strings.ToLower(host))
 	if h == "localhost" {
@@ -229,7 +249,7 @@ func isCloudAIHost(host string) bool {
 	}
 	ip := net.ParseIP(h)
 	if ip == nil {
-		if !strictSecurityModeEnabled() && strings.HasSuffix(h, ".local") {
+		if !strictSecurityModeEnabled() && (strings.HasSuffix(h, ".local") || !strings.Contains(h, ".")) {
 			return false
 		}
 		return true
