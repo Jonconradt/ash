@@ -9,6 +9,10 @@ REPO_ROOT="$(cd -- "${SCRIPT_DIR}/../.." && pwd)"
 readonly REPO_ROOT
 readonly LOCK_DIR="${TMPDIR:-/tmp}/ash-secupdate.lock"
 
+# Report the failing command and line so the systemd failure mail names the exact
+# step that failed instead of a bare silent `exit 1` from `set -e`.
+trap 'rc=$?; printf "[secupdate] FAILED rc=%d at %s:%d cmd: %s\n" "$rc" "${BASH_SOURCE[0]}" "$LINENO" "$BASH_COMMAND" >&2' ERR
+
 log() {
 	printf '[secupdate] %s\n' "$*"
 }

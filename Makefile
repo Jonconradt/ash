@@ -8,7 +8,7 @@ GOLANGCI_LINT_VERSION ?= v2.13.1
 RUFF_VERSION ?= 0.12.10
 MARKDOWNLINT_CLI2_VERSION ?= 0.23.2
 GOSEC_VERSION ?= v2.28.0
-GOVULNCHECK_VERSION ?= v1.1.4
+GOVULNCHECK_VERSION ?= v1.7.0
 STATICCHECK_VERSION ?= latest
 YAMLFMT_VERSION ?= latest
 APP_NAME ?= ash
@@ -103,7 +103,8 @@ gosec:
 	@go run github.com/securego/gosec/v2/cmd/gosec@$(GOSEC_VERSION) -quiet ./...
 
 govulncheck:
-	@go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...
+	@go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) -version
+	@go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) -show verbose ./...
 
 test:
 	@go test ./...
