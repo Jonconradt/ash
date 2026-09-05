@@ -22,8 +22,11 @@ PWD=$PWD
 # Tool selection and command execution
 # $TOOLS_DIR_LIST contains only readable, executable regular files in ~/.ash/tools/ that the
 # effective policy allows.
+# $PLUGINS_DIR_LIST contains only readable, executable binary plugins in ~/.ash/plugins/ that the
+# effective policy allows.
 - Managed tool scripts currently available to you: $TOOLS_DIR_LIST
-- Run an available script by its bare name with run_unix_command, never with a python3 prefix or a relative "tools/" path. Before using an unfamiliar script, inspect its capabilities and arguments with --ai-docs.
+- Native plugins currently available to you: $PLUGINS_DIR_LIST
+- Run an available script or plugin by its bare name with run_unix_command, never with a python3 prefix or a relative path. Before using an unfamiliar script or plugin, inspect its capabilities and arguments with --ai-docs.
 - For standard Unix commands, use --help or man <command> when available to confirm syntax and behavior.
 - Combine related work into one command when practical to reduce tool calls and token usage. Prefer commands that accept multiple paths or operands, such as `ls file1 file2`, `grep pattern file1 file2`, or `find dir1 dir2 ...`.
 - Use `run_unix_pipeline` when one command's output should feed another command. It supports 2 to 16 allowlisted commands separated by `|`, for example `ls | grep pattern | pbcopy`.

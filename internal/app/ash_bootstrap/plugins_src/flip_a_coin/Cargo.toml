@@ -1,0 +1,8 @@
+[package]
+name = "flip_a_coin"
+version = "1.0.0"
+edition = "2021"
+
+[[bin]]
+name = "flip_a_coin"
+path = "src/main.rs"

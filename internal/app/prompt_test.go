@@ -190,7 +190,7 @@ func TestToolDirectoryListIsInternalAndFiltersEligibleScripts(t *testing.T) {
 		t.Fatalf("mkdir non-script entry: %v", err)
 	}
 
-	allowed, err := parseAllowlistFileWithToolDirectoryList("ls\n$TOOLS_DIR_LIST\n$TOOLS_DIR_LIST,ps\n")
+	allowed, err := parseAllowlistFileWithTokens("ls\n$TOOLS_DIR_LIST\n$TOOLS_DIR_LIST,ps\n")
 	if err != nil {
 		t.Fatalf("parse allowlist marker: %v", err)
 	}
@@ -343,20 +343,20 @@ func TestReadSystemPromptErrors(t *testing.T) {
 func TestBuildSystemPrompt(t *testing.T) {
 	now := time.Date(2026, time.July, 24, 9, 15, 30, 0, time.FixedZone("PDT", -7*3600))
 
-	t.Run("header only when empty prompt", func(t *testing.T) {
+	t.Run("guidance only when empty prompt", func(t *testing.T) {
 		got := buildSystemPrompt("", now)
-		if !strings.HasPrefix(got, "Current local datetime: 2026-07-24T09:15:30-07:00\n\n") {
-			t.Fatalf("unexpected prompt header: got %q", got)
+		if strings.Contains(got, "Current local datetime") {
+			t.Fatalf("datetime should not be in system prompt: got %q", got)
 		}
 		if !strings.Contains(got, "run_sub_agent") || !strings.Contains(got, "untrusted evidence") {
 			t.Fatalf("expected delegation guidance, got %q", got)
 		}
 	})
 
-	t.Run("header plus prompt body", func(t *testing.T) {
+	t.Run("guidance plus prompt body", func(t *testing.T) {
 		got := buildSystemPrompt("sys-msg", now)
-		if !strings.HasPrefix(got, "Current local datetime: 2026-07-24T09:15:30-07:00\n\n") {
-			t.Fatalf("expected datetime prefix, got %q", got)
+		if strings.Contains(got, "Current local datetime") {
+			t.Fatalf("datetime should not be in system prompt: got %q", got)
 		}
 		if !strings.HasSuffix(got, "sys-msg") {
 			t.Fatalf("expected user prompt suffix, got %q", got)

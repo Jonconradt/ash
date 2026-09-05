@@ -243,7 +243,7 @@ func TestInstallUpgradeArchiveInstallsAshAndBroker(t *testing.T) {
 	var archive bytes.Buffer
 	gzipWriter := gzip.NewWriter(&archive)
 	tarWriter := tar.NewWriter(gzipWriter)
-	ash := []byte("#!/bin/sh\nmkdir -p \"$2\"\nfor asset in .ash_env .ash_tools .ash_bashrc .ash_zshrc .ash_system; do\n  printf candidate > \"$2/$asset\"\ndone\n")
+	ash := []byte("#!/bin/sh\nmkdir -p \"$2\"\nfor asset in .ash_env .ash_allow .ash_deny .ash_bashrc .ash_zshrc .ash_system; do\n  printf candidate > \"$2/$asset\"\ndone\n")
 	broker := []byte("new ash-broker binary")
 	for _, entry := range []struct {
 		name string

@@ -584,7 +584,8 @@ func exportUpgradeAssets(binaryPath, destination string) error {
 		name   string
 	}{
 		{source: "ash_bootstrap/.ash_env", name: ".ash_env"},
-		{source: "ash_bootstrap/.ash_tools", name: ".ash_tools"},
+		{source: "ash_bootstrap/.ash_allow", name: ".ash_allow"},
+		{source: "ash_bootstrap/.ash_deny", name: ".ash_deny"},
 		{source: "ash_bootstrap/.ash_bashrc", name: ".ash_bashrc"},
 		{source: "ash_bootstrap/.ash_zshrc", name: ".ash_zshrc"},
 		{source: "ash_bootstrap/.ash_system", name: ".ash_system"},
@@ -615,7 +616,7 @@ func syncUpgradeAssets(candidateRoot string, options upgradeOptions, stdout io.W
 	if err := os.MkdirAll(destinationRoot, 0o700); err != nil {
 		return err
 	}
-	assets := []string{".ash_env", ".ash_tools", ".ash_bashrc", ".ash_zshrc", ".ash_system"}
+	assets := []string{".ash_env", ".ash_allow", ".ash_deny", ".ash_bashrc", ".ash_zshrc", ".ash_system"}
 	var reader *bufio.Reader
 	if !options.replace && !options.skipCustomized && stdinIsInteractive() {
 		reader = bufio.NewReader(os.Stdin)

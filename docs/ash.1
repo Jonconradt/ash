@@ -261,14 +261,20 @@ Optional request timeout. Default is 3m.
 .B ASH_HISTORY_MAX
 Optional max number of history messages retained per key. Default is 40.
 .TP
-.B ASH_TOOL_ALLOWLIST
+.B ASH_ALLOW
 Optional comma-separated allowlist for
 .B run_unix_command
+and
+.B run_unix_pipeline
 tool executables. When unset,
-.I ~/.ash/.ash_tools
-is used if present. The standalone $TOOLS_DIR_LIST line in that file is an
-internal Ash directive that permits eligible managed tool scripts; it is not an
-environment variable.
+.I ~/.ash/.ash_allow
+is used if present. Standalone $TOOLS_DIR_LIST and $PLUGINS_DIR_LIST lines in that file are
+internal Ash directives that permit eligible managed tool scripts and native plugins.
+.TP
+.B ASH_DENY
+Optional comma-separated denylist for commands, tools, and plugins. When unset,
+.I ~/.ash/.ash_deny
+is used if present. Denied commands are blocked unconditionally.
 .TP
 .B ASH_TOOL_TIMEOUT
 Optional timeout for local tool command execution. Default is 15s.
@@ -377,13 +383,18 @@ when present, otherwise system
 .SH FILES
 .TP
 .I ~/.ash/.ash_system
-Canonical system prompt file. $TOOLS_DIR_LIST and $IF_PYTHON_AVAILABLE are
-reserved internal Ash substitutions, not environment variables. The tool list
-contains only allowed regular files in ~/.ash/tools with read and execute bits.
+Canonical system prompt file. $TOOLS_DIR_LIST, $PLUGINS_DIR_LIST, and $IF_PYTHON_AVAILABLE are
+reserved internal Ash substitutions, not environment variables.
 .TP
-.I ~/.ash/.ash_tools
-Canonical tool allowlist file. Replace its standalone $TOOLS_DIR_LIST directive
-with literal bare names for a fixed restrictive managed-script policy.
+.I ~/.ash/.ash_allow
+Canonical command, tool, and plugin allowlist file. Replace its standalone $TOOLS_DIR_LIST and $PLUGINS_DIR_LIST directives
+with literal bare names for a fixed restrictive policy.
+.TP
+.I ~/.ash/.ash_deny
+Canonical command, tool, and plugin denylist file for explicitly blocking specific executables.
+.TP
+.I ~/.ash/plugins/
+Directory holding installed native binary plugins.
 .TP
 .I ~/.ash/venv/
 Managed virtualenv holding third-party dependencies for bundled Python tools. Built

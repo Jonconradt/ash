@@ -1,4 +1,4 @@
-.PHONY: all verify build config lint site-lint yaml-lint python-lint markdown-lint sync-route-words test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install version release release-check release-clean release-build release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one release-checksums restart-broker
+.PHONY: all verify build config lint site-lint yaml-lint python-lint markdown-lint sync-route-words test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install version release release-check release-clean release-build release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one release-checksums restart-broker plugins-build plugins-test plugins-lint plugins-clean plugins-install
 
 SHELL := /bin/bash
 
@@ -14,6 +14,9 @@ YAMLFMT_VERSION ?= latest
 APP_NAME ?= ash
 LOCAL_BIN_DIR ?= $(HOME)/.local/bin
 LOCAL_BINARY_PATH ?= $(LOCAL_BIN_DIR)/$(APP_NAME)
+PLUGINS_SRC_DIR ?= internal/app/ash_bootstrap/plugins_src
+PLUGINS_BIN_DIR ?= bin/plugins
+LOCAL_PLUGINS_DIR ?= $(HOME)/.ash/plugins
 RELEASE_ARCH ?= arm64
 RELEASE_OUTPUT_DIR ?= dist/release
 RELEASE_PACKAGE_DIR ?= $(RELEASE_OUTPUT_DIR)
@@ -65,7 +68,43 @@ verify: test test-race test-cover vet staticcheck security test-fuzz benchmark
 sync-route-words:
 	@cd internal/app && go run ../../cmd/ash --internal-sync-route-words
 
-build: lint test
+plugins-build:
+	@mkdir -p "$(PLUGINS_BIN_DIR)"
+	@for dir in $(PLUGINS_SRC_DIR)/*; do \
+		if [ -f "$$dir/Makefile" ]; then \
+			$(MAKE) -C "$$dir" build || exit 1; \
+		fi; \
+	done
+
+plugins-test: plugins-build
+	@for dir in $(PLUGINS_SRC_DIR)/*; do \
+		if [ -f "$$dir/Makefile" ]; then \
+			$(MAKE) -C "$$dir" test || exit 1; \
+		fi; \
+	done
+
+plugins-lint:
+	@for dir in $(PLUGINS_SRC_DIR)/*; do \
+		if [ -f "$$dir/Makefile" ]; then \
+			$(MAKE) -C "$$dir" lint || exit 1; \
+		fi; \
+	done
+
+plugins-clean:
+	@for dir in $(PLUGINS_SRC_DIR)/*; do \
+		if [ -f "$$dir/Makefile" ]; then \
+			$(MAKE) -C "$$dir" clean || exit 1; \
+		fi; \
+	done
+	@rm -rf "$(PLUGINS_BIN_DIR)"
+
+plugins-install: plugins-build
+	@mkdir -p "$(LOCAL_PLUGINS_DIR)"
+	@if [ -d "$(PLUGINS_BIN_DIR)" ]; then \
+		cp -f "$(PLUGINS_BIN_DIR)"/* "$(LOCAL_PLUGINS_DIR)/" 2>/dev/null || true; \
+	fi
+
+build: lint test plugins-build plugins-install
 	@mkdir -p "$(LOCAL_BIN_DIR)"
 	@go build -o "$(LOCAL_BINARY_PATH)" -ldflags "-X ash/internal/app.ashVersion=$(BUILD_VERSION) -X ash/internal/app.ashCommit=$(BUILD_COMMIT) -X ash/internal/app.ashDevelopmentBuild=true" ./cmd/ash
 	@go build -o "$(LOCAL_BIN_DIR)/ash-broker" ./cmd/ash-broker
@@ -80,7 +119,7 @@ restart-broker:
 	@pkill -f "$(LOCAL_BIN_DIR)/ash-broker" 2>/dev/null || true
 	@pkill -f "broker --socket .*--parent-pid" 2>/dev/null || true
 
-lint: site-lint yaml-lint python-lint markdown-lint
+lint: site-lint yaml-lint python-lint markdown-lint plugins-lint
 	@go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run ./...
 
 site-lint:
@@ -95,7 +134,7 @@ python-lint:
 	@uvx ruff@$(RUFF_VERSION) format --check internal/app/ash_bootstrap/tools
 
 markdown-lint:
-	@npx --yes markdownlint-cli2@$(MARKDOWNLINT_CLI2_VERSION) "**/*.md" "!dist/**" "!node_modules/**"
+	@npx --yes markdownlint-cli2@$(MARKDOWNLINT_CLI2_VERSION) "**/*.md" "!dist/**" "!node_modules/**" "!**/node_modules/**" "!**/target/**"
 
 security: gosec govulncheck
 
@@ -106,7 +145,7 @@ govulncheck:
 	@go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) -version
 	@go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) -show verbose ./...
 
-test:
+test: plugins-test
 	@go test ./...
 
 test-race:
@@ -134,7 +173,7 @@ staticcheck:
 		echo "staticcheck not installed; skipping"; \
 	fi
 
-install: test lint gosec
+install: test lint gosec plugins-build plugins-install
 	@mkdir -p "$(LOCAL_BIN_DIR)"
 	@go build -o "$(LOCAL_BINARY_PATH)" -ldflags "-X ash/internal/app.ashVersion=$(BUILD_VERSION) -X ash/internal/app.ashCommit=$(BUILD_COMMIT) -X ash/internal/app.ashDevelopmentBuild=true" ./cmd/ash
 	@go build -o "$(LOCAL_BIN_DIR)/ash-broker" ./cmd/ash-broker

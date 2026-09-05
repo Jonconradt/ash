@@ -1270,10 +1270,12 @@ func TestLoadAllowlistedCommands(t *testing.T) {
 	// Deterministic: python3 availability must not depend on the host running these tests.
 	t.Setenv("ASH_STRICT", "")
 	t.Setenv("ASH_PYTHON", "python3")
+	t.Setenv("ASH_ALLOW", "")
+	t.Setenv("ASH_DENY", "")
 	execLookPath = func(string) (string, error) { return "", errors.New("not found") }
 
 	t.Run("env override", func(t *testing.T) {
-		t.Setenv("ASH_TOOL_ALLOWLIST", "ls, ps,python3")
+		t.Setenv("ASH_ALLOW", "ls, ps,python3")
 		allowed, err := loadAllowlistedCommands()
 		if err != nil {
 			t.Fatalf("loadAllowlistedCommands error: %v", err)
@@ -1289,6 +1291,24 @@ func TestLoadAllowlistedCommands(t *testing.T) {
 		}
 	})
 
+	t.Run("denylist subtraction", func(t *testing.T) {
+		t.Setenv("ASH_ALLOW", "ls, ps, what_time_is_it")
+		t.Setenv("ASH_DENY", "ps, what_time_is_it")
+		allowed, err := loadAllowlistedCommands()
+		if err != nil {
+			t.Fatalf("loadAllowlistedCommands error: %v", err)
+		}
+		if _, ok := allowed["ls"]; !ok {
+			t.Fatalf("expected ls in allowlist: %#v", allowed)
+		}
+		if _, ok := allowed["ps"]; ok {
+			t.Fatalf("expected ps to be denied: %#v", allowed)
+		}
+		if _, ok := allowed["what_time_is_it"]; ok {
+			t.Fatalf("expected what_time_is_it to be denied: %#v", allowed)
+		}
+	})
+
 	t.Run("dot-prefixed entries are dropped", func(t *testing.T) {
 		if got := normalizeToolName(".secret"); got != "" {
 			t.Fatalf("expected dot-prefixed tool name to be rejected, got %q", got)
@@ -1297,7 +1317,7 @@ func TestLoadAllowlistedCommands(t *testing.T) {
 			t.Fatalf("expected bare tool name to pass through, got %q", got)
 		}
 
-		t.Setenv("ASH_TOOL_ALLOWLIST", "ls,.secret")
+		t.Setenv("ASH_ALLOW", "ls,.secret")
 		allowed, err := loadAllowlistedCommands()
 		if err != nil {
 			t.Fatalf("loadAllowlistedCommands error: %v", err)
@@ -1315,7 +1335,7 @@ func TestLoadAllowlistedCommands(t *testing.T) {
 		t.Cleanup(func() { execLookPath = original })
 		execLookPath = func(string) (string, error) { return "/usr/bin/python3", nil }
 
-		t.Setenv("ASH_TOOL_ALLOWLIST", "ls, ps,python3")
+		t.Setenv("ASH_ALLOW", "ls, ps,python3")
 		allowed, err := loadAllowlistedCommands()
 		if err != nil {
 			t.Fatalf("loadAllowlistedCommands error: %v", err)
@@ -1333,7 +1353,7 @@ func TestLoadAllowlistedCommands(t *testing.T) {
 		t.Cleanup(func() { execLookPath = original })
 		execLookPath = func(string) (string, error) { return "", errors.New("not found") }
 
-		t.Setenv("ASH_TOOL_ALLOWLIST", "python3")
+		t.Setenv("ASH_ALLOW", "python3")
 		allowed, err := loadAllowlistedCommands()
 		if err != nil {
 			t.Fatalf("loadAllowlistedCommands error: %v", err)
@@ -1344,16 +1364,16 @@ func TestLoadAllowlistedCommands(t *testing.T) {
 	})
 
 	t.Run("cwd file wins over home", func(t *testing.T) {
-		t.Setenv("ASH_TOOL_ALLOWLIST", "")
+		t.Setenv("ASH_ALLOW", "")
 		home := t.TempDir()
 		cwd := t.TempDir()
 		t.Setenv("HOME", home)
 
-		if err := os.WriteFile(filepath.Join(home, toolsFileName), []byte("ls\n"), 0o600); err != nil {
-			t.Fatalf("write home tools file: %v", err)
+		if err := os.WriteFile(filepath.Join(home, allowFileName), []byte("ls\n"), 0o600); err != nil {
+			t.Fatalf("write home allow file: %v", err)
 		}
-		if err := os.WriteFile(filepath.Join(cwd, toolsFileName), []byte("ps\n"), 0o600); err != nil {
-			t.Fatalf("write cwd tools file: %v", err)
+		if err := os.WriteFile(filepath.Join(cwd, allowFileName), []byte("ps\n"), 0o600); err != nil {
+			t.Fatalf("write cwd allow file: %v", err)
 		}
 		if err := os.Chdir(cwd); err != nil {
 			t.Fatalf("Chdir failed: %v", err)
@@ -1372,7 +1392,7 @@ func TestLoadAllowlistedCommands(t *testing.T) {
 	})
 
 	t.Run("canonical file wins over cwd and home", func(t *testing.T) {
-		t.Setenv("ASH_TOOL_ALLOWLIST", "")
+		t.Setenv("ASH_ALLOW", "")
 		home := t.TempDir()
 		cwd := t.TempDir()
 		t.Setenv("HOME", home)
@@ -1380,14 +1400,14 @@ func TestLoadAllowlistedCommands(t *testing.T) {
 		if err := os.MkdirAll(filepath.Join(home, ashWorkspaceDirName), 0o700); err != nil {
 			t.Fatalf("mkdir canonical workspace: %v", err)
 		}
-		if err := os.WriteFile(filepath.Join(home, ashWorkspaceDirName, toolsFileName), []byte("say\n"), 0o600); err != nil {
-			t.Fatalf("write canonical tools file: %v", err)
+		if err := os.WriteFile(filepath.Join(home, ashWorkspaceDirName, allowFileName), []byte("say\n"), 0o600); err != nil {
+			t.Fatalf("write canonical allow file: %v", err)
 		}
-		if err := os.WriteFile(filepath.Join(home, toolsFileName), []byte("ls\n"), 0o600); err != nil {
-			t.Fatalf("write home tools file: %v", err)
+		if err := os.WriteFile(filepath.Join(home, allowFileName), []byte("ls\n"), 0o600); err != nil {
+			t.Fatalf("write home allow file: %v", err)
 		}
-		if err := os.WriteFile(filepath.Join(cwd, toolsFileName), []byte("ps\n"), 0o600); err != nil {
-			t.Fatalf("write cwd tools file: %v", err)
+		if err := os.WriteFile(filepath.Join(cwd, allowFileName), []byte("ps\n"), 0o600); err != nil {
+			t.Fatalf("write cwd allow file: %v", err)
 		}
 		if err := os.Chdir(cwd); err != nil {
 			t.Fatalf("Chdir failed: %v", err)
@@ -3689,8 +3709,8 @@ func TestRunInstall(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(cwd, systemFileName), []byte("canonical system"), 0o600); err != nil {
 		t.Fatalf("write local system file: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(cwd, toolsFileName), []byte("say\n"), 0o600); err != nil {
-		t.Fatalf("write local tools file: %v", err)
+	if err := os.WriteFile(filepath.Join(cwd, allowFileName), []byte("say\n"), 0o600); err != nil {
+		t.Fatalf("write local allow file: %v", err)
 	}
 
 	var stdout bytes.Buffer
@@ -3757,13 +3777,13 @@ func TestRunInstall(t *testing.T) {
 		t.Fatalf("canonical system mismatch: got %q", string(canonicalSystemContent))
 	}
 
-	canonicalToolsPath := filepath.Join(home, ashWorkspaceDirName, toolsFileName)
-	canonicalToolsContent, err := os.ReadFile(canonicalToolsPath)
+	canonicalAllowPath := filepath.Join(home, ashWorkspaceDirName, allowFileName)
+	canonicalAllowContent, err := os.ReadFile(canonicalAllowPath)
 	if err != nil {
-		t.Fatalf("read canonical tools file: %v", err)
+		t.Fatalf("read canonical allow file: %v", err)
 	}
-	if !strings.Contains(string(canonicalToolsContent), "say") {
-		t.Fatalf("expected canonical tools content to include say, got %q", string(canonicalToolsContent))
+	if !strings.Contains(string(canonicalAllowContent), "say") {
+		t.Fatalf("expected canonical allow content to include say, got %q", string(canonicalAllowContent))
 	}
 
 	staleBlock := installSourceBlockForShell("bash")
@@ -4093,8 +4113,8 @@ func TestRunInstallHardensWorkspacePermissions(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(cwd, systemFileName), []byte("system"), 0o600); err != nil {
 		t.Fatalf("write cwd system: %v", err)
 	}
-	if err := os.WriteFile(filepath.Join(cwd, toolsFileName), []byte("say\n"), 0o600); err != nil {
-		t.Fatalf("write cwd tools: %v", err)
+	if err := os.WriteFile(filepath.Join(cwd, allowFileName), []byte("say\n"), 0o600); err != nil {
+		t.Fatalf("write cwd allow: %v", err)
 	}
 
 	var stdout bytes.Buffer
@@ -4136,12 +4156,12 @@ func TestRunInstallHardensWorkspacePermissions(t *testing.T) {
 		t.Fatalf("canonical system permissions mismatch: got %o want %o", got, 0o600)
 	}
 
-	canonicalToolsInfo, err := os.Stat(filepath.Join(ashRoot, toolsFileName))
+	canonicalAllowInfo, err := os.Stat(filepath.Join(ashRoot, allowFileName))
 	if err != nil {
-		t.Fatalf("stat canonical tools file: %v", err)
+		t.Fatalf("stat canonical allow file: %v", err)
 	}
-	if got := canonicalToolsInfo.Mode().Perm(); got != 0o600 {
-		t.Fatalf("canonical tools permissions mismatch: got %o want %o", got, 0o600)
+	if got := canonicalAllowInfo.Mode().Perm(); got != 0o600 {
+		t.Fatalf("canonical allow permissions mismatch: got %o want %o", got, 0o600)
 	}
 }
 
@@ -4885,8 +4905,8 @@ func TestRun(t *testing.T) {
 		if len(gotReq.Messages) == 0 || gotReq.Messages[0].Role != "system" {
 			t.Fatalf("expected first message to be system prompt, got %#v", gotReq.Messages)
 		}
-		if !strings.Contains(gotReq.Messages[0].Content, "Current local datetime: 2026-07-24T07:00:00-07:00") {
-			t.Fatalf("expected datetime in system prompt, got %q", gotReq.Messages[0].Content)
+		if !strings.Contains(gotReq.Messages[0].Content, "sys-msg") {
+			t.Fatalf("expected sys-msg in system prompt, got %q", gotReq.Messages[0].Content)
 		}
 		if !strings.HasSuffix(gotReq.Messages[0].Content, "sys-msg") {
 			t.Fatalf("expected original system prompt suffix, got %q", gotReq.Messages[0].Content)

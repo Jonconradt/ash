@@ -54,7 +54,8 @@ const (
 	runtimeDirName                    = "runtime"
 	brokerSocketProbeTimeout          = 50 * time.Millisecond
 	systemFileName                    = ".ash_system"
-	toolsFileName                     = ".ash_tools"
+	allowFileName                     = ".ash_allow"
+	denyFileName                      = ".ash_deny"
 	ashWorkspaceDirName               = workspace.DirName
 	inventoryFileName                 = "inventory.md"
 	schedulerLogDirName               = "logs"
@@ -196,7 +197,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 	allowlist, err := loadAllowlistedCommands()
 	if err != nil {
-		slog.Error(fmt.Sprintf("failed to read %s: %v", toolsFileName, err), "EID", "f6qdSTFE")
+		slog.Error(fmt.Sprintf("failed to read %s: %v", allowFileName, err), "EID", "f6qdSTFE")
 		return 1
 	}
 
