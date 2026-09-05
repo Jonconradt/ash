@@ -139,13 +139,30 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 		promoteNextPendingTask(tasks)
 		for _, call := range assistant.ToolCalls {
 			toolName := strings.TrimSpace(call.Function.Name)
-			slog.Debug("Tool invocation requested", "request_id", requestIDFromContext(ctx), "name", toolName, "arg_count", len(call.Function.Arguments), "EID", "iYWCHf8N")
+			pluginName := pluginNameForToolCall(toolName, call.Function.Arguments)
+			requestArgs := []any{"request_id", requestIDFromContext(ctx), "name", toolName, "plugin", pluginName, "arg_count", len(call.Function.Arguments)}
+			if strictSecurityModeEnabled() {
+				requestArgs = append(requestArgs, "args_redacted", true)
+			} else {
+				requestArgs = append(requestArgs, "args", sanitizeArgsForLog(call.Function.Arguments))
+			}
+			requestArgs = append(requestArgs, "EID", "iYWCHf8N")
+			slog.Debug("Tool invocation requested", append(requestArgs, "EID", "Iuz4RCQq")...,
+			)
 			toolStarted := time.Now()
 			toolResult := shim.CallTool(ctx, toolName, call.Function.Arguments)
 			if metrics := executionMetricsFromContext(ctx); metrics != nil {
 				metrics.addToolCall(toolName, time.Since(toolStarted))
 			}
-			slog.Debug("Tool invocation result", "request_id", requestIDFromContext(ctx), "name", toolName, "bytes", len(toolResult), "sha256", hashForLog([]byte(toolResult)), "EID", "L6UuVgEs")
+			resultArgs := []any{"request_id", requestIDFromContext(ctx), "name", toolName, "plugin", pluginName, "bytes", len(toolResult), "sha256", hashForLog([]byte(toolResult))}
+			if strictSecurityModeEnabled() {
+				resultArgs = append(resultArgs, "output_redacted", true)
+			} else {
+				resultArgs = append(resultArgs, "output_preview", previewForLog(toolResult))
+			}
+			resultArgs = append(resultArgs, "EID", "L6UuVgEs")
+			slog.Debug("Tool invocation result", append(resultArgs, "EID", "0kEcQZWa")...,
+			)
 			observation := parseToolObservation(toolResult)
 			if observation.Command == "" {
 				observation.Command = toolName
@@ -188,6 +205,59 @@ func toolCallSignature(name string, args map[string]any, result string) string {
 		encodedArgs = []byte(fmt.Sprintf("%v", args))
 	}
 	return name + "\x00" + string(encodedArgs) + "\x00" + hashForLog([]byte(result))
+}
+
+const logPreviewMaxBytes = 500
+
+// pluginNameForToolCall resolves the actual plugin/binary invoked by a tool call, unwrapping the
+// generic run_unix_command/run_unix_pipeline tools so logs unambiguously identify which plugin ran.
+func pluginNameForToolCall(toolName string, args map[string]any) string {
+	switch toolName {
+	case "run_unix_command":
+		commandInput, _ := toStringArg(args["command"])
+		fields := strings.Fields(commandInput)
+		if len(fields) == 0 {
+			return toolName
+		}
+		return normalizeToolName(fields[0])
+	case "run_unix_pipeline":
+		pipeline, _ := toStringArg(args["pipeline"])
+		names := make([]string, 0, 4)
+		for _, part := range strings.Split(pipeline, "|") {
+			fields := strings.Fields(part)
+			if len(fields) == 0 {
+				continue
+			}
+			names = append(names, normalizeToolName(fields[0]))
+		}
+		if len(names) == 0 {
+			return toolName
+		}
+		return strings.Join(names, "|")
+	default:
+		return toolName
+	}
+}
+
+// sanitizeArgsForLog encodes tool call arguments for a debug log entry, truncating oversized payloads.
+func sanitizeArgsForLog(args map[string]any) string {
+	encoded, err := json.Marshal(args)
+	if err != nil {
+		return fmt.Sprintf("%v", args)
+	}
+	return truncateForLog(string(encoded))
+}
+
+// previewForLog returns a truncated preview of a tool result for non-strict debug logging.
+func previewForLog(result string) string {
+	return truncateForLog(result)
+}
+
+func truncateForLog(value string) string {
+	if len(value) <= logPreviewMaxBytes {
+		return value
+	}
+	return value[:logPreviewMaxBytes] + "...(truncated)"
 }
 
 // shouldForceToolRetry reports whether the condition is true.

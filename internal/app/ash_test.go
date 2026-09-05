@@ -3042,8 +3042,64 @@ func TestRunToolLoopVerboseLogsToolInvocation(t *testing.T) {
 	if !strings.Contains(logs, `"name":"run_unix_command"`) {
 		t.Fatalf("expected tool name in invocation debug log, got %q", logs)
 	}
+	if !strings.Contains(logs, `"plugin":"ls"`) {
+		t.Fatalf("expected resolved plugin name in invocation debug log, got %q", logs)
+	}
 	if !strings.Contains(logs, `"message":"Tool invocation result"`) {
 		t.Fatalf("expected tool result debug log, got %q", logs)
+	}
+}
+
+func TestRunToolLoopStrictRedactsToolArgsAndOutput(t *testing.T) {
+	originalRunner := toolCommandRunner
+	origDebugWriter := debugWriter
+	t.Cleanup(func() {
+		toolCommandRunner = originalRunner
+		debugWriter = origDebugWriter
+	})
+
+	t.Setenv("ASH_VERBOSE", "1")
+	t.Setenv("ASH_STRICT", "1")
+	var logOutput bytes.Buffer
+	debugWriter = &logOutput
+
+	toolCommandRunner = func(ctx context.Context, name string, args []string, timeout time.Duration, outputMax int) toolCommandResult {
+		return toolCommandResult{OK: true, Command: "calculator", ExitCode: 0, Stdout: "super-secret-result"}
+	}
+
+	requestCount := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requestCount++
+		w.Header().Set("Content-Type", "application/json")
+		if requestCount == 1 {
+			_, _ = w.Write([]byte(`{"message":{"role":"assistant","content":"","tool_calls":[{"function":{"name":"run_unix_command","arguments":{"command":"calculator","args":["--expr","1+1"]}}}]}}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"message":{"role":"assistant","content":"done"}}`))
+	}))
+	defer srv.Close()
+
+	shim := localToolShim{allowlist: map[string]struct{}{"calculator": {}}}
+	_, _, err := runToolLoop(context.Background(), testAIConfig(srv.URL, "model"), "calculate", []message{{Role: "user", Content: "calculate"}}, shim)
+	if err != nil {
+		t.Fatalf("runToolLoop returned error: %v", err)
+	}
+
+	logs := logOutput.String()
+	if !strings.Contains(logs, `"plugin":"calculator"`) {
+		t.Fatalf("expected resolved plugin name in invocation debug log, got %q", logs)
+	}
+	if !strings.Contains(logs, `"args_redacted":true`) {
+		t.Fatalf("expected args_redacted marker under ASH_STRICT, got %q", logs)
+	}
+	if !strings.Contains(logs, `"output_redacted":true`) {
+		t.Fatalf("expected output_redacted marker under ASH_STRICT, got %q", logs)
+	}
+	if strings.Contains(logs, "--expr") || strings.Contains(logs, "1+1") {
+		t.Fatalf("expected tool argument values to be suppressed under ASH_STRICT, got %q", logs)
+	}
+	if strings.Contains(logs, "super-secret-result") {
+		t.Fatalf("expected tool output values to be suppressed under ASH_STRICT, got %q", logs)
 	}
 }
 
