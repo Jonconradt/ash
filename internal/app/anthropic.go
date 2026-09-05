@@ -89,6 +89,14 @@ func buildAnthropicMessages(messages []message, useCache bool) ([]anthropic.Text
 				}
 				blocks = append(blocks, block)
 			}
+			// Echo a reasoning-only assistant turn as text so the continuation retry
+			// resumes the chain of thought. A signed thinking block would be ideal,
+			// but the signature is not captured at parse time, so text is the safe
+			// fallback that keeps the turn from being dropped entirely.
+			if msg.Role == "assistant" && len(msg.ToolCalls) == 0 &&
+				len(blocks) == 0 && strings.TrimSpace(msg.Reasoning) != "" {
+				blocks = append(blocks, anthropic.NewTextBlock(reasoningEchoContent(msg.Reasoning)))
+			}
 			for _, call := range msg.ToolCalls {
 				callID := strings.TrimSpace(call.ID)
 				if callID == "" {
@@ -143,6 +151,10 @@ func parseAnthropicMessage(resp *anthropic.Message) chatResponse {
 		case "text":
 			if text := strings.TrimSpace(block.Text); text != "" {
 				textParts = append(textParts, text)
+			}
+		case "thinking":
+			if thinking := strings.TrimSpace(block.Thinking); thinking != "" {
+				assistant.Reasoning = thinking
 			}
 		case "tool_use":
 			assistant.ToolCalls = append(assistant.ToolCalls, toolCall{

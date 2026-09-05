@@ -306,6 +306,14 @@ func buildOpenAIChatMessages(messages []message) []openai.ChatCompletionMessageP
 			if len(msg.ToolCalls) == 0 {
 				if text := strings.TrimSpace(msg.Content); text != "" {
 					out = append(out, openai.AssistantMessage(text))
+					continue
+				}
+				// A reasoning-only turn was truncated mid-thought; echo the trace back
+				// in think tags so thinking models (e.g. Ollama qwen3/deepseek-r1)
+				// resume their chain instead of restarting it. Skipping the turn
+				// entirely would discard the effort and force a full re-think.
+				if reasoning := strings.TrimSpace(msg.Reasoning); reasoning != "" {
+					out = append(out, openai.AssistantMessage(reasoningEchoContent(reasoning)))
 				}
 				continue
 			}

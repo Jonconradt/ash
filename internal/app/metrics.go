@@ -44,6 +44,7 @@ type executionMetrics struct {
 	outputTokens          int
 	inputTokensAvailable  bool
 	outputTokensAvailable bool
+	aiRoundTrips          int
 	connectionReused      bool
 	connectionObserved    bool
 }
@@ -67,6 +68,7 @@ type executionMetricsSnapshot struct {
 	OutputTokens          int
 	InputTokensAvailable  bool
 	OutputTokensAvailable bool
+	AIRoundTrips          int
 }
 
 type metricsContextKey struct{}
@@ -187,6 +189,17 @@ func (m *executionMetrics) addTokenUsage(inputTokens, outputTokens int, availabl
 	m.outputTokensAvailable = true
 }
 
+// addAIRoundTrip records one completed model call (one assistant turn) so the
+// dashboard can report how many round trips a request actually took.
+func (m *executionMetrics) addAIRoundTrip() {
+	if m == nil {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.aiRoundTrips++
+}
+
 // recordAIResponseMetrics folds one completed AI call into the dashboard: its
 // provider-reported token usage, plus its wall time minus whatever connect time
 // the transport recorded during the same call (which is reported separately).
@@ -196,6 +209,7 @@ func recordAIResponseMetrics(ctx context.Context, usage chatUsage, startedAt tim
 		return
 	}
 	metrics.addTokenUsage(usage.InputTokens, usage.OutputTokens, usage.Available)
+	metrics.addAIRoundTrip()
 	processing := time.Since(startedAt) - (metrics.stageDuration(metricsStageConnect) - connectBefore)
 	if processing < 0 {
 		processing = 0
@@ -283,6 +297,7 @@ func (m *executionMetrics) snapshot() executionMetricsSnapshot {
 		OutputTokens:          m.outputTokens,
 		InputTokensAvailable:  m.inputTokensAvailable,
 		OutputTokensAvailable: m.outputTokensAvailable,
+		AIRoundTrips:          m.aiRoundTrips,
 	}
 }
 
@@ -335,6 +350,7 @@ func renderExecutionDashboard(metrics *executionMetrics, ansi bool) string {
 	metrics.mu.RUnlock()
 	fmt.Fprintf(&b, "%-20s %s\n", style("Connection reused"), connectionStatus)
 	fmt.Fprintf(&b, "%-20s %s\n", style("AI processing"), formatMetricDuration(metrics.stageDuration(metricsStageAIProcessing)))
+	fmt.Fprintf(&b, "%-20s %d\n", style("AI round trips"), snap.AIRoundTrips)
 	fmt.Fprintf(&b, "%-20s %d tools (%s)\n", style("Tool calls"), snap.ToolCalls, formatMetricDuration(snap.ToolDuration))
 	writeCountBreakdown(&b, style("  by tool"), snap.ToolCallCounts)
 	fmt.Fprintf(&b, "%-20s %d (%s), canceled %d, timed out %d, failed %d\n", style("Sub-agents"), snap.SubAgentCalls, formatMetricDuration(snap.SubAgentDuration), snap.SubAgentCanceled, snap.SubAgentTimedOut, snap.SubAgentFailed)
@@ -370,6 +386,7 @@ func logExecutionSummary(requestID string, metrics *executionMetrics) {
 		"connect_ms", metrics.stageDuration(metricsStageConnect).Milliseconds(),
 		"connection_reused", metrics.connectionWasReused(),
 		"ai_processing_ms", metrics.stageDuration(metricsStageAIProcessing).Milliseconds(),
+		"ai_round_trips", snap.AIRoundTrips,
 		"tool_calls", snap.ToolCalls,
 		"tool_duration_ms", snap.ToolDuration.Milliseconds(),
 		"tool_call_counts", snap.ToolCallCounts,

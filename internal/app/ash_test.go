@@ -2425,7 +2425,7 @@ func TestWorkspaceWriteRejectsPathTraversal(t *testing.T) {
 
 // TestRunToolLoopReasoningOnlyReply covers servers (e.g. Ollama's
 // OpenAI-compatible endpoint) that return thinking output with empty content:
-// ash must ask again for a real answer rather than printing the reasoning.
+// ash must continue the truncated turn rather than printing the reasoning.
 func TestRunToolLoopReasoningOnlyReply(t *testing.T) {
 	originalChatStreamExecutor := chatStreamExecutor
 	t.Cleanup(func() { chatStreamExecutor = originalChatStreamExecutor })
@@ -2488,6 +2488,105 @@ func TestOpenAIReasoningText(t *testing.T) {
 				t.Fatalf("openAIReasoningText(%q) = %q, want %q", tt.raw, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestReasoningContinuationInstruction(t *testing.T) {
+	plain := reasoningContinuationInstruction(false)
+	if !strings.Contains(plain, "Continue directly from that thinking") {
+		t.Fatalf("expected continuation phrasing, got %q", plain)
+	}
+	forced := reasoningContinuationInstruction(true)
+	if !strings.Contains(forced, "call an appropriate tool now") {
+		t.Fatalf("expected folded tool-use nudge, got %q", forced)
+	}
+	if !strings.Contains(forced, "Continue directly from that thinking") {
+		t.Fatalf("expected forced instruction to still be a continuation, got %q", forced)
+	}
+}
+
+func TestReasoningEchoContent(t *testing.T) {
+	got := reasoningEchoContent("  think step  ")
+	if !strings.HasPrefix(got, "<think>\n") || !strings.HasSuffix(got, "\n</think>") {
+		t.Fatalf("expected think-wrapped trace, got %q", got)
+	}
+	if !strings.Contains(got, "think step") {
+		t.Fatalf("expected trimmed trace preserved, got %q", got)
+	}
+	long := reasoningEchoContent(strings.Repeat("x", 10000))
+	if len(long) > 4000+len("<think>\n\n</think>") {
+		t.Fatalf("expected trace to be capped, got %d bytes", len(long))
+	}
+}
+
+// TestBuildOpenAIChatMessagesEchoesReasoning ensures a reasoning-only assistant
+// turn is echoed back (think-wrapped) rather than dropped, so the model resumes
+// its chain of thought on the continuation retry.
+func TestBuildOpenAIChatMessagesEchoesReasoning(t *testing.T) {
+	msgs := []message{
+		{Role: "user", Content: "run it"},
+		{Role: "assistant", Reasoning: "I should call a tool"},
+		{Role: "system", Content: "continue"},
+	}
+	out := buildOpenAIChatMessages(msgs)
+	if len(out) != 3 {
+		t.Fatalf("expected reasoning-only turn echoed (3 messages), got %d", len(out))
+	}
+}
+
+// TestProvidersEchoReasoningOnlyTurn ensures every provider keeps a reasoning-only
+// assistant turn on the wire (echoed as a think-wrapped block) so the continuation
+// retry resumes the model's chain of thought rather than dropping or emptying it.
+func TestProvidersEchoReasoningOnlyTurn(t *testing.T) {
+	msgs := []message{
+		{Role: "user", Content: "run it"},
+		{Role: "assistant", Reasoning: "I should call a tool"},
+	}
+
+	t.Run("anthropic", func(t *testing.T) {
+		_, out := buildAnthropicMessages(msgs, false)
+		if len(out) != 2 {
+			t.Fatalf("expected 2 messages, got %d", len(out))
+		}
+	})
+	t.Run("bedrock", func(t *testing.T) {
+		_, out := buildBedrockMessages(msgs)
+		if len(out) != 2 {
+			t.Fatalf("expected 2 messages, got %d", len(out))
+		}
+	})
+	t.Run("cohere", func(t *testing.T) {
+		out := buildCohereMessages(msgs)
+		if len(out) != 2 {
+			t.Fatalf("expected 2 messages, got %d", len(out))
+		}
+		assistant := out[1].Assistant
+		if assistant == nil || assistant.Content == nil || !strings.Contains(assistant.Content.String, "<think>") {
+			t.Fatalf("expected think-wrapped echo in cohere assistant content, got %#v", assistant)
+		}
+	})
+	t.Run("ollama native", func(t *testing.T) {
+		payload, err := (ollamaAdapter{}).BuildPayload(aiConfig{Model: "m"}, msgs, nil)
+		if err != nil {
+			t.Fatalf("BuildPayload error: %v", err)
+		}
+		// The payload is JSON, so angle brackets are escaped; check the escaped form.
+		if !strings.Contains(string(payload), `think\u003e\nI should call a tool`) {
+			t.Fatalf("expected think-wrapped echo in ollama payload, got %s", payload)
+		}
+	})
+}
+
+// TestOllamaNativeCapturesThinking ensures the native Ollama adapter lifts the
+// message.thinking field into Reasoning for content-empty turns.
+func TestOllamaNativeCapturesThinking(t *testing.T) {
+	body := []byte(`{"message":{"role":"assistant","content":"","thinking":"let me think"}}`)
+	resp, err := (ollamaAdapter{}).ParseResponse(body)
+	if err != nil {
+		t.Fatalf("ParseResponse error: %v", err)
+	}
+	if resp.Message.Reasoning != "let me think" {
+		t.Fatalf("expected reasoning captured, got %q", resp.Message.Reasoning)
 	}
 }
 

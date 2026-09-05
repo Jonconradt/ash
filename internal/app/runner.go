@@ -90,18 +90,26 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 
 		if len(assistant.ToolCalls) == 0 {
 			slog.Debug("Assistant returned no tool calls", "request_id", requestIDFromContext(ctx), "EID", "lEPk12rd")
-			// A reply that is only thinking output is not an answer; nudge once,
-			// then fail loudly instead of printing reasoning or nothing at all.
+			// A reply that is only thinking output is a truncated turn, not a finished
+			// answer: continue it instead of discarding the effort. The assistant turn
+			// is already in messages; providers that support it (e.g. Ollama thinking
+			// models) echo the trace back so the model resumes its chain of thought.
 			if strings.TrimSpace(assistant.Content) == "" && strings.TrimSpace(assistant.Reasoning) != "" {
 				if emptyReplyRetryUsed {
 					return "", nil, errors.New("model produced no answer (only internal reasoning); try a different AI_MODEL or a larger server context window")
 				}
 				emptyReplyRetryUsed = true
-				slog.Debug("Assistant reply had no content, requesting a final answer", "request_id", requestIDFromContext(ctx), "reasoning_bytes", len(assistant.Reasoning), "EID", "Zt5rQw2K")
+				// When the prompt is execution-style, fold the forced tool-use nudge
+				// into this single retry so both fixes cost one round trip, not two.
+				forceToolUse := shouldForceToolRetry(userInput, "", tools)
+				slog.Debug("Assistant reply had no content, requesting continuation", "request_id", requestIDFromContext(ctx), "reasoning_bytes", len(assistant.Reasoning), "force_tool_use", forceToolUse, "EID", "Zt5rQw2K")
 				messages = append(messages, message{
 					Role:    "system",
-					Content: "Your previous turn produced no answer. Do not reply with internal reasoning. Reply now with the final answer as the assistant message content, or call a tool.",
+					Content: reasoningContinuationInstruction(forceToolUse),
 				})
+				if forceToolUse {
+					forcedToolRetryUsed = true
+				}
 				continue
 			}
 			if hasPendingExecutionTasks(tasks) {
@@ -196,6 +204,32 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 	}
 
 	return "", nil, errors.New("unreachable tool loop state")
+}
+
+// reasoningContinuationInstruction builds the nudge appended after a reasoning-only
+// turn. The assistant's thinking trace stays in history (providers that support it
+// echo it back), so the instruction tells the model to resume rather than restart.
+// When the prompt is execution-style the tool-use push is folded in so one retry
+// fixes both problems.
+func reasoningContinuationInstruction(forceToolUse bool) string {
+	if forceToolUse {
+		return "You stopped mid-thought. Continue directly from that thinking and finish: call an appropriate tool now instead of explaining or restarting your reasoning."
+	}
+	return "You stopped mid-thought. Continue directly from that thinking and finish: reply now with the final answer as the assistant message content, or call a tool. Do not restart your reasoning."
+}
+
+// reasoningEchoContent wraps a thinking trace in <think> tags for echoing back as
+// the assistant message content on a continuation retry, so servers that round-trip
+// think blocks (Ollama thinking models and other OpenAI-compatible servers) treat
+// it as the model's own prior reasoning rather than a fresh instruction. The trace
+// is capped to avoid replaying an oversized thought into a small context window.
+func reasoningEchoContent(reasoning string) string {
+	const maxEchoBytes = 4000
+	reasoning = strings.TrimSpace(reasoning)
+	if len(reasoning) > maxEchoBytes {
+		reasoning = reasoning[:maxEchoBytes]
+	}
+	return "<think>\n" + reasoning + "\n</think>"
 }
 
 // toolCallSignature returns a stable identifier for a tool invocation and its result, used to detect no-progress repetition.
