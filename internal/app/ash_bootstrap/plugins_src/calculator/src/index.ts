@@ -15,7 +15,7 @@ function getAiDocs(): string {
     ],
     Arguments: {
       "--expr": "Mathematical expression string to evaluate (e.g. '2 + 2 * 3', 'sin(pi / 4)', 'sqrt(144) + 10^2')",
-      "--format": "Output format: 'text' (default) or 'json'",
+      "--format": "Output format: 'json' (default) or 'text'",
       "--ai-docs": "Print AI documentation and exit",
       "--version": "Print version and exit",
       "--help": "Print help and exit"
@@ -26,7 +26,7 @@ function getAiDocs(): string {
       result: "calculated numerical result as a float or integer",
       error_message: "description of syntax or evaluation error when status is error"
     },
-    "Usage guidance for the AI": "Use calculator for precise mathematical computations instead of performing mental math."
+    "Usage guidance for the AI": "Use calculator for precise mathematical computations instead of performing mental math. A single call evaluates the expression. Directly parse and use the numerical result from the JSON response."
   };
   return JSON.stringify(docs, null, 2);
 }
@@ -286,7 +286,7 @@ function main() {
   logEvent("DEBUG", "executing calculator plugin", { EID: "calc01a" });
 
   let expr = "";
-  let format = "text";
+  let format = "json";
 
   for (let i = 0; i < rawArgs.length; i++) {
     if (rawArgs[i] === "--expr" && i + 1 < rawArgs.length) {

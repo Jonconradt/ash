@@ -15,7 +15,7 @@ fn get_ai_docs() -> String {
   ],
   "Arguments": {
     "--count": "Number of coins to flip (positive integer, default: 1)",
-    "--format": "Output format: 'text' (default) or 'json'",
+    "--format": "Output format: 'json' (default) or 'text'",
     "--ai-docs": "Print AI documentation and exit",
     "--version": "Print version and exit",
     "--help": "Print help and exit"
@@ -27,7 +27,7 @@ fn get_ai_docs() -> String {
     "heads_count": "number of HEADS",
     "tails_count": "number of TAILS"
   },
-  "Usage guidance for the AI": "Use flip_a_coin when the user wants a random coin toss or binary decision."
+  "Usage guidance for the AI": "A single call to flip_a_coin performs the coin toss. Do not repeat the call. Directly report the result from the JSON response to the user."
 }"#.to_string()
 }
 
@@ -115,7 +115,7 @@ fn main() {
     log_event("DEBUG", "executing flip_a_coin plugin", &[("EID", "flpC01a")]);
 
     let mut count: usize = 1;
-    let mut format = "text".to_string();
+    let mut format = "json".to_string();
 
     let mut i = 0;
     while i < args.len() {
