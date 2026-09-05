@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
+	"strings"
 	"time"
 
 	"ash/internal/plugin"
@@ -79,7 +81,7 @@ func (t *timePlugin) Run(ctx context.Context, args []string, stdout, stderr io.W
 	}
 
 	now := time.Now()
-	loc := time.Local
+	var loc *time.Location
 	if *tzName != "" && *tzName != "local" {
 		var err error
 		loc, err = time.LoadLocation(*tzName)
@@ -93,6 +95,14 @@ func (t *timePlugin) Run(ctx context.Context, args []string, stdout, stderr io.W
 			_, _ = fmt.Fprintln(stdout, string(out))
 			return 1
 		}
+	} else if envTZ := strings.TrimSpace(os.Getenv("TZ")); envTZ != "" {
+		if envLoc, err := time.LoadLocation(envTZ); err == nil {
+			loc = envLoc
+		} else {
+			loc = time.Local
+		}
+	} else {
+		loc = time.Local
 	}
 
 	nowInLoc := now.In(loc)

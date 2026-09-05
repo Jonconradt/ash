@@ -126,6 +126,43 @@ func TestPluginTimezoneHandling(t *testing.T) {
 	p := &timePlugin{}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
+	t.Run("default timezone respects TZ environment variable", func(t *testing.T) {
+		t.Setenv("TZ", "America/New_York")
+		var stdout, stderr bytes.Buffer
+		code := p.Run(context.Background(), []string{"--format", "json"}, &stdout, &stderr, logger)
+		if code != 0 {
+			t.Fatalf("expected code 0, got %d", code)
+		}
+		var res map[string]any
+		if err := json.Unmarshal(stdout.Bytes(), &res); err != nil {
+			t.Fatalf("unmarshal error: %v", err)
+		}
+		tz, ok := res["timezone"].(string)
+		if !ok || (tz != "EST" && tz != "EDT") {
+			t.Errorf("expected EST or EDT timezone from TZ env, got %v", res["timezone"])
+		}
+		isoStr, ok := res["iso8601"].(string)
+		if !ok {
+			t.Fatalf("missing iso8601 string in output")
+		}
+		parsed, err := time.Parse(time.RFC3339, isoStr)
+		if err != nil {
+			t.Fatalf("failed to parse iso8601 timestamp %q: %v", isoStr, err)
+		}
+		nyLoc, err := time.LoadLocation("America/New_York")
+		if err != nil {
+			t.Fatalf("failed to load location America/New_York: %v", err)
+		}
+		_, expectedOffset := time.Now().In(nyLoc).Zone()
+		_, gotOffset := parsed.Zone()
+		if gotOffset != expectedOffset {
+			t.Errorf("expected timezone offset %d, got %d", expectedOffset, gotOffset)
+		}
+		if gotOffset == 0 && expectedOffset != 0 {
+			t.Errorf("expected non-UTC offset %d, got UTC", expectedOffset)
+		}
+	})
+
 	t.Run("valid timezone UTC", func(t *testing.T) {
 		var stdout, stderr bytes.Buffer
 		code := p.Run(context.Background(), []string{"--timezone", "UTC", "--format", "json"}, &stdout, &stderr, logger)
