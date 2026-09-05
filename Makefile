@@ -63,7 +63,20 @@ config:
 	MARKDOWNLINT_CLI2_VERSION=$(MARKDOWNLINT_CLI2_VERSION) \
 	./scripts/dev/install_dev_tools.sh
 
-verify: test test-race test-cover vet staticcheck security test-fuzz benchmark
+# verify runs the full quality gate quietly: each step prints a single "ok"
+# line on success and dumps its full output only when it fails, ending with one
+# success marker. Run `make V=1 verify` to stream each step's full output.
+verify:
+	@./scripts/dev/run-quiet.sh "lint"        $(MAKE) --no-print-directory lint
+	@./scripts/dev/run-quiet.sh "test"        $(MAKE) --no-print-directory test
+	@./scripts/dev/run-quiet.sh "test-race"   go test -race ./...
+	@./scripts/dev/run-quiet.sh "test-cover"  $(MAKE) --no-print-directory test-cover
+	@./scripts/dev/run-quiet.sh "vet"         go vet ./...
+	@./scripts/dev/run-quiet.sh "staticcheck" $(MAKE) --no-print-directory staticcheck
+	@./scripts/dev/run-quiet.sh "security"    $(MAKE) --no-print-directory security
+	@./scripts/dev/run-quiet.sh "test-fuzz"   go test -fuzz=Fuzz -fuzztime=$(FUZZ_TIME) ./internal/app
+	@./scripts/dev/run-quiet.sh "benchmark"   go test -bench=. -benchmem ./...
+	@echo "verify: all checks passed"
 
 sync-route-words:
 	@cd internal/app && go run ../../cmd/ash --internal-sync-route-words
@@ -72,23 +85,26 @@ plugins-build:
 	@mkdir -p "$(PLUGINS_BIN_DIR)"
 	@for dir in $(PLUGINS_SRC_DIR)/*; do \
 		if [ -f "$$dir/Makefile" ]; then \
-			$(MAKE) -C "$$dir" build || exit 1; \
+			./scripts/dev/run-quiet.sh "plugin-build:$$(basename $$dir)" $(MAKE) -C "$$dir" build || exit 1; \
 		fi; \
 	done
+	@echo "plugins-build: ok"
 
 plugins-test: plugins-build
 	@for dir in $(PLUGINS_SRC_DIR)/*; do \
 		if [ -f "$$dir/Makefile" ]; then \
-			$(MAKE) -C "$$dir" test || exit 1; \
+			./scripts/dev/run-quiet.sh "plugin-test:$$(basename $$dir)" $(MAKE) -C "$$dir" test || exit 1; \
 		fi; \
 	done
+	@echo "plugins-test: ok"
 
 plugins-lint:
 	@for dir in $(PLUGINS_SRC_DIR)/*; do \
 		if [ -f "$$dir/Makefile" ]; then \
-			$(MAKE) -C "$$dir" lint || exit 1; \
+			./scripts/dev/run-quiet.sh "plugin-lint:$$(basename $$dir)" $(MAKE) -C "$$dir" lint || exit 1; \
 		fi; \
 	done
+	@echo "plugins-lint: ok"
 
 plugins-clean:
 	@for dir in $(PLUGINS_SRC_DIR)/*; do \
@@ -120,46 +136,54 @@ restart-broker:
 	@pkill -f "broker --socket .*--parent-pid" 2>/dev/null || true
 
 lint: site-lint yaml-lint python-lint markdown-lint plugins-lint
-	@go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run ./...
+	@./scripts/dev/run-quiet.sh "golangci-lint" go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run ./...
+	@echo "lint: ok"
 
 site-lint:
-	@sh -n site/install.sh
+	@./scripts/dev/run-quiet.sh "site-lint" sh -n site/install.sh
 
 yaml-lint:
-	@echo "Validating GitHub Actions workflows..."
-	@go run github.com/google/yamlfmt/cmd/yamlfmt@latest -lint .github/workflows/*.yml
+	@./scripts/dev/run-quiet.sh "yaml-lint" go run github.com/google/yamlfmt/cmd/yamlfmt@latest -lint .github/workflows/*.yml
 
 python-lint:
-	@uvx ruff@$(RUFF_VERSION) check internal/app/ash_bootstrap/tools
-	@uvx ruff@$(RUFF_VERSION) format --check internal/app/ash_bootstrap/tools
+	@./scripts/dev/run-quiet.sh "ruff-check" uvx ruff@$(RUFF_VERSION) check internal/app/ash_bootstrap/tools
+	@./scripts/dev/run-quiet.sh "ruff-format" uvx ruff@$(RUFF_VERSION) format --check internal/app/ash_bootstrap/tools
 
 markdown-lint:
-	@npx --yes markdownlint-cli2@$(MARKDOWNLINT_CLI2_VERSION) "**/*.md" "!dist/**" "!node_modules/**" "!**/node_modules/**" "!**/target/**"
+	@./scripts/dev/run-quiet.sh "markdown-lint" npx --yes markdownlint-cli2@$(MARKDOWNLINT_CLI2_VERSION) "**/*.md" "!dist/**" "!node_modules/**" "!**/node_modules/**" "!**/target/**"
 
 security: gosec govulncheck
+	@echo "security: ok"
 
 gosec:
-	@go run github.com/securego/gosec/v2/cmd/gosec@$(GOSEC_VERSION) -quiet ./...
+	@./scripts/dev/run-quiet.sh "gosec" go run github.com/securego/gosec/v2/cmd/gosec@$(GOSEC_VERSION) -quiet ./...
 
 govulncheck:
-	@go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) -version
-	@go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) -show verbose ./...
+	@./scripts/dev/run-quiet.sh "govulncheck" go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...
 
 test: plugins-test
-	@go test ./...
+	@./scripts/dev/run-quiet.sh "go-test" go test ./...
+	@echo "test: ok"
 
 test-race:
-	@go test -race ./...
+	@./scripts/dev/run-quiet.sh "go-test-race" go test -race ./...
 
 test-cover:
-	@go test -coverprofile=coverage.out ./...
-	@go tool cover -func=coverage.out | awk '/^total:/ {gsub("%", "", $$3); if ($$3 + 0 < $(COVERAGE_MIN)) {printf("coverage %.1f%% is below %s%%\n", $$3, "$(COVERAGE_MIN)"); exit 1} else {printf("coverage %.1f%% meets %s%%\n", $$3, "$(COVERAGE_MIN)")}}'
+	@./scripts/dev/run-quiet.sh "go-test-cover" go test -coverprofile=coverage.out ./...
+	@cov=$$(go tool cover -func=coverage.out | awk '/^total:/ {gsub("%", "", $$3); printf "%.1f", $$3}'); \
+	below=$$(awk -v c="$$cov" -v min="$(COVERAGE_MIN)" 'BEGIN {print (c+0 < min+0) ? 1 : 0}'); \
+	if [ "$$below" = "0" ]; then \
+		echo "test-cover: ok $$cov%"; \
+	else \
+		echo "test-cover: FAILED coverage $$cov% is below $(COVERAGE_MIN)%"; \
+		exit 1; \
+	fi
 
 test-fuzz:
-	@go test -fuzz=Fuzz -fuzztime=$(FUZZ_TIME) ./internal/app
+	@./scripts/dev/run-quiet.sh "go-test-fuzz" go test -fuzz=Fuzz -fuzztime=$(FUZZ_TIME) ./internal/app
 
 benchmark:
-	@go test -bench=. -benchmem ./...
+	@./scripts/dev/run-quiet.sh "benchmark" go test -bench=. -benchmem ./...
 
 vet:
 	@go vet ./...

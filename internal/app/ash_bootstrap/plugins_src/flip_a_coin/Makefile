@@ -6,18 +6,21 @@ OUTPUT_PATH ?= $(BUILD_DIR)/$(PLUGIN_NAME)
 
 all: build
 
+RUN_QUIET := ../../../../../scripts/dev/run-quiet.sh
+
 build:
 	@mkdir -p "$(BUILD_DIR)"
-	@cargo build --release
+	@$(RUN_QUIET) "cargo-build" cargo build --release
 	@cp target/release/$(PLUGIN_NAME) "$(OUTPUT_PATH)"
 
 test:
-	@cargo test --verbose
+	@$(RUN_QUIET) "cargo-test" cargo test
+	@echo "test: ok"
 
 lint:
-	@cargo check
+	@$(RUN_QUIET) "cargo-check" cargo check
 	@if command -v cargo-clippy >/dev/null 2>&1; then \
-		cargo clippy -- -D warnings; \
+		$(RUN_QUIET) "cargo-clippy" cargo clippy -- -D warnings; \
 	fi
 
 clean:

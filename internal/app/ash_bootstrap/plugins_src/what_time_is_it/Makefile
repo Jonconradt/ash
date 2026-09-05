@@ -9,16 +9,20 @@ GOSEC_VERSION ?= v2.28.0
 
 all: build
 
+RUN_QUIET := ../../../../../scripts/dev/run-quiet.sh
+
 build:
 	@mkdir -p "$(BUILD_DIR)"
-	@go build -o "$(OUTPUT_PATH)" .
+	@$(RUN_QUIET) "go-build" go build -o "$(OUTPUT_PATH)" .
 
 test:
-	@go test -v ./...
+	@$(RUN_QUIET) "go-test" go test ./...
+	@echo "test: ok"
 
 lint:
-	@go vet ./...
-	@go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run .
+	@$(RUN_QUIET) "go-vet" go vet ./...
+	@$(RUN_QUIET) "golangci-lint" go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run .
+	@echo "lint: ok"
 
 security:
 	@go run github.com/securego/gosec/v2/cmd/gosec@$(GOSEC_VERSION) -quiet ./...
