@@ -334,6 +334,7 @@ func chat(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolD
 		}
 		if metrics := executionMetricsFromContext(ctx); metrics != nil {
 			metrics.addTokenUsage(parsed.Usage.InputTokens, parsed.Usage.OutputTokens, parsed.Usage.Available)
+			metrics.addAIRoundTrip()
 		}
 		recordProcessing()
 

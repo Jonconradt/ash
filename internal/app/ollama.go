@@ -3,6 +3,7 @@ package app
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 )
 
 type ollamaAdapter struct{}
@@ -40,6 +41,15 @@ type ollamaChatResponse struct {
 	EvalCount       int     `json:"eval_count"`
 }
 
+// ollamaThinkingResponse captures the `thinking` field Ollama emits for thinking
+// models alongside message, since the shared message type leaves Reasoning
+// unmarshalable (json:"-") to keep it off the wire.
+type ollamaThinkingResponse struct {
+	Message struct {
+		Thinking string `json:"thinking"`
+	} `json:"message"`
+}
+
 func (a ollamaAdapter) Name() aiProvider {
 	return providerOllama
 }
@@ -59,6 +69,12 @@ func (a ollamaAdapter) BuildPayload(aiCfg aiConfig, messages []message, tools []
 			Role:     msg.Role,
 			Content:  msg.Content,
 			ToolName: msg.ToolName,
+		}
+		// Echo a reasoning-only assistant turn back as a think-wrapped block so the
+		// continuation retry resumes the chain of thought instead of restarting it.
+		if msg.Role == "assistant" && len(msg.ToolCalls) == 0 &&
+			strings.TrimSpace(msg.Content) == "" && strings.TrimSpace(msg.Reasoning) != "" {
+			wireMsg.Content = reasoningEchoContent(msg.Reasoning)
 		}
 		if len(msg.ToolCalls) > 0 {
 			wireMsg.ToolCalls = make([]ollamaToolCall, 0, len(msg.ToolCalls))
@@ -96,6 +112,14 @@ func (a ollamaAdapter) ParseResponse(body []byte) (chatResponse, error) {
 	var parsed ollamaChatResponse
 	if err := json.Unmarshal(body, &parsed); err != nil {
 		return chatResponse{}, err
+	}
+	// Ollama thinking models emit the trace in message.thinking; capture it so a
+	// truncated (content-empty) turn can be continued rather than discarded.
+	if strings.TrimSpace(parsed.Message.Content) == "" && len(parsed.Message.ToolCalls) == 0 {
+		var thinking ollamaThinkingResponse
+		if err := json.Unmarshal(body, &thinking); err == nil {
+			parsed.Message.Reasoning = strings.TrimSpace(thinking.Message.Thinking)
+		}
 	}
 	return chatResponse{
 		Message: parsed.Message,

@@ -1,0 +1,17 @@
+{
+  "name": "calculator",
+  "version": "1.0.0",
+  "description": "Mathematical expression evaluator plugin for Ash",
+  "bin": {
+    "calculator": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "node dist/index.js --expr '2 + 2 * 3'",
+    "lint": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.0",
+    "typescript": "^5.7.3"
+  }
+}

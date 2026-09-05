@@ -1,0 +1,31 @@
+# ash command, tool, and plugin denylist
+#
+# This file allows you to explicitly block specific Unix commands, managed tools,
+# and native plugins from being executed by ash (via run_unix_command and
+# run_unix_pipeline), even if they appear in .ash_allow or are discovered in
+# ~/.ash/tools/ or ~/.ash/plugins/.
+#
+# Format rules:
+# - One command per line (preferred), or comma-separated on one line.
+# - Lines starting with # are comments and are ignored.
+# - Use bare executable or tool names only (no paths, no arguments).
+# - Empty lines are ignored.
+#
+# Precedence and Safety model:
+# - Denials take absolute precedence over allowlist rules: if a command is in
+#   both .ash_allow and .ash_deny, it is DENIED.
+# - The ASH_DENY environment variable (comma-separated) can also be used to
+#   specify denied commands.
+# - When you modify this file, ash install and update tools will not overwrite
+#   or reset your custom denylist rules.
+#
+# Examples:
+# To block macOS text-to-speech:
+#   say
+# To block a specific plugin:
+#   calculator
+# To block network diagnostics:
+#   ping6
+#   traceroute6
+#
+# List commands, tools, or plugins to deny below:

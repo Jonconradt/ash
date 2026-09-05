@@ -14,9 +14,9 @@ $:~ jon$ When is the next full moon?
   Based on the lunar cycle, a full moon occurs approximately 14-15 days after the first quarter. Given today's date is August 20, 2026, the next full moon is expected to occur around September 3-4, 2026.
 ```
 
-What if you want the AI to investigate a problem? The .ash_tools file is an allow list of unix commands the AI can use (and pipe together) to accomplish investigations.
+What if you want the AI to investigate a problem? The .ash_allow file is an allow list of unix commands, managed tools, and native plugins the AI can use (and pipe together) to accomplish investigations. You can also explicitly deny specific commands or tools using .ash_deny.
 
-What if you have a more complex question, something that needs to be computed? If you allow ash to expose Python the AI can write temporary scripts, or use scripts in the ~/.ash/tools directory to run complex processes.
+What if you have a more complex question, something that needs to be computed? If you allow ash to expose Python the AI can write temporary scripts, or use scripts in the ~/.ash/tools directory to run complex processes. You can also add compiled native plugins in Go, Rust, or TypeScript under ~/.ash/plugins/.
 
 What if the AI needs temporary notes, plans, script fragments, or small working files? Ash includes a managed scratch workspace under `~/.ash/scratch/<session-id>/` that is automatically scoped to the current session. The AI never needs to remember or pass the session ID; ash resolves it automatically. Scratch files are kept inside the managed workspace and are cleaned up on exit when a directory is older than 48 hours and has not been accessed in the last 24 hours.
 
@@ -40,7 +40,7 @@ inappropriate for accessibility, privacy, or automation reasons by setting
 
 What if I want to run a unix command that looks like a prompt, e.g. which ash? You can snooze ash with "ash snooze 5m" and it will not interpret your command line as a prompt.
 
-What if I am on MacOS and I want the results in my clipboard? Add pbcopy to .ash_tools. If you forget, ask the AI because it knows what to do.
+What if I am on MacOS and I want the results in my clipboard? Add pbcopy to .ash_allow. If you forget, ask the AI because it knows what to do.
 
 Where is the system prompt? Put your system prompt in ~/.ash/.ash_system. It supports replacement of environment variables.
 
@@ -295,7 +295,8 @@ Notes:
 - `AI` (legacy, unsupported): Deprecated and rejected; use `AI_ENDPOINT` and `AI_MODEL`.
 - `AI_TIMEOUT` (optional): AI request timeout. Default `3m`.
 - `ASH_HISTORY_MAX` (optional): Max retained history messages per key. Default `40`.
-- `ASH_TOOL_ALLOWLIST` (optional): Comma-separated allowlisted executables for `run_unix_command`; it overrides `.ash_tools` and does not expand Ash internal tokens.
+- `ASH_ALLOW` (optional): Comma-separated allowlisted executables for `run_unix_command`; it overrides `.ash_allow` and does not expand Ash internal tokens.
+- `ASH_DENY` (optional): Comma-separated denylist for commands, tools, and plugins; it overrides `.ash_deny`.
 - `ASH_TOOL_TIMEOUT` (optional): Timeout for local tool execution. Default `15s`.
 - `ASH_TOOL_OUTPUT_MAX` (optional): Max bytes captured from tool output. Default `8192`.
 - `ASH_MAX_TOOL_ITERS` (optional): Maximum AI tool-loop iterations. Default `16`.
@@ -336,7 +337,7 @@ Example `.ash_system` content:
 You are a concise shell assistant. Keep answers short and practical. 🙂
 ```
 
-`$TOOLS_DIR_LIST` and `$IF_PYTHON_AVAILABLE` are reserved internal Ash substitutions, not environment variables. Ash computes them before expanding ordinary environment variables. `$TOOLS_DIR_LIST` lists only allowed, regular files in `~/.ash/tools/` that have both a read bit and an execute bit set.
+`$TOOLS_DIR_LIST`, `$PLUGINS_DIR_LIST`, and `$IF_PYTHON_AVAILABLE` are reserved internal Ash substitutions, not environment variables. Ash computes them before expanding ordinary environment variables. `$TOOLS_DIR_LIST` lists only allowed regular files in `~/.ash/tools/` with read and execute bits. `$PLUGINS_DIR_LIST` lists allowed native plugins in `~/.ash/plugins/`.
 
 History is stored in:
 
@@ -386,7 +387,7 @@ ash install --shell bash --dry-run
 
 `ash install` is idempotent and appends a single managed block to your rc file.
 For bash it targets `~/.bashrc`; for zsh it targets `~/.zshrc`.
-During install, if `./.ash_system` or `./.ash_tools` exist in your current
+During install, if `./.ash_system`, `./.ash_allow`, or `./.ash_deny` exist in your current
 directory, they are copied into `~/.ash/` and become the canonical files used
 by `ash`.
 
@@ -466,10 +467,10 @@ Set allowlisted Unix executables with one of these methods:
 1. Environment variable override:
 
 ```bash
-export ASH_TOOL_ALLOWLIST="ls,ps,man,osascript"
+export ASH_ALLOW="ls,ps,man,osascript"
 ```
 
-1. Canonical config file `$HOME/.ash/.ash_tools`:
+1. Canonical config file `$HOME/.ash/.ash_allow`:
 
 ```text
 # one per line or comma-separated
@@ -479,9 +480,17 @@ man
 osascript
 ```
 
-If both are present, `ASH_TOOL_ALLOWLIST` wins.
+If both are present, `ASH_ALLOW` wins.
 
-The standalone `$TOOLS_DIR_LIST` line in `.ash_tools` is an internal Ash directive that allows eligible managed tool scripts. Replace that line with literal bare names for a fixed restrictive script policy. Install never silently broadens an existing custom policy; when interactive, it asks before adding newly bundled entries.
+The standalone `$TOOLS_DIR_LIST` and `$PLUGINS_DIR_LIST` lines in `.ash_allow` are internal Ash directives that allow eligible managed tool scripts and native plugins. Replace those lines with literal bare names for a fixed restrictive policy.
+
+1. Canonical denylist file `$HOME/.ash/.ash_deny`:
+
+```text
+# Block specific commands, tools, or plugins
+say
+calculator
+```
 
 ### Tool safety settings
 

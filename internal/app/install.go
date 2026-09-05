@@ -123,7 +123,7 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 				return 1
 			}
 			_, _ = fmt.Fprintf(stdout, "ash install already present in %s\n", rcPath)
-			_, _ = fmt.Fprintln(stdout, "synced .ash_system/.ash_tools to ~/.ash when present")
+			_, _ = fmt.Fprintln(stdout, "synced .ash_system/.ash_allow/.ash_deny to ~/.ash when present")
 			return 0
 		}
 
@@ -161,7 +161,7 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 		}
 
 		_, _ = fmt.Fprintf(stdout, "ash install updated wrappers in %s\n", rcPath)
-		_, _ = fmt.Fprintln(stdout, "synced .ash_system/.ash_tools to ~/.ash when present")
+		_, _ = fmt.Fprintln(stdout, "synced .ash_system/.ash_allow/.ash_deny to ~/.ash when present")
 		_, _ = fmt.Fprintln(stdout, "restart your shell or source your rc file to activate wrappers")
 		return 0
 	}
@@ -195,7 +195,7 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 	}
 
 	_, _ = fmt.Fprintf(stdout, "ash install appended wrappers to %s\n", rcPath)
-	_, _ = fmt.Fprintln(stdout, "synced .ash_system/.ash_tools to ~/.ash when present")
+	_, _ = fmt.Fprintln(stdout, "synced .ash_system/.ash_allow/.ash_deny to ~/.ash when present")
 	_, _ = fmt.Fprintln(stdout, "restart your shell or source your rc file to activate wrappers")
 	return 0
 }
@@ -209,11 +209,11 @@ func maybeAdoptBundledAllowlistEntries(stdout io.Writer, dryRun bool) error {
 	if err != nil {
 		return err
 	}
-	baseline, err := readEmbeddedBootstrapAsset("ash_bootstrap/.ash_tools")
+	baseline, err := readEmbeddedBootstrapAsset("ash_bootstrap/.ash_allow")
 	if err != nil {
 		return fmt.Errorf("read bundled allowlist: %w", err)
 	}
-	path := filepath.Join(root, toolsFileName)
+	path := filepath.Join(root, allowFileName)
 	missing, err := missingAllowlistAdditions(path, baseline)
 	if err != nil || len(missing) == 0 {
 		return err
@@ -221,7 +221,7 @@ func maybeAdoptBundledAllowlistEntries(stdout io.Writer, dryRun bool) error {
 	uistyle.PrintMenuTitle(stdout, "Update tool policy")
 	uistyle.PrintHint(stdout, "New bundled entries: "+strings.Join(missing, ", "))
 	uistyle.PrintHint(stdout, "Your existing policy is preserved unless you approve this addition.")
-	uistyle.PrintPrompt(stdout, "Add entries to .ash_tools? [y/N]")
+	uistyle.PrintPrompt(stdout, "Add entries to .ash_allow? [y/N]")
 	answer, err := bufio.NewReader(os.Stdin).ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
 		return err
@@ -230,10 +230,10 @@ func maybeAdoptBundledAllowlistEntries(stdout io.Writer, dryRun bool) error {
 		if err := syncAllowlistAdditions(path, baseline, stdout); err != nil {
 			return err
 		}
-		uistyle.PrintSuccess(stdout, "Updated .ash_tools with bundled entries")
+		uistyle.PrintSuccess(stdout, "Updated .ash_allow with bundled entries")
 		return nil
 	}
-	uistyle.PrintHint(stdout, "Kept existing .ash_tools policy")
+	uistyle.PrintHint(stdout, "Kept existing .ash_allow policy")
 	return nil
 }
 
@@ -540,7 +540,7 @@ func syncCanonicalConfigFilesFromCWD() error {
 		return err
 	}
 
-	for _, name := range []string{systemFileName, toolsFileName} {
+	for _, name := range []string{systemFileName, allowFileName, denyFileName} {
 		srcPath := filepath.Join(cwd, name)
 		content, readErr := osReadFile(srcPath)
 		if errors.Is(readErr, os.ErrNotExist) {

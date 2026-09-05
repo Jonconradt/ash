@@ -28,6 +28,21 @@ For a full release-style verification pass, run:
 make verify
 ```
 
+The lint/test/verify targets are quiet by default: each step prints a single
+`ok` line on success and dumps its full output only when it fails. To see the
+full streaming output while debugging, prefix the target with `V=1`:
+
+```bash
+make V=1 lint
+make V=1 test
+make V=1 verify
+```
+
+Note for CI: the `V=1` escape hatch can't be injected into an already-queued
+workflow run. If a CI step is flaky and you need its verbose log, edit the
+workflow's `run:` line (for example `make V=1 lint test`) and re-trigger the
+run rather than trying to attach `V=1` after the fact.
+
 ## Testing expectations
 
 - Add regression tests for new runtime behavior.

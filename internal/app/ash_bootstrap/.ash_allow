@@ -1,7 +1,7 @@
-# ash tool allowlist
+# ash command, tool, and plugin allowlist
 #
-# This file is read by ash to allow Unix command execution through the
-# run_unix_command tool.
+# This file is read by ash to allow Unix command execution, managed tools, and
+# native plugins through the run_unix_command and run_unix_pipeline tools.
 #
 # Format rules:
 # - One command per line (preferred), or comma-separated on one line.
@@ -14,16 +14,20 @@
 # - Avoid destructive tools (rm, mv, dd, chmod, chown, kill, sudo, etc).
 #
 # Notes:
-# - ASH_TOOL_ALLOWLIST environment variable overrides this file.
+# - ASH_ALLOW environment variable overrides this file.
+# - Any command, tool, or plugin listed in .ash_deny (or ASH_DENY) is blocked.
 # - python3 always runs through ash's dedicated run_python3 tool, never here.
 #
 # -----------------------------------------------------------------------------
-# Internet and current information search tools
+# Managed tools and native plugins
 # -----------------------------------------------------------------------------
-# $TOOLS_DIR_LIST is an internal Ash directive, not an environment variable. As a complete line,
-# it allows readable, executable regular files in ~/.ash/tools/. Replace it with literal bare names
-# to use a fixed, restrictive tool-script policy.
+# $TOOLS_DIR_LIST is an internal Ash directive that expands to eligible Python
+# scripts in ~/.ash/tools/.
 $TOOLS_DIR_LIST
+
+# $PLUGINS_DIR_LIST is an internal Ash directive that expands to eligible native
+# binary plugins in ~/.ash/plugins/.
+$PLUGINS_DIR_LIST
 
 # -----------------------------------------------------------------------------
 # Core shell information
@@ -148,21 +152,3 @@ say
 mdfind
 mdls
 sw_vers
-pbcopy
-
-# -----------------------------------------------------------------------------
-# scheduling utilities
-# -----------------------------------------------------------------------------
-launchctl
-
-
-
-
-# -----------------------------------------------------------------------------
-# Optional additions (uncomment only if desired)
-# -----------------------------------------------------------------------------
-# git
-# make
-# go
-# curl
-# wget

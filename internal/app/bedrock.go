@@ -95,6 +95,13 @@ func buildBedrockMessages(messages []message) ([]types.SystemContentBlock, []typ
 			if text := strings.TrimSpace(msg.Content); text != "" {
 				blocks = append(blocks, &types.ContentBlockMemberText{Value: text})
 			}
+			// Echo a reasoning-only assistant turn as text so the continuation retry
+			// resumes the chain of thought. A signed reasoning block would be ideal,
+			// but the signature is not captured at parse time, so text is the safe
+			// fallback that keeps the turn from being dropped entirely.
+			if len(msg.ToolCalls) == 0 && len(blocks) == 0 && strings.TrimSpace(msg.Reasoning) != "" {
+				blocks = append(blocks, &types.ContentBlockMemberText{Value: reasoningEchoContent(msg.Reasoning)})
+			}
 			for _, call := range msg.ToolCalls {
 				callID := strings.TrimSpace(call.ID)
 				if callID == "" {
@@ -143,6 +150,12 @@ func parseBedrockResponse(resp *bedrockruntime.ConverseOutput) chatResponse {
 			case *types.ContentBlockMemberText:
 				if text := strings.TrimSpace(b.Value); text != "" {
 					textParts = append(textParts, text)
+				}
+			case *types.ContentBlockMemberReasoningContent:
+				if rt, ok := b.Value.(*types.ReasoningContentBlockMemberReasoningText); ok {
+					if text := strings.TrimSpace(aws.ToString(rt.Value.Text)); text != "" {
+						assistant.Reasoning = text
+					}
 				}
 			case *types.ContentBlockMemberToolUse:
 				args := map[string]any{}

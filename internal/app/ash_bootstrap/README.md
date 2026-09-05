@@ -14,13 +14,15 @@ edit the copies under `~/.ash/`, which are overwritten on install/update.
 ## Runtime config templates
 
 - `.ash_env` — managed `AI_ENDPOINT`/`AI_MODEL`/`AI_AUTH_TOKEN`/PATH exports, written by `ash install`'s interactive/auto-detect flow.
-- `.ash_system` — default system prompt, supports `$IF_PYTHON_AVAILABLE` and `$VARIABLE` expansion.
-- `.ash_tools` — default tool allowlist.
+- `.ash_system` — default system prompt, supports `$IF_PYTHON_AVAILABLE`, `$TOOLS_DIR_LIST`, `$PLUGINS_DIR_LIST`, and `$VARIABLE` expansion.
+- `.ash_allow` — default command, tool, and plugin allowlist.
+- `.ash_deny` — default denylist for explicitly blocking specific executables, tools, and plugins.
 
 ## Prompt fragments
 
 - `prompt-instructions/python-available.txt`, `prompt-instructions/python-unavailable.txt` — conditional guidance spliced into the system prompt depending on whether a Python interpreter is available.
 
-## Bundled tools
+## Bundled tools and native plugins
 
 - `tools/` — Python scripts installed into `~/.ash/tools/` and made available to the model as callable tools (`headlines.py`, `wikipedia.py`, `yfinance.py`), plus `requirements.txt` and `test_tool_docs.py` (verifies each tool documents its own usage).
+- `plugins_src/` — Native plugins in Go, Rust, and TypeScript with dedicated Makefiles and source trees (`what_time_is_it`, `flip_a_coin`, `calculator`). Built into `~/.ash/plugins/`.

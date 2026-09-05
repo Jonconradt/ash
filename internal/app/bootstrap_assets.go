@@ -16,7 +16,8 @@ import (
 
 //go:embed ash_bootstrap/.ash_env
 //go:embed ash_bootstrap/.ash_system
-//go:embed ash_bootstrap/.ash_tools
+//go:embed ash_bootstrap/.ash_allow
+//go:embed ash_bootstrap/.ash_deny
 //go:embed ash_bootstrap/.ash_bashrc
 //go:embed ash_bootstrap/.ash_fish.fish
 //go:embed ash_bootstrap/.ash_zshrc
@@ -56,7 +57,8 @@ func installEmbeddedBootstrapAssets(overwrite bool, skipPath string, stdout io.W
 	}{
 		{srcPath: "ash_bootstrap/.ash_env", dstPath: filepath.Join(root, ".ash_env"), mode: 0o600},
 		{srcPath: "ash_bootstrap/.ash_system", dstPath: filepath.Join(root, systemFileName), mode: 0o600},
-		{srcPath: "ash_bootstrap/.ash_tools", dstPath: filepath.Join(root, toolsFileName), mode: 0o600},
+		{srcPath: "ash_bootstrap/.ash_allow", dstPath: filepath.Join(root, allowFileName), mode: 0o600},
+		{srcPath: "ash_bootstrap/.ash_deny", dstPath: filepath.Join(root, denyFileName), mode: 0o600},
 		{srcPath: "ash_bootstrap/.ash_bashrc", dstPath: filepath.Join(root, ".ash_bashrc"), mode: 0o600},
 		{srcPath: "ash_bootstrap/.ash_fish.fish", dstPath: filepath.Join(root, ".ash_fish.fish"), mode: 0o600},
 		{srcPath: "ash_bootstrap/.ash_zshrc", dstPath: filepath.Join(root, ".ash_zshrc"), mode: 0o600},
@@ -112,6 +114,11 @@ func installEmbeddedBootstrapAssets(overwrite bool, skipPath string, stdout io.W
 }
 
 func bootstrapAssetContent(srcPath, dstPath string, overwrite bool) ([]byte, error) {
+	if srcPath == "ash_bootstrap/.ash_deny" {
+		if content, err := osReadFile(dstPath); err == nil {
+			return content, nil
+		}
+	}
 	if srcPath != "ash_bootstrap/.ash_env" {
 		content, err := readEmbeddedBootstrapAsset(srcPath)
 		if err != nil {

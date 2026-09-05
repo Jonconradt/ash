@@ -53,6 +53,10 @@ func (a googleAdapter) Send(ctx context.Context, aiCfg aiConfig, messages []mess
 		default:
 			if text := strings.TrimSpace(msg.Content); text != "" {
 				contents = append(contents, genai.NewContentFromText(text, googleContentRole(msg.Role)))
+			} else if msg.Role == "assistant" && len(msg.ToolCalls) == 0 && strings.TrimSpace(msg.Reasoning) != "" {
+				// Echo a reasoning-only assistant turn as text so the continuation retry
+				// resumes the chain of thought instead of dropping the turn entirely.
+				contents = append(contents, genai.NewContentFromText(reasoningEchoContent(msg.Reasoning), genai.RoleModel))
 			}
 			for _, call := range msg.ToolCalls {
 				contents = append(contents, genai.NewContentFromFunctionCall(call.Function.Name, call.Function.Arguments, genai.RoleModel))
@@ -109,6 +113,12 @@ func parseGoogleResponse(resp *genai.GenerateContentResponse) message {
 			continue
 		}
 		if text := strings.TrimSpace(part.Text); text != "" {
+			// Gemini marks thought parts with Thought=true; capture the trace so a
+			// truncated (content-empty) turn can be continued rather than discarded.
+			if part.Thought {
+				assistant.Reasoning = strings.TrimSpace(assistant.Reasoning + "\n" + text)
+				continue
+			}
 			textParts = append(textParts, text)
 		}
 		if part.FunctionCall != nil {

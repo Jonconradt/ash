@@ -56,15 +56,14 @@ func formatUntrustedEvidenceBlock(kind, source, content string) string {
 	)
 }
 
-// buildSystemPrompt creates the system prompt prefix that includes the current local time and the user's request.
+// buildSystemPrompt creates the system prompt prefix that includes guidance and the user's request.
 func buildSystemPrompt(userPrompt string, now time.Time) string {
-	header := fmt.Sprintf("Current local datetime: %s", now.Format(time.RFC3339))
 	guidance := subAgentSystemGuidance()
 	trimmed := strings.TrimSpace(userPrompt)
 	if trimmed == "" {
-		return header + "\n\n" + guidance
+		return guidance
 	}
-	return header + "\n\n" + guidance + "\n\n" + trimmed
+	return guidance + "\n\n" + trimmed
 }
 
 func subAgentSystemGuidance() string {

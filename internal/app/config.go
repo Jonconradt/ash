@@ -316,6 +316,13 @@ func loadAllowlistedCommands() (map[string]struct{}, error) {
 	if err != nil {
 		return nil, err
 	}
+	denied, err := loadDenylistedCommands()
+	if err != nil {
+		return nil, err
+	}
+	for item := range denied {
+		delete(allowed, item)
+	}
 	// python3 has its own scratch-scoped tool (run_python3); dropping it here
 	// stops the model from bypassing that tool via run_unix_command/run_unix_pipeline.
 	if pythonExecutionAvailable() {
@@ -324,16 +331,21 @@ func loadAllowlistedCommands() (map[string]struct{}, error) {
 	return allowed, nil
 }
 
-// loadAllowlistedCommandsFromSource resolves the raw allowlist from env, cwd, or home, before any post-processing.
-func loadAllowlistedCommandsFromSource() (map[string]struct{}, error) {
-	if raw := strings.TrimSpace(os.Getenv("ASH_TOOL_ALLOWLIST")); raw != "" {
+// loadDenylistedCommands loads denied commands and tools from environment or files.
+func loadDenylistedCommands() (map[string]struct{}, error) {
+	return loadDenylistedCommandsFromSource()
+}
+
+// loadDenylistedCommandsFromSource resolves the raw denylist from env, cwd, or home.
+func loadDenylistedCommandsFromSource() (map[string]struct{}, error) {
+	if raw := strings.TrimSpace(os.Getenv("ASH_DENY")); raw != "" {
 		return parseAllowlistCSV(raw), nil
 	}
 
 	if root, err := ashWorkspaceDir(); err == nil {
-		canonicalPath := filepath.Join(root, toolsFileName)
+		canonicalPath := filepath.Join(root, denyFileName)
 		if content, err := osReadFile(canonicalPath); err == nil {
-			return parseAllowlistFileWithToolDirectoryList(string(content))
+			return parseDenylistFile(string(content)), nil
 		} else if !errors.Is(err, os.ErrNotExist) {
 			return nil, err
 		}
@@ -344,9 +356,9 @@ func loadAllowlistedCommandsFromSource() (map[string]struct{}, error) {
 		return nil, err
 	}
 
-	cwdPath := filepath.Join(cwd, toolsFileName)
+	cwdPath := filepath.Join(cwd, denyFileName)
 	if content, err := osReadFile(cwdPath); err == nil {
-		return parseAllowlistFileWithToolDirectoryList(string(content))
+		return parseDenylistFile(string(content)), nil
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
@@ -356,14 +368,75 @@ func loadAllowlistedCommandsFromSource() (map[string]struct{}, error) {
 		return nil, err
 	}
 
-	homePath := filepath.Join(home, toolsFileName)
+	homePath := filepath.Join(home, denyFileName)
 	if content, err := osReadFile(homePath); err == nil {
-		return parseAllowlistFileWithToolDirectoryList(string(content))
+		return parseDenylistFile(string(content)), nil
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
 	}
 
 	return map[string]struct{}{}, nil
+}
+
+// loadAllowlistedCommandsFromSource resolves the raw allowlist from env, cwd, or home, before any post-processing.
+func loadAllowlistedCommandsFromSource() (map[string]struct{}, error) {
+	if raw := strings.TrimSpace(os.Getenv("ASH_ALLOW")); raw != "" {
+		return parseAllowlistCSV(raw), nil
+	}
+
+	if root, err := ashWorkspaceDir(); err == nil {
+		canonicalPath := filepath.Join(root, allowFileName)
+		if content, err := osReadFile(canonicalPath); err == nil {
+			return parseAllowlistFileWithTokens(string(content))
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
+	}
+
+	cwd, err := osGetwd()
+	if err != nil {
+		return nil, err
+	}
+
+	cwdPath := filepath.Join(cwd, allowFileName)
+	if content, err := osReadFile(cwdPath); err == nil {
+		return parseAllowlistFileWithTokens(string(content))
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+
+	home, err := osUserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+
+	homePath := filepath.Join(home, allowFileName)
+	if content, err := osReadFile(homePath); err == nil {
+		return parseAllowlistFileWithTokens(string(content))
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+
+	return map[string]struct{}{}, nil
+}
+
+// parseDenylistFile parses and validates denylist entries.
+func parseDenylistFile(raw string) map[string]struct{} {
+	set := map[string]struct{}{}
+	for _, line := range strings.Split(raw, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			continue
+		}
+		for _, token := range strings.Split(trimmed, ",") {
+			name := normalizeToolName(token)
+			if name == "" {
+				continue
+			}
+			set[name] = struct{}{}
+		}
+	}
+	return set
 }
 
 // parseAllowlistCSV parses and validates input values.
@@ -384,7 +457,7 @@ func parseAllowlistFile(raw string) map[string]struct{} {
 	set := map[string]struct{}{}
 	for _, line := range strings.Split(raw, "\n") {
 		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.Contains(trimmed, toolsDirListToken) || strings.HasPrefix(trimmed, "#") {
+		if trimmed == "" || strings.Contains(trimmed, toolsDirListToken) || strings.Contains(trimmed, pluginsDirListToken) || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
 		for _, token := range strings.Split(trimmed, ",") {
@@ -398,19 +471,31 @@ func parseAllowlistFile(raw string) map[string]struct{} {
 	return set
 }
 
-// parseAllowlistFileWithToolDirectoryList expands the Ash-owned standalone marker only in files.
-func parseAllowlistFileWithToolDirectoryList(raw string) (map[string]struct{}, error) {
+// parseAllowlistFileWithTokens expands internal Ash tokens only in non-strict files.
+func parseAllowlistFileWithTokens(raw string) (map[string]struct{}, error) {
 	set := parseAllowlistFile(raw)
+	if strictSecurityModeEnabled() {
+		return set, nil
+	}
 	for _, line := range strings.Split(raw, "\n") {
-		if strings.TrimSpace(line) != toolsDirListToken {
-			continue
+		trimmed := strings.TrimSpace(line)
+		if trimmed == toolsDirListToken {
+			tools, err := eligibleToolScripts()
+			if err != nil {
+				return nil, err
+			}
+			for _, tool := range tools {
+				set[tool] = struct{}{}
+			}
 		}
-		tools, err := eligibleToolScripts()
-		if err != nil {
-			return nil, err
-		}
-		for _, tool := range tools {
-			set[tool] = struct{}{}
+		if trimmed == pluginsDirListToken {
+			plugins, err := eligiblePlugins()
+			if err != nil {
+				return nil, err
+			}
+			for _, plugin := range plugins {
+				set[plugin] = struct{}{}
+			}
 		}
 	}
 	return set, nil
@@ -419,7 +504,7 @@ func parseAllowlistFileWithToolDirectoryList(raw string) (map[string]struct{}, e
 // normalizeToolName trims whitespace and rejects slash-delimited or dot-prefixed (hidden) values so tool names remain canonical.
 func normalizeToolName(value string) string {
 	trimmed := strings.TrimSpace(value)
-	if trimmed == "" || trimmed == toolsDirListToken || strings.Contains(trimmed, "/") || strings.HasPrefix(trimmed, ".") {
+	if trimmed == "" || trimmed == toolsDirListToken || trimmed == pluginsDirListToken || strings.Contains(trimmed, "/") || strings.HasPrefix(trimmed, ".") {
 		return ""
 	}
 	return trimmed
@@ -430,6 +515,8 @@ const (
 	pythonUnavailableInstructionsPath = "ash_bootstrap/prompt-instructions/python-unavailable.txt"
 	// #nosec G101 -- this is an internal prompt placeholder, not a credential.
 	toolsDirListToken = "$TOOLS_DIR_LIST"
+	// #nosec G101 -- this is an internal prompt placeholder, not a credential.
+	pluginsDirListToken = "$PLUGINS_DIR_LIST"
 )
 
 // expandSystemPrompt injects conditional guidance, strips source comments, and expands runtime values.
@@ -450,6 +537,7 @@ func expandSystemPromptWithAllowlist(prompt string, allowlist map[string]struct{
 	prompt = strings.ReplaceAll(prompt, "$IF_PYTHON_AVAILABLE", string(instructions))
 	prompt = stripSystemPromptComments(prompt)
 	prompt = strings.ReplaceAll(prompt, toolsDirListToken, renderEligibleToolScripts(allowlist))
+	prompt = strings.ReplaceAll(prompt, pluginsDirListToken, renderEligiblePlugins(allowlist))
 
 	unameValue := ""
 	if _, err := execLookPath("uname"); err == nil {
@@ -517,6 +605,77 @@ func renderEligibleToolScripts(allowlist map[string]struct{}) string {
 		return "No eligible managed tool scripts are currently allowed."
 	}
 	return strings.Join(allowed, ", ")
+}
+
+// eligiblePlugins returns readable, executable regular files in Ash's managed plugins directory.
+func eligiblePlugins() ([]string, error) {
+	root, err := ashWorkspaceDir()
+	if err != nil {
+		return nil, err
+	}
+	entries, err := os.ReadDir(filepath.Join(root, "plugins"))
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	plugins := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || normalizeToolName(entry.Name()) != entry.Name() {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return nil, err
+		}
+		mode := info.Mode()
+		if !mode.IsRegular() || mode.Perm()&0o444 == 0 || mode.Perm()&0o111 == 0 {
+			continue
+		}
+		plugins = append(plugins, entry.Name())
+	}
+	sort.Strings(plugins)
+	return plugins, nil
+}
+
+func renderEligiblePlugins(allowlist map[string]struct{}) string {
+	plugins, err := eligiblePlugins()
+	if err != nil || len(plugins) == 0 {
+		return "No eligible native plugins are currently available."
+	}
+	allowed := make([]string, 0, len(plugins))
+	for _, plugin := range plugins {
+		if _, ok := allowlist[plugin]; ok {
+			allowed = append(allowed, plugin)
+		}
+	}
+	if len(allowed) == 0 {
+		return "No eligible native plugins are currently allowed."
+	}
+	return strings.Join(allowed, ", ")
+}
+
+// managedNativePlugin resolves an installed plugin name to its executable path in ~/.ash/plugins/.
+func managedNativePlugin(name string) (string, bool) {
+	if normalizeToolName(name) != name {
+		return "", false
+	}
+	root, err := ashWorkspaceDir()
+	if err != nil {
+		return "", false
+	}
+	pluginPath := filepath.Join(root, "plugins", name)
+	info, err := os.Stat(pluginPath)
+	if err != nil || info.IsDir() {
+		return "", false
+	}
+	mode := info.Mode()
+	if !mode.IsRegular() || mode.Perm()&0o444 == 0 || mode.Perm()&0o111 == 0 {
+		return "", false
+	}
+	return pluginPath, true
 }
 
 func stripSystemPromptComments(prompt string) string {

@@ -77,6 +77,10 @@ func buildCohereMessages(messages []message) cohere.ChatMessages {
 			assistant := &cohere.AssistantMessage{}
 			if text := strings.TrimSpace(msg.Content); text != "" {
 				assistant.Content = &cohere.AssistantMessageV2Content{String: text}
+			} else if len(msg.ToolCalls) == 0 && strings.TrimSpace(msg.Reasoning) != "" {
+				// Echo a reasoning-only assistant turn as text so the continuation retry
+				// resumes the chain of thought instead of sending an empty message.
+				assistant.Content = &cohere.AssistantMessageV2Content{String: reasoningEchoContent(msg.Reasoning)}
 			}
 			for _, call := range msg.ToolCalls {
 				callID := strings.TrimSpace(call.ID)
