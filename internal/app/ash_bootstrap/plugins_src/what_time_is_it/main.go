@@ -30,7 +30,7 @@ func (t *timePlugin) AIDocs() string {
 			"Support specific IANA timezone conversions.",
 		},
 		"Arguments": map[string]string{
-			"--format":   "Output format: 'rfc3339' (default), 'unix', 'utc', 'human', or 'json'",
+			"--format":   "Output format: 'json' (default), 'human', 'rfc3339', 'unix', or 'utc'",
 			"--timezone": "Optional IANA timezone location such as 'America/New_York', 'UTC', or 'local' (default: local)",
 			"--ai-docs":  "Print this documentation and exit",
 			"--version":  "Print version and exit",
@@ -38,13 +38,17 @@ func (t *timePlugin) AIDocs() string {
 		},
 		"Return format": map[string]string{
 			"status":         "success or error",
-			"iso8601":        "RFC3339 timestamp in target timezone",
+			"local_time":     "Current local 12-hour time with AM/PM (e.g. '5:15:30 PM')",
+			"local_time_24h": "Current local 24-hour time (e.g. '17:15:30')",
+			"local_date":     "Current local date (e.g. 'Saturday, September 5, 2026')",
+			"local_datetime": "Full human-readable local date, time, and timezone",
+			"timezone":       "Local timezone abbreviation (e.g. 'EDT', 'PST')",
+			"iso8601":        "RFC3339 timestamp in local timezone",
 			"utc_iso8601":    "RFC3339 timestamp in UTC",
 			"unix_timestamp": "seconds since Unix epoch",
-			"timezone":       "active timezone name",
-			"human_readable": "formatted date and time string",
+			"human_readable": "Full formatted date and time string in local timezone",
 		},
-		"Usage guidance for the AI": "Use what_time_is_it when you need the current date, time, or day of the week instead of guessing.",
+		"Usage guidance for the AI": "When asked for the current time or date, ALWAYS report the local time (from 'local_time' or 'local_datetime' and 'timezone'). Do not convert from UTC or assume a different timezone unless the user explicitly requested a specific timezone.",
 	}
 	bytes, err := json.MarshalIndent(docs, "", "  ")
 	if err != nil {
@@ -59,7 +63,7 @@ func (t *timePlugin) Run(ctx context.Context, args []string, stdout, stderr io.W
 	flags := flag.NewFlagSet("what_time_is_it", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 
-	format := flags.String("format", "json", "Output format: json, rfc3339, unix, utc, human")
+	format := flags.String("format", "json", "Output format: json, human, rfc3339, unix, utc")
 	tzName := flags.String("timezone", "local", "Timezone location name")
 
 	if err := flags.Parse(args); err != nil {
@@ -102,17 +106,21 @@ func (t *timePlugin) Run(ctx context.Context, args []string, stdout, stderr io.W
 	case "utc":
 		_, _ = fmt.Fprintln(stdout, now.UTC().Format(time.RFC3339))
 	case "human":
-		_, _ = fmt.Fprintln(stdout, nowInLoc.Format("Monday, January 2, 2006 15:04:05 MST"))
+		_, _ = fmt.Fprintln(stdout, nowInLoc.Format("Monday, January 2, 2006 3:04:05 PM MST"))
 	case "json":
 		fallthrough
 	default:
 		payload := map[string]any{
 			"status":         "success",
+			"local_time":     nowInLoc.Format("3:04:05 PM"),
+			"local_time_24h": nowInLoc.Format("15:04:05"),
+			"local_date":     nowInLoc.Format("Monday, January 2, 2006"),
+			"local_datetime": nowInLoc.Format("Monday, January 2, 2006 3:04:05 PM MST"),
+			"timezone":       zoneName,
 			"iso8601":        nowInLoc.Format(time.RFC3339),
 			"utc_iso8601":    now.UTC().Format(time.RFC3339),
 			"unix_timestamp": nowInLoc.Unix(),
-			"timezone":       zoneName,
-			"human_readable": nowInLoc.Format("Monday, January 2, 2006 15:04:05 MST"),
+			"human_readable": nowInLoc.Format("Monday, January 2, 2006 3:04:05 PM MST"),
 		}
 		data, err := json.MarshalIndent(payload, "", "  ")
 		if err != nil {

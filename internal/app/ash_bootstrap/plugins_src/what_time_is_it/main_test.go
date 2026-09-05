@@ -58,6 +58,12 @@ func TestPluginRunFormats(t *testing.T) {
 				if res["status"] != "success" {
 					t.Errorf("expected status success, got %v", res["status"])
 				}
+				if _, ok := res["local_time"]; !ok {
+					t.Errorf("missing local_time in JSON output")
+				}
+				if _, ok := res["local_datetime"]; !ok {
+					t.Errorf("missing local_datetime in JSON output")
+				}
 				if _, ok := res["iso8601"]; !ok {
 					t.Errorf("missing iso8601 in JSON output")
 				}
