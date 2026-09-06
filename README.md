@@ -134,6 +134,12 @@ download against the release `SHA256SUMS` manifest and installs `ash` to
 `~/.local/bin` without requiring `sudo`. Set `ASH_INSTALL_DIR` to choose a
 different destination when needed.
 
+| OS | amd64 | arm64 |
+|---|---|---|
+| macOS (darwin) | ✅ | ✅ |
+| Linux | ✅ | ✅ |
+| FreeBSD | ✅ | ❌ |
+
 The installer runs `ash install` for the detected shell. Bash, zsh, and Fish are
 detected; unknown shells default to bash. Fish uses its standard
 `$XDG_CONFIG_HOME/fish/config.fish` path (defaulting to `~/.config/fish/config.fish`).
