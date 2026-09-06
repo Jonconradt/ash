@@ -50,6 +50,7 @@ RELEASE_NOTES_PATH ?= $(RELEASE_OUTPUT_DIR)/release-notes.md
 RELEASE_NOTES_ATTEMPTS ?= 5
 RELEASE_ARTIFACT_BASE ?= $(APP_NAME)-$(RELEASE_VERSION)-$(RELEASE_GOOS)-$(RELEASE_ARCH)
 RELEASE_BINARY_PATH ?= $(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)
+RELEASE_PLUGINS_BIN_DIR ?= $(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)-plugins
 
 all: verify install
 
@@ -85,7 +86,7 @@ plugins-build:
 	@mkdir -p "$(PLUGINS_BIN_DIR)"
 	@for dir in $(PLUGINS_SRC_DIR)/*; do \
 		if [ -f "$$dir/Makefile" ]; then \
-			./scripts/dev/run-quiet.sh "plugin-build:$$(basename $$dir)" $(MAKE) -C "$$dir" build || exit 1; \
+			./scripts/dev/run-quiet.sh "plugin-build:$$(basename $$dir)" $(MAKE) -C "$$dir" build BUILD_DIR="$(abspath $(PLUGINS_BIN_DIR))" || exit 1; \
 		fi; \
 	done
 	@echo "plugins-build: ok"
@@ -237,6 +238,7 @@ release-build-one:
 	@mkdir -p "$(RELEASE_OUTPUT_DIR)"
 	GOOS=$(RELEASE_GOOS) GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X ash/internal/app.ashVersion=$(RELEASE_VERSION) -X ash/internal/app.ashCommit=$(RELEASE_COMMIT)" -o "$(RELEASE_BINARY_PATH)" ./cmd/ash
 	GOOS=$(RELEASE_GOOS) GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "$(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)-broker" ./cmd/ash-broker
+	$(MAKE) plugins-build PLUGINS_BIN_DIR="$(RELEASE_PLUGINS_BIN_DIR)"
 
 release-pkg:
 	@mkdir -p "$(RELEASE_PACKAGE_DIR)"
@@ -296,13 +298,19 @@ release-pkg-one:
 				echo "man page not found: $(MAN_PAGE_PATH)"; \
 				exit 1; \
 			fi; \
+			if [[ ! -d "$(RELEASE_PLUGINS_BIN_DIR)" ]] || [[ -z "$$(find "$(RELEASE_PLUGINS_BIN_DIR)" -maxdepth 1 -type f -perm -111 -print -quit)" ]]; then \
+				echo "release plugins not found: $(RELEASE_PLUGINS_BIN_DIR)"; \
+				exit 1; \
+			fi; \
 			tmp_dir="$$(mktemp -d)"; \
 			trap 'rm -rf "$$tmp_dir"' EXIT; \
 			cp "$(RELEASE_BINARY_PATH)" "$$tmp_dir/$(notdir $(RELEASE_BINARY_PATH))"; \
 			cp "$(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)-broker" "$$tmp_dir/$(APP_NAME)-broker"; \
 			mkdir -p "$$tmp_dir/$(TARBALL_MAN_PATH)"; \
 			install -m 0644 "$(MAN_PAGE_PATH)" "$$tmp_dir/$(TARBALL_MAN_PATH)/$(APP_NAME).1"; \
-			tar -C "$$tmp_dir" -czf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" "$(notdir $(RELEASE_BINARY_PATH))" "$(APP_NAME)-broker" "$(TARBALL_MAN_PATH)/$(APP_NAME).1"; \
+			mkdir -p "$$tmp_dir/plugins"; \
+			find "$(RELEASE_PLUGINS_BIN_DIR)" -maxdepth 1 -type f -perm -111 -exec cp {} "$$tmp_dir/plugins/" \;; \
+			tar -C "$$tmp_dir" -czf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" "$(notdir $(RELEASE_BINARY_PATH))" "$(APP_NAME)-broker" "$(TARBALL_MAN_PATH)/$(APP_NAME).1" "plugins"; \
 			;; \
 		*) \
 			echo "unsupported RELEASE_FORMAT=$(RELEASE_FORMAT)"; \
@@ -348,6 +356,7 @@ release-validate-one:
 			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^$(notdir $(RELEASE_BINARY_PATH))$$"; \
 			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^$(APP_NAME)-broker$$"; \
 			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^$(TARBALL_MAN_PATH)/$(APP_NAME)\.1$$"; \
+			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^plugins/[^/]+$$"; \
 			shasum -a 256 "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" > "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz.sha256"; \
 			;; \
 		*) \

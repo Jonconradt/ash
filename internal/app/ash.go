@@ -56,6 +56,7 @@ const (
 	systemFileName                    = ".ash_system"
 	allowFileName                     = ".ash_allow"
 	denyFileName                      = ".ash_deny"
+	legacyToolsFileName               = ".ash_tools"
 	ashWorkspaceDirName               = workspace.DirName
 	inventoryFileName                 = "inventory.md"
 	schedulerLogDirName               = "logs"

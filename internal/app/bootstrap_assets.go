@@ -18,6 +18,7 @@ import (
 //go:embed ash_bootstrap/.ash_system
 //go:embed ash_bootstrap/.ash_allow
 //go:embed ash_bootstrap/.ash_deny
+//go:embed ash_bootstrap/.ash_tools
 //go:embed ash_bootstrap/.ash_bashrc
 //go:embed ash_bootstrap/.ash_fish.fish
 //go:embed ash_bootstrap/.ash_zshrc
@@ -85,6 +86,9 @@ func installEmbeddedBootstrapAssets(overwrite bool, skipPath string, stdout io.W
 	}
 	if err := installManagedAssetFile(filepath.Join(root, ".ash_fish_env.fish"), buildFishEnvironmentFile(string(envContent)), true, 0o600, stdout, false); err != nil {
 		return err
+	}
+	if err := osMkdirAll(filepath.Join(root, "plugins"), 0o700); err != nil {
+		return fmt.Errorf("create managed plugins directory: %w", err)
 	}
 
 	entries, err := fs.ReadDir(embeddedBootstrapAssets, "ash_bootstrap/tools")

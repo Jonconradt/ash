@@ -1,6 +1,8 @@
 package app
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -54,6 +56,37 @@ func TestStreamingEnabled(t *testing.T) {
 				t.Fatalf("streamingEnabled() with ASH_STREAM=%q = %v, want %v", tt.env, got, tt.want)
 			}
 		})
+	}
+}
+
+func TestLoadAllowlistedCommandsFallsBackToLegacyAshTools(t *testing.T) {
+	home := t.TempDir()
+	cwd := t.TempDir()
+	originalCwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(originalCwd) })
+	if err := os.Chdir(cwd); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("HOME", home)
+	t.Setenv("ASH_ALLOW", "")
+	t.Setenv("ASH_DENY", "")
+	workspace := filepath.Join(home, ashWorkspaceDirName)
+	if err := os.MkdirAll(workspace, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(workspace, legacyToolsFileName), []byte("ls\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	allowed, err := loadAllowlistedCommands()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := allowed["ls"]; !ok {
+		t.Fatalf("expected ls from legacy %s fallback", legacyToolsFileName)
 	}
 }
 

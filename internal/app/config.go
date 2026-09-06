@@ -391,6 +391,12 @@ func loadAllowlistedCommandsFromSource() (map[string]struct{}, error) {
 		} else if !errors.Is(err, os.ErrNotExist) {
 			return nil, err
 		}
+		legacyPath := filepath.Join(root, legacyToolsFileName)
+		if content, err := osReadFile(legacyPath); err == nil {
+			return parseAllowlistFileWithTokens(string(content))
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return nil, err
+		}
 	}
 
 	cwd, err := osGetwd()
@@ -412,6 +418,13 @@ func loadAllowlistedCommandsFromSource() (map[string]struct{}, error) {
 
 	homePath := filepath.Join(home, allowFileName)
 	if content, err := osReadFile(homePath); err == nil {
+		return parseAllowlistFileWithTokens(string(content))
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, err
+	}
+
+	legacyHomePath := filepath.Join(home, legacyToolsFileName)
+	if content, err := osReadFile(legacyHomePath); err == nil {
 		return parseAllowlistFileWithTokens(string(content))
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, err

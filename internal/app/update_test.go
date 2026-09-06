@@ -245,12 +245,14 @@ func TestInstallUpgradeArchiveInstallsAshAndBroker(t *testing.T) {
 	tarWriter := tar.NewWriter(gzipWriter)
 	ash := []byte("#!/bin/sh\nmkdir -p \"$2\"\nfor asset in .ash_env .ash_allow .ash_deny .ash_bashrc .ash_zshrc .ash_system; do\n  printf candidate > \"$2/$asset\"\ndone\n")
 	broker := []byte("new ash-broker binary")
+	plugin := []byte("#!/bin/sh\nprintf plugin\n")
 	for _, entry := range []struct {
 		name string
 		data []byte
 	}{
 		{name: "ash", data: ash},
 		{name: "ash-broker", data: broker},
+		{name: "plugins/calculator", data: plugin},
 	} {
 		if err := tarWriter.WriteHeader(&tar.Header{Name: entry.name, Mode: 0o755, Size: int64(len(entry.data))}); err != nil {
 			t.Fatal(err)
@@ -278,8 +280,9 @@ func TestInstallUpgradeArchiveInstallsAshAndBroker(t *testing.T) {
 		t.Fatalf("installUpgradeArchive() error = %v", err)
 	}
 	for path, want := range map[string][]byte{
-		filepath.Join(home, ".local", "bin", "ash"):        ash,
-		filepath.Join(home, ".local", "bin", "ash-broker"): broker,
+		filepath.Join(home, ".local", "bin", "ash"):                       ash,
+		filepath.Join(home, ".local", "bin", "ash-broker"):                broker,
+		filepath.Join(home, ashWorkspaceDirName, "plugins", "calculator"): plugin,
 	} {
 		got, err := os.ReadFile(path)
 		if err != nil {
@@ -295,6 +298,78 @@ func TestInstallUpgradeArchiveInstallsAshAndBroker(t *testing.T) {
 		if info.Mode().Perm() != 0o755 {
 			t.Errorf("%s mode = %o, want 755", path, info.Mode().Perm())
 		}
+	}
+	pluginsInfo, err := os.Stat(filepath.Join(home, ashWorkspaceDirName, "plugins"))
+	if err != nil {
+		t.Fatalf("expected plugins directory to be created: %v", err)
+	}
+	if !pluginsInfo.IsDir() {
+		t.Fatal("expected plugins path to be a directory")
+	}
+}
+
+func TestInstallUpgradeArchiveRollbackKeepsPreviousBinaryExecutable(t *testing.T) {
+	var archive bytes.Buffer
+	gzipWriter := gzip.NewWriter(&archive)
+	tarWriter := tar.NewWriter(gzipWriter)
+	ash := []byte("#!/bin/sh\nmkdir -p \"$2\"\nprintf candidate > \"$2/.ash_env\"\n")
+	if err := tarWriter.WriteHeader(&tar.Header{Name: "ash", Mode: 0o755, Size: int64(len(ash))}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tarWriter.Write(ash); err != nil {
+		t.Fatal(err)
+	}
+	if err := tarWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gzipWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	home := t.TempDir()
+	binDir := filepath.Join(home, ".local", "bin")
+	if err := os.MkdirAll(binDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	previous := []byte("previous ash binary")
+	destination := filepath.Join(binDir, "ash")
+	if err := os.WriteFile(destination, previous, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	originalHome := osUserHomeDir
+	osUserHomeDir = func() (string, error) { return home, nil }
+	t.Cleanup(func() { osUserHomeDir = originalHome })
+
+	if err := installUpgradeArchive(archive.Bytes(), "v1.2.3", upgradeOptions{replace: true}, &bytes.Buffer{}); err == nil {
+		t.Fatal("installUpgradeArchive() succeeded with incomplete candidate assets")
+	}
+	got, err := os.ReadFile(destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(got, previous) {
+		t.Fatalf("rollback content = %q, want %q", got, previous)
+	}
+	info, err := os.Stat(destination)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o700 {
+		t.Fatalf("rollback mode = %o, want 700", info.Mode().Perm())
+	}
+}
+
+func TestExportUpgradeAssetsIncludesLegacyToolsForOldUpdaters(t *testing.T) {
+	candidate := t.TempDir()
+	if err := exportUpgradeAssets("", candidate); err != nil {
+		t.Fatal(err)
+	}
+	content, err := os.ReadFile(filepath.Join(candidate, legacyToolsFileName))
+	if err != nil {
+		t.Fatalf("expected legacy tools asset to be exported: %v", err)
+	}
+	if bytes.Contains(content, []byte(pluginsDirListToken)) {
+		t.Fatalf("legacy tools asset must not contain %s", pluginsDirListToken)
 	}
 }
 

@@ -512,10 +512,13 @@ func installUpgradeArchive(content []byte, version string, options upgradeOption
 	}
 	if err := syncUpgradeAssets(candidateAssets, options, stdout); err != nil {
 		if hadPreviousBinary {
-			_ = writeUpgradeAsset(destination, previousBinary, false)
+			_ = writeUpgradeAsset(destination, previousBinary, true)
 		} else {
 			_ = os.Remove(destination)
 		}
+		return err
+	}
+	if err := syncUpgradePlugins(filepath.Join(staging, "plugins"), home, stdout); err != nil {
 		return err
 	}
 	restartStaleBrokerDaemons(destinationDir)
@@ -586,6 +589,7 @@ func exportUpgradeAssets(binaryPath, destination string) error {
 		{source: "ash_bootstrap/.ash_env", name: ".ash_env"},
 		{source: "ash_bootstrap/.ash_allow", name: ".ash_allow"},
 		{source: "ash_bootstrap/.ash_deny", name: ".ash_deny"},
+		{source: "ash_bootstrap/.ash_tools", name: legacyToolsFileName},
 		{source: "ash_bootstrap/.ash_bashrc", name: ".ash_bashrc"},
 		{source: "ash_bootstrap/.ash_zshrc", name: ".ash_zshrc"},
 		{source: "ash_bootstrap/.ash_system", name: ".ash_system"},
@@ -615,6 +619,9 @@ func syncUpgradeAssets(candidateRoot string, options upgradeOptions, stdout io.W
 	destinationRoot := filepath.Join(home, ashWorkspaceDirName)
 	if err := os.MkdirAll(destinationRoot, 0o700); err != nil {
 		return err
+	}
+	if err := os.MkdirAll(filepath.Join(destinationRoot, "plugins"), 0o700); err != nil {
+		return fmt.Errorf("create managed plugins directory: %w", err)
 	}
 	assets := []string{".ash_env", ".ash_allow", ".ash_deny", ".ash_bashrc", ".ash_zshrc", ".ash_system"}
 	var reader *bufio.Reader
@@ -700,6 +707,40 @@ func syncUpgradeAssets(candidateRoot string, options upgradeOptions, stdout io.W
 	return nil
 }
 
+func syncUpgradePlugins(candidateRoot, home string, stdout io.Writer) error {
+	destinationRoot := filepath.Join(home, ashWorkspaceDirName, "plugins")
+	if err := os.MkdirAll(destinationRoot, 0o700); err != nil {
+		return err
+	}
+	entries, err := os.ReadDir(candidateRoot)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read candidate plugins: %w", err)
+	}
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || normalizeToolName(name) != name {
+			return fmt.Errorf("invalid plugin archive entry %q", name)
+		}
+		source := filepath.Join(candidateRoot, name)
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
+			return fmt.Errorf("plugin archive entry %q is not executable", name)
+		}
+		target := filepath.Join(destinationRoot, name)
+		if err := replaceUpgradeFile(source, target, 0o755); err != nil {
+			return err
+		}
+		_, _ = fmt.Fprintf(stdout, "installed %s\n", target)
+	}
+	return nil
+}
+
 func rollbackUpgradeAssets(changes []upgradeAssetChange) {
 	for index := len(changes) - 1; index >= 0; index-- {
 		item := changes[index]
@@ -718,14 +759,18 @@ func rollbackUpgradeAssets(changes []upgradeAssetChange) {
 	}
 }
 
-func writeUpgradeAsset(destination string, content []byte, _ bool) error {
+func writeUpgradeAsset(destination string, content []byte, executable bool) error {
 	temporary, err := os.CreateTemp(filepath.Dir(destination), ".ash-asset-*")
 	if err != nil {
 		return err
 	}
 	temporaryPath := temporary.Name()
 	defer func() { _ = os.Remove(temporaryPath) }()
-	if err := temporary.Chmod(0o600); err != nil {
+	mode := os.FileMode(0o600)
+	if executable {
+		mode = 0o700
+	}
+	if err := temporary.Chmod(mode); err != nil {
 		_ = temporary.Close()
 		return err
 	}
@@ -779,6 +824,12 @@ func extractUpgradeArchive(content []byte, destination string) error {
 			return fmt.Errorf("duplicate archive entry %q", header.Name)
 		}
 		seen[name] = struct{}{}
+		if header.Typeflag == tar.TypeDir {
+			if err := os.MkdirAll(filepath.Join(destination, name), 0o700); err != nil {
+				return err
+			}
+			continue
+		}
 		if header.Typeflag != 0 && header.Typeflag != tar.TypeReg {
 			return fmt.Errorf("unsupported archive entry %q", header.Name)
 		}

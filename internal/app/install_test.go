@@ -267,6 +267,14 @@ func TestInstallUsesEmbeddedBootstrapAssets(t *testing.T) {
 	if _, err := os.Stat(workspaceToolsPath); err != nil {
 		t.Fatalf("expected tool script to be installed: %v", err)
 	}
+	workspacePluginsPath := filepath.Join(home, ashWorkspaceDirName, "plugins")
+	pluginsInfo, err := os.Stat(workspacePluginsPath)
+	if err != nil {
+		t.Fatalf("expected plugins directory to be created: %v", err)
+	}
+	if !pluginsInfo.IsDir() {
+		t.Fatalf("expected plugins path to be a directory")
+	}
 }
 
 func TestRunInstallFish(t *testing.T) {

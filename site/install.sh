@@ -149,6 +149,25 @@ else
   printf 'ash installer: %s does not ship ash-broker; connection reuse will be disabled\n' "$tag" >&2
 fi
 
+plugins_dir="$HOME/.ash/plugins"
+mkdir -p "$plugins_dir" || fail "could not create plugins directory $plugins_dir"
+chmod 700 "$plugins_dir" 2>/dev/null || true
+if [ -d "$tmp_dir/plugins" ]; then
+  for plugin_source in "$tmp_dir/plugins"/*; do
+    [ -f "$plugin_source" ] || continue
+    plugin_name=$(basename "$plugin_source")
+    case $plugin_name in
+      ''|.*|*/*) fail "release archive contained invalid plugin name: $plugin_name" ;;
+    esac
+    install -m 0755 "$plugin_source" "$plugins_dir/$plugin_name" 2>/dev/null || {
+      cp "$plugin_source" "$plugins_dir/$plugin_name" || fail "could not install plugin $plugin_name"
+      chmod 0755 "$plugins_dir/$plugin_name" || fail "could not make plugin $plugin_name executable"
+    }
+  done
+else
+  printf 'ash installer: %s does not ship plugins; native plugins will be unavailable\n' "$tag" >&2
+fi
+
 # Broker daemons are long-lived per-shell processes; kill stale ones so open
 # shells respawn a fresh broker running the binary just installed. The second
 # pattern catches pre-migration daemons started as "<binary> broker ..." (a
