@@ -101,7 +101,6 @@ for asset in \
   "ash-${tag}-linux-amd64.tar.gz" \
   "ash-${tag}-linux-arm64.tar.gz" \
   "ash-${tag}-freebsd-amd64.tar.gz" \
-  "ash-${tag}-freebsd-arm64.tar.gz" \
   "ash-${tag}-darwin-amd64.pkg.sha256" \
   "ash-${tag}-darwin-arm64.pkg.sha256" \
   "ash-${tag}-darwin-amd64.tar.gz.sha256" \
@@ -113,7 +112,6 @@ for asset in \
   "ash-${tag}-linux-amd64.tar.gz.sha256" \
   "ash-${tag}-linux-arm64.tar.gz.sha256" \
   "ash-${tag}-freebsd-amd64.tar.gz.sha256" \
-  "ash-${tag}-freebsd-arm64.tar.gz.sha256" \
   "SHA256SUMS" \
   "SHA256SUMS.sigstore.json"; do
   expected_assets+=("$asset")

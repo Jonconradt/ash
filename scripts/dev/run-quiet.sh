@@ -18,16 +18,17 @@ if [[ "${V:-${VERBOSE:-0}}" == "1" ]]; then
 	exit $?
 fi
 
-log="$(mktemp -t "ash-verify-${label//[^A-Za-z0-9_.-]/_}")"
+log="$(mktemp "${TMPDIR:-/tmp}/ash-verify-${label//[^A-Za-z0-9_.-]/_}.XXXXXX")"
 trap 'rm -f "$log"' EXIT
 
 printf '==> %s ... ' "$label"
-if "$@" >"$log" 2>&1; then
+"$@" >"$log" 2>&1
+status=$?
+if [[ "$status" -eq 0 ]]; then
 	echo "ok"
 	exit 0
 fi
 
-status=$?
 echo "FAILED (exit $status)"
 echo "----- $label output -----"
 cat "$log"

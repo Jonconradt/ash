@@ -53,6 +53,11 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+      - name: Install Rust cross target
+        if: matrix.arch == 'amd64'
+        # macos-14 runners are arm64; Xcode's toolchain can link x86_64-apple-darwin
+        # natively once the target's std is present, no extra linker needed.
+        run: rustup target add x86_64-apple-darwin
       - name: Build and package macOS artifacts
         run: |
           make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES=${{ matrix.arch }} RELEASE_VERSION="${GITHUB_REF_NAME}"
@@ -80,6 +85,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y ruby ruby-dev build-essential rpm
           sudo gem install --no-document fpm
+      - name: Install Rust cross toolchain (arm64)
+        if: matrix.arch == 'arm64'
+        run: |
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+          rustup target add aarch64-unknown-linux-gnu
       - name: Build and package Linux artifacts
         run: |
           make release-artifacts RELEASE_TARGET_OSES=linux RELEASE_TARGET_ARCHES=${{ matrix.arch }} RELEASE_VERSION="${GITHUB_REF_NAME}"
@@ -94,7 +104,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        arch: [amd64, arm64]
+        arch: [amd64]
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -102,6 +112,10 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+      - name: Install Rust cross toolchain (FreeBSD)
+        # cross-rs builds the Rust plugin inside a Docker image with a real FreeBSD
+        # sysroot; a plain rustup target add can't link a FreeBSD binary from Linux.
+        run: cargo install cross --git https://github.com/cross-rs/cross --locked
       - name: Build and package FreeBSD artifacts
         run: |
           make release-artifacts RELEASE_TARGET_OSES=freebsd RELEASE_TARGET_ARCHES=${{ matrix.arch }} RELEASE_VERSION="${GITHUB_REF_NAME}"

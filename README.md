@@ -128,7 +128,8 @@ Install the latest release with the verified one-liner:
 curl -fsSL https://jonconradt.github.io/ash/install.sh | sh
 ```
 
-The installer supports Linux, macOS, and FreeBSD on `amd64` and `arm64`. It verifies the
+The installer supports Linux and macOS on `amd64` and `arm64`, and FreeBSD on
+`amd64`. It verifies the
 download against the release `SHA256SUMS` manifest and installs `ash` to
 `~/.local/bin` without requiring `sudo`. Set `ASH_INSTALL_DIR` to choose a
 different destination when needed.
@@ -409,7 +410,8 @@ ash update --yes
 ash update --skip-customized
 ```
 
-The updater supports macOS, Linux, and FreeBSD on amd64 and arm64 and installs to
+The updater supports macOS and Linux on amd64 and arm64, and FreeBSD on amd64,
+and installs to
 `~/.local/bin/ash`, the same location used by the install script. It verifies the
 Sigstore keyless signature for `SHA256SUMS`
 against the `Jonconradt/ash` release workflow, then verifies the selected

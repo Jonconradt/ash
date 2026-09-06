@@ -17,6 +17,11 @@ LOCAL_BINARY_PATH ?= $(LOCAL_BIN_DIR)/$(APP_NAME)
 PLUGINS_SRC_DIR ?= internal/app/ash_bootstrap/plugins_src
 PLUGINS_BIN_DIR ?= bin/plugins
 LOCAL_PLUGINS_DIR ?= $(HOME)/.ash/plugins
+# Cross-compilation target for non-Go plugin toolchains (Rust); empty means "build
+# natively for the host", used by local dev builds. release-build-one sets these to
+# RELEASE_GOOS/RELEASE_ARCH so release plugin binaries match the release target.
+PLUGIN_TARGET_GOOS ?=
+PLUGIN_TARGET_GOARCH ?=
 RELEASE_ARCH ?= arm64
 RELEASE_OUTPUT_DIR ?= dist/release
 RELEASE_PACKAGE_DIR ?= $(RELEASE_OUTPUT_DIR)
@@ -86,7 +91,7 @@ plugins-build:
 	@mkdir -p "$(PLUGINS_BIN_DIR)"
 	@for dir in $(PLUGINS_SRC_DIR)/*; do \
 		if [ -f "$$dir/Makefile" ]; then \
-			./scripts/dev/run-quiet.sh "plugin-build:$$(basename $$dir)" $(MAKE) -C "$$dir" build BUILD_DIR="$(abspath $(PLUGINS_BIN_DIR))" || exit 1; \
+			./scripts/dev/run-quiet.sh "plugin-build:$$(basename $$dir)" $(MAKE) -C "$$dir" build BUILD_DIR="$(abspath $(PLUGINS_BIN_DIR))" TARGET_GOOS="$(PLUGIN_TARGET_GOOS)" TARGET_GOARCH="$(PLUGIN_TARGET_GOARCH)" || exit 1; \
 		fi; \
 	done
 	@echo "plugins-build: ok"
@@ -238,7 +243,7 @@ release-build-one:
 	@mkdir -p "$(RELEASE_OUTPUT_DIR)"
 	GOOS=$(RELEASE_GOOS) GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X ash/internal/app.ashVersion=$(RELEASE_VERSION) -X ash/internal/app.ashCommit=$(RELEASE_COMMIT)" -o "$(RELEASE_BINARY_PATH)" ./cmd/ash
 	GOOS=$(RELEASE_GOOS) GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "$(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)-broker" ./cmd/ash-broker
-	$(MAKE) plugins-build PLUGINS_BIN_DIR="$(RELEASE_PLUGINS_BIN_DIR)"
+	$(MAKE) plugins-build PLUGINS_BIN_DIR="$(RELEASE_PLUGINS_BIN_DIR)" PLUGIN_TARGET_GOOS="$(RELEASE_GOOS)" PLUGIN_TARGET_GOARCH="$(RELEASE_ARCH)"
 
 release-pkg:
 	@mkdir -p "$(RELEASE_PACKAGE_DIR)"
@@ -464,6 +469,10 @@ release-artifacts:
 				;; \
 			freebsd) \
 				for arch in $(RELEASE_TARGET_ARCHES); do \
+					if [ "$$arch" != "amd64" ]; then \
+						echo "skipping unsupported freebsd arch: $$arch (only amd64 is published; no aarch64-unknown-freebsd cross toolchain)"; \
+						continue; \
+					fi; \
 					$(MAKE) release-build-one RELEASE_GOOS=freebsd RELEASE_ARCH=$$arch RELEASE_VERSION=$(RELEASE_VERSION); \
 					$(MAKE) release-pkg-one RELEASE_GOOS=freebsd RELEASE_ARCH=$$arch RELEASE_FORMAT=tar.gz RELEASE_VERSION=$(RELEASE_VERSION); \
 					$(MAKE) release-validate-one RELEASE_GOOS=freebsd RELEASE_ARCH=$$arch RELEASE_FORMAT=tar.gz RELEASE_VERSION=$(RELEASE_VERSION); \

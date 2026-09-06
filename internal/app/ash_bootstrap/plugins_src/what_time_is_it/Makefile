@@ -2,6 +2,11 @@ PLUGIN_NAME := what_time_is_it
 BUILD_DIR ?= ../../../../../bin/plugins
 OUTPUT_PATH ?= $(BUILD_DIR)/$(PLUGIN_NAME)
 
+# TARGET_GOOS/TARGET_GOARCH mirror the top-level Makefile's RELEASE_GOOS/RELEASE_ARCH;
+# left empty (the default for local dev builds) this builds natively for the host.
+TARGET_GOOS ?=
+TARGET_GOARCH ?=
+
 GOLANGCI_LINT_VERSION ?= v2.13.1
 GOSEC_VERSION ?= v2.28.0
 
@@ -13,7 +18,11 @@ RUN_QUIET := ../../../../../scripts/dev/run-quiet.sh
 
 build:
 	@mkdir -p "$(BUILD_DIR)"
-	@$(RUN_QUIET) "go-build" go build -o "$(OUTPUT_PATH)" .
+	@if [ -n "$(TARGET_GOOS)" ] && [ -n "$(TARGET_GOARCH)" ]; then \
+		$(RUN_QUIET) "go-build" env GOOS="$(TARGET_GOOS)" GOARCH="$(TARGET_GOARCH)" CGO_ENABLED=0 go build -o "$(OUTPUT_PATH)" .; \
+	else \
+		$(RUN_QUIET) "go-build" go build -o "$(OUTPUT_PATH)" .; \
+	fi
 
 test:
 	@$(RUN_QUIET) "go-test" go test ./...
