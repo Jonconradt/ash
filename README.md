@@ -135,7 +135,7 @@ download against the release `SHA256SUMS` manifest and installs `ash` to
 different destination when needed.
 
 | OS | amd64 | arm64 |
-|---|---|---|
+| --- | --- | --- |
 | macOS (darwin) | ✅ | ✅ |
 | Linux | ✅ | ✅ |
 | FreeBSD | ✅ | ❌ |
