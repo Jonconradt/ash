@@ -91,6 +91,28 @@ install_go_tools() {
 	esac
 }
 
+install_rust_toolchain() {
+	export PATH="$HOME/.cargo/bin:$PATH"
+
+	if command -v cargo >/dev/null 2>&1; then
+		log "rust: cargo already installed ($(cargo --version))"
+	else
+		log "rust: installing via rustup (required by the flip_a_coin plugin)"
+		curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path --profile minimal
+		command -v cargo >/dev/null 2>&1 || fail "cargo is not on PATH after rustup installation"
+	fi
+
+	if command -v rustup >/dev/null 2>&1 && ! command -v cargo-clippy >/dev/null 2>&1; then
+		log "rust: adding clippy component"
+		rustup component add clippy
+	fi
+
+	case ":${PATH}:" in
+	*":$HOME/.cargo/bin:"*) ;;
+	*) log "note: add $HOME/.cargo/bin to PATH so 'cargo' is runnable in new shells" ;;
+	esac
+}
+
 warm_python_and_node_tools() {
 	if command -v uv >/dev/null 2>&1; then
 		export PATH="$HOME/.local/bin:$PATH"
@@ -118,9 +140,10 @@ main() {
 	esac
 
 	install_go_tools
+	install_rust_toolchain
 	warm_python_and_node_tools
 
-	log "done: go, node/npm, python3, git, uv, golangci-lint, gosec, govulncheck, yamlfmt, staticcheck are ready"
+	log "done: go, node/npm, python3, git, uv, rust/cargo, golangci-lint, gosec, govulncheck, yamlfmt, staticcheck are ready"
 }
 
 main "$@"

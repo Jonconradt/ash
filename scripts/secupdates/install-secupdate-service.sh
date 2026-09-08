@@ -149,7 +149,7 @@ User=${SERVICE_USER}
 Group=${SERVICE_USER}
 WorkingDirectory=${REPO_ROOT}
 Environment=HOME=${USER_HOME}
-Environment=PATH=${USER_HOME}/.local/bin:/usr/local/bin:/usr/bin:/bin:/snap/bin:/usr/local/go/bin:${USER_HOME}/go/bin
+Environment=PATH=${USER_HOME}/.local/bin:${USER_HOME}/.cargo/bin:/usr/local/bin:/usr/bin:/bin:/snap/bin:/usr/local/go/bin:${USER_HOME}/go/bin
 ExecStart=${REPO_ROOT}/scripts/secupdates/secupdate.sh
 UMask=0077
 EOF
@@ -214,7 +214,7 @@ install_macos() {
 	<key>StandardOutPath</key><string>${USER_HOME}/Library/Logs/ash-secupdate.log</string>
 	<key>StandardErrorPath</key><string>${USER_HOME}/Library/Logs/ash-secupdate.log</string>
 	<key>EnvironmentVariables</key>
-	<dict><key>PATH</key><string>${USER_HOME}/.local/bin:/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string></dict>
+	<dict><key>PATH</key><string>${USER_HOME}/.local/bin:${USER_HOME}/.cargo/bin:/usr/local/bin:/usr/bin:/bin:/opt/homebrew/bin</string></dict>
 </dict>
 </plist>
 EOF
