@@ -126,11 +126,13 @@ EOF
 install_mail_helper() {
 	mkdir -p "$BIN_DIR"
 	# Escape sed replacement metacharacters (&, \, |) in the recipient.
-	local esc
+	local esc tmp
 	esc="$(printf '%s\n' "$MAILTO" | sed 's/[&\\|]/\\&/g')"
+	tmp="$(mktemp)"
 	sed "s/__MAILTO__/${esc}/g" \
-		"${REPO_ROOT}/scripts/secupdates/secupdate-failure-mail.sh" \
-		| install -m 0755 /dev/stdin "${BIN_DIR}/ash-secupdate-failure-mail"
+		"${REPO_ROOT}/scripts/secupdates/secupdate-failure-mail.sh" >"$tmp"
+	install -m 0755 "$tmp" "${BIN_DIR}/ash-secupdate-failure-mail"
+	rm -f "$tmp"
 	log "installed ${BIN_DIR}/ash-secupdate-failure-mail (mailto=${MAILTO})"
 }
 
