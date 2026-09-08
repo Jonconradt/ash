@@ -87,12 +87,17 @@ USER_HOME="${USER_HOME:-$HOME}"
 OS="$(uname -s)"
 
 write_file() { # path mode owner content-via-stdin
-	local path="$1" mode="$2" owner="$3"
+	local path="$1" mode="$2" owner="$3" tmp
+	tmp="$(mktemp)"
+	cat >"$tmp"
+	# Stage in a temp file: sudo can replace the command's stdin (use_pty), which
+	# makes `install /dev/stdin` fail with "No such file or directory".
 	if [[ "$(id -u)" -eq 0 ]]; then
-		install -m "$mode" -o "${owner%%:*}" -g "${owner##*:}" /dev/stdin "$path"
+		install -m "$mode" -o "${owner%%:*}" -g "${owner##*:}" "$tmp" "$path"
 	else
-		sudo install -m "$mode" -o "${owner%%:*}" -g "${owner##*:}" /dev/stdin "$path"
+		sudo install -m "$mode" -o "${owner%%:*}" -g "${owner##*:}" "$tmp" "$path"
 	fi
+	rm -f "$tmp"
 }
 
 # --- sudoers (Linux) ---------------------------------------------------------
