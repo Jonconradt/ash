@@ -8,6 +8,11 @@ if not status is-interactive
 end
 
 function _ash_ensure_broker
+	set -l mcp_credential_key ""
+	if set -q ASH_MCP_CREDENTIAL_KEY
+		set mcp_credential_key "$ASH_MCP_CREDENTIAL_KEY"
+		set -e ASH_MCP_CREDENTIAL_KEY
+	end
 	if not set -q AI_ENDPOINT; or not set -q AI_MODEL
 		return 1
 	end
@@ -40,6 +45,7 @@ function _ash_ensure_broker
 
 	begin
 		set -lx ASH_BROKER_TOKEN "$token"
+		set -lx ASH_MCP_CREDENTIAL_KEY "$mcp_credential_key"
 		command ash-broker --socket "$socket_path" --parent-pid "$parent_pid" --lease "$lease_path" </dev/null >/dev/null 2>&1
 	end &
 	set -l broker_pid $last_pid

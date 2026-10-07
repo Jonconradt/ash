@@ -37,6 +37,7 @@ func testAIConfig(baseURL, model string) aiConfig {
 }
 
 func TestRun(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
 	t.Setenv("ASH_VERBOSE", "")
 	// This suite exercises the legacy Ollama chat-format test doubles below, so it
 	// explicitly disables both flags rather than relying on their (now-on) defaults.

@@ -214,7 +214,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	metrics.addStageDuration(metricsStageDefaults, timeNow().Sub(defaultsStarted))
 	slog.Debug("Allowlist loaded", "request_id", requestID, "allowlist", strings.Join(sortedAllowlist(allowlist), ","), "EID", "oYccBW9V")
 
-	toolShim := localToolShim{allowlist: allowlist, agents: newAgentBudget(maxAgents())}
+	localShim := localToolShim{allowlist: allowlist, agents: newAgentBudget(maxAgents())}
 
 	conversation := history.Conversations[aiCfg.HistoryKey]
 	messages := make([]message, 0, len(conversation)+2)
@@ -229,6 +229,12 @@ func run(args []string, stdout, stderr io.Writer) int {
 	defer cancel()
 	ctx = withExecutionMetrics(ctx, metrics)
 	ctx = withRequestID(ctx, requestID)
+	toolShim, err := prepareRemoteMCP(ctx, stderr, localShim)
+	if err != nil {
+		slog.Error("failed to initialize remote MCP tools", "error", err, "EID", "R7vQmA2c")
+		_, _ = fmt.Fprintf(stderr, "MCP configuration error: %v\n", err)
+		return 1
+	}
 
 	stopSpinner := startThinkingIndicator(stderr)
 	assistantReply, updatedMessages, err := runToolLoop(ctx, aiCfg, userInput, messages, toolShim)

@@ -21,6 +21,8 @@
   the install UI, with no dependency on anything else in `internal/app`.
 - [internal/brokerproto](internal/brokerproto): wire protocol shared by the `ash` client and
   the `ash-broker` server.
+- [internal/mcp](internal/mcp): remote Streamable HTTP MCP configuration, long-lived client
+  sessions, OAuth callback flow, and protected credential storage used by `ash-broker`.
 
 ## Runtime overview
 
@@ -30,6 +32,13 @@ The CLI entry point in [internal/app/ash.go](internal/app/ash.go) initializes co
 2. load prompt/history/allowlist state
 3. run the chat/tool loop
 4. render the final assistant reply
+
+Remote MCP servers are configured in `$HOME/.ash/mcp.json`. The `ash` executable loads their
+tool definitions through typed broker requests and dispatches model-selected calls back to the
+broker. `ash-broker` owns the persistent MCP sessions and OAuth protocol state. `ash` only opens
+the browser authorization URL; the broker receives the loopback redirect, validates OAuth
+state/PKCE through the MCP SDK, exchanges and refreshes tokens, and persists credentials in the
+OS credential manager or encrypted fallback file.
 
 ## Key subsystems
 
@@ -52,7 +61,9 @@ The CLI entry point in [internal/app/ash.go](internal/app/ash.go) initializes co
 - [ai_autoconfig.go](internal/app/ai_autoconfig.go): cloud provider/local server auto-detection and model-listing prompts used by `ash install`.
 - [provider.go](internal/app/provider.go): provider adapter registry (`ollama`, `openai`, `google`, `anthropic`, `cohere`, `bedrock`) and the adapter interface tiers: `providerAdapter` (base), `byteProviderAdapter` (raw HTTP, used only by `ollamaAdapter`), `sdkProviderAdapter` (official SDK-based `Send`, used by every other adapter), `streamingProviderAdapter` (adds `SendStream`, currently implemented only by [openai.go](internal/app/openai.go)).
 - [openai.go](internal/app/openai.go), [google.go](internal/app/google.go), [anthropic.go](internal/app/anthropic.go), [cohere.go](internal/app/cohere.go), [bedrock.go](internal/app/bedrock.go): per-provider adapters built on each vendor's official Go SDK, all sharing the `ai_transport.go` HTTP client so retries/broker-fallback/metrics stay consistent across providers.
-- [broker.go](internal/app/broker.go): client-side broker connection logic used by the main `ash` binary; the broker server itself lives in the separate [cmd/ash-broker](cmd/ash-broker) binary (see [internal/brokerproto](internal/brokerproto) for the shared wire types) so the broker has no dependency on any AI provider SDK.
+- [broker.go](internal/app/broker.go): client-side broker connection logic used by the main `ash` binary; the broker server itself lives in the separate [cmd/ash-broker](cmd/ash-broker) binary (see [internal/brokerproto](internal/brokerproto) for the shared wire types).
+- [mcp.go](internal/app/mcp.go): remote MCP config loading, browser authorization handoff, and remote tool integration with the existing tool loop.
+- [remote.go](internal/mcp/remote.go) and [credentials.go](internal/mcp/credentials.go): broker-owned remote MCP sessions, OAuth handling, OS credential manager use, and encrypted-file fallback.
 - [snooze.go](internal/app/snooze.go): persistent expiry state for pausing automatic shell routing.
 
 ## Known interim state

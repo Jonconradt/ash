@@ -6,6 +6,7 @@ package brokerproto
 import (
 	"context"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"io"
 	"net/http"
@@ -21,21 +22,44 @@ const (
 
 // Request is the payload a client sends to the broker over the Unix socket.
 type Request struct {
-	Version uint16            `json:"version"`
-	Token   string            `json:"token"`
-	URL     string            `json:"url"`
-	Headers map[string]string `json:"headers"`
-	Body    []byte            `json:"body"`
+	Version   uint16            `json:"version"`
+	Token     string            `json:"token"`
+	URL       string            `json:"url"`
+	Headers   map[string]string `json:"headers"`
+	Body      []byte            `json:"body"`
+	MCPAction string            `json:"mcp_action,omitempty"`
+	MCPServer string            `json:"mcp_server,omitempty"`
+	MCPURL    string            `json:"mcp_url,omitempty"`
+	MCPTool   string            `json:"mcp_tool,omitempty"`
+	MCPArgs   map[string]any    `json:"mcp_args,omitempty"`
 }
 
 // Response is the payload the broker sends back to a client.
 type Response struct {
-	Version     uint16 `json:"version"`
-	Status      int    `json:"status"`
-	Reused      bool   `json:"reused,omitempty"`
-	ContentType string `json:"content_type,omitempty"`
-	Body        []byte `json:"body,omitempty"`
-	Error       string `json:"error,omitempty"`
+	Version     uint16          `json:"version"`
+	Status      int             `json:"status"`
+	Reused      bool            `json:"reused,omitempty"`
+	ContentType string          `json:"content_type,omitempty"`
+	Body        []byte          `json:"body,omitempty"`
+	Error       string          `json:"error,omitempty"`
+	MCPStatus   *MCPStatus      `json:"mcp_status,omitempty"`
+	MCPTools    []MCPTool       `json:"mcp_tools,omitempty"`
+	MCPResult   json.RawMessage `json:"mcp_result,omitempty"`
+}
+
+// MCPStatus is the current state of a broker-owned MCP session.
+type MCPStatus struct {
+	State   string `json:"state"`
+	AuthURL string `json:"auth_url,omitempty"`
+	Error   string `json:"error,omitempty"`
+}
+
+// MCPTool is a tool definition returned by a broker-owned MCP session.
+type MCPTool struct {
+	Server      string         `json:"server"`
+	Name        string         `json:"name"`
+	Description string         `json:"description"`
+	InputSchema map[string]any `json:"input_schema"`
 }
 
 // HeaderAllowed reports whether name may be forwarded through the broker.

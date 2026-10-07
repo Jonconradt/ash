@@ -319,6 +319,7 @@ Notes:
 - `ASH_LOG_MAX_BYTES` (optional): Max log size before rotation when `ASH_LOG_FILE` is used. Default `1048576` (1 MiB).
 - `ASH_LOG_FORMAT` (scheduler/internal): Log format set to `json` for scheduled invocations.
 - `ASH_BROKER_SOCKET`, `ASH_BROKER_TOKEN`, and `ASH_BROKER_LEASE` (internal): Ephemeral per-shell broker settings. They are created by the installed Bash/zsh/Fish wrappers and should not be persisted or copied into scheduled jobs.
+- `ASH_MCP_CREDENTIAL_KEY` (optional): High-entropy 32-byte hex/base64 key for encrypted MCP OAuth credential fallback when the OS credential store is unavailable. The shell wrapper passes it only to `ash-broker` at launch and unsets its shell copy; do not put it in command arguments or logs.
 - `SESSION_ID`: Session identifier used for history and scheduled log naming (generated when missing in interactive runs).
 - `ASH_SCHEDULED_TASK` (internal): Set by scheduled invocations to mark task execution context.
 - `ASH_CHILD_AGENT` (internal): Marks a one-level child agent; child agents cannot create or schedule ash agents.
@@ -331,6 +332,25 @@ Notes:
 On macOS, Linux, and FreeBSD, the installed Bash, zsh, and Fish wrappers lazily start one unprivileged broker per interactive shell. The wrapper passes its process ID to the broker, which remains available until that shell exits. Subshells reuse their parent shell's broker; independent shells have independent brokers.
 
 The broker keeps a bounded HTTPS connection pool alive across separate `ash` processes and does not apply a local idle timeout to those connections. A provider can still close an idle connection; the next prompt opens a new connection automatically. Broker use is transparent and has a direct HTTPS fallback. Its private Unix socket and capability token are ephemeral shell state and are not written to cron, launchd, or other persistent scheduler configuration. Scheduled invocations therefore use direct HTTPS unless they explicitly inherit a live broker environment.
+
+### Remote MCP servers
+
+Configure remote Streamable HTTP MCP servers in `$HOME/.ash/mcp.json`:
+
+```json
+{
+  "servers": [
+    {
+      "name": "complex",
+      "url": "https://mcpplaygroundonline.com/mcp-complex-server"
+    }
+  ]
+}
+```
+
+On the next `ash` invocation, the broker connects to each configured server, retains its MCP session, and exposes its tools to the model. OAuth-protected servers use the browser authorization-code flow with PKCE; `ash` opens the authorization page while the broker handles the local callback, token exchange, and refresh. Configure only servers you trust, since their tools can perform actions on your behalf. HTTPS is required except for localhost development endpoints; URLs containing userinfo, query parameters, or fragments are rejected.
+
+OAuth credentials are stored in the OS credential manager when available. If it is unavailable, Ash requires `ASH_MCP_CREDENTIAL_KEY` containing a randomly generated 32-byte key encoded as hex or base64 and stores only authenticated-encrypted credentials in `$HOME/.ash/mcp/mcp-credentials.enc` with private permissions. The key itself is not stored by Ash. The public MCP playground above does not require OAuth and is only useful for remote transport/tool-discovery smoke testing; it does not test OAuth behavior.
 
 Optional canonical system prompt file:
 

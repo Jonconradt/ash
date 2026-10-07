@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"ash/internal/brokerproto"
+	"ash/internal/mcp"
 )
 
 const (
@@ -124,6 +125,21 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 		logger.Error("ash-broker requires a complete AI environment", "EID", "Ry8VqM3d")
 		return 2
 	}
+	credentialKey := os.Getenv("ASH_MCP_CREDENTIAL_KEY")
+	if err := os.Unsetenv("ASH_MCP_CREDENTIAL_KEY"); err != nil {
+		logger.Error(fmt.Sprintf("failed to clear MCP credential key from broker environment: %v", err), "EID", "Mc8wQx2v")
+		return 1
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		logger.Error(fmt.Sprintf("failed to locate home directory for MCP credentials: %v", err), "EID", "Fh4TzP9b")
+		return 1
+	}
+	credentialStorage, err := mcp.NewCredentialStorage(filepath.Join(home, ".ash", "mcp"), credentialKey)
+	if err != nil {
+		logger.Error(fmt.Sprintf("failed to initialize MCP credential storage: %v", err), "EID", "Xk7NfV3c")
+		return 1
+	}
 	endpointURL, err := url.Parse(endpoint)
 	if err != nil || endpointURL.Host == "" {
 		logger.Error("ash-broker requires a valid AI_ENDPOINT host", "EID", "Ft6BwX2n")
@@ -160,6 +176,8 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 		return 1
 	}
 	client := newBrokerHTTPClient()
+	mcpManager := mcp.NewRemoteManager(ctx, credentialStorage)
+	defer mcpManager.Close()
 	var active sync.WaitGroup
 	go func() {
 		<-ctx.Done()
@@ -181,7 +199,7 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 			break
 		}
 		active.Add(1)
-		go func() { defer active.Done(); handleBrokerConn(ctx, conn, token, client, allowedHost) }()
+		go func() { defer active.Done(); handleBrokerConn(ctx, conn, token, client, allowedHost, mcpManager) }()
 	}
 	active.Wait()
 	return 0
@@ -195,7 +213,7 @@ func brokerParentAlive(parentPID int) bool {
 	return err == nil || errors.Is(err, syscall.EPERM)
 }
 
-func handleBrokerConn(ctx context.Context, conn net.Conn, token string, client *http.Client, allowedHost string) {
+func handleBrokerConn(ctx context.Context, conn net.Conn, token string, client *http.Client, allowedHost string, mcpManagers ...*mcp.RemoteManager) {
 	defer func() { _ = conn.Close() }()
 	if !brokerPeerAllowed(conn) {
 		return
@@ -206,7 +224,20 @@ func handleBrokerConn(ctx context.Context, conn net.Conn, token string, client *
 		return
 	}
 	var request brokerproto.Request
-	if json.Unmarshal(payload, &request) != nil || request.Version != brokerproto.Version || subtle.ConstantTimeCompare([]byte(request.Token), []byte(token)) != 1 || !brokerproto.URLAllowed(request.URL, allowedHost) || len(request.Body) > brokerproto.MaxBody {
+	if json.Unmarshal(payload, &request) != nil || request.Version != brokerproto.Version || subtle.ConstantTimeCompare([]byte(request.Token), []byte(token)) != 1 {
+		_ = brokerproto.WriteFrame(conn, mustBrokerJSON(brokerproto.Response{Version: brokerproto.Version, Error: "broker request rejected"}))
+		return
+	}
+	if request.MCPAction != "" {
+		if len(mcpManagers) != 1 || mcpManagers[0] == nil {
+			_ = brokerproto.WriteFrame(conn, mustBrokerJSON(brokerproto.Response{Version: brokerproto.Version, Error: "MCP broker is unavailable"}))
+			return
+		}
+		response := handleMCPRequest(ctx, request, mcpManagers[0])
+		_ = brokerproto.WriteFrame(conn, mustBrokerJSON(response))
+		return
+	}
+	if !brokerproto.URLAllowed(request.URL, allowedHost) || len(request.Body) > brokerproto.MaxBody {
 		_ = brokerproto.WriteFrame(conn, mustBrokerJSON(brokerproto.Response{Version: brokerproto.Version, Error: "broker request rejected"}))
 		return
 	}
@@ -253,6 +284,47 @@ func handleBrokerConn(ctx context.Context, conn net.Conn, token string, client *
 	if err != nil {
 		_ = brokerproto.WriteFrame(conn, mustBrokerJSON(brokerproto.Response{Version: brokerproto.Version, Error: err.Error()}))
 	}
+}
+
+func handleMCPRequest(ctx context.Context, request brokerproto.Request, manager *mcp.RemoteManager) brokerproto.Response {
+	response := brokerproto.Response{Version: brokerproto.Version}
+	var status mcp.RemoteStatus
+	var err error
+	switch request.MCPAction {
+	case "start":
+		status, err = manager.Start(ctx, mcp.RemoteServer{Name: request.MCPServer, URL: request.MCPURL})
+	case "status":
+		status, err = manager.Status(ctx, request.MCPServer)
+	case "auth_ack":
+		err = manager.AcknowledgeAuth(request.MCPServer)
+	case "list":
+		var tools []mcp.RemoteTool
+		tools, err = manager.ListTools(request.MCPServer)
+		if err == nil {
+			response.MCPTools = make([]brokerproto.MCPTool, 0, len(tools))
+			for _, tool := range tools {
+				response.MCPTools = append(response.MCPTools, brokerproto.MCPTool{
+					Server: tool.Server, Name: tool.Name, Description: tool.Description, InputSchema: tool.InputSchema,
+				})
+			}
+		}
+	case "call":
+		var result any
+		result, err = manager.CallTool(ctx, request.MCPServer, request.MCPTool, request.MCPArgs)
+		if err == nil {
+			response.MCPResult, err = json.Marshal(result)
+		}
+	default:
+		err = errors.New("unsupported MCP broker action")
+	}
+	if err != nil {
+		response.Error = err.Error()
+		return response
+	}
+	if request.MCPAction == "start" || request.MCPAction == "status" {
+		response.MCPStatus = &brokerproto.MCPStatus{State: status.State, AuthURL: status.AuthURL, Error: status.Error}
+	}
+	return response
 }
 
 func mustBrokerJSON(value brokerproto.Response) []byte {

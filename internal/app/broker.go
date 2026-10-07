@@ -108,3 +108,58 @@ func brokerDo(ctx context.Context, req *http.Request) (*http.Response, bool, err
 	}
 	return &http.Response{StatusCode: response.Status, Status: strconv.Itoa(response.Status), Body: io.NopCloser(strings.NewReader(string(response.Body))), Header: header, Request: req}, response.Reused, nil
 }
+
+func brokerMCPDo(ctx context.Context, request brokerproto.Request) (brokerproto.Response, error) {
+	socket := strings.TrimSpace(os.Getenv(brokerSocketEnv))
+	token := strings.TrimSpace(os.Getenv(brokerTokenEnv))
+	if socket == "" || token == "" {
+		return brokerproto.Response{}, errors.New("broker is not configured")
+	}
+	request.Version = brokerproto.Version
+	request.Token = token
+	payload, err := json.Marshal(request)
+	if err != nil {
+		return brokerproto.Response{}, err
+	}
+	conn, err := (&net.Dialer{}).DialContext(ctx, "unix", socket)
+	if err != nil {
+		return brokerproto.Response{}, err
+	}
+	defer func() { _ = conn.Close() }()
+	done := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			_ = conn.Close()
+		case <-done:
+		}
+	}()
+	defer close(done)
+	if deadline, ok := ctx.Deadline(); ok {
+		_ = conn.SetDeadline(deadline)
+	}
+	if err := brokerproto.WriteFrame(conn, payload); err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return brokerproto.Response{}, ctxErr
+		}
+		return brokerproto.Response{}, err
+	}
+	responsePayload, err := brokerproto.ReadFrame(conn)
+	if err != nil {
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return brokerproto.Response{}, ctxErr
+		}
+		return brokerproto.Response{}, err
+	}
+	var response brokerproto.Response
+	if err := json.Unmarshal(responsePayload, &response); err != nil {
+		return brokerproto.Response{}, err
+	}
+	if response.Version != brokerproto.Version {
+		return brokerproto.Response{}, errors.New("broker protocol version mismatch")
+	}
+	if response.Error != "" {
+		return brokerproto.Response{}, errors.New(response.Error)
+	}
+	return response, nil
+}

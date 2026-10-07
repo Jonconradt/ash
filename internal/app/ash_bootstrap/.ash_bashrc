@@ -6,6 +6,8 @@ case "$-" in
 esac
 
 _ash_ensure_broker() {
+	local mcp_credential_key="${ASH_MCP_CREDENTIAL_KEY:-}"
+	unset ASH_MCP_CREDENTIAL_KEY
 	[[ -n "${AI_ENDPOINT:-}" && -n "${AI_MODEL:-}" ]] || return 1
 	# Without this probe a missing ash-broker reaches command_not_found_handle, which
 	# would forward the broker's own command line to the AI as a prompt.
@@ -32,7 +34,8 @@ _ash_ensure_broker() {
 	# pid is handed back through a file because $! is not visible to the parent.
 	local pid_path="$runtime_dir/${SESSION_ID:-shell}.pid"
 	local parent_pid="$BASHPID"
-	( ASH_BROKER_TOKEN="$token" command ash-broker --socket "$socket_path" --parent-pid "$parent_pid" --lease "$lease_path" </dev/null >/dev/null 2>&1 & printf '%s' "$!" > "$pid_path" )
+	( ASH_BROKER_TOKEN="$token" ASH_MCP_CREDENTIAL_KEY="$mcp_credential_key" command ash-broker --socket "$socket_path" --parent-pid "$parent_pid" --lease "$lease_path" </dev/null >/dev/null 2>&1 & printf '%s' "$!" > "$pid_path" )
+	unset mcp_credential_key
 	local broker_pid
 	broker_pid="$(cat "$pid_path" 2>/dev/null)"
 	rm -f "$pid_path" 2>/dev/null
