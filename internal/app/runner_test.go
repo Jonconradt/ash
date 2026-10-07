@@ -200,6 +200,33 @@ func TestProvidersEchoReasoningOnlyTurn(t *testing.T) {
 	})
 }
 
+func TestOllamaToolReplyPayloadUsesPlainMCPResultText(t *testing.T) {
+	raw := json.RawMessage(`{"_meta":{"server":"mcp-playground-complex-server"},"content":[{"type":"text","text":"{\"results\":[{\"id\":1}],\"resultType\":\"complete\"}"}],"resultType":"complete"}`)
+	content := formatRemoteMCPResult(raw)
+	payload, err := (ollamaAdapter{}).BuildPayload(aiConfig{Model: "gemma4:31b-cloud"}, []message{{
+		Role:     "tool",
+		ToolName: "mcp_268065b7_analyze_data_16ad6c36",
+		Content:  content,
+	}}, nil)
+	if err != nil {
+		t.Fatalf("BuildPayload() error = %v", err)
+	}
+	var request ollamaChatRequest
+	if err := json.Unmarshal(payload, &request); err != nil {
+		t.Fatalf("Unmarshal(BuildPayload()) error = %v", err)
+	}
+	if len(request.Messages) != 1 {
+		t.Fatalf("message count = %d, want 1", len(request.Messages))
+	}
+	got := request.Messages[0]
+	if got.Role != "tool" || got.ToolName != "mcp_268065b7_analyze_data_16ad6c36" {
+		t.Fatalf("Ollama tool message = %+v, want tool role and matching tool_name", got)
+	}
+	if !strings.Contains(got.Content, `"results":[{"id":1}]`) || strings.Contains(got.Content, `"_meta"`) || strings.Contains(got.Content, `"content"`) {
+		t.Fatalf("Ollama tool content retained the nested MCP envelope: %q", got.Content)
+	}
+}
+
 func TestOllamaNativeCapturesThinking(t *testing.T) {
 	body := []byte(`{"message":{"role":"assistant","content":"","thinking":"let me think"}}`)
 	resp, err := (ollamaAdapter{}).ParseResponse(body)

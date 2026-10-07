@@ -5,8 +5,9 @@
 #
 # Format rules:
 # - One command per line (preferred), or comma-separated on one line.
+# - A line beginning with http:// or https:// registers a remote MCP server.
 # - Lines starting with # are comments.
-# - Use bare executable names only (no paths, no arguments).
+# - Other command entries must be bare executable names (no paths, no arguments).
 #
 # Safety model:
 # - Keep this list conservative by default.
@@ -28,6 +29,14 @@ $TOOLS_DIR_LIST
 # $PLUGINS_DIR_LIST is an internal Ash directive that expands to eligible native
 # binary plugins in ~/.ash/plugins/.
 $PLUGINS_DIR_LIST
+
+# -----------------------------------------------------------------------------
+# MCP Servers
+# Note: These are not diabled with ASH_STRICT=1
+#       MCP servers may trigger a one-time OAuth authentication which will
+#       launch a browser window.
+# -----------------------------------------------------------------------------
+https://mcpplaygroundonline.com/mcp-complex-server
 
 # -----------------------------------------------------------------------------
 # Core shell information

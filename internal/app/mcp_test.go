@@ -61,12 +61,33 @@ func TestRemoteToolShimCallsBroker(t *testing.T) {
 		refs:  map[string]remoteToolRef{toolName: {server: "remote", name: "echo"}},
 	}
 	result := shim.CallTool(context.Background(), toolName, map[string]any{"value": "hello"})
-	if !strings.Contains(result, `"text": "hello"`) {
-		t.Fatalf("CallTool() = %s, want remote broker result", result)
+	if want := "MCP tool call completed without a protocol-level error.\nResult:\nhello"; result != want {
+		t.Fatalf("CallTool() = %q, want %q", result, want)
 	}
 	if err := <-requestDone; err != nil {
 		t.Fatalf("fake broker request: %v", err)
 	}
+}
+
+func TestFormatRemoteMCPResultForModel(t *testing.T) {
+	t.Run("unwraps successful text content", func(t *testing.T) {
+		raw := json.RawMessage(`{"_meta":{"server":"test"},"content":[{"type":"text","text":"{\"results\":[1,2,3],\"resultType\":\"complete\"}"}],"resultType":"complete"}`)
+		got := formatRemoteMCPResult(raw)
+		if !strings.HasPrefix(got, "MCP tool call completed without a protocol-level error.\nResult:\n") {
+			t.Fatalf("formatted result lacks success status: %q", got)
+		}
+		if !strings.Contains(got, `"results":[1,2,3]`) || strings.Contains(got, `"_meta"`) || strings.Contains(got, `"content"`) {
+			t.Fatalf("formatted result retained the MCP wrapper or lost tool data: %q", got)
+		}
+	})
+
+	t.Run("marks MCP tool errors", func(t *testing.T) {
+		raw := json.RawMessage(`{"isError":true,"content":[{"type":"text","text":"invalid data source"}]}`)
+		got := formatRemoteMCPResult(raw)
+		if !strings.HasPrefix(got, "The MCP server reports a tool error.\nResult:\n") || !strings.Contains(got, "invalid data source") {
+			t.Fatalf("formatted error result = %q", got)
+		}
+	})
 }
 
 func TestPrepareRemoteMCPWithNoConfigPreservesLocalShim(t *testing.T) {
@@ -78,6 +99,57 @@ func TestPrepareRemoteMCPWithNoConfigPreservesLocalShim(t *testing.T) {
 	}
 	if len(got.ListTools()) != len(local.ListTools()) {
 		t.Fatalf("tool count = %d, want %d", len(got.ListTools()), len(local.ListTools()))
+	}
+}
+
+func TestLoadRemoteMCPServersFromAllowlistIgnoresStrictMode(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("ASH_STRICT", "1")
+	t.Setenv("ASH_ALLOW", "ls")
+	ashRoot := filepath.Join(home, ashWorkspaceDirName)
+	if err := os.MkdirAll(ashRoot, 0o700); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(ashRoot, allowFileName), []byte("https://example.com/mcp\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	servers, err := loadRemoteMCPServers()
+	if err != nil {
+		t.Fatalf("loadRemoteMCPServers() error = %v", err)
+	}
+	if len(servers) != 1 || servers[0].URL != "https://example.com/mcp" || len(servers[0].Name) != 8 {
+		t.Fatalf("loadRemoteMCPServers() = %+v, want one registered server despite strict mode", servers)
+	}
+}
+
+func TestLoadRemoteMCPServersIgnoresLegacyMCPJSON(t *testing.T) {
+	home := t.TempDir()
+	originalCwd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("Getwd() error = %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(originalCwd) })
+	if err := os.Chdir(t.TempDir()); err != nil {
+		t.Fatalf("Chdir() error = %v", err)
+	}
+	t.Setenv("HOME", home)
+	ashRoot := filepath.Join(home, ashWorkspaceDirName)
+	if err := os.MkdirAll(ashRoot, 0o700); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	legacyConfig := `{"servers":[{"name":"legacy","url":"https://example.com/mcp"}]}`
+	if err := os.WriteFile(filepath.Join(ashRoot, "mcp.json"), []byte(legacyConfig), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	servers, err := loadRemoteMCPServers()
+	if err != nil {
+		t.Fatalf("loadRemoteMCPServers() error = %v", err)
+	}
+	if len(servers) != 0 {
+		t.Fatalf("loadRemoteMCPServers() = %+v, want no servers without .ash_allow registrations", servers)
 	}
 }
 

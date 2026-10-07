@@ -90,6 +90,18 @@ func TestLoadAllowlistedCommandsFallsBackToLegacyAshTools(t *testing.T) {
 	}
 }
 
+func TestParseAllowlistFileIgnoresRemoteMCPURLs(t *testing.T) {
+	allowed := parseAllowlistFile("ls\nhttps://example.com/mcp,python3\nHTTP://localhost:8080/mcp,rm\nps\n")
+	for _, command := range []string{"ls", "ps"} {
+		if _, ok := allowed[command]; !ok {
+			t.Errorf("allowlist is missing command %q", command)
+		}
+	}
+	if len(allowed) != 2 {
+		t.Fatalf("allowlist commands = %v, want only ls and ps", allowed)
+	}
+}
+
 // TestParseAIConfigFromEnvOllamaOpenAIAPIDefault covers the ASH_ALWAYS_OPENAI_API
 // default (on) end-to-end through parseAIConfigFromEnv, separately from the raw
 // provider-detection table above which explicitly disables it.

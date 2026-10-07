@@ -3,6 +3,8 @@ package mcp
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -119,6 +121,44 @@ func TestValidateRemoteServer(t *testing.T) {
 			err := validateRemoteServer(test.server)
 			if (err != nil) != test.wantErr {
 				t.Fatalf("validateRemoteServer() error = %v, wantErr %t", err, test.wantErr)
+			}
+		})
+	}
+}
+
+func TestRemoteServersFromAllowlist(t *testing.T) {
+	urlText := "HTTPS://mcpplaygroundonline.com/mcp-complex-server"
+	servers, err := RemoteServersFromAllowlist("# commands\nls\n  " + urlText + "  \nHTTP://localhost:8080/mcp\n")
+	if err != nil {
+		t.Fatalf("RemoteServersFromAllowlist() error = %v", err)
+	}
+	if len(servers) != 2 {
+		t.Fatalf("server count = %d, want 2", len(servers))
+	}
+	hash := sha256.Sum256([]byte(urlText))
+	wantName := hex.EncodeToString(hash[:4])
+	if servers[0].Name != wantName {
+		t.Fatalf("server name = %q, want first 8 SHA-256 hex characters %q", servers[0].Name, wantName)
+	}
+	if len(servers[0].Name) != 8 || servers[0].URL != "https://mcpplaygroundonline.com/mcp-complex-server" {
+		t.Fatalf("server parsed as %+v; want normalized scheme and 8-character name", servers[0])
+	}
+	if servers[1].URL != "http://localhost:8080/mcp" {
+		t.Fatalf("localhost server URL = %q, want normalized http URL", servers[1].URL)
+	}
+}
+
+func TestRemoteServersFromAllowlistRejectsInvalidAndDuplicateURLs(t *testing.T) {
+	for _, test := range []struct {
+		name string
+		raw  string
+	}{
+		{name: "external http", raw: "HTTP://example.com/mcp"},
+		{name: "duplicate URL", raw: "https://example.com/mcp\nhttps://example.com/mcp"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if _, err := RemoteServersFromAllowlist(test.raw); err == nil {
+				t.Fatal("RemoteServersFromAllowlist() succeeded, want an error")
 			}
 		})
 	}

@@ -79,12 +79,9 @@ func New() {
 
 	for _, srv := range servers {
 		slog.Info(fmt.Sprintf("🔌 [%s] Testing server '%s'...\n", strings.ToUpper(srv.HostApp), srv.Name), "EID", "cMCcN08x")
-		slog.Info(fmt.Sprintf("   Command: %s %v\n", srv.Command, srv.Args), "EID",
+		slog.Info(fmt.Sprintf("   Command: %s %v\n", srv.Command, srv.Args), "EID", "vVGZQSBF")
 
-			// Prepare standard OS subprocess command using CommandContext
-			// #nosec G204 -- This explicit discovery runs commands from the user's configured MCP servers.
-			"vVGZQSBF")
-
+		// #nosec G204 -- This explicit discovery runs commands from the user's configured MCP servers.
 		cmd := exec.CommandContext(ctx, srv.Command, srv.Args...)
 		if len(srv.Env) > 0 {
 			cmd.Env = os.Environ()

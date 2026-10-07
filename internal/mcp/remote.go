@@ -11,8 +11,6 @@ import (
 	"net"
 	"net/http"
 	"net/url"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"sync"
@@ -32,48 +30,45 @@ const (
 
 var toolNameSanitizer = regexp.MustCompile(`[^A-Za-z0-9_-]+`)
 
-// RemoteConfigPath returns the user's remote MCP configuration path.
-func RemoteConfigPath() (string, error) {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return "", fmt.Errorf("locating home directory: %w", err)
-	}
-	return filepath.Join(home, ".ash", "mcp.json"), nil
+// IsRemoteServerLine reports whether an allowlist line registers a remote HTTP MCP server.
+func IsRemoteServerLine(line string) bool {
+	trimmed := strings.ToLower(strings.TrimSpace(line))
+	return strings.HasPrefix(trimmed, "http://") || strings.HasPrefix(trimmed, "https://")
 }
 
-// LoadRemoteConfig loads remote MCP server definitions from ~/.ash/mcp.json.
-func LoadRemoteConfig() ([]RemoteServer, error) {
-	path, err := RemoteConfigPath()
-	if err != nil {
-		return nil, err
-	}
-	data, err := readConfigFile(path)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, fmt.Errorf("reading %s: %w", path, err)
-	}
-	if len(data) > 1<<20 {
-		return nil, errors.New("remote MCP configuration exceeds 1 MiB")
-	}
-	var config struct {
-		Servers []RemoteServer `json:"servers"`
-	}
-	if err := json.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("parsing %s: %w", path, err)
-	}
-	seen := make(map[string]struct{}, len(config.Servers))
-	for _, server := range config.Servers {
+// RemoteServersFromAllowlist extracts and validates MCP server URLs from allowlist lines.
+func RemoteServersFromAllowlist(raw string) ([]RemoteServer, error) {
+	var servers []RemoteServer
+	seen := make(map[string]string)
+	for lineIndex, line := range strings.Split(raw, "\n") {
+		urlText := strings.TrimSpace(line)
+		if !IsRemoteServerLine(urlText) {
+			continue
+		}
+		parsed, err := url.Parse(urlText)
+		if err != nil {
+			return nil, fmt.Errorf("invalid MCP URL on .ash_allow line %d: %w", lineIndex+1, err)
+		}
+		parsed.Scheme = strings.ToLower(parsed.Scheme)
+		server := RemoteServer{Name: remoteServerName(urlText), URL: parsed.String()}
 		if err := validateRemoteServer(server); err != nil {
-			return nil, fmt.Errorf("invalid MCP server %q: %w", server.Name, err)
+			return nil, fmt.Errorf("invalid MCP URL on .ash_allow line %d: %w", lineIndex+1, err)
 		}
-		if _, ok := seen[server.Name]; ok {
-			return nil, fmt.Errorf("duplicate MCP server name %q", server.Name)
+		if priorURL, ok := seen[server.Name]; ok {
+			if priorURL == urlText {
+				return nil, fmt.Errorf("duplicate MCP server URL on .ash_allow line %d", lineIndex+1)
+			}
+			return nil, fmt.Errorf("MCP server name hash collision on .ash_allow line %d", lineIndex+1)
 		}
-		seen[server.Name] = struct{}{}
+		seen[server.Name] = urlText
+		servers = append(servers, server)
 	}
-	return config.Servers, nil
+	return servers, nil
+}
+
+func remoteServerName(urlText string) string {
+	hash := sha256.Sum256([]byte(strings.TrimSpace(urlText)))
+	return hex.EncodeToString(hash[:4])
 }
 
 // ToolFunctionName returns the model-safe, server-qualified name of an MCP tool.
@@ -510,10 +505,14 @@ func validateRemoteServer(server RemoteServer) error {
 		return errors.New("MCP server name must contain 1 to 128 characters")
 	}
 	u, err := url.Parse(strings.TrimSpace(server.URL))
-	if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (u.Scheme != "https" && u.Scheme != "http") {
+	scheme := ""
+	if err == nil {
+		scheme = strings.ToLower(u.Scheme)
+	}
+	if err != nil || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (scheme != "https" && scheme != "http") {
 		return errors.New("MCP server URL must be a valid http or https URL without embedded credentials, query, or fragment")
 	}
-	if u.Scheme == "http" && !isLocalHost(u.Hostname()) {
+	if scheme == "http" && !isLocalHost(u.Hostname()) {
 		return errors.New("MCP server URLs must use https unless they target localhost")
 	}
 	if strings.ContainsAny(name, "/\\\x00") {

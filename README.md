@@ -335,20 +335,15 @@ The broker keeps a bounded HTTPS connection pool alive across separate `ash` pro
 
 ### Remote MCP servers
 
-Configure remote Streamable HTTP MCP servers in `$HOME/.ash/mcp.json`:
+Register remote Streamable HTTP MCP servers by adding one URL per line to `$HOME/.ash/.ash_allow`:
 
-```json
-{
-  "servers": [
-    {
-      "name": "complex",
-      "url": "https://mcpplaygroundonline.com/mcp-complex-server"
-    }
-  ]
-}
+```text
+https://mcpplaygroundonline.com/mcp-complex-server
 ```
 
-On the next `ash` invocation, the broker connects to each configured server, retains its MCP session, and exposes its tools to the model. OAuth-protected servers use the browser authorization-code flow with PKCE; `ash` opens the authorization page while the broker handles the local callback, token exchange, and refresh. Configure only servers you trust, since their tools can perform actions on your behalf. HTTPS is required except for localhost development endpoints; URLs containing userinfo, query parameters, or fragments are rejected.
+Ash derives each server's local name from the first 8 lowercase hexadecimal characters of SHA-256 over the exact URL text after trimming whitespace. The URL scheme is recognized case-insensitively; use the exact URL spelling consistently because it determines that name. Lines beginning with HTTP(S) register MCP servers and are ignored as shell-command allowlist entries. `ASH_STRICT=1` does not disable these explicitly registered servers. Existing `$HOME/.ash/mcp.json` files are no longer read; move their URLs into `.ash_allow` manually.
+
+On the next `ash` invocation, the broker connects to each registered server, retains its MCP session, and exposes its tools to the model. OAuth-protected servers use the browser authorization-code flow with PKCE; `ash` opens the authorization page while the broker handles the local callback, token exchange, and refresh. Configure only servers you trust, since their tools can perform actions on your behalf. HTTPS is required except for localhost development endpoints; URLs containing userinfo, query parameters, or fragments are rejected.
 
 OAuth credentials are stored in the OS credential manager when available. If it is unavailable, Ash requires `ASH_MCP_CREDENTIAL_KEY` containing a randomly generated 32-byte key encoded as hex or base64 and stores only authenticated-encrypted credentials in `$HOME/.ash/mcp/mcp-credentials.enc` with private permissions. The key itself is not stored by Ash. The public MCP playground above does not require OAuth and is only useful for remote transport/tool-discovery smoke testing; it does not test OAuth behavior.
 
@@ -509,6 +504,9 @@ osascript
 ```
 
 If both are present, `ASH_ALLOW` wins.
+
+In `.ash_allow`, a line beginning with `http://` or `https://` registers a remote MCP server
+instead of a shell command. These URL lines are ignored by the command allowlist parser.
 
 The standalone `$TOOLS_DIR_LIST` and `$PLUGINS_DIR_LIST` lines in `.ash_allow` are internal Ash directives that allow eligible managed tool scripts and native plugins. Replace those lines with literal bare names for a fixed restrictive policy.
 

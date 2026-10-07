@@ -33,12 +33,14 @@ The CLI entry point in [internal/app/ash.go](internal/app/ash.go) initializes co
 3. run the chat/tool loop
 4. render the final assistant reply
 
-Remote MCP servers are configured in `$HOME/.ash/mcp.json`. The `ash` executable loads their
-tool definitions through typed broker requests and dispatches model-selected calls back to the
-broker. `ash-broker` owns the persistent MCP sessions and OAuth protocol state. `ash` only opens
-the browser authorization URL; the broker receives the loopback redirect, validates OAuth
-state/PKCE through the MCP SDK, exchanges and refreshes tokens, and persists credentials in the
-OS credential manager or encrypted fallback file.
+Remote MCP servers are registered as URL lines in `$HOME/.ash/.ash_allow`. The `ash` executable
+derives stable local names from each URL, loads tool definitions through typed broker requests,
+and dispatches model-selected calls back to the broker. URL registrations are excluded from the
+shell-command allowlist and remain active in strict mode. `ash-broker` owns the persistent MCP
+sessions and OAuth protocol state. `ash` only opens the browser authorization URL; the broker
+receives the loopback redirect, validates OAuth state/PKCE through the MCP SDK, exchanges and
+refreshes tokens, and persists credentials in the OS credential manager or encrypted fallback
+file.
 
 ## Key subsystems
 

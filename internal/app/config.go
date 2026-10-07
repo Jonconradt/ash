@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	mcpclient "ash/internal/mcp"
 )
 
 const (
@@ -470,7 +472,7 @@ func parseAllowlistFile(raw string) map[string]struct{} {
 	set := map[string]struct{}{}
 	for _, line := range strings.Split(raw, "\n") {
 		trimmed := strings.TrimSpace(line)
-		if trimmed == "" || strings.Contains(trimmed, toolsDirListToken) || strings.Contains(trimmed, pluginsDirListToken) || strings.HasPrefix(trimmed, "#") {
+		if trimmed == "" || mcpclient.IsRemoteServerLine(trimmed) || strings.Contains(trimmed, toolsDirListToken) || strings.Contains(trimmed, pluginsDirListToken) || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
 		for _, token := range strings.Split(trimmed, ",") {

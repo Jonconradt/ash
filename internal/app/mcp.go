@@ -8,8 +8,11 @@ import (
 	"fmt"
 	"io"
 	"net/url"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"ash/internal/brokerproto"
@@ -27,10 +30,21 @@ type remoteToolShim struct {
 	refs  map[string]remoteToolRef
 }
 
+type remoteMCPCallResult struct {
+	IsError           bool                `json:"isError"`
+	Content           []remoteMCPTextItem `json:"content"`
+	StructuredContent json.RawMessage     `json:"structuredContent"`
+}
+
+type remoteMCPTextItem struct {
+	Type string `json:"type"`
+	Text string `json:"text"`
+}
+
 var openBrowserCommand = exec.CommandContext
 
 func prepareRemoteMCP(ctx context.Context, stderrWriter io.Writer, local mcpToolShim) (mcpToolShim, error) {
-	servers, err := mcpclient.LoadRemoteConfig()
+	servers, err := loadRemoteMCPServers()
 	if err != nil {
 		return nil, err
 	}
@@ -127,6 +141,36 @@ func prepareRemoteMCP(ctx context.Context, stderrWriter io.Writer, local mcpTool
 	return shim, nil
 }
 
+func loadRemoteMCPServers() ([]mcpclient.RemoteServer, error) {
+	root, err := ashWorkspaceDir()
+	if err != nil {
+		return nil, err
+	}
+	cwd, err := osGetwd()
+	if err != nil {
+		return nil, err
+	}
+	home, err := osUserHomeDir()
+	if err != nil {
+		return nil, err
+	}
+	for _, path := range []string{
+		filepath.Join(root, allowFileName),
+		filepath.Join(cwd, allowFileName),
+		filepath.Join(home, allowFileName),
+	} {
+		content, err := osReadFile(path)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("reading MCP registrations from %s: %w", path, err)
+		}
+		return mcpclient.RemoteServersFromAllowlist(string(content))
+	}
+	return nil, nil
+}
+
 func (s remoteToolShim) ListTools() []toolDefinition {
 	tools := s.local.ListTools()
 	return append(tools, s.tools...)
@@ -149,9 +193,47 @@ func (s remoteToolShim) CallTool(ctx context.Context, name string, args map[stri
 	if len(response.MCPResult) == 0 {
 		return "MCP tool call returned no result"
 	}
+	return formatRemoteMCPResult(response.MCPResult)
+}
+
+func formatRemoteMCPResult(raw json.RawMessage) string {
+	var result remoteMCPCallResult
+	if err := json.Unmarshal(raw, &result); err != nil {
+		return indentRemoteMCPJSON(raw)
+	}
+
+	output := ""
+	if len(result.Content) > 0 {
+		text := make([]string, 0, len(result.Content))
+		for _, item := range result.Content {
+			if item.Type != "text" {
+				text = nil
+				break
+			}
+			text = append(text, item.Text)
+		}
+		if text != nil {
+			output = strings.Join(text, "\n")
+		}
+	}
+	if output == "" && len(result.StructuredContent) > 0 {
+		output = indentRemoteMCPJSON(result.StructuredContent)
+	}
+	if output == "" {
+		output = indentRemoteMCPJSON(raw)
+	}
+
+	status := "MCP tool call completed without a protocol-level error."
+	if result.IsError {
+		status = "The MCP server reports a tool error."
+	}
+	return status + "\nResult:\n" + output
+}
+
+func indentRemoteMCPJSON(raw json.RawMessage) string {
 	var pretty bytes.Buffer
-	if err := json.Indent(&pretty, response.MCPResult, "", "  "); err != nil {
-		return string(response.MCPResult)
+	if err := json.Indent(&pretty, raw, "", "  "); err != nil {
+		return string(raw)
 	}
 	return pretty.String()
 }
