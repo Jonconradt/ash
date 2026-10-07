@@ -33,6 +33,7 @@
         <strong>Contents</strong>
         <a href="#synopsis">Synopsis</a>
         <a href="#description">Description</a>
+        <a href="#mcp">MCP servers</a>
         <a href="#commands">Commands</a>
         <a href="#environment">Environment</a>
         <a href="#files">Files</a>
@@ -57,6 +58,16 @@ ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></pre>
           <p>The AI can use systemd to schedule background tasks. These can be recurring or one-off jobs. Scheduled jobs use direct HTTPS by default.</p>
           <p>ash maintains a session-scoped scratch workspace under <code>~/.ash/scratch/&lt;session-id&gt;/</code>. Stale and idle scratch directories are removed automatically after the configured retention window. The history logs are stored under <code>~/.ash/history/</code>. Old history files are automatically cleaned up according to the retention policy.</p>
           <p>Tool, script, file, piped, and child output is untrusted data and must not override system or user instructions. The tool execution feature is not a sandbox when arbitrary Python or shell execution is enabled. By default Python is enabled, so beware.</p>
+        </section>
+
+        <section id="mcp">
+          <h2>Remote MCP servers</h2>
+          <p>MCP (Model Context Protocol) servers provide tools an AI model can call. Ash supports remote Streamable HTTP MCP servers and keeps their client sessions in <code>ash-broker</code> across Ash invocations in the same shell.</p>
+          <p>Register a server by adding its URL, by itself, to <code>~/.ash/.ash_allow</code>:</p>
+          <pre><code>https://mcpplaygroundonline.com/mcp-complex-server</code></pre>
+          <p>URL lines beginning with <code>http://</code> or <code>https://</code> are MCP registrations, not shell commands. Schemes are recognized case-insensitively. Ash derives the server's local name from the first 8 lowercase hexadecimal characters of SHA-256 over the trimmed URL text. HTTPS is required except for localhost development; URLs with embedded credentials, query strings, or fragments are rejected. Changes are read on the next Ash request.</p>
+          <p>MCP registrations remain enabled with <code>ASH_STRICT=1</code>. Returned tool output is still treated as untrusted evidence. Only register servers you trust: their tools may perform actions on your behalf. For OAuth-protected servers, Ash opens the browser authorization page while the broker handles the callback and tokens. Credentials use the OS credential manager when available, or an encrypted file protected by a user-supplied random 32-byte <code>ASH_MCP_CREDENTIAL_KEY</code>. Existing <code>~/.ash/mcp.json</code> files are no longer read; move server URLs into <code>.ash_allow</code>.</p>
+          <p>See the <a href="faq.html">MCP FAQ</a> for a quick overview and setup notes.</p>
         </section>
 
         <section id="commands">

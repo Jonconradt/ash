@@ -388,7 +388,10 @@ reserved internal Ash substitutions, not environment variables.
 .TP
 .I ~/.ash/.ash_allow
 Canonical command, tool, and plugin allowlist file. Replace its standalone $TOOLS_DIR_LIST and $PLUGINS_DIR_LIST directives
-with literal bare names for a fixed restrictive policy.
+with literal bare names for a fixed restrictive policy. A line beginning with http:// or https://
+registers a remote Streamable HTTP MCP server instead of a shell command. Its local name is the
+first 8 lowercase hexadecimal characters of SHA-256 over the trimmed URL text. MCP registrations
+remain active when ASH_STRICT=1. Existing ~/.ash/mcp.json files are not read.
 .TP
 .I ~/.ash/.ash_deny
 Canonical command, tool, and plugin denylist file for explicitly blocking specific executables.
