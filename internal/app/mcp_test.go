@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net"
 	"os"
 	"path/filepath"
@@ -99,6 +100,47 @@ func TestPrepareRemoteMCPWithNoConfigPreservesLocalShim(t *testing.T) {
 	}
 	if len(got.ListTools()) != len(local.ListTools()) {
 		t.Fatalf("tool count = %d, want %d", len(got.ListTools()), len(local.ListTools()))
+	}
+}
+
+func TestPrepareToolsMCPInitializationFailureFallsBackToLocalTools(t *testing.T) {
+	for _, test := range []struct {
+		name        string
+		interactive bool
+		wantWarning bool
+	}{
+		{name: "interactive", interactive: true, wantWarning: true},
+		{name: "non-interactive"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			t.Setenv("HOME", t.TempDir())
+			t.Setenv(brokerSocketEnv, "")
+			t.Setenv(brokerTokenEnv, "")
+			root, err := ashWorkspaceDir()
+			if err != nil {
+				t.Fatalf("ashWorkspaceDir() error = %v", err)
+			}
+			if err := os.MkdirAll(root, 0o700); err != nil {
+				t.Fatalf("MkdirAll() error = %v", err)
+			}
+			if err := os.WriteFile(filepath.Join(root, allowFileName), []byte("https://example.com/mcp\n"), 0o600); err != nil {
+				t.Fatalf("WriteFile() error = %v", err)
+			}
+
+			var stderr strings.Builder
+			previousLogger := slog.Default()
+			configureDebugLogging(&stderr)
+			t.Cleanup(func() { slog.SetDefault(previousLogger) })
+
+			local := localToolShim{allowlist: map[string]struct{}{"ls": {}}}
+			got := prepareTools(context.Background(), &stderr, local, test.interactive)
+			if len(got.ListTools()) != len(local.ListTools()) {
+				t.Fatalf("tool count = %d, want local tool count %d", len(got.ListTools()), len(local.ListTools()))
+			}
+			if strings.Contains(stderr.String(), "remote MCP tools unavailable") != test.wantWarning {
+				t.Fatalf("stderr = %q, want warning=%t", stderr.String(), test.wantWarning)
+			}
+		})
 	}
 }
 

@@ -345,6 +345,8 @@ Ash derives each server's local name from the first 8 lowercase hexadecimal char
 
 On the next `ash` invocation, the broker connects to each registered server, retains its MCP session, and exposes its tools to the model. OAuth-protected servers use the browser authorization-code flow with PKCE; `ash` opens the authorization page while the broker handles the local callback, token exchange, and refresh. Configure only servers you trust, since their tools can perform actions on your behalf. HTTPS is required except for localhost development endpoints; URLs containing userinfo, query parameters, or fragments are rejected.
 
+If MCP initialization fails, `ash` continues the request with its local tools and without any remote MCP tools. Interactive runs warn on stderr; non-interactive runs intentionally suppress this expected failure. Scheduled jobs do not inherit the per-shell broker, so they run without MCP tools even when servers are listed in `.ash_allow`. Do not schedule prompts that depend on MCP results; they may complete without performing the requested MCP work.
+
 OAuth credentials are stored in the OS credential manager when available. If it is unavailable, Ash requires `ASH_MCP_CREDENTIAL_KEY` containing a randomly generated 32-byte key encoded as hex or base64 and stores only authenticated-encrypted credentials in `$HOME/.ash/mcp/mcp-credentials.enc` with private permissions. The key itself is not stored by Ash. The public MCP playground above does not require OAuth and is only useful for remote transport/tool-discovery smoke testing; it does not test OAuth behavior.
 
 Optional canonical system prompt file:
@@ -536,6 +538,7 @@ The Unix tool rejects risky shell-control argument patterns and always executes 
 - Recurring scheduling uses user `crontab` entries with ash metadata markers.
 - Recurring-job management (`list`, `cancel`, `modify`, `explain`) operates only on ash-owned crontab entries.
 - Scheduled runs capture prompt + working directory and replay a minimal environment allowlist (`AI_ENDPOINT`, `AI_MODEL`, auth/session variables, `HOME`, `PATH`, and selected ash config vars).
+- Scheduled runs do not inherit an interactive shell's broker and therefore cannot use remote MCP tools. Ash continues without MCP tools; the failure is intentionally silent in non-interactive runs. Do not schedule prompts that require MCP actions or data.
 - One-off scheduled runs also enable verbose logging and write JSON debug logs to `~/.ash/logs/task_$SESSION_ID.log`, rotating the file at 1 MB.
 - SESSION_ID is required for default log naming and is sanitized to alphanumeric characters for filename safety.
 

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/url"
 	"os"
 	"os/exec"
@@ -139,6 +140,18 @@ func prepareRemoteMCP(ctx context.Context, stderrWriter io.Writer, local mcpTool
 	}
 	shim.local = local
 	return shim, nil
+}
+
+func prepareTools(ctx context.Context, stderrWriter io.Writer, local mcpToolShim, interactive bool) mcpToolShim {
+	tools, err := prepareRemoteMCP(ctx, stderrWriter, local)
+	if err == nil {
+		return tools
+	}
+	if interactive {
+		slog.Warn("remote MCP tools unavailable; continuing without them", "error", err, "EID", "R7vQmA2c")
+		_, _ = fmt.Fprintf(stderrWriter, "Warning: remote MCP tools unavailable; continuing without them: %v\n", err)
+	}
+	return local
 }
 
 func loadRemoteMCPServers() ([]mcpclient.RemoteServer, error) {

@@ -229,12 +229,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	defer cancel()
 	ctx = withExecutionMetrics(ctx, metrics)
 	ctx = withRequestID(ctx, requestID)
-	toolShim, err := prepareRemoteMCP(ctx, stderr, localShim)
-	if err != nil {
-		slog.Error("failed to initialize remote MCP tools", "error", err, "EID", "R7vQmA2c")
-		_, _ = fmt.Fprintf(stderr, "MCP configuration error: %v\n", err)
-		return 1
-	}
+	toolShim := prepareTools(ctx, stderr, localShim, stdinIsInteractive())
 
 	stopSpinner := startThinkingIndicator(stderr)
 	assistantReply, updatedMessages, err := runToolLoop(ctx, aiCfg, userInput, messages, toolShim)
