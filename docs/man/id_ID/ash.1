@@ -37,6 +37,8 @@ Subperintah
 .B install
 menambahkan blok integrasi terkelola ke berkas awal shell. Saat instalasi, bahasa
 dipilih berdasarkan
+.B ASH_LANG
+(jika ditetapkan) atau
 .B LANG
 dan paket bahasa yang tersedia disimpan di
 .IR ~/.ash/languages/ .
@@ -82,8 +84,14 @@ Menyetujui konfirmasi pembaruan.
 Melewati konfigurasi yang telah disesuaikan.
 .SH LINGKUNGAN
 .TP
+.B ASH_LANG
+Memilih bahasa antarmuka sementara dan memiliki prioritas atas
+.BR LANG .
+.TP
 .B LANG
-Memilih bahasa antarmuka. Mendukung en_US, zh_CN, zh_TW, es_ES, ar_AE, dan id_ID. Jika terjemahan dialek tidak tersedia, katalog bahasa yang tersedia akan digunakan.
+Memilih bahasa antarmuka jika
+.B ASH_LANG
+tidak ditetapkan. Mendukung en_US, zh_CN, zh_TW, es_ES, ar_AE, dan id_ID. Jika terjemahan dialek tidak tersedia, katalog bahasa yang tersedia akan digunakan.
 .TP
 .B AI_ENDPOINT, AI_MODEL, AI_AUTH_TOKEN
 Mengatur endpoint, model, dan kredensial AI.

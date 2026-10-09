@@ -37,6 +37,8 @@ El subcomando
 .B install
 añade un bloque de integración administrado a los archivos de inicio del shell.
 Durante la instalación, el idioma se selecciona según
+.B ASH_LANG
+(si está definida) o, de lo contrario,
 .B LANG
 y los paquetes disponibles se guardan en
 .IR ~/.ash/languages/ .
@@ -82,8 +84,14 @@ Acepta la confirmación de actualización.
 Omite la configuración personalizada.
 .SH ENTORNO
 .TP
+.B ASH_LANG
+Selecciona temporalmente el idioma de la interfaz y tiene prioridad sobre
+.BR LANG .
+.TP
 .B LANG
-Selecciona el idioma de la interfaz. Se admiten en_US, zh_CN, zh_TW, es_ES, ar_AE e id_ID. Si no existe una variante regional, se usa el catálogo disponible para ese idioma.
+Selecciona el idioma de la interfaz si
+.B ASH_LANG
+no está definida. Se admiten en_US, zh_CN, zh_TW, es_ES, ar_AE e id_ID. Si no existe una variante regional, se usa el catálogo disponible para ese idioma.
 .TP
 .B AI_ENDPOINT, AI_MODEL, AI_AUTH_TOKEN
 Configuran el endpoint, el modelo y las credenciales de IA.

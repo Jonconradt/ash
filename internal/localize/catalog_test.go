@@ -34,6 +34,19 @@ func TestResolveLocale(t *testing.T) {
 	}
 }
 
+func TestEnvironmentLocalePrefersASHLang(t *testing.T) {
+	t.Setenv("LANG", "es_ES.UTF-8")
+	t.Setenv("ASH_LANG", "zh_TW")
+	if got := EnvironmentLocale(); got != "zh_TW" {
+		t.Fatalf("EnvironmentLocale() = %q, want ASH_LANG value %q", got, "zh_TW")
+	}
+
+	t.Setenv("ASH_LANG", "  ")
+	if got := EnvironmentLocale(); got != "es_ES.UTF-8" {
+		t.Fatalf("EnvironmentLocale() = %q, want LANG value %q", got, "es_ES.UTF-8")
+	}
+}
+
 func TestValidateCatalogLocaleRejectsUnsafePathComponents(t *testing.T) {
 	for _, locale := range []string{"../outside", "zh/../../outside", "en-US", "en_US.json"} {
 		if err := ValidateCatalogLocale(locale); err == nil {

@@ -26,6 +26,14 @@ const defaultLocale = "en_US"
 var formatVerbPattern = regexp.MustCompile(`%(\[[1-9][0-9]*\])?[-+# 0-9.]*[a-zA-Z]`)
 var catalogLocalePattern = regexp.MustCompile(`^[A-Za-z]{2,3}_[A-Za-z]{2,4}$`)
 
+// EnvironmentLocale returns ASH_LANG when set, otherwise LANG.
+func EnvironmentLocale() string {
+	if locale := strings.TrimSpace(os.Getenv("ASH_LANG")); locale != "" {
+		return locale
+	}
+	return strings.TrimSpace(os.Getenv("LANG"))
+}
+
 type fileCatalog struct {
 	Locale   string            `json:"locale"`
 	Parent   string            `json:"parent,omitempty"`

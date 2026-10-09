@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 	"time"
 
 	"ash/internal/localize"
@@ -29,7 +28,7 @@ type languagePackMetadata struct {
 }
 
 func installPreferredLanguage(stdout io.Writer) error {
-	requested := strings.TrimSpace(os.Getenv("LANG"))
+	requested := localize.EnvironmentLocale()
 	baseLocale := localize.ResolveLocale(requested)
 	candidates := make([]string, 0, 2)
 	if exact := localize.ExactLocale(requested); exact != "" && exact != "en_US" {

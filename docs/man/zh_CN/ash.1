@@ -36,6 +36,8 @@ ash \- 用于命令未找到工作流的实用 Shell 助手
 .PP
 .B install
 子命令会向 Shell 启动文件添加受管理的集成区块。安装时会根据
+.B ASH_LANG
+（若已设置）或
 .B LANG
 选择语言，并将可用语言包存放在
 .IR ~/.ash/languages/ 。
@@ -81,8 +83,14 @@ ash \- 用于命令未找到工作流的实用 Shell 助手
 跳过已自定义的配置。
 .SH 环境
 .TP
+.B ASH_LANG
+临时选择界面语言，且优先于
+.BR LANG 。
+.TP
 .B LANG
-选择界面语言。支持 en_US、zh_CN、zh_TW、es_ES、ar_AE 和 id_ID；缺少方言翻译时会使用相应语言目录。
+仅在未设置
+.B ASH_LANG
+时选择界面语言。支持 en_US、zh_CN、zh_TW、es_ES、ar_AE 和 id_ID；缺少方言翻译时会使用相应语言目录。
 .TP
 .B AI_ENDPOINT, AI_MODEL, AI_AUTH_TOKEN
 配置 AI 服务端点、模型和凭据。

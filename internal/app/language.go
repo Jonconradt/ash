@@ -20,7 +20,7 @@ func initLanguage(stderr io.Writer) bool {
 		_, _ = fmt.Fprintf(stderr, "language packs unavailable: %v; using en_US\n", err)
 		return true
 	}
-	if err := localize.Init(os.Getenv("LANG"), filepath.Join(home, ".ash", "languages")); err != nil {
+	if err := localize.Init(localize.EnvironmentLocale(), filepath.Join(home, ".ash", "languages")); err != nil {
 		_, _ = fmt.Fprintf(stderr, "language catalog error: %v\n", err)
 		if fallbackErr := localize.Init("en_US", ""); fallbackErr != nil {
 			_, _ = fmt.Fprintf(stderr, "English language catalog error: %v\n", fallbackErr)

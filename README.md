@@ -148,7 +148,9 @@ file, so restart the shell or source its rc file afterward.
 
 ### Language support
 
-`ash` and `ash-broker` use `LANG` to select the interface language. Releases
+`ash` and `ash-broker` use `ASH_LANG` to select the interface language when it
+is set; otherwise they use `LANG`. Set `ASH_LANG` to temporarily test another
+language without changing your shell's `LANG` setting. Releases
 include the `en_US` fallback catalog and publish downloadable UTF-8 JSON
 language catalogs for `zh_CN`, `zh_TW`, `es_ES`, `ar_AE`, and `id_ID`.
 Ash also tells the AI to respond in the resolved language.
