@@ -224,7 +224,35 @@ func Load(rawLocale, dir string) (*Translator, error) {
 	}, nil
 }
 
-func loadCatalogChain(locale, dir string, files map[string]fileCatalog, visiting map[string]bool, require bool) error {
+func loadCatalogChain(locale, dir string, files map[string]fileCatalog, visiting map[string]bool, require bool) (resultErr error) {
+	if err := ValidateCatalogLocale(locale); err != nil {
+		return err
+	}
+	if locale == defaultLocale {
+		return nil
+	}
+	if visiting[locale] {
+		return fmt.Errorf("language catalog parent cycle at %s", locale)
+	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			if require {
+				return fmt.Errorf("language catalog %s.json is missing", locale)
+			}
+			return nil
+		}
+		return fmt.Errorf("open language catalog directory %s: %w", dir, err)
+	}
+	defer func() {
+		if closeErr := root.Close(); resultErr == nil && closeErr != nil {
+			resultErr = fmt.Errorf("close language catalog directory %s: %w", dir, closeErr)
+		}
+	}()
+	return loadCatalogChainFromRoot(locale, dir, root, files, visiting, require)
+}
+
+func loadCatalogChainFromRoot(locale, dir string, root *os.Root, files map[string]fileCatalog, visiting map[string]bool, require bool) error {
 	if err := ValidateCatalogLocale(locale); err != nil {
 		return err
 	}
@@ -235,7 +263,7 @@ func loadCatalogChain(locale, dir string, files map[string]fileCatalog, visiting
 		return fmt.Errorf("language catalog parent cycle at %s", locale)
 	}
 	path := filepath.Join(dir, locale+".json")
-	data, err := os.ReadFile(path)
+	file, err := root.Open(locale + ".json")
 	if errors.Is(err, os.ErrNotExist) {
 		if require {
 			return fmt.Errorf("language catalog %s.json is missing", locale)
@@ -244,6 +272,14 @@ func loadCatalogChain(locale, dir string, files map[string]fileCatalog, visiting
 	}
 	if err != nil {
 		return fmt.Errorf("read language catalog %s: %w", path, err)
+	}
+	data, readErr := io.ReadAll(file)
+	closeErr := file.Close()
+	if readErr != nil {
+		return fmt.Errorf("read language catalog %s: %w", path, readErr)
+	}
+	if closeErr != nil {
+		return fmt.Errorf("close language catalog %s: %w", path, closeErr)
 	}
 	entry, err := parseCatalog(data, path)
 	if err != nil {
@@ -254,7 +290,7 @@ func loadCatalogChain(locale, dir string, files map[string]fileCatalog, visiting
 	}
 	visiting[locale] = true
 	if entry.Parent != "" {
-		if err := loadCatalogChain(entry.Parent, dir, files, visiting, require); err != nil {
+		if err := loadCatalogChainFromRoot(entry.Parent, dir, root, files, visiting, require); err != nil {
 			return err
 		}
 	}
@@ -329,7 +365,7 @@ func parseCatalog(data []byte, source string) (fileCatalog, error) {
 
 // ValidateDir parses the catalogs in dir and ensures every catalog resolves
 // all keys from the English base through its declared parent chain.
-func ValidateDir(dir string) error {
+func ValidateDir(dir string) (resultErr error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		return fmt.Errorf("read language catalog directory %s: %w", dir, err)
@@ -343,14 +379,31 @@ func ValidateDir(dir string) error {
 		return err
 	}
 	files := make(map[string]fileCatalog)
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return fmt.Errorf("open language catalog directory %s: %w", dir, err)
+	}
+	defer func() {
+		if closeErr := root.Close(); resultErr == nil && closeErr != nil {
+			resultErr = fmt.Errorf("close language catalog directory %s: %w", dir, closeErr)
+		}
+	}()
 	for _, entry := range entries {
 		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
 			continue
 		}
 		path := filepath.Join(dir, entry.Name())
-		data, readErr := os.ReadFile(path)
+		file, openErr := root.Open(entry.Name())
+		if openErr != nil {
+			return fmt.Errorf("read language catalog %s: %w", path, openErr)
+		}
+		data, readErr := io.ReadAll(file)
+		closeErr := file.Close()
 		if readErr != nil {
 			return fmt.Errorf("read language catalog %s: %w", path, readErr)
+		}
+		if closeErr != nil {
+			return fmt.Errorf("close language catalog %s: %w", path, closeErr)
 		}
 		parsed, parseErr := parseCatalog(data, path)
 		if parseErr != nil {

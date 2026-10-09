@@ -112,7 +112,7 @@ func commitLanguageCatalogs(stagingDir, languageDir string) error {
 	return nil
 }
 
-func fetchLanguageCatalogChain(locale, dir string, visiting map[string]bool) error {
+func fetchLanguageCatalogChain(locale, dir string, visiting map[string]bool) (resultErr error) {
 	if err := localize.ValidateCatalogLocale(locale); err != nil {
 		return err
 	}
@@ -125,10 +125,31 @@ func fetchLanguageCatalogChain(locale, dir string, visiting map[string]bool) err
 	visiting[locale] = true
 	defer delete(visiting, locale)
 
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return fmt.Errorf("open language catalog directory %s: %w", dir, err)
+	}
+	defer func() {
+		if closeErr := root.Close(); resultErr == nil && closeErr != nil {
+			resultErr = fmt.Errorf("close language catalog directory %s: %w", dir, closeErr)
+		}
+	}()
 	path := filepath.Join(dir, locale+".json")
-	data, err := os.ReadFile(path)
+	var data []byte
+	file, err := root.Open(locale + ".json")
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
 		return fmt.Errorf("read existing language catalog %s: %w", path, err)
+	}
+	if err == nil {
+		var readErr error
+		data, readErr = io.ReadAll(file)
+		closeErr := file.Close()
+		if readErr != nil {
+			return fmt.Errorf("read existing language catalog %s: %w", path, readErr)
+		}
+		if closeErr != nil {
+			return fmt.Errorf("close existing language catalog %s: %w", path, closeErr)
+		}
 	}
 	if errors.Is(err, os.ErrNotExist) {
 		data, err = downloadLanguageCatalog(locale)
