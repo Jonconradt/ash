@@ -41,6 +41,7 @@ const (
 	protocolDiscoveryTimeout = 15 * time.Second
 	legacyToolsTTL           = 5 * time.Minute
 	toolsTimeout             = 15 * time.Second
+	oauthDialFallbackDelay   = 300 * time.Millisecond
 )
 
 var toolNameSanitizer = regexp.MustCompile(`[^A-Za-z0-9_-]+`)
@@ -468,15 +469,102 @@ func (t *remoteOAuthTransport) dialContext(ctx context.Context, network, address
 			}
 		}
 	}
+	return dialResolvedOAuthAddresses(ctx, network, port, addresses, t.dial)
+}
+
+type oauthDialResult struct {
+	conn net.Conn
+	err  error
+}
+
+func dialResolvedOAuthAddresses(ctx context.Context, network, port string, addresses []netip.Addr, dial func(context.Context, string, string) (net.Conn, error)) (net.Conn, error) {
+	if len(addresses) == 0 {
+		return nil, errors.New("no resolved OAuth addresses to dial")
+	}
+	dialCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	results := make(chan oauthDialResult, len(addresses))
+	next, active := 0, 0
+	launch := func() {
+		address := net.JoinHostPort(addresses[next].String(), port)
+		next++
+		active++
+		go func() {
+			conn, err := dial(dialCtx, network, address)
+			results <- oauthDialResult{conn: conn, err: err}
+		}()
+	}
+	launch()
+
+	timer := time.NewTimer(oauthDialFallbackDelay)
+	defer timer.Stop()
+	timerC := timer.C
 	var lastErr error
-	for _, ip := range addresses {
-		conn, err := t.dial(ctx, network, net.JoinHostPort(ip.String(), port))
-		if err == nil {
-			return conn, nil
+	for active > 0 {
+		select {
+		case result := <-results:
+			active--
+			if result.err == nil && result.conn != nil {
+				cancel()
+				drainOAuthDialResults(results, active)
+				return result.conn, nil
+			}
+			if result.err != nil {
+				lastErr = result.err
+			} else {
+				lastErr = errors.New("OAuth dial returned no connection")
+			}
+			if active == 0 && next < len(addresses) {
+				launch()
+				if next < len(addresses) {
+					resetTimer(timer, oauthDialFallbackDelay)
+					timerC = timer.C
+				} else {
+					timerC = nil
+				}
+			}
+		case <-timerC:
+			if next < len(addresses) {
+				launch()
+			}
+			if next < len(addresses) {
+				timer.Reset(oauthDialFallbackDelay)
+				timerC = timer.C
+			} else {
+				timerC = nil
+			}
+		case <-ctx.Done():
+			cancel()
+			drainOAuthDialResults(results, active)
+			return nil, ctx.Err()
 		}
-		lastErr = err
 	}
 	return nil, lastErr
+}
+
+func resetTimer(timer *time.Timer, delay time.Duration) {
+	if !timer.Stop() {
+		select {
+		case <-timer.C:
+		default:
+		}
+	}
+	timer.Reset(delay)
+}
+
+func drainOAuthDialResults(results <-chan oauthDialResult, count int) {
+	if count == 0 {
+		return
+	}
+	go func() {
+		for range count {
+			result := <-results
+			if result.conn != nil {
+				_ = result.conn.Close()
+			}
+		}
+	}()
 }
 
 func normalizeOAuthAuthority(parsed *url.URL) string {

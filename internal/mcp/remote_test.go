@@ -1286,6 +1286,57 @@ func TestRemoteOAuthTransportAllowsPrivateAddressesOnlyForRegisteredOrigin(t *te
 	}
 }
 
+func TestRemoteOAuthTransportFallsBackAcrossResolvedAddresses(t *testing.T) {
+	firstIP := netip.MustParseAddr("2001:4860:4860::8888")
+	secondIP := netip.MustParseAddr("8.8.8.8")
+	firstAddress := net.JoinHostPort(firstIP.String(), "443")
+	secondAddress := net.JoinHostPort(secondIP.String(), "443")
+	attempts := make(chan string, 2)
+	transport := &remoteOAuthTransport{
+		base:             &http.Transport{},
+		trustedAuthority: "mcp.example:443",
+		lookupNetIP: func(context.Context, string, string) ([]netip.Addr, error) {
+			return []netip.Addr{firstIP, secondIP}, nil
+		},
+		dial: func(ctx context.Context, _, address string) (net.Conn, error) {
+			attempts <- address
+			if address == firstAddress {
+				<-ctx.Done()
+				return nil, ctx.Err()
+			}
+			if address != secondAddress {
+				return nil, fmt.Errorf("unexpected dial address %q", address)
+			}
+			conn, peer := net.Pipe()
+			go func() { _ = peer.Close() }()
+			return conn, nil
+		},
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	start := time.Now()
+	conn, err := transport.dialContext(ctx, "tcp", "mcp.example:443")
+	elapsed := time.Since(start)
+	if err != nil {
+		t.Fatalf("dialContext() error = %v", err)
+	}
+	_ = conn.Close()
+	if elapsed >= 2*time.Second {
+		t.Fatalf("dialContext() took %v, want fallback without waiting for the first address to time out", elapsed)
+	}
+	for _, want := range []string{firstAddress, secondAddress} {
+		select {
+		case got := <-attempts:
+			if got != want {
+				t.Fatalf("dial attempt = %q, want %q", got, want)
+			}
+		default:
+			t.Fatalf("dial attempt for %q was not started", want)
+		}
+	}
+}
+
 func TestRemoteManagerOAuthAuthorizationCodeFlow(t *testing.T) {
 	var mu sync.Mutex
 	var codeChallenge string
