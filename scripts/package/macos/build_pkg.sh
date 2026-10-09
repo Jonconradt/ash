@@ -4,7 +4,7 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  build_pkg.sh --app-name <name> --version <vX.Y.Z> --binary <path> --install-path </path> --man-page <path> --man-install-path </path> --output <path.pkg>
+  build_pkg.sh --app-name <name> --version <vX.Y.Z> --binary <path> --install-path </path> --man-page <path> --man-install-path </path> [--localized-man-dir <dir>] --output <path.pkg>
 EOF
 }
 
@@ -14,6 +14,7 @@ binary_path=""
 install_path=""
 man_page_path=""
 man_install_path=""
+localized_man_dir=""
 output_path=""
 
 while [[ $# -gt 0 ]]; do
@@ -40,6 +41,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --man-install-path)
       man_install_path="${2:-}"
+      shift 2
+      ;;
+    --localized-man-dir)
+      localized_man_dir="${2:-}"
       shift 2
       ;;
     --output)
@@ -105,6 +110,30 @@ mkdir -p "$target_dir"
 mkdir -p "$target_man_dir"
 install -m 0755 "$binary_path" "$target_dir/$app_name"
 install -m 0644 "$man_page_path" "$target_man_dir/$app_name.1"
+if [[ -n "$localized_man_dir" ]]; then
+  if [[ ! -d "$localized_man_dir" ]]; then
+    echo "localized man page directory not found: $localized_man_dir" >&2
+    exit 1
+  fi
+  man_root="${man_install_path%/man1}"
+  if [[ "$man_root" == "$man_install_path" ]]; then
+    echo "man install path must end in /man1 to install localized pages: $man_install_path" >&2
+    exit 1
+  fi
+  localized_count=0
+  for page in "$localized_man_dir"/*/"$app_name".1; do
+    [[ -f "$page" ]] || continue
+    locale="$(basename "$(dirname "$page")")"
+    locale_man_dir="$payload_root$man_root/$locale/man1"
+    mkdir -p "$locale_man_dir"
+    install -m 0644 "$page" "$locale_man_dir/$app_name.1"
+    ((localized_count += 1))
+  done
+  if [[ "$localized_count" -eq 0 ]]; then
+    echo "no localized man pages found in: $localized_man_dir" >&2
+    exit 1
+  fi
+fi
 
 pkgbuild \
   --identifier "dev.ash.cli" \

@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"ash/internal/localize"
 )
 
 const (
@@ -18,16 +20,16 @@ const (
 
 func runSnooze(args []string, stdout, stderr io.Writer) int {
 	if len(args) > 1 {
-		_, _ = fmt.Fprintln(stderr, "usage: ash snooze [duration|off]")
+		_, _ = fmt.Fprintln(stderr, localize.Text("usage.snooze"))
 		return 1
 	}
 
 	if len(args) == 1 && strings.EqualFold(strings.TrimSpace(args[0]), "off") {
 		if err := clearSnooze(); err != nil {
-			_, _ = fmt.Fprintf(stderr, "failed to clear snooze: %v\n", err)
+			_, _ = fmt.Fprintln(stderr, localize.Format("snooze.failed_clear", []any{err}))
 			return 1
 		}
-		_, _ = fmt.Fprintln(stdout, "ash prompt processing resumed")
+		_, _ = fmt.Fprintln(stdout, localize.Text("snooze.resumed"))
 		return 0
 	}
 
@@ -35,7 +37,7 @@ func runSnooze(args []string, stdout, stderr io.Writer) int {
 	if len(args) == 1 {
 		parsed, err := time.ParseDuration(strings.TrimSpace(args[0]))
 		if err != nil || parsed <= 0 {
-			_, _ = fmt.Fprintln(stderr, "duration must be a positive value such as 30s, 5m, or 1h")
+			_, _ = fmt.Fprintln(stderr, localize.Text("snooze.invalid_duration"))
 			return 1
 		}
 		duration = parsed
@@ -43,10 +45,10 @@ func runSnooze(args []string, stdout, stderr io.Writer) int {
 
 	expiresAt := timeNow().Add(duration)
 	if err := writeSnoozeExpiry(expiresAt); err != nil {
-		_, _ = fmt.Fprintf(stderr, "failed to start snooze: %v\n", err)
+		_, _ = fmt.Fprintln(stderr, localize.Format("snooze.failed_start", []any{err}))
 		return 1
 	}
-	_, _ = fmt.Fprintf(stdout, "ash prompt processing snoozed until %s\n", expiresAt.Format(time.RFC3339))
+	_, _ = fmt.Fprintln(stdout, localize.Format("snooze.started", []any{expiresAt.Format(time.RFC3339)}))
 	return 0
 }
 

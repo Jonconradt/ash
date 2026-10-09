@@ -85,5 +85,13 @@ if ! grep -Eq "^(\./)?${expected_man_path#/}$" <<<"$payload_list"; then
   echo "$payload_list" >&2
   exit 1
 fi
+man_root="${expected_man_path%/man1/$app_name.1}"
+for locale in zh_CN zh_TW es_ES ar_AE id_ID; do
+  expected_localized_man="$man_root/$locale/man1/$app_name.1"
+  if ! grep -Eq "^(\./)?${expected_localized_man#/}$" <<<"$payload_list"; then
+    echo "localized man page missing from package: $expected_localized_man" >&2
+    exit 1
+  fi
+done
 
 echo "package validation passed: $pkg_path"

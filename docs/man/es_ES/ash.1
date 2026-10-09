@@ -1,0 +1,110 @@
+.TH ASH 1 "October 2026" "ash" "Órdenes de usuario"
+.SH NOMBRE
+ash \- asistente práctico de shell para flujos de trabajo de órdenes no encontradas
+.SH SINOPSIS
+.B ash
+.RI [ --attach " ruta" ]...
+.RI [ texto... ]
+.br
+.B ash install
+.RI [ --shell " bash|fish|zsh" ]
+.RI [ --dry-run ]
+.RI [ --overwrite ]
+.br
+.B ash mcp add
+.I URL
+.RI [ --no-browser ]
+.br
+.B ash snooze
+.RI [ duración|off ]
+.br
+.B ash update
+.RI [ --version vX.Y.Z ]
+.RI [ --yes | --skip-customized ]
+.SH DESCRIPCIÓN
+.B ash
+envía el texto de la solicitud al endpoint de IA configurado y muestra la respuesta.
+Si no se proporciona texto como argumento, lee la solicitud de la entrada estándar
+cuando esta no es interactiva.
+.PP
+En macOS, una petición de lenguaje natural que comienza por
+.B say
+pronuncia la respuesta correcta mediante la función nativa de texto a voz. Defina
+.B ASH_SAY_TEXT=1
+para forzar la salida de texto.
+.PP
+El subcomando
+.B install
+añade un bloque de integración administrado a los archivos de inicio del shell.
+Durante la instalación, el idioma se selecciona según
+.B LANG
+y los paquetes disponibles se guardan en
+.IR ~/.ash/languages/ .
+.SH ÓRDENES
+.TP
+.B ash [texto...]
+Envía una solicitud al asistente.
+.TP
+.B ash install
+Instala o actualiza la integración del shell. Admite bash, zsh y fish.
+.TP
+.B ash mcp add URL
+Conecta con un servidor MCP remoto y lo registra en la lista de permisos.
+.TP
+.B ash snooze [duración|off]
+Pausa el procesamiento de solicitudes; use
+.B off
+para reanudarlo.
+.TP
+.B ash update
+Verifica e instala una versión firmada de GitHub.
+.SH OPCIONES
+.TP
+.BI --attach " ruta"
+Adjunta una imagen o un documento a la solicitud. Se puede repetir.
+.TP
+.BI --shell " shell"
+Selecciona explícitamente el shell que se instalará.
+.TP
+.B --dry-run
+Previsualiza los cambios sin escribir archivos.
+.TP
+.B --overwrite
+Sobrescribe los archivos administrados instalados.
+.TP
+.B --no-browser
+No abre automáticamente la página de autorización MCP.
+.TP
+.B --yes
+Acepta la confirmación de actualización.
+.TP
+.B --skip-customized
+Omite la configuración personalizada.
+.SH ENTORNO
+.TP
+.B LANG
+Selecciona el idioma de la interfaz. Se admiten en_US, zh_CN, zh_TW, es_ES, ar_AE e id_ID. Si no existe una variante regional, se usa el catálogo disponible para ese idioma.
+.TP
+.B AI_ENDPOINT, AI_MODEL, AI_AUTH_TOKEN
+Configuran el endpoint, el modelo y las credenciales de IA.
+.TP
+.B ASH_SAY_TEXT
+Con el valor
+.B 1
+desactiva la salida de voz.
+.SH ARCHIVOS
+.TP
+.I ~/.ash/languages/
+Catálogos de idioma instalados por el usuario.
+.TP
+.I ~/.ash/.ash_env
+Configuración administrada del entorno de IA.
+.SH ESTADO DE SALIDA
+.TP
+.B 0
+La orden se completó correctamente.
+.TP
+.B Distinto de cero
+La orden falló o los argumentos no son válidos.
+.SH VÉASE TAMBIÉN
+.BR ash-broker (1)

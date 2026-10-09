@@ -180,6 +180,13 @@ jobs:
       - name: Flatten artifact directories
         run: |
           find dist/release -mindepth 2 -type f -name '*' -exec mv {} dist/release/ \;
+      - name: Add downloadable language catalogs
+        run: |
+          set -euo pipefail
+          for catalog in internal/localize/languages/*.json; do
+            locale="$(basename "$catalog" .json)"
+            cp "$catalog" "dist/release/ash-language-${locale}.json"
+          done
       - name: Install cosign
         uses: sigstore/cosign-installer@v3.8.1
       - name: Generate and sign checksum manifest
@@ -187,7 +194,7 @@ jobs:
           set -euo pipefail
           cd dist/release
           : > SHA256SUMS
-          for artifact in ash-*.pkg ash-*.deb ash-*.rpm ash-*.tar.gz ash-*.msi; do
+          for artifact in ash-*.pkg ash-*.deb ash-*.rpm ash-*.tar.gz ash-*.msi ash-language-*.json; do
             if [[ -f "$artifact" ]]; then
               sha256sum "$artifact" >> SHA256SUMS
             fi

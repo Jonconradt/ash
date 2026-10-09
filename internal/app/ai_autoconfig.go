@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"ash/internal/localize"
 	"ash/internal/uistyle"
 )
 
@@ -211,12 +212,12 @@ func fetchAvailableModels(provider aiProvider, baseURL, authToken string) ([]str
 
 // promptSelectModel displays a numeric menu of models and returns the chosen (or manually entered) model name.
 func promptSelectModel(reader *bufio.Reader, stdout io.Writer, models []string) (string, error) {
-	uistyle.PrintMenuTitle(stdout, "Select a model:")
+	uistyle.PrintMenuTitle(stdout, localize.Text("install.model.title"))
 	for i, m := range models {
 		uistyle.PrintMenuItem(stdout, i+1, m, "")
 	}
 	customIdx := len(models) + 1
-	uistyle.PrintMenuItem(stdout, customIdx, "Enter a custom model name", "")
+	uistyle.PrintMenuItem(stdout, customIdx, localize.Text("install.model.custom"), "")
 
 	for {
 		uistyle.PrintPrompt(stdout, aiEnvModel)
@@ -236,7 +237,7 @@ func promptSelectModel(reader *bufio.Reader, stdout io.Writer, models []string) 
 				return promptNonEmpty(reader, stdout, aiEnvModel)
 			}
 		}
-		uistyle.PrintError(stdout, "invalid selection, enter a menu number")
+		uistyle.PrintError(stdout, localize.Text("install.selection.invalid"))
 	}
 }
 
@@ -252,12 +253,12 @@ func promptModelForEndpoint(reader *bufio.Reader, stdout io.Writer, provider aiP
 
 // promptSelectDetectedProvider displays a numeric menu of detected cloud providers and returns the chosen one.
 func promptSelectDetectedProvider(reader *bufio.Reader, stdout io.Writer, detected []detectedCloudProvider) (detectedCloudProvider, error) {
-	uistyle.PrintMenuTitle(stdout, "Multiple cloud AI provider credentials detected:")
+	uistyle.PrintMenuTitle(stdout, localize.Text("install.providers.multiple"))
 	for i, d := range detected {
 		uistyle.PrintMenuItem(stdout, i+1, d.Name, "")
 	}
 	for {
-		uistyle.PrintPrompt(stdout, "Select provider")
+		uistyle.PrintPrompt(stdout, localize.Text("install.provider.select"))
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			return detectedCloudProvider{}, err
@@ -266,7 +267,7 @@ func promptSelectDetectedProvider(reader *bufio.Reader, stdout io.Writer, detect
 		if convErr == nil && idx >= 1 && idx <= len(detected) {
 			return detected[idx-1], nil
 		}
-		uistyle.PrintError(stdout, "invalid selection, enter a menu number")
+		uistyle.PrintError(stdout, localize.Text("install.selection.invalid"))
 	}
 }
 
@@ -289,12 +290,12 @@ func resolveOllamaCloudSelection(reader *bufio.Reader, stdout io.Writer, baseURL
 		return baseURL, authToken, nil
 	}
 
-	uistyle.PrintHint(stdout, fmt.Sprintf("%q is an Ollama cloud model; using %s, which requires an API key.", model, ollamaCloudEndpoint))
+	uistyle.PrintHint(stdout, localize.Format("install.ollama_cloud_model", []any{model, ollamaCloudEndpoint}))
 	if authToken == "" {
 		authToken = strings.TrimSpace(os.Getenv("OLLAMA_API_KEY"))
 	}
 	if authToken == "" {
-		uistyle.PrintHint(stdout, "Create a key at https://ollama.com/settings/keys")
+		uistyle.PrintHint(stdout, localize.Text("install.ollama_cloud_key"))
 		var err error
 		authToken, err = promptNonEmpty(reader, stdout, aiEnvAuthToken)
 		if err != nil {
@@ -345,12 +346,12 @@ func promptInstallEnvValuesAuto(reader *bufio.Reader, stdout io.Writer) (map[str
 				return nil, err
 			}
 		}
-		uistyle.PrintSuccess(stdout, fmt.Sprintf("Detected %s credentials; configuring ash automatically.", chosen.Name))
+		uistyle.PrintSuccess(stdout, localize.Format("install.provider.detected", []any{chosen.Name}))
 		return finishAutoConfigure(reader, stdout, chosen.Endpoint, chosen.AuthToken)
 	}
 
 	if local := detectLocalAIService(); local != nil {
-		uistyle.PrintSuccess(stdout, fmt.Sprintf("Detected local AI server (%s); configuring ash automatically.", local.Name))
+		uistyle.PrintSuccess(stdout, localize.Format("install.local_server.detected", []any{local.Name}))
 		return finishAutoConfigure(reader, stdout, local.BaseURL, "")
 	}
 

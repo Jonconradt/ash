@@ -1,0 +1,110 @@
+.TH ASH 1 "October 2026" "ash" "Perintah Pengguna"
+.SH NAMA
+ash \- asisten shell praktis untuk alur kerja perintah yang tidak ditemukan
+.SH SINOPSIS
+.B ash
+.RI [ --attach " jalur" ]...
+.RI [ teks... ]
+.br
+.B ash install
+.RI [ --shell " bash|fish|zsh" ]
+.RI [ --dry-run ]
+.RI [ --overwrite ]
+.br
+.B ash mcp add
+.I URL
+.RI [ --no-browser ]
+.br
+.B ash snooze
+.RI [ durasi|off ]
+.br
+.B ash update
+.RI [ --version vX.Y.Z ]
+.RI [ --yes | --skip-customized ]
+.SH DESKRIPSI
+.B ash
+mengirim teks prompt ke endpoint AI yang dikonfigurasi dan menampilkan balasan asisten.
+Jika teks posisi tidak diberikan, prompt dibaca dari input standar noninteraktif.
+.PP
+Di macOS, permintaan bahasa alami yang diawali
+.B say
+akan membacakan balasan yang berhasil menggunakan fitur teks-ke-suara bawaan.
+Atur
+.B ASH_SAY_TEXT=1
+untuk memaksa keluaran teks.
+.PP
+Subperintah
+.B install
+menambahkan blok integrasi terkelola ke berkas awal shell. Saat instalasi, bahasa
+dipilih berdasarkan
+.B LANG
+dan paket bahasa yang tersedia disimpan di
+.IR ~/.ash/languages/ .
+.SH PERINTAH
+.TP
+.B ash [teks...]
+Mengirim satu permintaan asisten.
+.TP
+.B ash install
+Memasang atau memperbarui integrasi shell. Mendukung bash, zsh, dan fish.
+.TP
+.B ash mcp add URL
+Menghubungkan server MCP jarak jauh dan mendaftarkannya di daftar izin.
+.TP
+.B ash snooze [durasi|off]
+Menjeda pemrosesan prompt; gunakan
+.B off
+untuk melanjutkannya.
+.TP
+.B ash update
+Memverifikasi dan memasang rilis GitHub yang ditandatangani.
+.SH OPSI
+.TP
+.BI --attach " jalur"
+Melampirkan gambar atau dokumen ke permintaan. Dapat digunakan berulang kali.
+.TP
+.BI --shell " shell"
+Memilih shell yang akan dipasang secara eksplisit.
+.TP
+.B --dry-run
+Meninjau perubahan berkas tanpa menulisnya.
+.TP
+.B --overwrite
+Menimpa berkas terkelola yang sudah terpasang.
+.TP
+.B --no-browser
+Tidak membuka halaman otorisasi MCP secara otomatis.
+.TP
+.B --yes
+Menyetujui konfirmasi pembaruan.
+.TP
+.B --skip-customized
+Melewati konfigurasi yang telah disesuaikan.
+.SH LINGKUNGAN
+.TP
+.B LANG
+Memilih bahasa antarmuka. Mendukung en_US, zh_CN, zh_TW, es_ES, ar_AE, dan id_ID. Jika terjemahan dialek tidak tersedia, katalog bahasa yang tersedia akan digunakan.
+.TP
+.B AI_ENDPOINT, AI_MODEL, AI_AUTH_TOKEN
+Mengatur endpoint, model, dan kredensial AI.
+.TP
+.B ASH_SAY_TEXT
+Menonaktifkan keluaran suara jika diatur ke
+.B 1
+.
+.SH BERKAS
+.TP
+.I ~/.ash/languages/
+Katalog bahasa yang dipasang pengguna.
+.TP
+.I ~/.ash/.ash_env
+Konfigurasi lingkungan AI terkelola.
+.SH STATUS KELUAR
+.TP
+.B 0
+Perintah berhasil.
+.TP
+.B Bukan nol
+Perintah gagal atau argumen tidak valid.
+.SH LIHAT JUGA
+.BR ash-broker (1)

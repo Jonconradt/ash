@@ -7,7 +7,25 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"ash/internal/localize"
 )
+
+func TestSystemPromptUsesResolvedResponseLanguage(t *testing.T) {
+	languageDir := filepath.Join("..", "localize", "languages")
+	if err := localize.Init("zh_TW.UTF-8", languageDir); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := localize.Init("en_US", ""); err != nil {
+			t.Errorf("restore English translator: %v", err)
+		}
+	})
+
+	if got := expandSystemPrompt("Respond in $ASH_RESPONSE_LANGUAGE"); got != "Respond in Traditional Chinese" {
+		t.Fatalf("expanded response-language instruction = %q", got)
+	}
+}
 
 func TestReadSystemPrompt(t *testing.T) {
 	originalCwd, err := os.Getwd()

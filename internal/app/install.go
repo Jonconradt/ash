@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"ash/internal/localize"
 	"ash/internal/uistyle"
 )
 
@@ -68,6 +69,12 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 	if shellName == "" {
 		shellName = defaultInstallShell(os.Getenv("SHELL"))
 	}
+	if !dryRun {
+		if err := installPreferredLanguage(stdout); err != nil {
+			_, _ = fmt.Fprintf(stderr, "install error: %v\n", err)
+			return 1
+		}
+	}
 
 	rcPath, err := rcPathForShell(shellName)
 	if err != nil {
@@ -122,8 +129,8 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 				slog.Error(fmt.Sprintf("install error: %v", err), "EID", "j6SE1V4c")
 				return 1
 			}
-			_, _ = fmt.Fprintf(stdout, "ash install already present in %s\n", rcPath)
-			_, _ = fmt.Fprintln(stdout, "synced .ash_system/.ash_allow/.ash_deny to ~/.ash when present")
+			_, _ = fmt.Fprintln(stdout, localize.Format("install.already_present", []any{rcPath}))
+			_, _ = fmt.Fprintln(stdout, localize.Text("install.synced"))
 			return 0
 		}
 
@@ -134,7 +141,7 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 		}
 
 		if dryRun {
-			_, _ = fmt.Fprintf(stdout, "[dry-run] would update install block in %s\n", rcPath)
+			_, _ = fmt.Fprintln(stdout, localize.Format("install.dry_run_update", []any{rcPath}))
 			_, _ = fmt.Fprint(stdout, block)
 			if !strings.HasSuffix(block, "\n") {
 				_, _ = fmt.Fprintln(stdout)
@@ -160,15 +167,15 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 			return 1
 		}
 
-		_, _ = fmt.Fprintf(stdout, "ash install updated wrappers in %s\n", rcPath)
-		_, _ = fmt.Fprintln(stdout, "synced .ash_system/.ash_allow/.ash_deny to ~/.ash when present")
-		_, _ = fmt.Fprintln(stdout, "restart your shell or source your rc file to activate wrappers")
+		_, _ = fmt.Fprintln(stdout, localize.Format("install.updated", []any{rcPath}))
+		_, _ = fmt.Fprintln(stdout, localize.Text("install.synced"))
+		_, _ = fmt.Fprintln(stdout, localize.Text("install.restart"))
 		return 0
 	}
 
 	updated := appendInstallBlock(existing, block)
 	if dryRun {
-		_, _ = fmt.Fprintf(stdout, "[dry-run] would append install block to %s\n", rcPath)
+		_, _ = fmt.Fprintln(stdout, localize.Format("install.dry_run_append", []any{rcPath}))
 		_, _ = fmt.Fprint(stdout, block)
 		if !strings.HasSuffix(block, "\n") {
 			_, _ = fmt.Fprintln(stdout)
@@ -194,9 +201,9 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	_, _ = fmt.Fprintf(stdout, "ash install appended wrappers to %s\n", rcPath)
-	_, _ = fmt.Fprintln(stdout, "synced .ash_system/.ash_allow/.ash_deny to ~/.ash when present")
-	_, _ = fmt.Fprintln(stdout, "restart your shell or source your rc file to activate wrappers")
+	_, _ = fmt.Fprintln(stdout, localize.Format("install.appended", []any{rcPath}))
+	_, _ = fmt.Fprintln(stdout, localize.Text("install.synced"))
+	_, _ = fmt.Fprintln(stdout, localize.Text("install.restart"))
 	return 0
 }
 
@@ -218,10 +225,10 @@ func maybeAdoptBundledAllowlistEntries(stdout io.Writer, dryRun bool) error {
 	if err != nil || len(missing) == 0 {
 		return err
 	}
-	uistyle.PrintMenuTitle(stdout, "Update tool policy")
-	uistyle.PrintHint(stdout, "New bundled entries: "+strings.Join(missing, ", "))
-	uistyle.PrintHint(stdout, "Your existing policy is preserved unless you approve this addition.")
-	uistyle.PrintPrompt(stdout, "Add entries to .ash_allow? [y/N]")
+	uistyle.PrintMenuTitle(stdout, localize.Text("install.policy.title"))
+	uistyle.PrintHint(stdout, localize.Format("install.policy.new_entries", []any{strings.Join(missing, ", ")}))
+	uistyle.PrintHint(stdout, localize.Text("install.policy.preserve"))
+	uistyle.PrintPrompt(stdout, localize.Text("install.policy.add_prompt"))
 	answer, err := bufio.NewReader(os.Stdin).ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
 		return err
@@ -230,10 +237,10 @@ func maybeAdoptBundledAllowlistEntries(stdout io.Writer, dryRun bool) error {
 		if err := syncAllowlistAdditions(path, baseline, stdout); err != nil {
 			return err
 		}
-		uistyle.PrintSuccess(stdout, "Updated .ash_allow with bundled entries")
+		uistyle.PrintSuccess(stdout, localize.Text("install.policy.updated"))
 		return nil
 	}
-	uistyle.PrintHint(stdout, "Kept existing .ash_allow policy")
+	uistyle.PrintHint(stdout, localize.Text("install.policy.kept"))
 	return nil
 }
 
@@ -251,8 +258,8 @@ func maybeConfigureInstallEnv(stdout, stderr io.Writer, dryRun bool) error {
 		return nil
 	}
 	if !shouldPromptInstallEnv() {
-		uistyle.PrintHint(stdout, "AI provider not configured automatically: this shell session is not interactive (for example, running through 'curl | sh').")
-		uistyle.PrintHint(stdout, "Open a new terminal and run 'ash install' again to pick a provider and model, or set AI_ENDPOINT, AI_MODEL, and AI_AUTH_TOKEN manually.")
+		uistyle.PrintHint(stdout, localize.Text("install.interactive_hint"))
+		uistyle.PrintHint(stdout, localize.Text("install.configure_again_hint"))
 		return nil
 	}
 
@@ -282,7 +289,7 @@ func maybeConfigureInstallEnv(stdout, stderr io.Writer, dryRun bool) error {
 	if err := osWriteFile(path, []byte(buildManagedAshEnv(values)), 0o600); err != nil {
 		return err
 	}
-	_, _ = fmt.Fprintf(stdout, "updated %s\n", path)
+	_, _ = fmt.Fprintln(stdout, localize.Format("install.updated_file", []any{path}))
 	return nil
 }
 
@@ -375,7 +382,7 @@ func ashEnvFilePath() (string, error) {
 
 // promptInstallEnvValues collects the AI endpoint and authentication values needed to create a managed ash environment file.
 func promptInstallEnvValues(reader *bufio.Reader, stdout io.Writer) (map[string]string, error) {
-	uistyle.PrintMenuTitle(stdout, "Configure ash environment values")
+	uistyle.PrintMenuTitle(stdout, localize.Text("install.configure.title"))
 	endpoint, err := promptEndpointWithPresets(reader, stdout)
 	if err != nil {
 		return nil, err
@@ -426,11 +433,11 @@ func promptInstallEnvValues(reader *bufio.Reader, stdout io.Writer) (map[string]
 
 // promptEndpointWithPresets prompts for an AI endpoint, accepting either a preset choice or a custom URL.
 func promptEndpointWithPresets(reader *bufio.Reader, stdout io.Writer) (string, error) {
-	uistyle.PrintMenuTitle(stdout, "Select AI endpoint preset or enter a custom URL:")
+	uistyle.PrintMenuTitle(stdout, localize.Text("install.endpoint.title"))
 	for i, preset := range installEndpointPresets {
 		uistyle.PrintMenuItem(stdout, i+1, preset.Name, preset.URL)
 	}
-	uistyle.PrintHint(stdout, "Enter a menu number above, or paste a full http(s) URL directly.")
+	uistyle.PrintHint(stdout, localize.Text("install.endpoint.hint"))
 
 	for {
 		uistyle.PrintPrompt(stdout, aiEnvEndpoint)
@@ -460,14 +467,14 @@ func promptEndpointWithPresets(reader *bufio.Reader, stdout io.Writer) (string, 
 					if _, _, _, parseErr := parseAIEndpoint(custom); parseErr == nil {
 						return strings.TrimRight(custom, "/"), nil
 					}
-					uistyle.PrintError(stdout, "invalid endpoint, enter a full http(s) URL")
+					uistyle.PrintError(stdout, localize.Text("install.endpoint.invalid_url"))
 				}
 			}
 		}
 		if _, _, _, parseErr := parseAIEndpoint(input); parseErr == nil {
 			return strings.TrimRight(input, "/"), nil
 		}
-		uistyle.PrintError(stdout, "invalid endpoint, enter a preset number or full http(s) URL")
+		uistyle.PrintError(stdout, localize.Text("install.endpoint.invalid_choice"))
 	}
 }
 

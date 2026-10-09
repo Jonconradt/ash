@@ -15,7 +15,7 @@ edit the copies under `~/.ash/`, which are overwritten on install/update.
 
 - `.ash_env` — managed `AI_ENDPOINT`/`AI_MODEL`/`AI_AUTH_TOKEN`/PATH exports, written by `ash install`'s interactive/auto-detect flow.
 - The shell wrappers consume `ASH_MCP_CREDENTIAL_KEY` at broker launch, pass it only in the broker process environment, then unset their temporary shell copy.
-- `.ash_system` — default system prompt, supports `$IF_PYTHON_AVAILABLE`, `$TOOLS_DIR_LIST`, `$PLUGINS_DIR_LIST`, and `$VARIABLE` expansion.
+- `.ash_system` — default system prompt, supports `$IF_PYTHON_AVAILABLE`, `$TOOLS_DIR_LIST`, `$PLUGINS_DIR_LIST`, `$ASH_RESPONSE_LANGUAGE`, and `$VARIABLE` expansion.
 - `.ash_allow` — default command, tool, and plugin allowlist; HTTP(S) URL lines register remote MCP servers.
 - `.ash_deny` — default denylist for explicitly blocking specific executables, tools, and plugins.
 

@@ -8,6 +8,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"ash/internal/localize"
 )
 
 const managedVenvDirName = "venv"
@@ -88,44 +90,44 @@ func provisionManagedPythonEnv(stdout io.Writer) {
 
 	root, err := ashWorkspaceDir()
 	if err != nil {
-		_, _ = fmt.Fprintf(stdout, "skipping python environment setup: %v\n", err)
+		_, _ = fmt.Fprintln(stdout, localize.Format("install.python.setup_skipped", []any{err}))
 		return
 	}
 	venvDir := filepath.Join(root, managedVenvDirName)
 	venvPython, err := managedVenvPython()
 	if err != nil {
-		_, _ = fmt.Fprintf(stdout, "skipping python environment setup: %v\n", err)
+		_, _ = fmt.Fprintln(stdout, localize.Format("install.python.setup_skipped", []any{err}))
 		return
 	}
 
 	if !managedVenvReady(venvPython) {
 		if removeErr := os.RemoveAll(venvDir); removeErr != nil {
-			_, _ = fmt.Fprintf(stdout, "skipping python environment setup: remove incomplete environment: %v\n", removeErr)
+			_, _ = fmt.Fprintln(stdout, localize.Format("install.python.remove_incomplete", []any{removeErr}))
 			return
 		}
 		if runErr := runProvisionCommand(stdout, "python3", "-m", "venv", venvDir); runErr != nil {
-			_, _ = fmt.Fprintf(stdout, "skipping python environment setup: %v\n", runErr)
-			_, _ = fmt.Fprintln(stdout, "install python3 and the venv module, then rerun 'ash install', to enable bundled python tools")
+			_, _ = fmt.Fprintln(stdout, localize.Format("install.python.setup_skipped", []any{runErr}))
+			_, _ = fmt.Fprintln(stdout, localize.Text("install.python.install_runtime"))
 			return
 		}
 	}
 
 	reqPath := filepath.Join(venvDir, "requirements.txt")
 	if writeErr := os.WriteFile(reqPath, requirements, 0o600); writeErr != nil {
-		_, _ = fmt.Fprintf(stdout, "skipping python dependency install: %v\n", writeErr)
+		_, _ = fmt.Fprintln(stdout, localize.Format("install.python.write_requirements_failed", []any{writeErr}))
 		return
 	}
 
 	// Platforms without prebuilt wheels (FreeBSD in particular) build dependencies from
 	// source here, which can run for minutes with no pip output because of --quiet.
-	_, _ = fmt.Fprintln(stdout, "installing bundled python tool dependencies (this can take several minutes)...")
+	_, _ = fmt.Fprintln(stdout, localize.Text("install.python.installing_dependencies"))
 	if runErr := runProvisionCommand(stdout, venvPython, "-m", "pip", "install", "--disable-pip-version-check", "--quiet", "-r", reqPath); runErr != nil {
-		_, _ = fmt.Fprintf(stdout, "python dependency install failed: %v\n", runErr)
-		_, _ = fmt.Fprintln(stdout, "bundled python tools that need third-party packages will report a missing-library error until this succeeds")
+		_, _ = fmt.Fprintln(stdout, localize.Format("install.python.dependencies_failed", []any{runErr}))
+		_, _ = fmt.Fprintln(stdout, localize.Text("install.python.missing_libraries"))
 		return
 	}
 
-	_, _ = fmt.Fprintf(stdout, "python environment ready at %s\n", venvDir)
+	_, _ = fmt.Fprintln(stdout, localize.Format("install.python.ready", []any{venvDir}))
 }
 
 func runProvisionCommand(stdout io.Writer, name string, args ...string) error {

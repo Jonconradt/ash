@@ -553,6 +553,7 @@ func expandSystemPromptWithAllowlist(prompt string, allowlist map[string]struct{
 	prompt = stripSystemPromptComments(prompt)
 	prompt = strings.ReplaceAll(prompt, toolsDirListToken, renderEligibleToolScripts(allowlist))
 	prompt = strings.ReplaceAll(prompt, pluginsDirListToken, renderEligiblePlugins(allowlist))
+	prompt = strings.ReplaceAll(prompt, "$ASH_RESPONSE_LANGUAGE", responseLanguageName())
 
 	unameValue := ""
 	if _, err := execLookPath("uname"); err == nil {

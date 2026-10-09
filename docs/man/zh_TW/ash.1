@@ -1,0 +1,109 @@
+.TH ASH 1 "October 2026" "ash" "使用者命令"
+.SH 名稱
+ash \- 用於找不到命令工作流程的實用 Shell 助理
+.SH 摘要
+.B ash
+.RI [ --attach " 路徑" ]...
+.RI [ 文字... ]
+.br
+.B ash install
+.RI [ --shell " bash|fish|zsh" ]
+.RI [ --dry-run ]
+.RI [ --overwrite ]
+.br
+.B ash mcp add
+.I 網址
+.RI [ --no-browser ]
+.br
+.B ash snooze
+.RI [ 時長|off ]
+.br
+.B ash update
+.RI [ --version vX.Y.Z ]
+.RI [ --yes | --skip-customized ]
+.SH 說明
+.B ash
+會將提示文字傳送至已設定的 AI 端點，並顯示助理回覆。未提供位置文字時，
+.B ash
+會從非互動式標準輸入讀取提示。
+.PP
+在 macOS 上，以
+.B say
+開頭的自然語言 Shell 要求會使用系統文字轉語音功能朗讀成功的回覆。
+設定
+.B ASH_SAY_TEXT=1
+可強制以文字輸出。
+.PP
+.B install
+子命令會在 Shell 啟動檔案中加入受管理的整合區塊。安裝時會依據
+.B LANG
+選擇語言，並將可用語言套件存放在
+.IR ~/.ash/languages/ 。
+.SH 命令
+.TP
+.B ash [文字...]
+傳送一次助理要求。
+.TP
+.B ash install
+安裝或更新 Shell 整合。支援 bash、zsh 和 fish。
+.TP
+.B ash mcp add URL
+連線至遠端 MCP 伺服器並將其登錄在允許清單中。
+.TP
+.B ash snooze [時長|off]
+暫停提示處理；使用
+.B off
+即可恢復處理。
+.TP
+.B ash update
+驗證並安裝已簽署的 GitHub 版本。
+.SH 選項
+.TP
+.BI --attach " 路徑"
+將影像或文件附加至要求。可重複使用。
+.TP
+.BI --shell " shell"
+指定要安裝的 Shell。
+.TP
+.B --dry-run
+預覽檔案變更但不寫入。
+.TP
+.B --overwrite
+覆寫已安裝的受管理檔案。
+.TP
+.B --no-browser
+不自動開啟 MCP 授權頁面。
+.TP
+.B --yes
+接受更新確認。
+.TP
+.B --skip-customized
+略過已自訂的設定。
+.SH 環境
+.TP
+.B LANG
+選擇介面語言。支援 en_US、zh_CN、zh_TW、es_ES、ar_AE 和 id_ID；沒有方言翻譯時會使用相應語言目錄。
+.TP
+.B AI_ENDPOINT, AI_MODEL, AI_AUTH_TOKEN
+設定 AI 服務端點、模型和認證資訊。
+.TP
+.B ASH_SAY_TEXT
+設為
+.B 1
+時停用語音輸出。
+.SH 檔案
+.TP
+.I ~/.ash/languages/
+使用者安裝的語言目錄和語言套件。
+.TP
+.I ~/.ash/.ash_env
+受管理的 AI 環境設定。
+.SH 結束狀態
+.TP
+.B 0
+命令成功。
+.TP
+.B 非零
+命令失敗或參數無效。
+.SH 另請參閱
+.BR ash-broker (1)

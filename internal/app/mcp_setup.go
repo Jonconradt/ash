@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"ash/internal/brokerproto"
+	"ash/internal/localize"
 	mcpclient "ash/internal/mcp"
 )
 
@@ -26,7 +27,7 @@ func runMCP(args []string, stdout, stderr io.Writer) int {
 		return 0
 	}
 	if args[0] != "add" {
-		_, _ = fmt.Fprintf(stderr, "unsupported MCP command %q\n", args[0])
+		_, _ = fmt.Fprintln(stderr, localize.Format("mcp.unsupported", []any{args[0]}))
 		printMCPUsage(stderr)
 		return 2
 	}
@@ -38,8 +39,8 @@ func runMCP(args []string, stdout, stderr io.Writer) int {
 }
 
 func printMCPUsage(writer io.Writer) {
-	_, _ = fmt.Fprintln(writer, "usage: ash mcp add <url> [--no-browser]")
-	_, _ = fmt.Fprintln(writer, "       ash mcp --help")
+	_, _ = fmt.Fprintln(writer, localize.Text("usage.mcp.add"))
+	_, _ = fmt.Fprintln(writer, localize.Text("usage.mcp.help"))
 }
 
 func parseMCPAddArgs(args []string) (mcpAddOptions, error) {
@@ -77,17 +78,17 @@ func runMCPAdd(args []string, stdout, stderr io.Writer) int {
 		return 2
 	}
 	if !stdinIsInteractive() {
-		_, _ = fmt.Fprintln(stderr, "ash mcp add requires an interactive terminal")
+		_, _ = fmt.Fprintln(stderr, localize.Text("mcp.interactive_required"))
 		return 1
 	}
 
 	servers, err := mcpclient.RemoteServersFromAllowlist(options.url)
 	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "invalid MCP server URL: %v\n", err)
+		_, _ = fmt.Fprintln(stderr, localize.Format("mcp.invalid_url", []any{err}))
 		return 1
 	}
 	if len(servers) != 1 {
-		_, _ = fmt.Fprintln(stderr, "MCP server URL must begin with http:// or https://")
+		_, _ = fmt.Fprintln(stderr, localize.Text("mcp.url_scheme"))
 		return 1
 	}
 	server := servers[0]
@@ -102,33 +103,33 @@ func runMCPAdd(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	if !brokerConfigured() {
-		_, _ = fmt.Fprintln(stderr, "the Ash MCP broker is unavailable; run this command from a supported interactive Ash shell")
+		_, _ = fmt.Fprintln(stderr, localize.Text("mcp.broker_unavailable"))
 		return 1
 	}
 
 	ctx, stop := signalNotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
-	if _, err := fmt.Fprintf(stdout, "Connecting to MCP server %s\n", server.URL); err != nil {
+	if _, err := fmt.Fprintln(stdout, localize.Format("mcp.connecting", []any{server.URL})); err != nil {
 		_, _ = fmt.Fprintf(stderr, "writing setup status: %v\n", err)
 		return 1
 	}
 	if err := connectMCPForSetup(ctx, server, options.noBrowser, stdout); err != nil {
 		if errors.Is(err, context.Canceled) {
-			_, _ = fmt.Fprintln(stderr, "MCP setup canceled; no server registration was written")
+			_, _ = fmt.Fprintln(stderr, localize.Text("mcp.setup_canceled"))
 			return 130
 		}
 		if errors.Is(err, context.DeadlineExceeded) {
-			_, _ = fmt.Fprintln(stderr, "MCP setup timed out; no server registration was written")
+			_, _ = fmt.Fprintln(stderr, localize.Text("mcp.setup_timeout"))
 			return 1
 		}
-		_, _ = fmt.Fprintf(stderr, "MCP setup failed: %v\n", err)
+		_, _ = fmt.Fprintln(stderr, localize.Format("mcp.setup_failed", []any{err}))
 		return 1
 	}
 	if err := addMCPRegistration(allowlistPath, server, registrationURL); err != nil {
-		_, _ = fmt.Fprintf(stderr, "MCP server connected, but registration failed: %v\n", err)
+		_, _ = fmt.Fprintln(stderr, localize.Format("mcp.registration_failed", []any{err}))
 		return 1
 	}
-	if _, err := fmt.Fprintf(stdout, "MCP server connected and registered in %s\n", allowlistPath); err != nil {
+	if _, err := fmt.Fprintln(stdout, localize.Format("mcp.registered", []any{allowlistPath})); err != nil {
 		_, _ = fmt.Fprintf(stderr, "MCP server is connected and registered in %s, but writing setup status failed: %v\n", allowlistPath, err)
 		return 1
 	}
@@ -187,7 +188,7 @@ func presentMCPAuthorization(ctx context.Context, authorizationURL string, noBro
 	}
 	if !noBrowser && guiSessionAvailable() {
 		if err := launchMCPAuthorization(ctx, authorizationURL); err == nil {
-			if _, writeErr := fmt.Fprintln(stdout, "Authorization page opened in your browser."); writeErr != nil {
+			if _, writeErr := fmt.Fprintln(stdout, localize.Text("mcp.browser_opened")); writeErr != nil {
 				return fmt.Errorf("writing setup status: %w", writeErr)
 			}
 		} else if ctx.Err() != nil {
@@ -196,14 +197,14 @@ func presentMCPAuthorization(ctx context.Context, authorizationURL string, noBro
 			return err
 		}
 	} else {
-		if _, err := fmt.Fprintln(stdout, "No browser was opened. Authorize this server in a browser on this host:"); err != nil {
+		if _, err := fmt.Fprintln(stdout, localize.Text("mcp.no_browser")); err != nil {
 			return fmt.Errorf("writing authorization instructions: %w", err)
 		}
 		if _, err := fmt.Fprintln(stdout, authorizationURL); err != nil {
 			return fmt.Errorf("writing authorization URL: %w", err)
 		}
 	}
-	_, err := fmt.Fprintln(stdout, "Waiting for OAuth authorization to complete; press Ctrl-C to stop waiting.")
+	_, err := fmt.Fprintln(stdout, localize.Text("mcp.oauth_wait"))
 	if err != nil {
 		return fmt.Errorf("writing setup status: %w", err)
 	}

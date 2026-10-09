@@ -28,6 +28,7 @@ import (
 	"time"
 
 	"ash/internal/brokerproto"
+	"ash/internal/localize"
 	"ash/internal/mcp"
 )
 
@@ -138,6 +139,10 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 	home, err := os.UserHomeDir()
 	if err != nil {
 		logger.Error(fmt.Sprintf("failed to locate home directory for MCP credentials: %v", err), "EID", "Fh4TzP9b")
+		return 1
+	}
+	if err := localize.Init(os.Getenv("LANG"), filepath.Join(home, ".ash", "languages")); err != nil {
+		_, _ = fmt.Fprintf(stderr, "language catalog error: %v\n", err)
 		return 1
 	}
 	credentialStorage, err := mcp.NewCredentialStorage(filepath.Join(home, ".ash", "mcp"), credentialKey)

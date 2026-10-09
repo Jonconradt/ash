@@ -14,6 +14,7 @@ import (
 	"syscall"
 	"time"
 
+	"ash/internal/localize"
 	"ash/internal/workspace"
 )
 
@@ -78,6 +79,9 @@ func Run(args []string, stdout, stderr io.Writer) int {
 
 // run runs the requested operation.
 func run(args []string, stdout, stderr io.Writer) int {
+	if !initLanguage(stderr) {
+		return 1
+	}
 	voiceMode := len(args) > 0 && args[0] == "--say" && !speechTextOutputEnabled()
 	if voiceMode {
 		args = args[1:]
@@ -122,7 +126,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runSnooze(args[1:], stdout, stderr)
 	}
 	if args[0] == "broker" {
-		_, _ = fmt.Fprintln(stderr, "ash broker has moved to a separate binary; run 'ash-broker' instead")
+		_, _ = fmt.Fprintln(stderr, localize.Text("ash.broker_moved"))
 		return 1
 	}
 	if args[0] == "route" {
@@ -149,7 +153,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 	attachments, err := loadAttachments(attachPaths)
 	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "Attachment error: %s\n", err)
+		_, _ = fmt.Fprintln(stderr, localize.Format("ash.attachment_error", []any{err}))
 		return 1
 	}
 
@@ -172,7 +176,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 	aiCfg, err := parseAIConfigFromEnv()
 	if err != nil {
-		_, _ = fmt.Fprintf(stderr, "Configuration error:\n\n%s\n", err)
+		_, _ = fmt.Fprint(stderr, localize.Format("ash.configuration_error", []any{err}))
 		return 1
 	}
 	slog.Debug("ash session started", "session_id", sessionID, "version", executionDashboardVersion(), "provider", aiCfg.Provider, "ollama_openai_api", aiCfg.OllamaOpenAIAPI, "stream_requested", streamingEnabled(), "EID", "vN2wSb8Q")
@@ -269,11 +273,11 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if voiceMode {
 		spoken, speakErr := speakAssistantReply(ctx, assistantReply, stdout, stderr)
 		if speakErr != nil {
-			_, _ = fmt.Fprintf(stderr, "say: text-to-speech failed: %v\n", speakErr)
+			_, _ = fmt.Fprint(stderr, localize.Format("ash.say_failed", []any{speakErr}))
 			return 1
 		}
 		if !spoken {
-			_, _ = fmt.Fprintln(stderr, "say: native text-to-speech command not found; displaying response")
+			_, _ = fmt.Fprintln(stderr, localize.Text("ash.say_unavailable"))
 			_, _ = fmt.Fprint(stdout, renderAssistantOutput(assistantReply, writerIsTerminal(stdout)))
 		}
 	} else {
@@ -291,7 +295,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 					if voiceMode {
 						attachmentOutput = stderr
 					}
-					_, _ = fmt.Fprintf(attachmentOutput, "Saved attachment: %s\n", path)
+					_, _ = fmt.Fprint(attachmentOutput, localize.Format("ash.saved_attachment", []any{path}))
 				}
 			}
 		}
@@ -310,9 +314,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 // printUsage writes the CLI usage text for the ash command to w.
 func printUsage(w io.Writer) {
-	_, _ = fmt.Fprintln(w, "usage: ash [--attach <path>]... <text>")
-	_, _ = fmt.Fprintln(w, "       ash install [--shell bash|zsh] [--dry-run] [--overwrite]")
-	_, _ = fmt.Fprintln(w, "       ash mcp add <url> [--no-browser]")
-	_, _ = fmt.Fprintln(w, "       ash update [--version vX.Y.Z] [--yes|--skip-customized]")
-	_, _ = fmt.Fprintln(w, "       ash broker --socket <path>")
+	_, _ = fmt.Fprintln(w, localize.Text("usage.ash.prompt"))
+	_, _ = fmt.Fprintln(w, localize.Text("usage.ash.install"))
+	_, _ = fmt.Fprintln(w, localize.Text("usage.ash.mcp"))
+	_, _ = fmt.Fprintln(w, localize.Text("usage.ash.update"))
+	_, _ = fmt.Fprintln(w, localize.Text("usage.ash.broker"))
 }

@@ -146,6 +146,22 @@ detected; unknown shells default to bash. Fish uses its standard
 `ash install` adds `~/.local/bin` to `PATH` from the managed `~/.ash/.ash_env`
 file, so restart the shell or source its rc file afterward.
 
+### Language support
+
+`ash` and `ash-broker` use `LANG` to select the interface language. Releases
+include the `en_US` fallback catalog and publish downloadable UTF-8 JSON
+language catalogs for `zh_CN`, `zh_TW`, `es_ES`, `ar_AE`, and `id_ID`.
+Ash also tells the AI to respond in the resolved language.
+`ash install` automatically downloads the catalog matching a supported
+non-English language into `~/.ash/languages/`; if the release asset is
+unavailable, installation continues in English with a notice. Locale variants
+such as `es_MX.UTF-8` use the available Spanish catalog unless an exact
+regional override is installed. Unsupported languages use `en_US`.
+
+The native man-page hierarchy is localized too. Use the usual `LANG` setting
+when running `man ash`; pages are installed under locale-specific paths such
+as `/usr/share/man/es_ES/man1/ash.1`.
+
 Bundled Python tools use an isolated virtualenv at `~/.ash/venv`; `ash install`
 waits for its dependencies, including `yfinance`, to be installed. Debian and
 Ubuntu packages declare `python3` and `python3-venv` as dependencies. When
@@ -192,6 +208,8 @@ Installer man pages are included in release artifacts:
 - macOS `.pkg`: `/usr/local/share/man/man1/ash.1`
 - Linux `.deb`/`.rpm`: `/usr/share/man/man1/ash.1`
 - `.tar.gz`: `usr/share/man/man1/ash.1`
+- Locale-specific pages are installed under `man/<locale>/man1/ash.1` (for
+  example, `/usr/share/man/es_ES/man1/ash.1` on Linux).
 
 On some macOS setups, `/usr/local/share/man` may not be in the default `MANPATH`.
 If `man ash` does not resolve after install, run:
@@ -291,6 +309,9 @@ Notes:
 ### Complete environment variable reference
 
 - `AI_ENDPOINT` (required): Base URL for the chat API endpoint.
+- `LANG` (optional): Selects the interface locale. Supported catalogs: `en_US`,
+  `zh_CN`, `zh_TW`, `es_ES`, `ar_AE`, and `id_ID`; missing regional variants
+  fall back to the available catalog for the language.
 - `AI_MODEL` (required): Model name sent to the endpoint.
 - `AI_AUTH_TOKEN` (optional): When set, sent as a bearer token. Required for cloud endpoints.
 - `AI_PROVIDER` (optional): Override auto-detected provider (`ollama`, `openai`, `google`, `gemini`, `anthropic`).

@@ -12,6 +12,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"ash/internal/localize"
 )
 
 //go:embed ash_bootstrap/.ash_env
@@ -49,6 +51,17 @@ func installEmbeddedBootstrapAssets(overwrite bool, skipPath string, stdout io.W
 	root, err := ashWorkspaceDir()
 	if err != nil {
 		return err
+	}
+	languageDir := filepath.Join(root, "languages")
+	if err := osMkdirAll(languageDir, 0o700); err != nil {
+		return fmt.Errorf("create language directory: %w", err)
+	}
+	englishCatalog, err := localize.EmbeddedEnglishCatalog()
+	if err != nil {
+		return fmt.Errorf("read embedded English language catalog: %w", err)
+	}
+	if err := installManagedAssetFile(filepath.Join(languageDir, "en_US.json"), englishCatalog, overwrite, 0o600, stdout, false); err != nil {
+		return fmt.Errorf("install English language catalog: %w", err)
 	}
 
 	assetFiles := []struct {

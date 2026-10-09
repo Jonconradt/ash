@@ -1,4 +1,4 @@
-.PHONY: all verify build config lint site-lint yaml-lint python-lint markdown-lint sync-route-words test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install version release release-check release-clean release-build release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one release-checksums restart-broker plugins-build plugins-test plugins-lint plugins-clean plugins-install
+.PHONY: all verify build config lint language-lint site-lint yaml-lint python-lint markdown-lint sync-route-words test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install version release release-check release-clean release-build release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one release-checksums restart-broker plugins-build plugins-test plugins-lint plugins-clean plugins-install
 
 SHELL := /bin/bash
 
@@ -48,6 +48,7 @@ RELEASE_PKG_NAME ?= $(APP_NAME)-$(RELEASE_VERSION)-darwin-$(RELEASE_ARCH).pkg
 RELEASE_PKG_PATH ?= $(RELEASE_PACKAGE_DIR)/$(RELEASE_PKG_NAME)
 RELEASE_INSTALL_PATH ?= /usr/local/bin
 MAN_PAGE_PATH ?= docs/ash.1
+LOCALIZED_MAN_DIR ?= docs/man
 MAN_INSTALL_PATH_LINUX ?= /usr/share/man/man1
 MAN_INSTALL_PATH_MACOS ?= /usr/local/share/man/man1
 TARBALL_MAN_PATH ?= usr/share/man/man1
@@ -141,9 +142,12 @@ restart-broker:
 	@pkill -f "$(LOCAL_BIN_DIR)/ash-broker" 2>/dev/null || true
 	@pkill -f "broker --socket .*--parent-pid" 2>/dev/null || true
 
-lint: site-lint yaml-lint python-lint markdown-lint plugins-lint
+lint: language-lint site-lint yaml-lint python-lint markdown-lint plugins-lint
 	@./scripts/dev/run-quiet.sh "golangci-lint" go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run ./...
 	@echo "lint: ok"
+
+language-lint:
+	@./scripts/dev/run-quiet.sh "language-catalogs" go run ./cmd/langcheck
 
 site-lint:
 	@./scripts/dev/run-quiet.sh "site-lint" sh -n site/install.sh
@@ -254,6 +258,7 @@ release-pkg:
 		--install-path "$(RELEASE_INSTALL_PATH)" \
 		--man-page "$(MAN_PAGE_PATH)" \
 		--man-install-path "$(MAN_INSTALL_PATH_MACOS)" \
+		--localized-man-dir "$(LOCALIZED_MAN_DIR)" \
 		--output "$(RELEASE_PKG_PATH)"
 
 # The tarball broker entry must be named plain "ash-broker", not "<versioned-binary>-broker":
@@ -274,6 +279,7 @@ release-pkg-one:
 				--install-path "$(RELEASE_INSTALL_PATH)" \
 				--man-page "$(MAN_PAGE_PATH)" \
 				--man-install-path "$(MAN_INSTALL_PATH_MACOS)" \
+				--localized-man-dir "$(LOCALIZED_MAN_DIR)" \
 				--output "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).pkg"; \
 			;; \
 		deb) \
@@ -285,6 +291,7 @@ release-pkg-one:
 				--install-path "$(RELEASE_INSTALL_PATH)" \
 				--man-page "$(MAN_PAGE_PATH)" \
 				--man-install-path "$(MAN_INSTALL_PATH_LINUX)" \
+				--localized-man-dir "$(LOCALIZED_MAN_DIR)" \
 				--output "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).deb"; \
 			;; \
 		rpm) \
@@ -296,6 +303,7 @@ release-pkg-one:
 				--install-path "$(RELEASE_INSTALL_PATH)" \
 				--man-page "$(MAN_PAGE_PATH)" \
 				--man-install-path "$(MAN_INSTALL_PATH_LINUX)" \
+				--localized-man-dir "$(LOCALIZED_MAN_DIR)" \
 				--output "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).rpm"; \
 			;; \
 		tar.gz) \
@@ -313,9 +321,17 @@ release-pkg-one:
 			cp "$(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)-broker" "$$tmp_dir/$(APP_NAME)-broker"; \
 			mkdir -p "$$tmp_dir/$(TARBALL_MAN_PATH)"; \
 			install -m 0644 "$(MAN_PAGE_PATH)" "$$tmp_dir/$(TARBALL_MAN_PATH)/$(APP_NAME).1"; \
+			tar_entries=("$(notdir $(RELEASE_BINARY_PATH))" "$(APP_NAME)-broker" "$(TARBALL_MAN_PATH)/$(APP_NAME).1" "plugins"); \
+			while IFS= read -r page; do \
+				locale="$$(basename "$$(dirname "$$page")")"; \
+				locale_man_dir="$$tmp_dir/usr/share/man/$$locale/man1"; \
+				mkdir -p "$$locale_man_dir"; \
+				install -m 0644 "$$page" "$$locale_man_dir/$(APP_NAME).1"; \
+				tar_entries+=("usr/share/man/$$locale/man1/$(APP_NAME).1"); \
+			done < <(find "$(LOCALIZED_MAN_DIR)" -mindepth 2 -maxdepth 2 -type f -name "$(APP_NAME).1" -print | sort); \
 			mkdir -p "$$tmp_dir/plugins"; \
 			find "$(RELEASE_PLUGINS_BIN_DIR)" -maxdepth 1 -type f -perm -111 -exec cp {} "$$tmp_dir/plugins/" \;; \
-			tar -C "$$tmp_dir" -czf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" "$(notdir $(RELEASE_BINARY_PATH))" "$(APP_NAME)-broker" "$(TARBALL_MAN_PATH)/$(APP_NAME).1" "plugins"; \
+			tar -C "$$tmp_dir" -czf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" "$${tar_entries[@]}"; \
 			;; \
 		*) \
 			echo "unsupported RELEASE_FORMAT=$(RELEASE_FORMAT)"; \
@@ -361,6 +377,9 @@ release-validate-one:
 			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^$(notdir $(RELEASE_BINARY_PATH))$$"; \
 			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^$(APP_NAME)-broker$$"; \
 			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^$(TARBALL_MAN_PATH)/$(APP_NAME)\.1$$"; \
+			for locale in zh_CN zh_TW es_ES ar_AE id_ID; do \
+				tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^usr/share/man/$$locale/man1/$(APP_NAME)\.1$$" || { echo "localized man page missing from tarball: $$locale"; exit 1; }; \
+			done; \
 			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^plugins/[^/]+$$"; \
 			shasum -a 256 "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" > "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz.sha256"; \
 			;; \
@@ -379,6 +398,13 @@ release-checksums:
 		name="$$(basename "$$artifact")"; \
 		count="$$(grep -Ec "^[0-9a-fA-F]{64}[[:space:]]+$$name$$" "$$manifest")"; \
 		test "$$count" -eq 1; \
+	done; \
+	for artifact in "$(RELEASE_PACKAGE_DIR)"/ash-language-*.json; do \
+		if [[ -f "$$artifact" ]]; then \
+			name="$$(basename "$$artifact")"; \
+			count="$$(grep -Ec "^[0-9a-fA-F]{64}[[:space:]]+$$name$$" "$$manifest")"; \
+			test "$$count" -eq 1; \
+		fi; \
 	done
 
 release-notes:
