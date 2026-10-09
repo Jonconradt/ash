@@ -7,8 +7,8 @@ FUZZ_TIME ?= 10s
 GOLANGCI_LINT_VERSION ?= v2.14.0
 RUFF_VERSION ?= 0.12.10
 MARKDOWNLINT_CLI2_VERSION ?= 0.23.2
-GOSEC_VERSION ?= v2.28.0
-GOVULNCHECK_VERSION ?= v1.7.0
+GOSEC_VERSION ?= v2.29.0
+GOVULNCHECK_VERSION ?= v1.8.0
 STATICCHECK_VERSION ?= latest
 YAMLFMT_VERSION ?= latest
 APP_NAME ?= ash
@@ -74,6 +74,16 @@ config:
 # line on success and dumps its full output only when it fails, ending with one
 # success marker. Run `make V=1 verify` to stream each step's full output.
 verify:
+	@set -e; \
+	mod_before=$$(mktemp); \
+	sum_before=$$(mktemp); \
+	trap 'rm -f "$$mod_before" "$$sum_before"' EXIT; \
+	cp go.mod "$$mod_before"; \
+	cp go.sum "$$sum_before"; \
+	./scripts/dev/run-quiet.sh "go-get" go get -u all; \
+	if ! cmp -s "$$mod_before" go.mod || ! cmp -s "$$sum_before" go.sum; then \
+		./scripts/dev/run-quiet.sh "go-mod-tidy" go mod tidy; \
+	fi
 	@./scripts/dev/run-quiet.sh "lint"        $(MAKE) --no-print-directory lint
 	@./scripts/dev/run-quiet.sh "test"        $(MAKE) --no-print-directory test
 	@./scripts/dev/run-quiet.sh "test-race"   go test -race ./...

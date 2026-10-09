@@ -151,6 +151,7 @@ func (s *systemCredentialStorage) LockRefresh(server string) (func() error, erro
 }
 
 func acquireCredentialFileLock(path string) (func() error, error) {
+	// #nosec G304 -- The server ID is validated as a single path component and is a hash-derived credential key.
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
 	if err != nil {
 		return nil, fmt.Errorf("opening MCP credential refresh lock: %w", err)

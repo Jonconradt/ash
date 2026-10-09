@@ -8,7 +8,7 @@ TARGET_GOOS ?=
 TARGET_GOARCH ?=
 
 GOLANGCI_LINT_VERSION ?= v2.14.0
-GOSEC_VERSION ?= v2.28.0
+GOSEC_VERSION ?= v2.29.0
 
 .PHONY: all build test lint security clean
 
