@@ -6,6 +6,7 @@ import (
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"io"
 	"os"
 	"path/filepath"
@@ -191,8 +192,12 @@ func TestExtractUpgradeArchiveAndReplace(t *testing.T) {
 	}
 
 	root := t.TempDir()
-	if err := extractUpgradeArchive(archive.Bytes(), root); err != nil {
+	unsupported, err := extractUpgradeArchive(archive.Bytes(), root)
+	if err != nil {
 		t.Fatalf("extractUpgradeArchive() error = %v", err)
+	}
+	if len(unsupported) != 0 {
+		t.Fatalf("unsupported archive entries = %#v, want none", unsupported)
 	}
 	source := filepath.Join(root, "ash-v1.2.3-darwin-arm64")
 	if err := os.Chmod(source, 0o700); err != nil {
@@ -234,8 +239,105 @@ func TestExtractUpgradeArchiveRejectsUnsafeEntries(t *testing.T) {
 	if err := gzipWriter.Close(); err != nil {
 		t.Fatal(err)
 	}
-	if err := extractUpgradeArchive(archive.Bytes(), t.TempDir()); err == nil {
+	if _, err := extractUpgradeArchive(archive.Bytes(), t.TempDir()); err == nil {
 		t.Fatal("extractUpgradeArchive() accepted traversal entry")
+	}
+}
+
+func TestExtractUpgradeArchiveReportsAndSkipsUnsupportedDirectoryPayload(t *testing.T) {
+	var archive bytes.Buffer
+	gzipWriter := gzip.NewWriter(&archive)
+	tarWriter := tar.NewWriter(gzipWriter)
+	directoryPayload := []byte("directory metadata")
+	if err := tarWriter.WriteHeader(&tar.Header{Name: "plugins/", Typeflag: 'D', Mode: 0o755, Size: int64(len(directoryPayload))}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tarWriter.Write(directoryPayload); err != nil {
+		t.Fatal(err)
+	}
+	plugin := []byte("plugin binary")
+	if err := tarWriter.WriteHeader(&tar.Header{Name: "plugins/calculator", Typeflag: tar.TypeReg, Mode: 0o755, Size: int64(len(plugin))}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := tarWriter.Write(plugin); err != nil {
+		t.Fatal(err)
+	}
+	if err := tarWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := gzipWriter.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	root := t.TempDir()
+	unsupported, err := extractUpgradeArchive(archive.Bytes(), root)
+	if err != nil {
+		t.Fatalf("extractUpgradeArchive() error = %v", err)
+	}
+	if len(unsupported) != 1 || unsupported[0].name != "plugins/" || unsupported[0].size != int64(len(directoryPayload)) {
+		t.Fatalf("unsupported archive entries = %#v", unsupported)
+	}
+	info, err := os.Stat(filepath.Join(root, "plugins"))
+	if err != nil {
+		t.Fatalf("stat extracted directory: %v", err)
+	}
+	if !info.IsDir() {
+		t.Fatal("extracted plugins entry is not a directory")
+	}
+	got, err := os.ReadFile(filepath.Join(root, "plugins", "calculator"))
+	if err != nil {
+		t.Fatalf("read extracted plugin: %v", err)
+	}
+	if !bytes.Equal(got, plugin) {
+		t.Fatalf("extracted plugin = %q, want %q", got, plugin)
+	}
+}
+
+func TestConfirmUpgradeExceptionsReportsSignatureAndArchiveState(t *testing.T) {
+	entries := []unsupportedUpgradeArchiveEntry{{name: "plugins/", typeflag: 'D', size: 12}}
+	tests := []struct {
+		name          string
+		signatureErr  error
+		wantSignature string
+		wantWarning   string
+	}{
+		{name: "verified", wantSignature: "Release signature verification: PASSED."},
+		{
+			name:          "failed",
+			signatureErr:  errors.New("signature mismatch"),
+			wantSignature: "Release signature verification: FAILED: signature mismatch",
+			wantWarning:   "Do not install this release unless you independently trust its source.",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var output bytes.Buffer
+			confirmed, err := confirmUpgradeExceptions(strings.NewReader("yes\n"), &output, "v1.2.3", entries, test.signatureErr)
+			if err != nil {
+				t.Fatalf("confirmUpgradeExceptions() error = %v", err)
+			}
+			if !confirmed {
+				t.Fatal("confirmUpgradeExceptions() did not accept yes")
+			}
+			for _, want := range []string{
+				test.wantSignature,
+				test.wantWarning,
+				`"plugins/"`,
+				"payloads will not be extracted",
+			} {
+				if want != "" && !strings.Contains(output.String(), want) {
+					t.Errorf("confirmation output %q does not contain %q", output.String(), want)
+				}
+			}
+		})
+	}
+
+	confirmed, err := confirmUpgradeExceptions(strings.NewReader("no\n"), io.Discard, "v1.2.3", entries, nil)
+	if err != nil {
+		t.Fatalf("confirmUpgradeExceptions() error = %v", err)
+	}
+	if confirmed {
+		t.Fatal("confirmUpgradeExceptions() accepted no")
 	}
 }
 

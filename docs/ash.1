@@ -180,10 +180,14 @@ architecture into
 .IR ~/.local/bin/ash .
 The release's
 .B SHA256SUMS
-manifest must pass Sigstore keyless verification against the ash release
-workflow, and the selected archive must pass SHA-256 verification. Missing or
-mismatched verification data aborts the update without changing the existing
-installation. Customized files under
+manifest is checked with Sigstore keyless verification against the ash release
+workflow, and the selected archive must pass SHA-256 verification. The archive
+digest must always match. If signature verification fails, an interactive
+confirmation is required to continue; do not approve unless you independently
+trust the release source. Missing verification data or a mismatched archive
+digest aborts the update. Unsupported archive entries are listed for approval;
+their payloads are skipped, and trailing-slash paths are created as directories.
+These confirmations are refused in non-interactive runs. Customized files under
 .IR ~/.ash
 are skipped by default;
 .B --yes

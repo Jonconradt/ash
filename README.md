@@ -442,8 +442,12 @@ and installs to
 `~/.local/bin/ash`, the same location used by the install script. It verifies the
 Sigstore keyless signature for `SHA256SUMS`
 against the `Jonconradt/ash` release workflow, then verifies the selected
-archive's SHA-256 digest. A missing or mismatched signature or digest is a hard
-failure and leaves the existing installation unchanged.
+archive's SHA-256 digest. The digest must always match. If signature verification
+fails, an interactive confirmation is required to continue; do not approve unless
+you independently trust the release source. Missing verification data and
+mismatched archive digests abort the update. Unsupported archive entries are
+listed for approval; their payloads are skipped, and trailing-slash paths are
+created as directories. These confirmations are refused in non-interactive runs.
 
 Customized files under `~/.ash` are skipped by default. Use `--yes` to replace
 them, or `--skip-customized` to make the default explicit. The updater never

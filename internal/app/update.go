@@ -65,6 +65,12 @@ type upgradeChecksum struct {
 	Name   string
 }
 
+type unsupportedUpgradeArchiveEntry struct {
+	name     string
+	typeflag byte
+	size     int64
+}
+
 type upgradeAssetChange struct {
 	target       string
 	content      []byte
@@ -282,10 +288,7 @@ func runUpgrade(args []string, stdout, stderr io.Writer) int {
 		_, _ = fmt.Fprintf(stderr, "ash update: signature bundle unavailable: %v\n", err)
 		return 1
 	}
-	if err := verifyUpgradeManifestSignature(manifest, bundle, release.TagName); err != nil {
-		_, _ = fmt.Fprintf(stderr, "WARNING: ash update refused release %s: signature verification failed: %v\n", release.TagName, err)
-		return 1
-	}
+	signatureErr := verifyUpgradeManifestSignature(manifest, bundle, release.TagName)
 	checksums, err := parseUpgradeChecksums(manifest)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "ash update: signed checksum manifest is invalid: %v\n", err)
@@ -305,7 +308,7 @@ func runUpgrade(args []string, stdout, stderr io.Writer) int {
 		_, _ = fmt.Fprintf(stderr, "WARNING: ash update refused release %s: %v\n", release.TagName, err)
 		return 1
 	}
-	if err := installUpgradeArchive(archive, release.TagName, options, stdout); err != nil {
+	if err := installUpgradeArchiveWithSignature(archive, release.TagName, options, signatureErr, stdout); err != nil {
 		_, _ = fmt.Fprintf(stderr, "ash update: %v\n", err)
 		return 1
 	}
@@ -469,13 +472,33 @@ func verifyLegacyRekorBundle(manifest []byte, leaf *x509.Certificate, signature 
 }
 
 func installUpgradeArchive(content []byte, version string, options upgradeOptions, stdout io.Writer) error {
+	return installUpgradeArchiveWithSignature(content, version, options, nil, stdout)
+}
+
+func installUpgradeArchiveWithSignature(content []byte, version string, options upgradeOptions, signatureErr error, stdout io.Writer) error {
 	staging, err := os.MkdirTemp("", "ash-upgrade-")
 	if err != nil {
 		return err
 	}
 	defer func() { _ = os.RemoveAll(staging) }()
-	if err := extractUpgradeArchive(content, staging); err != nil {
+	unsupportedEntries, err := extractUpgradeArchive(content, staging)
+	if err != nil {
 		return err
+	}
+	if signatureErr != nil || len(unsupportedEntries) > 0 {
+		if !shouldPromptInstallEnv() {
+			if signatureErr != nil {
+				return fmt.Errorf("signature verification failed and interactive confirmation is unavailable: %w", signatureErr)
+			}
+			return errors.New("archive contains unsupported entries and interactive confirmation is unavailable")
+		}
+		confirmed, err := confirmUpgradeExceptions(os.Stdin, stdout, version, unsupportedEntries, signatureErr)
+		if err != nil {
+			return err
+		}
+		if !confirmed {
+			return errors.New("update canceled by user")
+		}
 	}
 	binaryPath, err := findUpgradeBinary(staging, upgradeAssetName(version, runtime.GOOS, runtime.GOARCH))
 	if err != nil {
@@ -800,67 +823,105 @@ func writeUpgradeAsset(destination string, content []byte, executable bool) erro
 	return nil
 }
 
-func extractUpgradeArchive(content []byte, destination string) error {
+func confirmUpgradeExceptions(reader io.Reader, stdout io.Writer, version string, entries []unsupportedUpgradeArchiveEntry, signatureErr error) (bool, error) {
+	_, _ = fmt.Fprintf(stdout, "WARNING: ash update %s requires your approval.\n", version)
+	if signatureErr == nil {
+		_, _ = fmt.Fprintln(stdout, "Release signature verification: PASSED.")
+	} else {
+		_, _ = fmt.Fprintf(stdout, "Release signature verification: FAILED: %v\n", signatureErr)
+		_, _ = fmt.Fprintln(stdout, "Do not install this release unless you independently trust its source.")
+	}
+	if len(entries) > 0 {
+		_, _ = fmt.Fprintln(stdout, "Unsupported archive entry payloads will not be extracted; trailing-slash paths will be created as directories:")
+		for _, entry := range entries {
+			_, _ = fmt.Fprintf(stdout, "  %q (type %q, %d bytes)\n", entry.name, entry.typeflag, entry.size)
+		}
+	}
+	_, _ = fmt.Fprint(stdout, "Continue with this update? [y/N] ")
+	answer, err := bufio.NewReader(reader).ReadString('\n')
+	if err != nil && !errors.Is(err, io.EOF) {
+		return false, fmt.Errorf("read update confirmation: %w", err)
+	}
+	return strings.EqualFold(strings.TrimSpace(answer), "y") || strings.EqualFold(strings.TrimSpace(answer), "yes"), nil
+}
+
+func extractUpgradeArchive(content []byte, destination string) ([]unsupportedUpgradeArchiveEntry, error) {
 	reader, err := gzip.NewReader(bytes.NewReader(content))
 	if err != nil {
-		return fmt.Errorf("open gzip archive: %w", err)
+		return nil, fmt.Errorf("open gzip archive: %w", err)
 	}
 	defer func() { _ = reader.Close() }()
 	tarReader := tar.NewReader(reader)
 	seen := make(map[string]struct{})
+	var unsupportedEntries []unsupportedUpgradeArchiveEntry
 	for {
 		header, err := tarReader.Next()
 		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil {
-			return fmt.Errorf("read tar archive: %w", err)
+			return nil, fmt.Errorf("read tar archive: %w", err)
 		}
 		name := filepath.Clean(filepath.FromSlash(header.Name))
 		if name == "." || filepath.IsAbs(name) || name == ".." || strings.HasPrefix(name, ".."+string(filepath.Separator)) {
-			return fmt.Errorf("unsafe archive path %q", header.Name)
+			return nil, fmt.Errorf("unsafe archive path %q", header.Name)
 		}
 		if _, exists := seen[name]; exists {
-			return fmt.Errorf("duplicate archive entry %q", header.Name)
+			return nil, fmt.Errorf("duplicate archive entry %q", header.Name)
 		}
 		seen[name] = struct{}{}
-		if header.Typeflag == tar.TypeDir {
+		if header.Typeflag == tar.TypeDir && header.Size == 0 {
 			if err := os.MkdirAll(filepath.Join(destination, name), 0o700); err != nil {
-				return err
+				return nil, err
 			}
 			continue
 		}
-		if header.Typeflag != 0 && header.Typeflag != tar.TypeReg {
-			return fmt.Errorf("unsupported archive entry %q", header.Name)
-		}
 		if header.Size < 0 || header.Size > upgradeMaxEntry {
-			return fmt.Errorf("archive entry %q exceeds size limit", header.Name)
+			return nil, fmt.Errorf("archive entry %q exceeds size limit", header.Name)
+		}
+		if (header.Typeflag != 0 && header.Typeflag != tar.TypeReg) || strings.HasSuffix(header.Name, "/") {
+			unsupportedEntries = append(unsupportedEntries, unsupportedUpgradeArchiveEntry{
+				name:     header.Name,
+				typeflag: header.Typeflag,
+				size:     header.Size,
+			})
+			if header.Typeflag == tar.TypeDir || strings.HasSuffix(header.Name, "/") {
+				if err := os.MkdirAll(filepath.Join(destination, name), 0o700); err != nil {
+					return nil, err
+				}
+			}
+			if header.Size > 0 {
+				if _, err := io.CopyN(io.Discard, tarReader, header.Size); err != nil {
+					return nil, fmt.Errorf("skip unsupported archive entry %q: %w", header.Name, err)
+				}
+			}
+			continue
 		}
 		path := filepath.Join(destination, name)
 		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
-			return err
+			return nil, err
 		}
 		// #nosec G304 -- path is normalized and rejected unless contained by the staging root.
 		file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		_, copyErr := io.CopyN(file, tarReader, header.Size)
 		closeErr := file.Close()
 		if copyErr != nil {
-			return fmt.Errorf("extract archive entry %q: %w", header.Name, copyErr)
+			return nil, fmt.Errorf("extract archive entry %q: %w", header.Name, copyErr)
 		}
 		if closeErr != nil {
-			return closeErr
+			return nil, closeErr
 		}
 		if header.Mode&0o111 != 0 {
 			// #nosec G302 -- the extracted ash executable must retain execute permission.
 			if err := os.Chmod(path, 0o700); err != nil {
-				return err
+				return nil, err
 			}
 		}
 	}
-	return nil
+	return unsupportedEntries, nil
 }
 
 func findUpgradeBinary(root, expectedName string) (string, error) {
