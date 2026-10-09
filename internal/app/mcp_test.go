@@ -16,6 +16,12 @@ import (
 )
 
 func TestRemoteToolShimCallsBroker(t *testing.T) {
+	t.Setenv("ASH_VERBOSE", "1")
+	var debugLog strings.Builder
+	previousLogger := slog.Default()
+	configureDebugLogging(&debugLog)
+	t.Cleanup(func() { slog.SetDefault(previousLogger) })
+
 	socket := filepath.Join(t.TempDir(), "mcp.sock")
 	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "unix", socket)
 	if err != nil {
@@ -59,7 +65,8 @@ func TestRemoteToolShimCallsBroker(t *testing.T) {
 	toolName := "mcp_remote_echo_01234567"
 	shim := remoteToolShim{
 		local: localToolShim{},
-		refs:  map[string]remoteToolRef{toolName: {server: "remote", name: "echo"}},
+		refs:  map[string]remoteToolRef{toolName: {server: "remote", name: "echo", url: "https://example.com/mcp"}},
+		usage: &remoteMCPUsage{},
 	}
 	result := shim.CallTool(context.Background(), toolName, map[string]any{"value": "hello"})
 	if want := "MCP tool call completed without a protocol-level error.\nResult:\nhello"; result != want {
@@ -67,6 +74,13 @@ func TestRemoteToolShimCallsBroker(t *testing.T) {
 	}
 	if err := <-requestDone; err != nil {
 		t.Fatalf("fake broker request: %v", err)
+	}
+	shim.logMCPUsage(context.Background())
+	if !strings.Contains(debugLog.String(), `"message":"MCP servers used"`) ||
+		!strings.Contains(debugLog.String(), `"url":"https://example.com/mcp"`) ||
+		!strings.Contains(debugLog.String(), `"tools":["echo"]`) ||
+		!strings.Contains(debugLog.String(), `"calls":1`) {
+		t.Fatalf("debug log = %q, want used server and tool summary", debugLog.String())
 	}
 }
 
@@ -100,6 +114,90 @@ func TestPrepareRemoteMCPWithNoConfigPreservesLocalShim(t *testing.T) {
 	}
 	if len(got.ListTools()) != len(local.ListTools()) {
 		t.Fatalf("tool count = %d, want %d", len(got.ListTools()), len(local.ListTools()))
+	}
+}
+
+func TestPrepareRemoteMCPDoesNotReportUnusedServersAsUsed(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("ASH_VERBOSE", "1")
+	ashRoot := filepath.Join(home, ashWorkspaceDirName)
+	if err := os.MkdirAll(ashRoot, 0o700); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(ashRoot, allowFileName), []byte("https://example.com/mcp\n"), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	socket := filepath.Join(os.TempDir(), "ash-"+requestIDGenerator()+".sock")
+	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "unix", socket)
+	if err != nil {
+		t.Fatalf("Listen() error = %v", err)
+	}
+	t.Cleanup(func() {
+		_ = listener.Close()
+		_ = os.Remove(socket)
+	})
+	t.Setenv(brokerSocketEnv, socket)
+	t.Setenv(brokerTokenEnv, "test-token")
+
+	requestDone := make(chan error, 1)
+	go func() {
+		for range 2 {
+			conn, err := listener.Accept()
+			if err != nil {
+				requestDone <- err
+				return
+			}
+			payload, err := brokerproto.ReadFrame(conn)
+			if err != nil {
+				_ = conn.Close()
+				requestDone <- err
+				return
+			}
+			var request brokerproto.Request
+			if err := json.Unmarshal(payload, &request); err != nil {
+				_ = conn.Close()
+				requestDone <- err
+				return
+			}
+			response := brokerproto.Response{Version: brokerproto.Version}
+			switch request.MCPAction {
+			case "start":
+				response.MCPStatus = &brokerproto.MCPStatus{State: "connected"}
+			case "list":
+				response.MCPTools = []brokerproto.MCPTool{{Name: "search_snippets"}}
+			default:
+				_ = conn.Close()
+				requestDone <- os.ErrInvalid
+				return
+			}
+			encoded, err := json.Marshal(response)
+			if err == nil {
+				err = brokerproto.WriteFrame(conn, encoded)
+			}
+			_ = conn.Close()
+			if err != nil {
+				requestDone <- err
+				return
+			}
+		}
+		requestDone <- nil
+	}()
+
+	var debugLog strings.Builder
+	previousLogger := slog.Default()
+	configureDebugLogging(&debugLog)
+	t.Cleanup(func() { slog.SetDefault(previousLogger) })
+
+	if _, err := prepareRemoteMCP(context.Background(), os.Stderr, localToolShim{}); err != nil {
+		t.Fatalf("prepareRemoteMCP() error = %v", err)
+	}
+	if err := <-requestDone; err != nil {
+		t.Fatalf("fake broker request: %v", err)
+	}
+	if strings.Contains(debugLog.String(), `"message":"MCP servers used"`) {
+		t.Fatalf("debug log = %q, discovery alone must not report a server as used", debugLog.String())
 	}
 }
 
@@ -200,9 +298,9 @@ func TestShellWrappersScopeMCPCredentialKeyToBroker(t *testing.T) {
 		asset string
 		want  []string
 	}{
-		{asset: "ash_bootstrap/.ash_bashrc", want: []string{"local mcp_credential_key=", "unset ASH_MCP_CREDENTIAL_KEY", `ASH_MCP_CREDENTIAL_KEY="$mcp_credential_key" command ash-broker`, "unset mcp_credential_key"}},
-		{asset: "ash_bootstrap/.ash_zshrc", want: []string{"local mcp_credential_key=", "unset ASH_MCP_CREDENTIAL_KEY", `ASH_MCP_CREDENTIAL_KEY="$mcp_credential_key" command ash-broker`, "unset mcp_credential_key"}},
-		{asset: "ash_bootstrap/.ash_fish.fish", want: []string{"set -l mcp_credential_key", "set -e ASH_MCP_CREDENTIAL_KEY", `set -lx ASH_MCP_CREDENTIAL_KEY "$mcp_credential_key"`}},
+		{asset: "ash_bootstrap/.ash_bashrc", want: []string{"local mcp_credential_key=", "unset ASH_MCP_CREDENTIAL_KEY", `ASH_MCP_CREDENTIAL_KEY="$mcp_credential_key" command ash-broker`, "unset mcp_credential_key", `if [[ "${1:-}" == "mcp" && "${2:-}" == "add" ]]`, `command ash "$@"`}},
+		{asset: "ash_bootstrap/.ash_zshrc", want: []string{"local mcp_credential_key=", "unset ASH_MCP_CREDENTIAL_KEY", `ASH_MCP_CREDENTIAL_KEY="$mcp_credential_key" command ash-broker`, "unset mcp_credential_key", `if [[ "${1:-}" == "mcp" && "${2:-}" == "add" ]]`, `command ash "$@"`}},
+		{asset: "ash_bootstrap/.ash_fish.fish", want: []string{"set -l mcp_credential_key", "set -e ASH_MCP_CREDENTIAL_KEY", `set -lx ASH_MCP_CREDENTIAL_KEY "$mcp_credential_key"`, `if test (count $argv) -ge 2; and test "$argv[1]" = mcp; and test "$argv[2]" = add`, "command ash $argv"}},
 	}
 	for _, test := range tests {
 		content, err := readEmbeddedBootstrapAsset(test.asset)

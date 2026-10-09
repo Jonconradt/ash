@@ -83,6 +83,14 @@ command_not_found_handle() {
 	return 127
 }
 
+ash() {
+	if [[ "${1:-}" == "mcp" && "${2:-}" == "add" ]]; then
+		_ash_ensure_broker >/dev/null 2>&1
+		[[ -n "${ASH_BROKER_LEASE:-}" ]] && touch "$ASH_BROKER_LEASE"
+	fi
+	command ash "$@"
+}
+
 # Question words that can open the second position of a natural-language line.
 _ash_leading_question_word() {
 	case "$1" in

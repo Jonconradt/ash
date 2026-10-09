@@ -46,6 +46,7 @@
           <h2>Synopsis</h2>
           <pre><code>ash [text ...]
 ash install [--shell bash|zsh] [--dry-run] [--overwrite]
+ash mcp add &lt;url&gt; [--no-browser]
 ash snooze [duration|off]
 ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></pre>
         </section>
@@ -63,10 +64,11 @@ ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></pre>
         <section id="mcp">
           <h2>Remote MCP servers</h2>
           <p>MCP (Model Context Protocol) servers provide tools an AI model can call. Ash supports remote Streamable HTTP MCP servers and keeps their client sessions in <code>ash-broker</code> across Ash invocations in the same shell.</p>
-          <p>Register a server by adding its URL, by itself, to <code>~/.ash/.ash_allow</code>:</p>
+          <p>Register a server by adding its URL, by itself, to <code>~/.ash/.ash_allow</code>, or run <code>ash mcp add &lt;url&gt;</code> from an interactive Ash shell. The command connects and registers the server only after a successful connection:</p>
           <pre><code>https://mcpplaygroundonline.com/mcp-complex-server</code></pre>
-          <p>URL lines beginning with <code>http://</code> or <code>https://</code> are MCP registrations, not shell commands. Schemes are recognized case-insensitively. Ash derives the server's local name from the first 8 lowercase hexadecimal characters of SHA-256 over the trimmed URL text. HTTPS is required except for localhost development; URLs with embedded credentials, query strings, or fragments are rejected. Changes are read on the next Ash request.</p>
-          <p>MCP registrations remain enabled with <code>ASH_STRICT=1</code>. Returned tool output is still treated as untrusted evidence. Only register servers you trust: their tools may perform actions on your behalf. For OAuth-protected servers, Ash opens the browser authorization page while the broker handles the callback and tokens. Credentials use the OS credential manager when available, or an encrypted file protected by a user-supplied random 32-byte <code>ASH_MCP_CREDENTIAL_KEY</code>. Existing <code>~/.ash/mcp.json</code> files are no longer read; move server URLs into <code>.ash_allow</code>.</p>
+          <p>OAuth authorization opens in the desktop browser when a GUI is available. If the browser cannot be opened, Ash prints a copyable authorization URL and waits in the terminal. Use <code>ash mcp add &lt;url&gt; --no-browser</code> to always use this terminal flow. Manual URL authorization still requires a browser on the same host; it is not a browserless OAuth flow.</p>
+          <p>URL lines beginning with <code>http://</code> or <code>https://</code> are MCP registrations, not shell commands. Schemes are recognized case-insensitively. Ash derives the server's local name from the first 8 lowercase hexadecimal characters of SHA-256 over the trimmed URL text. HTTPS is required except for localhost development; URLs with embedded credentials, query strings, or fragments are rejected. For direct OAuth connections, discovery permits non-public IP addresses only for the exact registered MCP authority; other OAuth hosts remain subject to non-public-address blocking. A configured egress proxy is responsible for filtering its destination addresses. Changes are read on the next Ash request.</p>
+          <p>MCP registrations remain enabled with <code>ASH_STRICT=1</code>. Returned tool output is still treated as untrusted evidence. Only register servers you trust: their tools may perform actions on your behalf. For OAuth-protected servers, Ash opens the browser when a GUI is available while the broker handles the callback and tokens. Credentials use the OS credential manager when available, or an encrypted file protected by a user-supplied random 32-byte <code>ASH_MCP_CREDENTIAL_KEY</code>. Existing <code>~/.ash/mcp.json</code> files are no longer read; move server URLs into <code>.ash_allow</code>.</p>
           <p>If MCP initialization fails, Ash continues the request without remote MCP tools. Interactive runs print a warning; non-interactive runs fail quietly. <strong>Scheduled jobs do not have the per-interactive-shell broker and therefore cannot use remote MCP tools.</strong> A scheduled prompt that depends on MCP may still run but can finish without the requested MCP action or data. Do not schedule prompts that require MCP.</p>
           <p>See the <a href="faq.html">MCP FAQ</a> for a quick overview and setup notes.</p>
         </section>
@@ -76,6 +78,8 @@ ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></pre>
           <dl>
             <dt><code>ash [--attach path]... [text ...]</code></dt>
             <dd>Run a single assistant request. <code>--attach</code> attaches a file (image or document) to the request; repeatable. Size-limited by <code>ASH_ATTACHMENT_MAX_BYTES</code> and currently sent on the wire only to OpenAI-compatible providers.</dd>
+            <dt><code>ash mcp add &lt;url&gt; [--no-browser]</code></dt>
+            <dd>Connect and register a remote MCP server in the effective <code>.ash_allow</code>. Opens OAuth authorization in a desktop browser when available; falls back to a copyable URL in the terminal. <code>--no-browser</code> always uses the terminal flow.</dd>
             <dt><code>ash install [--shell bash|zsh] [--dry-run]</code></dt>
             <dd>Install or update shell integration. When <code>--shell</code> is omitted, the current shell is used when possible. <code>--dry-run</code> previews changes without writing. When interactive, install also auto-configures <code>AI_ENDPOINT</code>, <code>AI_MODEL</code>, and <code>AI_AUTH_TOKEN</code>: it prefers an already-set cloud provider API key (OpenAI, Anthropic, Google Gemini, Azure OpenAI, Mistral, Cohere, Groq, xAI, DeepSeek, Together AI, OpenRouter, or HuggingFace), then a running local inference server (Ollama, LM Studio, llama.cpp/MLX/LocalAI, vLLM, text-generation-webui, Jan, or GPT4All), and otherwise prompts with a numbered provider menu. The model is chosen from the endpoint's model list when available.</dd>
             <dt><code>ash snooze [duration|off]</code></dt>

@@ -8,13 +8,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -56,6 +59,39 @@ func (unavailableKeyring) Get(string, string) (string, error) {
 
 func (unavailableKeyring) Set(string, string, string) error {
 	return errors.New("credential store unavailable")
+}
+
+func TestRemoteManagerStatusNowReturnsQueuedAuthorizationURL(t *testing.T) {
+	manager := NewRemoteManager(context.Background(), nil)
+	session := &remoteSession{
+		status:   RemoteStatus{State: "connecting"},
+		authURL:  make(chan string, 1),
+		callback: make(chan authorizationCallback, 1),
+		done:     make(chan struct{}),
+	}
+	session.authURL <- "https://auth.example/authorize"
+	manager.sessions["test"] = session
+
+	status, err := manager.StatusNow("test")
+	if err != nil {
+		t.Fatalf("StatusNow() error = %v", err)
+	}
+	if status.State != "authorizing" || status.AuthURL != "https://auth.example/authorize" {
+		t.Fatalf("StatusNow() = %+v, want queued authorization URL", status)
+	}
+	if err := manager.AcknowledgeAuth("test"); err != nil {
+		t.Fatalf("AcknowledgeAuth() error = %v", err)
+	}
+	status, err = manager.StatusNow("test")
+	if err != nil {
+		t.Fatalf("StatusNow() after acknowledgment error = %v", err)
+	}
+	if status.State != "authorizing" || status.AuthURL != "" {
+		t.Fatalf("StatusNow() after acknowledgment = %+v, want authorizing without URL", status)
+	}
+	if _, err := manager.StatusNow("missing"); err == nil {
+		t.Fatal("StatusNow() accepted an unknown session")
+	}
 }
 
 func TestEncryptedCredentialStorageRoundTrip(t *testing.T) {
@@ -178,6 +214,7 @@ func TestToolFunctionNameIsStableAndQualified(t *testing.T) {
 }
 
 func TestRemoteManagerHTTPToolRoundTrip(t *testing.T) {
+	var getRequests atomic.Int32
 	server := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "1"}, nil)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "echo",
@@ -186,9 +223,15 @@ func TestRemoteManagerHTTPToolRoundTrip(t *testing.T) {
 	}, func(_ context.Context, _ *mcp.CallToolRequest, args map[string]any) (*mcp.CallToolResult, any, error) {
 		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: args["value"].(string)}}}, nil, nil
 	})
-	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
+	streamableHandler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
 		return server
-	}, &mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true})
+	}, &mcp.StreamableHTTPOptions{Stateless: true})
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			getRequests.Add(1)
+		}
+		streamableHandler.ServeHTTP(w, r)
+	})
 	httpServer := httptest.NewServer(handler)
 	defer httpServer.Close()
 
@@ -222,6 +265,82 @@ func TestRemoteManagerHTTPToolRoundTrip(t *testing.T) {
 	}
 	if len(result.Content) != 1 || result.Content[0].(*mcp.TextContent).Text != "hello" {
 		t.Fatalf("CallTool() result = %+v, want hello", result)
+	}
+	if got := getRequests.Load(); got != 0 {
+		t.Fatalf("client opened %d standalone SSE streams to a stateless server, want none", got)
+	}
+}
+
+func TestRemoteOAuthTransportAllowsPrivateAddressesOnlyForRegisteredOrigin(t *testing.T) {
+	tests := []struct {
+		name             string
+		host             string
+		trustedAuthority string
+		resolvedIP       string
+		wantDial         bool
+	}{
+		{
+			name:             "registered private origin",
+			host:             "mcp.example",
+			trustedAuthority: "mcp.example:443",
+			resolvedIP:       "192.168.1.2",
+			wantDial:         true,
+		},
+		{
+			name:             "unregistered private origin",
+			host:             "auth.example",
+			trustedAuthority: "mcp.example:443",
+			resolvedIP:       "192.168.1.2",
+			wantDial:         false,
+		},
+		{
+			name:             "unregistered public origin",
+			host:             "auth.example",
+			trustedAuthority: "mcp.example:443",
+			resolvedIP:       "8.8.8.8",
+			wantDial:         true,
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			resolvedIP, err := netip.ParseAddr(test.resolvedIP)
+			if err != nil {
+				t.Fatal(err)
+			}
+			dialed := ""
+			transport := &remoteOAuthTransport{
+				base:             &http.Transport{},
+				trustedAuthority: test.trustedAuthority,
+				lookupNetIP: func(context.Context, string, string) ([]netip.Addr, error) {
+					return []netip.Addr{resolvedIP}, nil
+				},
+				dial: func(_ context.Context, _, address string) (net.Conn, error) {
+					dialed = address
+					return nil, errors.New("stop after dial check")
+				},
+			}
+			transport.base.DialContext = transport.dialContext
+			request, err := http.NewRequestWithContext(context.Background(), http.MethodGet, "https://"+test.host+"/metadata", nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, err = transport.RoundTrip(request)
+			if test.wantDial {
+				if dialed != net.JoinHostPort(test.resolvedIP, "443") {
+					t.Fatalf("dialed address = %q, want %q; error = %v", dialed, net.JoinHostPort(test.resolvedIP, "443"), err)
+				}
+				if err == nil || !strings.Contains(err.Error(), "stop after dial check") {
+					t.Fatalf("RoundTrip() error = %v, want test dial error", err)
+				}
+				return
+			}
+			if dialed != "" {
+				t.Fatalf("dialed %q despite an untrusted private address", dialed)
+			}
+			if err == nil || !strings.Contains(err.Error(), "non-public IP address") {
+				t.Fatalf("RoundTrip() error = %v, want non-public address rejection", err)
+			}
+		})
 	}
 }
 
@@ -318,7 +437,7 @@ func TestRemoteManagerOAuthAuthorizationCodeFlow(t *testing.T) {
 		}
 		http.Handler(mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server {
 			return mcpServer
-		}, &mcp.StreamableHTTPOptions{Stateless: true, JSONResponse: true})).ServeHTTP(w, r)
+		}, &mcp.StreamableHTTPOptions{Stateless: true})).ServeHTTP(w, r)
 	})
 	remoteHTTPServer := httptest.NewServer(handler)
 	defer remoteHTTPServer.Close()

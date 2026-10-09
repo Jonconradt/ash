@@ -13,6 +13,12 @@ ash \- practical shell assistant for command-not-found workflows
 .RI [ --overwrite ]
 .br
 .B ash
+.B mcp
+.B add
+.I url
+.RI [ --no-browser ]
+.br
+.B ash
 .B snooze
 .RI [ duration|off ]
 .br
@@ -90,6 +96,17 @@ when the shell cannot be detected.
 .IP
 .B --dry-run
 Preview file changes without writing.
+.TP
+.B ash mcp add URL [--no-browser]
+Connect and register a remote MCP server in the effective
+.I .ash_allow
+file. The command requires an interactive Ash shell with its MCP broker.
+OAuth authorization opens in the desktop browser when a GUI is available. If
+the browser cannot be opened, ash prints a copyable authorization URL and
+waits in the terminal. The
+.B --no-browser
+option always uses the terminal flow. Manual authorization still requires a
+browser on the same host.
 .PP
 When run interactively without
 .B --dry-run,
@@ -392,6 +409,12 @@ with literal bare names for a fixed restrictive policy. A line beginning with ht
 registers a remote Streamable HTTP MCP server instead of a shell command. Its local name is the
 first 8 lowercase hexadecimal characters of SHA-256 over the trimmed URL text. MCP registrations
 remain active when ASH_STRICT=1. Existing ~/.ash/mcp.json files are not read.
+The
+.B ash mcp add
+command connects a server before registering its URL in the effective .ash_allow file.
+For direct OAuth connections, discovery permits non-public IP addresses only for the exact
+registered MCP authority; other OAuth hosts remain subject to non-public-address blocking.
+When configured, an egress proxy is responsible for filtering destination addresses.
 If MCP initialization fails, ash continues the request without remote MCP tools. Interactive
 sessions receive a warning; non-interactive sessions suppress the expected failure. Scheduled
 jobs do not inherit the per-shell broker and cannot use remote MCP tools. Prompts that depend on

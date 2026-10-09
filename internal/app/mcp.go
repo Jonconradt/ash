@@ -13,7 +13,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"ash/internal/brokerproto"
@@ -23,18 +25,36 @@ import (
 type remoteToolRef struct {
 	server string
 	name   string
+	url    string
 }
 
 type remoteToolShim struct {
 	local mcpToolShim
 	tools []toolDefinition
 	refs  map[string]remoteToolRef
+	usage *remoteMCPUsage
 }
 
 type remoteMCPCallResult struct {
 	IsError           bool                `json:"isError"`
 	Content           []remoteMCPTextItem `json:"content"`
 	StructuredContent json.RawMessage     `json:"structuredContent"`
+}
+
+type remoteMCPUsage struct {
+	mu    sync.Mutex
+	calls []remoteMCPUsageCall
+}
+
+type remoteMCPUsageCall struct {
+	url  string
+	tool string
+}
+
+type remoteMCPServerUsage struct {
+	URL   string   `json:"url"`
+	Tools []string `json:"tools"`
+	Calls int      `json:"calls"`
 }
 
 type remoteMCPTextItem struct {
@@ -50,7 +70,7 @@ func prepareRemoteMCP(ctx context.Context, stderrWriter io.Writer, local mcpTool
 		return nil, err
 	}
 	if len(servers) == 0 {
-		return local, nil
+		return remoteToolShim{local: local, refs: make(map[string]remoteToolRef), usage: &remoteMCPUsage{}}, nil
 	}
 	if !brokerConfigured() {
 		return nil, errors.New("remote MCP servers are configured but ash-broker is unavailable; open a supported interactive shell and retry")
@@ -123,7 +143,7 @@ func prepareRemoteMCP(ctx context.Context, stderrWriter io.Writer, local mcpTool
 				return nil, fmt.Errorf("remote MCP tool name collision for %q", name)
 			}
 			usedNames[name] = struct{}{}
-			shim.refs[name] = remoteToolRef{server: server.Name, name: remote.Name}
+			shim.refs[name] = remoteToolRef{server: server.Name, name: remote.Name, url: server.URL}
 			schema := remote.InputSchema
 			if schema == nil {
 				schema = map[string]any{"type": "object", "properties": map[string]any{}}
@@ -139,7 +159,50 @@ func prepareRemoteMCP(ctx context.Context, stderrWriter io.Writer, local mcpTool
 		}
 	}
 	shim.local = local
+	shim.usage = &remoteMCPUsage{}
 	return shim, nil
+}
+
+func (u *remoteMCPUsage) record(url, tool string) {
+	u.mu.Lock()
+	u.calls = append(u.calls, remoteMCPUsageCall{url: url, tool: tool})
+	u.mu.Unlock()
+}
+
+func (u *remoteMCPUsage) summary() []remoteMCPServerUsage {
+	u.mu.Lock()
+	defer u.mu.Unlock()
+
+	byURL := make(map[string]*remoteMCPServerUsage)
+	toolSets := make(map[string]map[string]struct{})
+	for _, call := range u.calls {
+		server, ok := byURL[call.url]
+		if !ok {
+			server = &remoteMCPServerUsage{URL: call.url, Tools: []string{}}
+			byURL[call.url] = server
+			toolSets[call.url] = make(map[string]struct{})
+		}
+		server.Calls++
+		toolSets[call.url][call.tool] = struct{}{}
+	}
+
+	servers := make([]remoteMCPServerUsage, 0, len(byURL))
+	for url, server := range byURL {
+		for tool := range toolSets[url] {
+			server.Tools = append(server.Tools, tool)
+		}
+		sort.Strings(server.Tools)
+		servers = append(servers, *server)
+	}
+	sort.Slice(servers, func(i, j int) bool { return servers[i].URL < servers[j].URL })
+	return servers
+}
+
+func (s remoteToolShim) logMCPUsage(ctx context.Context) {
+	if s.usage == nil {
+		return
+	}
+	slog.Debug("MCP servers used", "request_id", requestIDFromContext(ctx), "servers", s.usage.summary(), "EID", "u5McpV8Q")
 }
 
 func prepareTools(ctx context.Context, stderrWriter io.Writer, local mcpToolShim, interactive bool) mcpToolShim {
@@ -151,7 +214,12 @@ func prepareTools(ctx context.Context, stderrWriter io.Writer, local mcpToolShim
 		slog.Warn("remote MCP tools unavailable; continuing without them", "error", err, "EID", "R7vQmA2c")
 		_, _ = fmt.Fprintf(stderrWriter, "Warning: remote MCP tools unavailable; continuing without them: %v\n", err)
 	}
+	logRemoteMCPFallback(ctx)
 	return local
+}
+
+func logRemoteMCPFallback(ctx context.Context) {
+	slog.Debug("MCP servers used", "request_id", requestIDFromContext(ctx), "servers", []remoteMCPServerUsage{}, "EID", "u5McpV8Q")
 }
 
 func loadRemoteMCPServers() ([]mcpclient.RemoteServer, error) {
@@ -193,6 +261,9 @@ func (s remoteToolShim) CallTool(ctx context.Context, name string, args map[stri
 	ref, ok := s.refs[name]
 	if !ok {
 		return s.local.CallTool(ctx, name, args)
+	}
+	if s.usage != nil {
+		s.usage.record(ref.url, ref.name)
 	}
 	response, err := brokerMCPDo(ctx, brokerproto.Request{
 		MCPAction: "call",
@@ -262,9 +333,24 @@ func remoteStatus(response brokerproto.Response) (brokerproto.MCPStatus, error) 
 }
 
 func openMCPAuthorization(ctx context.Context, authorizationURL string, stderrWriter io.Writer) error {
-	parsed, err := url.Parse(authorizationURL)
-	if err != nil || parsed.Host == "" || parsed.User != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
-		return errors.New("broker returned an invalid OAuth authorization URL")
+	if err := validateMCPAuthorizationURL(authorizationURL); err != nil {
+		return err
+	}
+	if !guiSessionAvailable() {
+		return printMCPAuthorizationURL(stderrWriter, authorizationURL, nil)
+	}
+	if err := launchMCPAuthorization(ctx, authorizationURL); err != nil {
+		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return err
+		}
+		return printMCPAuthorizationURL(stderrWriter, authorizationURL, err)
+	}
+	return nil
+}
+
+func launchMCPAuthorization(ctx context.Context, authorizationURL string) error {
+	if err := validateMCPAuthorizationURL(authorizationURL); err != nil {
+		return err
 	}
 	var command string
 	var args []string
@@ -277,9 +363,40 @@ func openMCPAuthorization(ctx context.Context, authorizationURL string, stderrWr
 		command, args = "xdg-open", []string{authorizationURL}
 	}
 	if err := openBrowserCommand(ctx, command, args...).Run(); err != nil {
-		if _, writeErr := fmt.Fprintf(stderrWriter, "Open this URL to authorize the MCP server:\n%s\n", authorizationURL); writeErr != nil {
-			return errors.Join(err, writeErr)
-		}
+		return fmt.Errorf("opening authorization page: %w", err)
 	}
 	return nil
+}
+
+func validateMCPAuthorizationURL(authorizationURL string) error {
+	parsed, err := url.Parse(authorizationURL)
+	if err != nil || parsed.Host == "" || parsed.User != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") {
+		return errors.New("broker returned an invalid OAuth authorization URL")
+	}
+	return nil
+}
+
+func printMCPAuthorizationURL(writer io.Writer, authorizationURL string, launchErr error) error {
+	if launchErr != nil {
+		if _, err := fmt.Fprintf(writer, "Could not open the browser: %v\n", launchErr); err != nil {
+			return errors.Join(launchErr, err)
+		}
+	}
+	if _, err := fmt.Fprintf(writer, "Open this URL to authorize the MCP server:\n%s\n", authorizationURL); err != nil {
+		if launchErr != nil {
+			return errors.Join(launchErr, err)
+		}
+		return err
+	}
+	return nil
+}
+
+func guiSessionAvailable() bool {
+	switch runtime.GOOS {
+	case "darwin", "windows":
+		return true
+	default:
+		return strings.TrimSpace(os.Getenv("DISPLAY")) != "" ||
+			strings.TrimSpace(os.Getenv("WAYLAND_DISPLAY")) != ""
+	}
 }

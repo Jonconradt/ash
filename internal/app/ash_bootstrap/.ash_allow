@@ -33,8 +33,8 @@ $PLUGINS_DIR_LIST
 # -----------------------------------------------------------------------------
 # MCP Servers
 # Note: These are not diabled with ASH_STRICT=1
-#       MCP servers may trigger a one-time OAuth authentication which will
-#       launch a browser window.
+#       MCP servers may trigger one-time OAuth authentication. Ash opens the
+#       browser when a GUI is available and prints a URL for terminal fallback.
 # -----------------------------------------------------------------------------
 https://mcpplaygroundonline.com/mcp-complex-server
 

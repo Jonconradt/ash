@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
 	"regexp"
 	"strings"
@@ -127,6 +128,112 @@ type remoteSession struct {
 	closeOnce     sync.Once
 }
 
+type oauthDialPolicy struct {
+	targetAuthority string
+	proxyAuthority  string
+}
+
+type oauthDialPolicyKey struct{}
+
+// remoteOAuthTransport permits non-public addresses only for the explicitly registered
+// MCP authority (or a configured proxy), and pins DNS results to the actual dial.
+type remoteOAuthTransport struct {
+	base             *http.Transport
+	trustedAuthority string
+	lookupNetIP      func(context.Context, string, string) ([]netip.Addr, error)
+	dial             func(context.Context, string, string) (net.Conn, error)
+}
+
+func (t *remoteOAuthTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	policy := oauthDialPolicy{targetAuthority: normalizeOAuthAuthority(request.URL)}
+	if t.base.Proxy != nil {
+		proxyURL, err := t.base.Proxy(request)
+		if err != nil {
+			return nil, fmt.Errorf("resolving OAuth proxy: %w", err)
+		}
+		if proxyURL != nil {
+			policy.proxyAuthority = normalizeOAuthAuthority(proxyURL)
+		}
+	}
+	ctx := context.WithValue(request.Context(), oauthDialPolicyKey{}, policy)
+	return t.base.RoundTrip(request.WithContext(ctx))
+}
+
+func (t *remoteOAuthTransport) CloseIdleConnections() {
+	t.base.CloseIdleConnections()
+}
+
+func (t *remoteOAuthTransport) dialContext(ctx context.Context, network, address string) (net.Conn, error) {
+	host, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return nil, fmt.Errorf("invalid OAuth dial address %q: %w", address, err)
+	}
+	authority := net.JoinHostPort(normalizeOAuthHost(host), port)
+	policy, _ := ctx.Value(oauthDialPolicyKey{}).(oauthDialPolicy)
+	trustedPrivateAddress := authority == t.trustedAuthority || authority == policy.proxyAuthority
+	if !trustedPrivateAddress && authority != policy.targetAuthority {
+		return nil, fmt.Errorf("OAuth transport attempted to connect to unexpected authority %q", authority)
+	}
+
+	var addresses []netip.Addr
+	if ip, err := netip.ParseAddr(host); err == nil {
+		addresses = []netip.Addr{ip}
+	} else {
+		addresses, err = t.lookupNetIP(ctx, "ip", host)
+		if err != nil {
+			return nil, fmt.Errorf("resolving OAuth host %q: %w", host, err)
+		}
+	}
+	if len(addresses) == 0 {
+		return nil, fmt.Errorf("OAuth host %q resolved to no IP addresses", host)
+	}
+	if !trustedPrivateAddress {
+		for _, ip := range addresses {
+			if isNonPublicOAuthIP(ip) {
+				return nil, fmt.Errorf("refusing OAuth connection to non-public IP address %q for host %q", ip, host)
+			}
+		}
+	}
+	var lastErr error
+	for _, ip := range addresses {
+		conn, err := t.dial(ctx, network, net.JoinHostPort(ip.String(), port))
+		if err == nil {
+			return conn, nil
+		}
+		lastErr = err
+	}
+	return nil, lastErr
+}
+
+func normalizeOAuthAuthority(parsed *url.URL) string {
+	host := normalizeOAuthHost(parsed.Hostname())
+	port := parsed.Port()
+	if port == "" {
+		if strings.EqualFold(parsed.Scheme, "https") {
+			port = "443"
+		} else {
+			port = "80"
+		}
+	}
+	return net.JoinHostPort(host, port)
+}
+
+func normalizeOAuthHost(host string) string {
+	return strings.TrimSuffix(strings.ToLower(host), ".")
+}
+
+var oauthCGNATRange = netip.MustParsePrefix("100.64.0.0/10")
+
+func isNonPublicOAuthIP(ip netip.Addr) bool {
+	ip = ip.Unmap()
+	return !ip.IsValid() ||
+		ip.IsPrivate() ||
+		ip.IsLinkLocalUnicast() ||
+		ip.IsMulticast() ||
+		ip.IsUnspecified() ||
+		oauthCGNATRange.Contains(ip)
+}
+
 type authorizationCallback struct {
 	result *auth.AuthorizationResult
 	err    string
@@ -211,6 +318,24 @@ func (m *RemoteManager) Status(ctx context.Context, name string) (RemoteStatus, 
 		return RemoteStatus{}, errors.New("MCP server session has not been started")
 	}
 	return m.waitForChange(ctx, session)
+}
+
+// StatusNow returns the current session state without waiting for a transition.
+func (m *RemoteManager) StatusNow(name string) (RemoteStatus, error) {
+	m.mu.RLock()
+	session := m.sessions[name]
+	m.mu.RUnlock()
+	if session == nil {
+		return RemoteStatus{}, errors.New("MCP server session has not been started")
+	}
+	select {
+	case authURL := <-session.authURL:
+		m.setStatus(session, RemoteStatus{State: "authorizing", AuthURL: authURL})
+	default:
+	}
+	session.mu.Lock()
+	defer session.mu.Unlock()
+	return session.status, nil
 }
 
 // ListTools returns the tools exposed by a connected remote session.
@@ -363,9 +488,31 @@ func (m *RemoteManager) connect(managerCtx context.Context, session *remoteSessi
 	}()
 
 	redirectURL := "http://" + listener.Addr().String() + "/oauth/callback"
+	defaultTransport, ok := http.DefaultTransport.(*http.Transport)
+	if !ok {
+		m.setStatus(session, RemoteStatus{State: "error", Error: "default HTTP transport is not an *http.Transport"})
+		return
+	}
+	baseTransport := defaultTransport.Clone()
+	parsedServerURL, err := url.Parse(session.config.URL)
+	if err != nil {
+		m.setStatus(session, RemoteStatus{State: "error", Error: fmt.Sprintf("parsing MCP server URL: %v", err)})
+		return
+	}
+	oauthTransport := &remoteOAuthTransport{
+		base:             baseTransport,
+		trustedAuthority: normalizeOAuthAuthority(parsedServerURL),
+		lookupNetIP:      net.DefaultResolver.LookupNetIP,
+		dial: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+	}
+	baseTransport.DialContext = oauthTransport.dialContext
 	httpClient := &http.Client{
-		Timeout: 30 * time.Second,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		Transport: oauthTransport,
+		Timeout:   30 * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
 	}
@@ -453,7 +600,12 @@ func (m *RemoteManager) connect(managerCtx context.Context, session *remoteSessi
 
 	parsed, _ := url.Parse(session.config.URL)
 	client := mcp.NewClient(&mcp.Implementation{Name: "ash-broker", Version: "1.0.0"}, nil)
-	transport := &mcp.StreamableClientTransport{Endpoint: parsed.String(), HTTPClient: httpClient, OAuthHandler: oauthHandler}
+	transport := &mcp.StreamableClientTransport{
+		Endpoint:             parsed.String(),
+		HTTPClient:           httpClient,
+		OAuthHandler:         oauthHandler,
+		DisableStandaloneSSE: true,
+	}
 	ctx, cancel := context.WithCancel(managerCtx)
 	defer cancel()
 	clientSession, err := client.Connect(ctx, transport, nil)

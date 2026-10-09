@@ -135,5 +135,13 @@ command_not_found_handler() {
 	return $?
 }
 
+ash() {
+	if [[ "${1:-}" == "mcp" && "${2:-}" == "add" ]]; then
+		_ash_ensure_broker >/dev/null 2>&1
+		[[ -n "${ASH_BROKER_LEASE:-}" ]] && touch "$ASH_BROKER_LEASE"
+	fi
+	command ash "$@"
+}
+
 _ash_ensure_broker >/dev/null 2>&1
 # <<< ash install <<<

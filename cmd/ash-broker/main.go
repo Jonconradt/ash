@@ -295,6 +295,8 @@ func handleMCPRequest(ctx context.Context, request brokerproto.Request, manager 
 		status, err = manager.Start(ctx, mcp.RemoteServer{Name: request.MCPServer, URL: request.MCPURL})
 	case "status":
 		status, err = manager.Status(ctx, request.MCPServer)
+	case "status_now":
+		status, err = manager.StatusNow(request.MCPServer)
 	case "auth_ack":
 		err = manager.AcknowledgeAuth(request.MCPServer)
 	case "list":
@@ -321,7 +323,7 @@ func handleMCPRequest(ctx context.Context, request brokerproto.Request, manager 
 		response.Error = err.Error()
 		return response
 	}
-	if request.MCPAction == "start" || request.MCPAction == "status" {
+	if request.MCPAction == "start" || request.MCPAction == "status" || request.MCPAction == "status_now" {
 		response.MCPStatus = &brokerproto.MCPStatus{State: status.State, AuthURL: status.AuthURL, Error: status.Error}
 	}
 	return response

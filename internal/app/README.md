@@ -21,6 +21,7 @@ file, not by sub-package.
 - `openai.go`, `anthropic.go`, `google.go`, `cohere.go`, `bedrock.go`, `ollama.go` — per-provider adapters.
 - `broker.go` (+ `broker_test.go`) — client-side connection-reuse broker (see `cmd/ash-broker`).
 - `mcp.go` — remote MCP config loading, browser authorization handoff, and remote tool integration with the existing tool loop.
+- `mcp_setup.go` — `ash mcp add`, broker-mediated OAuth setup, browser/TUI fallback, and atomic `.ash_allow` registration.
 
 ## Tool execution
 

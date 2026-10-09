@@ -115,6 +115,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if args[0] == "install" {
 		return runInstall(args[1:], stdout, stderr)
 	}
+	if args[0] == "mcp" {
+		return runMCP(args[1:], stdout, stderr)
+	}
 	if args[0] == "snooze" {
 		return runSnooze(args[1:], stdout, stderr)
 	}
@@ -309,6 +312,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 func printUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, "usage: ash [--attach <path>]... <text>")
 	_, _ = fmt.Fprintln(w, "       ash install [--shell bash|zsh] [--dry-run] [--overwrite]")
+	_, _ = fmt.Fprintln(w, "       ash mcp add <url> [--no-browser]")
 	_, _ = fmt.Fprintln(w, "       ash update [--version vX.Y.Z] [--yes|--skip-customized]")
 	_, _ = fmt.Fprintln(w, "       ash broker --socket <path>")
 }

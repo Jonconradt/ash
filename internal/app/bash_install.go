@@ -60,6 +60,14 @@ command_not_found_handle() {
 	return 127
 }
 
+ash() {
+	if [[ "${1:-}" == "mcp" && "${2:-}" == "add" ]]; then
+		_ash_ensure_broker >/dev/null 2>&1
+		[[ -n "${ASH_BROKER_LEASE:-}" ]] && touch "$ASH_BROKER_LEASE"
+	fi
+	command ash "$@"
+}
+
 _ash_should_route() {
   local cmd="$1"
   shift

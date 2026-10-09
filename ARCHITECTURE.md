@@ -37,10 +37,14 @@ Remote MCP servers are registered as URL lines in `$HOME/.ash/.ash_allow`. The `
 derives stable local names from each URL, loads tool definitions through typed broker requests,
 and dispatches model-selected calls back to the broker. URL registrations are excluded from the
 shell-command allowlist and remain active in strict mode. `ash-broker` owns the persistent MCP
-sessions and OAuth protocol state. `ash` only opens the browser authorization URL; the broker
-receives the loopback redirect, validates OAuth state/PKCE through the MCP SDK, exchanges and
+sessions and OAuth protocol state. `ash` opens the browser authorization URL when a desktop
+session is available and falls back to displaying the URL in the terminal; the broker receives
+the loopback redirect, validates OAuth state/PKCE through the MCP SDK, exchanges and
 refreshes tokens, and persists credentials in the OS credential manager or encrypted fallback
-file.
+file. `ash mcp add <url>` connects and registers a server only after success; it launches the
+authorization URL when a desktop session is available and falls back to a copyable terminal URL
+when the environment is headless or browser launch fails. `--no-browser` forces that terminal
+path.
 
 ## Key subsystems
 
@@ -64,7 +68,8 @@ file.
 - [provider.go](internal/app/provider.go): provider adapter registry (`ollama`, `openai`, `google`, `anthropic`, `cohere`, `bedrock`) and the adapter interface tiers: `providerAdapter` (base), `byteProviderAdapter` (raw HTTP, used only by `ollamaAdapter`), `sdkProviderAdapter` (official SDK-based `Send`, used by every other adapter), `streamingProviderAdapter` (adds `SendStream`, currently implemented only by [openai.go](internal/app/openai.go)).
 - [openai.go](internal/app/openai.go), [google.go](internal/app/google.go), [anthropic.go](internal/app/anthropic.go), [cohere.go](internal/app/cohere.go), [bedrock.go](internal/app/bedrock.go): per-provider adapters built on each vendor's official Go SDK, all sharing the `ai_transport.go` HTTP client so retries/broker-fallback/metrics stay consistent across providers.
 - [broker.go](internal/app/broker.go): client-side broker connection logic used by the main `ash` binary; the broker server itself lives in the separate [cmd/ash-broker](cmd/ash-broker) binary (see [internal/brokerproto](internal/brokerproto) for the shared wire types).
-- [mcp.go](internal/app/mcp.go): remote MCP config loading, browser authorization handoff, and remote tool integration with the existing tool loop.
+- [mcp.go](internal/app/mcp.go): remote MCP config loading, GUI-aware browser authorization handoff, and remote tool integration with the existing tool loop.
+- [mcp_setup.go](internal/app/mcp_setup.go): `ash mcp add`, broker-mediated OAuth setup, and atomic registration of connected servers in `.ash_allow`.
 - [remote.go](internal/mcp/remote.go) and [credentials.go](internal/mcp/credentials.go): broker-owned remote MCP sessions, OAuth handling, OS credential manager use, and encrypted-file fallback.
 - [snooze.go](internal/app/snooze.go): persistent expiry state for pausing automatic shell routing.
 

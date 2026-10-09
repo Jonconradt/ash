@@ -36,6 +36,9 @@ const (
 // runToolLoop runs the requested operation.
 func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages []message, shim mcpToolShim) (string, []message, error) {
 	configureDebugLogging()
+	if reporter, ok := shim.(interface{ logMCPUsage(context.Context) }); ok {
+		defer reporter.logMCPUsage(ctx)
+	}
 
 	maxIters := maxToolIterations()
 	tools := shim.ListTools()

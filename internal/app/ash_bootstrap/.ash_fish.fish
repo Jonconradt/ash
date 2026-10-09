@@ -92,6 +92,13 @@ function fish_command_not_found
 	return 127
 end
 
+function ash
+	if test (count $argv) -ge 2; and test "$argv[1]" = mcp; and test "$argv[2]" = add
+		_ash_prepare_prompt
+	end
+	command ash $argv
+end
+
 function _ash_trim_trailing_punctuation
 	string replace -r '[?!.,:;]$' '' -- "$argv[1]"
 end
