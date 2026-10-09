@@ -301,6 +301,7 @@ Notes:
 - `ASH_ATTACHMENT_MAX_BYTES` (optional): Max size in bytes for a file passed via `--attach`. Default 10485760 (10 MiB).
 - `AI` (legacy, unsupported): Deprecated and rejected; use `AI_ENDPOINT` and `AI_MODEL`.
 - `AI_TIMEOUT` (optional): AI request timeout. Default `3m`.
+- `ASH_BROKER_AI_WARMUP` (optional): Send one credential-free `HEAD` request to the AI endpoint's origin at broker startup to warm its reusable HTTP connection. Enabled by default; set to `0` to disable. Set to `1` to enable explicitly. The probe does not validate API health or warm a local model.
 - `ASH_HISTORY_MAX` (optional): Max retained history messages per key. Default `40`.
 - `ASH_ALLOW` (optional): Comma-separated allowlisted executables for `run_unix_command`; it overrides `.ash_allow` and does not expand Ash internal tokens.
 - `ASH_DENY` (optional): Comma-separated denylist for commands, tools, and plugins; it overrides `.ash_deny`.
@@ -331,7 +332,15 @@ Notes:
 
 On macOS, Linux, and FreeBSD, the installed Bash, zsh, and Fish wrappers lazily start one unprivileged broker per interactive shell. The wrapper passes its process ID to the broker, which remains available until that shell exits. Subshells reuse their parent shell's broker; independent shells have independent brokers.
 
-The broker keeps a bounded HTTPS connection pool alive across separate `ash` processes and does not apply a local idle timeout to those connections. A provider can still close an idle connection; the next prompt opens a new connection automatically. Broker use is transparent and has a direct HTTPS fallback. Its private Unix socket and capability token are ephemeral shell state and are not written to cron, launchd, or other persistent scheduler configuration. Scheduled invocations therefore use direct HTTPS unless they explicitly inherit a live broker environment.
+The broker keeps a bounded HTTPS connection pool alive across separate `ash` processes and does not apply a local idle timeout to those connections. It uses Go's TCP-based HTTP transport (HTTP/1.1 or HTTP/2), not QUIC/HTTP/3. A provider can still close an idle connection; the next prompt opens a new connection automatically. Broker use is transparent and has a direct HTTPS fallback. Its private Unix socket and capability token are ephemeral shell state and are not written to cron, launchd, or other persistent scheduler configuration. Scheduled invocations therefore use direct HTTPS unless they explicitly inherit a live broker environment.
+
+Remote MCP servers in the effective `.ash_allow` file are connected and their tool catalogs are warmed in the background when the broker starts; shell startup does not wait for remote servers. OAuth credentials are reused when available, but broker startup never opens a browser. Servers needing authorization remain pending until an interactive Ash command handles the authorization flow. Independent server warm-ups run concurrently with a bounded worker pool; a failed or slow server does not block AI requests.
+
+MCP clients attempt the newest protocol supported by Ash first. They use a legacy protocol only when the server explicitly indicates that modern discovery or the requested version is unsupported; transient network and server failures are surfaced instead of triggering a silent downgrade.
+
+The broker retains complete tool catalogs in memory. For legacy MCP protocol sessions it refreshes metadata after five minutes and invalidates it on supported tool-list-change notifications. For newer protocol sessions, the MCP SDK honors each server's cache directives, including metadata that must not be cached. If an expired catalog cannot be refreshed, Ash reports the error instead of silently treating stale metadata as current. Tool results are never cached or replayed.
+
+The broker sends one bounded, unauthenticated `HEAD` request to the AI endpoint's origin at startup by default, through the same HTTP transport used for AI calls and without following redirects. Set `ASH_BROKER_AI_WARMUP=0` to disable the probe; `1` enables it explicitly. An endpoint may reject `HEAD`; a response status such as 401, 404, or 405 does not by itself mean connection warm-up failed, nor does a successful probe prove the AI API is healthy.
 
 ### Remote MCP servers
 

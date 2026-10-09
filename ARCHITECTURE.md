@@ -41,10 +41,23 @@ sessions and OAuth protocol state. `ash` opens the browser authorization URL whe
 session is available and falls back to displaying the URL in the terminal; the broker receives
 the loopback redirect, validates OAuth state/PKCE through the MCP SDK, exchanges and
 refreshes tokens, and persists credentials in the OS credential manager or encrypted fallback
-file. `ash mcp add <url>` connects and registers a server only after success; it launches the
+file. After binding its socket, the broker asynchronously connects registrations from the
+effective `.ash_allow` file and discovers complete MCP tool catalogs. Startup uses bounded
+concurrency and never initiates a browser flow; a pending OAuth server is completed by an
+interactive Ash command. Legacy catalogs are held in memory for five minutes and invalidated
+by supported list-change notifications. Newer protocol cache directives are honored by the
+MCP SDK, including zero-TTL responses. MCP clients attempt Ash's newest protocol first and
+downgrade only when discovery indicates that modern discovery or the requested version is
+unsupported; transient network and server failures are surfaced without a silent downgrade.
+`ash mcp add <url>` connects and registers a server only after success; it launches the
 authorization URL when a desktop session is available and falls back to a copyable terminal URL
 when the environment is headless or browser launch fails. `--no-browser` forces that terminal
 path.
+
+The broker's AI client retains a bounded Go `http.Transport` connection pool (TCP HTTP/1.1/2,
+not QUIC). By default, `ASH_BROKER_AI_WARMUP` sends one bounded unauthenticated HEAD to the AI
+endpoint's origin through that transport; set it to `0` to disable. This is not an API health
+check.
 
 ## Key subsystems
 

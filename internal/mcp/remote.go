@@ -1,6 +1,8 @@
 package mcp
 
 import (
+	"bufio"
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"crypto/subtle"
@@ -8,25 +10,37 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/netip"
 	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	"ash/internal/brokerproto"
+	"ash/internal/workspace"
 	"github.com/modelcontextprotocol/go-sdk/auth"
+	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
 	"golang.org/x/oauth2"
 )
 
 const (
-	toolNamePrefix = "mcp_"
-	authWait       = 200 * time.Millisecond
+	toolNamePrefix           = "mcp_"
+	authWait                 = 200 * time.Millisecond
+	modernProtocolVersion    = "2026-07-28"
+	protocolDiscoveryTimeout = 15 * time.Second
+	legacyToolsTTL           = 5 * time.Minute
+	toolsTimeout             = 15 * time.Second
 )
 
 var toolNameSanitizer = regexp.MustCompile(`[^A-Za-z0-9_-]+`)
@@ -65,6 +79,29 @@ func RemoteServersFromAllowlist(raw string) ([]RemoteServer, error) {
 		servers = append(servers, server)
 	}
 	return servers, nil
+}
+
+// ResolveRemoteServers reads the first existing .ash_allow file using Ash's
+// workspace, working-directory, then home-directory precedence.
+func ResolveRemoteServers(home, cwd string, readFile func(string) ([]byte, error)) ([]RemoteServer, error) {
+	if readFile == nil {
+		readFile = os.ReadFile
+	}
+	for _, path := range []string{
+		filepath.Join(workspace.Root(home), ".ash_allow"),
+		filepath.Join(cwd, ".ash_allow"),
+		filepath.Join(home, ".ash_allow"),
+	} {
+		content, err := readFile(path)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return nil, fmt.Errorf("reading MCP registrations from %s: %w", path, err)
+		}
+		return RemoteServersFromAllowlist(string(content))
+	}
+	return nil, nil
 }
 
 func remoteServerName(urlText string) string {
@@ -115,17 +152,35 @@ type persistedOAuth struct {
 }
 
 type remoteSession struct {
-	mu            sync.Mutex
-	config        RemoteServer
-	status        RemoteStatus
-	client        *mcp.ClientSession
-	authURL       chan string
-	callback      chan authorizationCallback
-	authActive    atomic.Bool
-	expectedState string
-	listener      net.Listener
-	done          chan struct{}
-	closeOnce     sync.Once
+	mu               sync.Mutex
+	config           RemoteServer
+	ctx              context.Context
+	cancel           context.CancelFunc
+	status           RemoteStatus
+	client           *mcp.ClientSession
+	authURL          chan string
+	callback         chan authorizationCallback
+	toolRefreshQueue chan struct{}
+	authActive       atomic.Bool
+	expectedState    string
+	listener         net.Listener
+	done             chan struct{}
+	closeOnce        sync.Once
+	closed           bool
+	tools            []RemoteTool
+	toolsExpiry      time.Time
+	toolsValid       bool
+	toolsGen         uint64
+	refresh          *toolRefresh
+	retryAt          time.Time
+	retryDelay       time.Duration
+	workers          sync.WaitGroup
+}
+
+type toolRefresh struct {
+	done  chan struct{}
+	tools []RemoteTool
+	err   error
 }
 
 type oauthDialPolicy struct {
@@ -134,6 +189,225 @@ type oauthDialPolicy struct {
 }
 
 type oauthDialPolicyKey struct{}
+
+type protocolNegotiationState struct {
+	mu           sync.Mutex
+	blockedError error
+}
+
+type protocolProbeRoundTripper struct {
+	base  http.RoundTripper
+	state *protocolNegotiationState
+}
+
+func (t *protocolProbeRoundTripper) RoundTrip(request *http.Request) (*http.Response, error) {
+	method := ""
+	if request.Method == http.MethodPost {
+		method = jsonRPCRequestMethod(request)
+	}
+	if method == "initialize" {
+		t.state.mu.Lock()
+		err := t.state.blockedError
+		t.state.mu.Unlock()
+		if err != nil {
+			return nil, err
+		}
+	}
+	if method != "server/discover" {
+		return t.base.RoundTrip(request)
+	}
+	t.state.mu.Lock()
+	t.state.blockedError = nil
+	t.state.mu.Unlock()
+	response, err := t.base.RoundTrip(request)
+	if err != nil {
+		t.blockLegacyFallback(fmt.Errorf("newest MCP protocol discovery failed: %w", err))
+		return nil, err
+	}
+	if response != nil {
+		errorCode, validResponse, supportsModern := responseDiscoveryProtocol(response)
+		legacyOnlyDiscovery := response.StatusCode >= http.StatusOK &&
+			response.StatusCode < http.StatusMultipleChoices &&
+			validResponse && errorCode == 0 && !supportsModern
+		if legacyFallbackRequired(response.StatusCode, errorCode) || legacyOnlyDiscovery {
+			return response, nil
+		}
+		if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices ||
+			!validResponse || errorCode != 0 {
+			if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden {
+				t.blockLegacyFallback(fmt.Errorf("newest MCP protocol discovery requires authorization (HTTP status %d)", response.StatusCode))
+			} else {
+				t.blockLegacyFallback(fmt.Errorf("newest MCP protocol discovery failed with HTTP status %d", response.StatusCode))
+			}
+		}
+	} else {
+		t.blockLegacyFallback(errors.New("newest MCP protocol discovery returned no HTTP response"))
+	}
+	return response, err
+}
+
+func (t *protocolProbeRoundTripper) blockLegacyFallback(err error) {
+	t.state.mu.Lock()
+	t.state.blockedError = err
+	t.state.mu.Unlock()
+}
+
+func jsonRPCRequestMethod(request *http.Request) string {
+	if request.GetBody == nil {
+		return ""
+	}
+	body, err := request.GetBody()
+	if err != nil {
+		return ""
+	}
+	defer func() { _ = body.Close() }()
+	payload, err := io.ReadAll(io.LimitReader(body, 1<<20))
+	if err != nil {
+		return ""
+	}
+	var message struct {
+		Method string `json:"method"`
+	}
+	if json.Unmarshal(payload, &message) != nil {
+		return ""
+	}
+	return message.Method
+}
+
+func responseDiscoveryProtocol(response *http.Response) (int, bool, bool) {
+	if response.Body == nil {
+		return 0, false, false
+	}
+	var payload []byte
+	var err error
+	if strings.Contains(response.Header.Get("Content-Type"), "text/event-stream") {
+		payload, err = firstSSEData(response)
+	} else {
+		body := response.Body
+		payload, err = readBoundedDiscoveryBody(body)
+		response.Body = bufferedResponseBody(payload, body, body)
+	}
+	if err != nil || len(payload) > brokerproto.MaxBody {
+		return 0, false, false
+	}
+	message, err := jsonrpc.DecodeMessage(payload)
+	if err != nil {
+		return 0, false, false
+	}
+	reply, ok := message.(*jsonrpc.Response)
+	if !ok {
+		return 0, false, false
+	}
+	if reply.Error != nil {
+		return jsonRPCErrorCode(reply.Error), true, false
+	}
+	var discovery struct {
+		SupportedVersions []string `json:"supportedVersions"`
+	}
+	if json.Unmarshal(reply.Result, &discovery) != nil {
+		return 0, false, false
+	}
+	for _, version := range discovery.SupportedVersions {
+		if version >= modernProtocolVersion {
+			return 0, true, true
+		}
+	}
+	return 0, true, false
+}
+
+func readBoundedDiscoveryBody(body io.ReadCloser) ([]byte, error) {
+	timer := time.AfterFunc(protocolDiscoveryTimeout, func() { _ = body.Close() })
+	payload, err := io.ReadAll(io.LimitReader(body, brokerproto.MaxBody+1))
+	if !timer.Stop() {
+		return payload, context.DeadlineExceeded
+	}
+	return payload, err
+}
+
+func firstSSEData(response *http.Response) ([]byte, error) {
+	body := response.Body
+	reader := bufio.NewReader(body)
+	var consumed, line, data bytes.Buffer
+	timer := time.AfterFunc(protocolDiscoveryTimeout, func() { _ = body.Close() })
+	defer timer.Stop()
+	restore := func() {
+		response.Body = bufferedResponseBody(consumed.Bytes(), reader, body)
+	}
+	for consumed.Len() <= brokerproto.MaxBody {
+		fragment, err := reader.ReadSlice('\n')
+		if consumed.Len()+len(fragment) > brokerproto.MaxBody {
+			restore()
+			return nil, errors.New("MCP server discovery response exceeds limit")
+		}
+		consumed.Write(fragment)
+		line.Write(fragment)
+		if errors.Is(err, bufio.ErrBufferFull) {
+			continue
+		}
+		if err != nil && !errors.Is(err, io.EOF) {
+			restore()
+			return nil, err
+		}
+		lineText := strings.TrimSuffix(strings.TrimSuffix(line.String(), "\n"), "\r")
+		if lineText == "" && data.Len() > 0 {
+			payload := bytes.TrimSuffix(data.Bytes(), []byte("\n"))
+			if !timer.Stop() {
+				restore()
+				return nil, context.DeadlineExceeded
+			}
+			restore()
+			return append([]byte(nil), payload...), nil
+		}
+		if value, ok := strings.CutPrefix(lineText, "data:"); ok {
+			if data.Len() > 0 {
+				data.WriteByte('\n')
+			}
+			data.WriteString(strings.TrimSpace(value))
+		}
+		line.Reset()
+		if errors.Is(err, io.EOF) {
+			if data.Len() > 0 {
+				payload := append([]byte(nil), data.Bytes()...)
+				if !timer.Stop() {
+					restore()
+					return nil, context.DeadlineExceeded
+				}
+				restore()
+				return payload, nil
+			}
+			restore()
+			return nil, io.EOF
+		}
+		if err != nil {
+			restore()
+			return nil, err
+		}
+	}
+	restore()
+	return nil, errors.New("MCP server discovery response exceeds limit")
+}
+
+func bufferedResponseBody(prefix []byte, remaining io.Reader, body io.Closer) io.ReadCloser {
+	return struct {
+		io.Reader
+		io.Closer
+	}{Reader: io.MultiReader(bytes.NewReader(prefix), remaining), Closer: body}
+}
+
+func jsonRPCErrorCode(err error) int {
+	var wireError *jsonrpc.Error
+	if errors.As(err, &wireError) {
+		return int(wireError.Code)
+	}
+	return 0
+}
+
+func legacyFallbackRequired(status, errorCode int) bool {
+	return status == http.StatusNotFound ||
+		status == http.StatusMethodNotAllowed ||
+		errorCode == jsonrpc.CodeMethodNotFound ||
+		errorCode == mcp.CodeUnsupportedProtocolVersion
+}
 
 // remoteOAuthTransport permits non-public addresses only for the explicitly registered
 // MCP authority (or a configured proxy), and pins DNS results to the actual dial.
@@ -242,17 +516,27 @@ type authorizationCallback struct {
 // RemoteManager owns long-lived HTTP MCP client sessions.
 type RemoteManager struct {
 	ctx        context.Context
+	cancel     context.CancelFunc
 	mu         sync.RWMutex
 	sessions   map[string]*remoteSession
 	credential credentialStorage
+	logger     *slog.Logger
+	closed     bool
 }
 
 // NewRemoteManager creates a manager whose sessions end when ctx is canceled.
-func NewRemoteManager(ctx context.Context, credential credentialStorage) *RemoteManager {
+func NewRemoteManager(ctx context.Context, credential credentialStorage, loggers ...*slog.Logger) *RemoteManager {
+	managerCtx, cancel := context.WithCancel(ctx)
+	logger := slog.Default()
+	if len(loggers) > 0 && loggers[0] != nil {
+		logger = loggers[0]
+	}
 	return &RemoteManager{
-		ctx:        ctx,
+		ctx:        managerCtx,
+		cancel:     cancel,
 		sessions:   make(map[string]*remoteSession),
 		credential: credential,
+		logger:     logger,
 	}
 }
 
@@ -264,32 +548,59 @@ func (m *RemoteManager) Start(ctx context.Context, server RemoteServer) (RemoteS
 		return RemoteStatus{}, err
 	}
 	m.mu.Lock()
-	session := m.sessions[server.Name]
-	if session != nil {
-		session.mu.Lock()
-		retry := session.status.State == "error"
-		session.mu.Unlock()
-		if retry {
-			delete(m.sessions, server.Name)
-			session.close()
-			session = nil
-		}
+	if m.closed {
+		m.mu.Unlock()
+		return RemoteStatus{}, errors.New("MCP manager is closed")
 	}
-	if session == nil {
-		session = &remoteSession{
-			config:   server,
-			status:   RemoteStatus{State: "connecting"},
-			authURL:  make(chan string, 1),
-			callback: make(chan authorizationCallback, 1),
-			done:     make(chan struct{}),
-		}
-		m.sessions[server.Name] = session
-		go m.connect(m.ctx, session)
-	} else if session.config.URL != server.URL {
+	session := m.sessions[server.Name]
+	if session != nil && session.config.URL != server.URL {
 		m.mu.Unlock()
 		return RemoteStatus{}, errors.New("MCP server name is already connected to a different URL")
 	}
+	var closeSession *remoteSession
+	var retryDelay time.Duration
+	if session != nil {
+		session.mu.Lock()
+		retry := session.status.State == "error" && (session.retryAt.IsZero() || !time.Now().Before(session.retryAt))
+		switch {
+		case retry:
+			retryDelay = session.retryDelay
+			delete(m.sessions, server.Name)
+			closeSession = session
+			session = nil
+		case session.status.State == "error" && !session.retryAt.IsZero():
+			retryErr := session.status.Error
+			session.mu.Unlock()
+			m.mu.Unlock()
+			return RemoteStatus{}, fmt.Errorf("MCP server %q reconnect is cooling down: %s", server.Name, retryErr)
+		default:
+			session.mu.Unlock()
+		}
+		if closeSession != nil {
+			closeSession.mu.Unlock()
+		}
+	}
+	if session == nil {
+		sessionCtx, cancel := context.WithCancel(m.ctx)
+		session = &remoteSession{
+			config:           server,
+			ctx:              sessionCtx,
+			cancel:           cancel,
+			status:           RemoteStatus{State: "connecting"},
+			retryDelay:       retryDelay,
+			authURL:          make(chan string, 1),
+			callback:         make(chan authorizationCallback, 1),
+			toolRefreshQueue: make(chan struct{}, 1),
+			done:             make(chan struct{}),
+		}
+		session.workers.Add(1)
+		m.sessions[server.Name] = session
+		go m.connect(session.ctx, session)
+	}
 	m.mu.Unlock()
+	if closeSession != nil {
+		closeSession.close()
+	}
 	return m.waitForChange(ctx, session)
 }
 
@@ -340,6 +651,12 @@ func (m *RemoteManager) StatusNow(name string) (RemoteStatus, error) {
 
 // ListTools returns the tools exposed by a connected remote session.
 func (m *RemoteManager) ListTools(name string) ([]RemoteTool, error) {
+	return m.ListToolsContext(m.ctx, name)
+}
+
+// ListToolsContext returns a complete catalog, coalescing discovery across
+// callers while allowing each caller to stop waiting independently.
+func (m *RemoteManager) ListToolsContext(ctx context.Context, name string) ([]RemoteTool, error) {
 	m.mu.RLock()
 	session := m.sessions[name]
 	m.mu.RUnlock()
@@ -356,21 +673,208 @@ func (m *RemoteManager) ListTools(name string) ([]RemoteTool, error) {
 		}
 		return nil, errors.New("MCP server session is not connected")
 	}
-	ctx, cancel := context.WithTimeout(m.ctx, 15*time.Second)
-	defer cancel()
-	result, err := client.ListTools(ctx, nil)
+	result, err := m.listToolsForSession(ctx, session)
 	if err != nil {
 		return nil, err
 	}
-	tools := make([]RemoteTool, 0, len(result.Tools))
-	for _, tool := range result.Tools {
-		schema, ok := tool.InputSchema.(map[string]any)
-		if !ok {
-			schema = map[string]any{"type": "object", "properties": map[string]any{}}
+	return cloneRemoteTools(result), nil
+}
+
+func (m *RemoteManager) listToolsForSession(ctx context.Context, session *remoteSession) ([]RemoteTool, error) {
+	for {
+		session.mu.Lock()
+		if session.closed {
+			session.mu.Unlock()
+			return nil, errors.New("MCP server session is closed")
 		}
-		tools = append(tools, RemoteTool{Server: name, Name: tool.Name, Description: tool.Description, InputSchema: schema})
+		client := session.client
+		status := session.status
+		if client == nil {
+			session.mu.Unlock()
+			if status.Error != "" {
+				return nil, errors.New(status.Error)
+			}
+			return nil, errors.New("MCP server session is not connected")
+		}
+		init := client.InitializeResult()
+		if init == nil || init.Capabilities == nil || init.Capabilities.Tools == nil {
+			session.mu.Unlock()
+			return []RemoteTool{}, nil
+		}
+		legacy := init.ProtocolVersion < modernProtocolVersion
+		if legacy && session.toolsValid && time.Now().Before(session.toolsExpiry) {
+			tools := session.tools
+			session.mu.Unlock()
+			return tools, nil
+		}
+		if pending := session.refresh; pending != nil {
+			session.mu.Unlock()
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-pending.done:
+				if pending.err != nil {
+					return nil, pending.err
+				}
+				return pending.tools, nil
+			}
+		}
+		refresh := &toolRefresh{done: make(chan struct{})}
+		generation := session.toolsGen
+		session.refresh = refresh
+		session.workers.Add(1)
+		session.mu.Unlock()
+		go m.refreshTools(session, client, refresh, generation)
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-refresh.done:
+			if refresh.err != nil {
+				return nil, refresh.err
+			}
+			return cloneRemoteTools(refresh.tools), nil
+		}
 	}
+}
+
+func (m *RemoteManager) refreshTools(session *remoteSession, client *mcp.ClientSession, refresh *toolRefresh, generation uint64) {
+	defer session.workers.Done()
+	ctx, cancel := context.WithTimeout(session.ctx, toolsTimeout)
+	defer cancel()
+	for {
+		tools, err := discoverTools(ctx, client, session.config.Name)
+		session.mu.Lock()
+		if session.closed || session.ctx.Err() != nil {
+			refresh.err = errors.New("MCP server session is closed")
+			session.refresh = nil
+			close(refresh.done)
+			session.mu.Unlock()
+			return
+		}
+		if session.client != client {
+			refresh.err = errors.New("MCP server session changed during tool discovery")
+			session.refresh = nil
+			close(refresh.done)
+			session.mu.Unlock()
+			return
+		}
+		if generation != session.toolsGen {
+			generation = session.toolsGen
+			session.mu.Unlock()
+			if ctx.Err() != nil {
+				session.mu.Lock()
+				refresh.err = ctx.Err()
+				session.refresh = nil
+				close(refresh.done)
+				session.mu.Unlock()
+				return
+			}
+			continue
+		}
+		if err != nil {
+			refresh.err = err
+			session.tools = nil
+			session.toolsValid = false
+			session.refresh = nil
+			close(refresh.done)
+			session.mu.Unlock()
+			return
+		}
+		init := client.InitializeResult()
+		legacy := init == nil || init.ProtocolVersion < modernProtocolVersion
+		if legacy {
+			session.tools = cloneRemoteTools(tools)
+			session.toolsExpiry = time.Now().Add(legacyToolsTTL)
+			session.toolsValid = true
+		}
+		refresh.tools = cloneRemoteTools(tools)
+		session.retryDelay = 0
+		session.retryAt = time.Time{}
+		session.refresh = nil
+		close(refresh.done)
+		session.mu.Unlock()
+		return
+	}
+}
+
+func discoverTools(ctx context.Context, client *mcp.ClientSession, server string) ([]RemoteTool, error) {
+	var tools []RemoteTool
+	seenCursors := make(map[string]struct{})
+	seenNames := make(map[string]struct{})
+	cursor := ""
+	for {
+		result, err := client.ListTools(ctx, &mcp.ListToolsParams{Cursor: cursor})
+		if err != nil {
+			return nil, fmt.Errorf("listing tools: %w", err)
+		}
+		for _, tool := range result.Tools {
+			if tool == nil || strings.TrimSpace(tool.Name) == "" {
+				return nil, errors.New("MCP server returned a tool without a name")
+			}
+			if _, exists := seenNames[tool.Name]; exists {
+				return nil, fmt.Errorf("MCP server returned duplicate tool %q", tool.Name)
+			}
+			schema, ok := tool.InputSchema.(map[string]any)
+			if !ok || schema == nil {
+				return nil, fmt.Errorf("MCP tool %q returned a non-object input schema", tool.Name)
+			}
+			seenNames[tool.Name] = struct{}{}
+			tools = append(tools, RemoteTool{
+				Server: server, Name: tool.Name, Description: tool.Description, InputSchema: schema,
+			})
+			encoded, err := json.Marshal(tools)
+			if err != nil {
+				return nil, fmt.Errorf("encoding MCP tool catalog: %w", err)
+			}
+			if len(encoded) > brokerproto.MaxBody {
+				return nil, errors.New("MCP tool catalog exceeds broker response limit")
+			}
+		}
+		if result.NextCursor == "" {
+			break
+		}
+		if _, exists := seenCursors[result.NextCursor]; exists {
+			return nil, errors.New("MCP server repeated a tools/list pagination cursor")
+		}
+		seenCursors[result.NextCursor] = struct{}{}
+		cursor = result.NextCursor
+	}
+	sort.Slice(tools, func(i, j int) bool { return tools[i].Name < tools[j].Name })
 	return tools, nil
+}
+
+func cloneRemoteTools(tools []RemoteTool) []RemoteTool {
+	cloned := make([]RemoteTool, len(tools))
+	for index, tool := range tools {
+		cloned[index] = tool
+		if tool.InputSchema != nil {
+			cloned[index].InputSchema = cloneJSONMap(tool.InputSchema)
+		}
+	}
+	return cloned
+}
+
+func cloneJSONMap(source map[string]any) map[string]any {
+	cloned := make(map[string]any, len(source))
+	for key, value := range source {
+		cloned[key] = cloneJSONValue(value)
+	}
+	return cloned
+}
+
+func cloneJSONValue(value any) any {
+	switch typed := value.(type) {
+	case map[string]any:
+		return cloneJSONMap(typed)
+	case []any:
+		cloned := make([]any, len(typed))
+		for index, item := range typed {
+			cloned[index] = cloneJSONValue(item)
+		}
+		return cloned
+	default:
+		return value
+	}
 }
 
 // CallTool invokes a tool on a connected remote session.
@@ -387,15 +891,25 @@ func (m *RemoteManager) CallTool(ctx context.Context, server, name string, argum
 	if client == nil {
 		return nil, errors.New("MCP server session is not connected")
 	}
-	return client.CallTool(ctx, &mcp.CallToolParams{Name: name, Arguments: arguments})
+	result, err := client.CallTool(ctx, &mcp.CallToolParams{Name: name, Arguments: arguments})
+	if err != nil && errors.Is(err, mcp.ErrConnectionClosed) {
+		m.markSessionFailed(session, err)
+	}
+	return result, err
 }
 
 // Close terminates all sessions.
 func (m *RemoteManager) Close() {
 	m.mu.Lock()
+	if m.closed {
+		m.mu.Unlock()
+		return
+	}
+	m.closed = true
 	sessions := m.sessions
 	m.sessions = make(map[string]*remoteSession)
 	m.mu.Unlock()
+	m.cancel()
 	for _, session := range sessions {
 		session.close()
 	}
@@ -404,21 +918,48 @@ func (m *RemoteManager) Close() {
 func (s *remoteSession) close() {
 	s.closeOnce.Do(func() {
 		s.mu.Lock()
+		s.closed = true
+		s.cancel()
 		listener := s.listener
 		s.listener = nil
 		client := s.client
 		s.client = nil
 		s.mu.Unlock()
-		if listener != nil {
-			_ = listener.Close()
-		}
 		if client != nil {
 			_ = client.Close()
 		}
+		if listener != nil {
+			_ = listener.Close()
+		}
+		s.workers.Wait()
 	})
 }
 
+func (m *RemoteManager) markSessionFailed(session *remoteSession, err error) {
+	session.mu.Lock()
+	if session.closed {
+		session.mu.Unlock()
+		return
+	}
+	session.client = nil
+	session.tools = nil
+	session.toolsValid = false
+	if session.retryDelay == 0 {
+		session.retryDelay = time.Second
+	} else {
+		session.retryDelay *= 2
+		if session.retryDelay > 30*time.Second {
+			session.retryDelay = 30 * time.Second
+		}
+	}
+	session.retryAt = time.Now().Add(session.retryDelay)
+	session.status = RemoteStatus{State: "error", Error: err.Error()}
+	session.cancel()
+	session.mu.Unlock()
+}
+
 func (m *RemoteManager) connect(managerCtx context.Context, session *remoteSession) {
+	defer session.workers.Done()
 	defer close(session.done)
 	defer func() {
 		session.mu.Lock()
@@ -436,6 +977,11 @@ func (m *RemoteManager) connect(managerCtx context.Context, session *remoteSessi
 		return
 	}
 	session.mu.Lock()
+	if session.closed || session.ctx.Err() != nil {
+		session.mu.Unlock()
+		_ = listener.Close()
+		return
+	}
 	session.listener = listener
 	session.mu.Unlock()
 	callbackServer := &http.Server{
@@ -483,6 +1029,7 @@ func (m *RemoteManager) connect(managerCtx context.Context, session *remoteSessi
 		}),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
+	defer func() { _ = callbackServer.Close() }()
 	go func() {
 		_ = callbackServer.Serve(listener)
 	}()
@@ -494,6 +1041,7 @@ func (m *RemoteManager) connect(managerCtx context.Context, session *remoteSessi
 		return
 	}
 	baseTransport := defaultTransport.Clone()
+	defer baseTransport.CloseIdleConnections()
 	parsedServerURL, err := url.Parse(session.config.URL)
 	if err != nil {
 		m.setStatus(session, RemoteStatus{State: "error", Error: fmt.Sprintf("parsing MCP server URL: %v", err)})
@@ -509,7 +1057,16 @@ func (m *RemoteManager) connect(managerCtx context.Context, session *remoteSessi
 		}).DialContext,
 	}
 	baseTransport.DialContext = oauthTransport.dialContext
+	baseTransport.ResponseHeaderTimeout = 30 * time.Second
+	protocolState := &protocolNegotiationState{}
 	httpClient := &http.Client{
+		Transport: &protocolProbeRoundTripper{base: oauthTransport, state: protocolState},
+		Timeout:   0,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	oauthHTTPClient := &http.Client{
 		Transport: oauthTransport,
 		Timeout:   30 * time.Second,
 		CheckRedirect: func(*http.Request, []*http.Request) error {
@@ -564,7 +1121,7 @@ func (m *RemoteManager) connect(managerCtx context.Context, session *remoteSessi
 		RedirectURL:                     redirectURL,
 		AuthorizationCodeFetcher:        authorizationFetcher,
 		RequestRefreshToken:             true,
-		Client:                          httpClient,
+		Client:                          oauthHTTPClient,
 	}
 	saveCredential := func(record persistedOAuth) error {
 		payload, err := json.Marshal(record)
@@ -599,26 +1156,80 @@ func (m *RemoteManager) connect(managerCtx context.Context, session *remoteSessi
 	}
 
 	parsed, _ := url.Parse(session.config.URL)
-	client := mcp.NewClient(&mcp.Implementation{Name: "ash-broker", Version: "1.0.0"}, nil)
+	client := mcp.NewClient(&mcp.Implementation{Name: "ash-broker", Version: "1.0.0"}, &mcp.ClientOptions{
+		ToolListChangedHandler: func(context.Context, *mcp.ToolListChangedRequest) {
+			session.mu.Lock()
+			if session.closed {
+				session.mu.Unlock()
+				return
+			}
+			session.toolsGen++
+			session.toolsValid = false
+			select {
+			case session.toolRefreshQueue <- struct{}{}:
+			default:
+			}
+			session.mu.Unlock()
+		},
+	})
 	transport := &mcp.StreamableClientTransport{
 		Endpoint:             parsed.String(),
 		HTTPClient:           httpClient,
 		OAuthHandler:         oauthHandler,
-		DisableStandaloneSSE: true,
+		DisableStandaloneSSE: false,
 	}
-	ctx, cancel := context.WithCancel(managerCtx)
-	defer cancel()
-	clientSession, err := client.Connect(ctx, transport, nil)
+	// Nil session options make the SDK negotiate its newest supported version first.
+	clientSession, err := client.Connect(session.ctx, transport, nil)
 	if err != nil {
 		m.setStatus(session, RemoteStatus{State: "error", Error: err.Error()})
 		return
 	}
 	session.mu.Lock()
+	if session.closed || session.ctx.Err() != nil {
+		session.mu.Unlock()
+		_ = clientSession.Close()
+		return
+	}
 	session.client = clientSession
 	session.status = RemoteStatus{State: "connected"}
+	session.retryAt = time.Time{}
+	session.retryDelay = 0
+	session.workers.Add(1)
+	session.workers.Add(1)
 	session.mu.Unlock()
-	<-managerCtx.Done()
-	_ = clientSession.Close()
+	go m.refreshNotifiedTools(session)
+	go func() {
+		defer session.workers.Done()
+		if _, err := m.listToolsForSession(session.ctx, session); err != nil && session.ctx.Err() == nil {
+			m.logger.Warn("MCP startup tool catalog warm-up failed", "server", session.config.Name, "error", err, "EID", "mcpWrM01")
+		}
+	}()
+	waitDone := make(chan error, 1)
+	go func() { waitDone <- clientSession.Wait() }()
+	select {
+	case <-session.ctx.Done():
+		_ = clientSession.Close()
+	case err := <-waitDone:
+		if err == nil {
+			err = errors.New("MCP server closed the session")
+		}
+		m.markSessionFailed(session, err)
+		_ = clientSession.Close()
+	}
+}
+
+func (m *RemoteManager) refreshNotifiedTools(session *remoteSession) {
+	defer session.workers.Done()
+	for {
+		select {
+		case <-session.ctx.Done():
+			return
+		case <-session.toolRefreshQueue:
+			if _, err := m.listToolsForSession(session.ctx, session); err != nil && session.ctx.Err() == nil {
+				m.logger.Warn("refreshing MCP tool catalog after notification failed", "server", session.config.Name, "error", err, "EID", "mcpL1stC")
+			}
+		}
+	}
 }
 
 func (m *RemoteManager) waitForChange(ctx context.Context, session *remoteSession) (RemoteStatus, error) {
@@ -647,7 +1258,21 @@ func (m *RemoteManager) waitForChange(ctx context.Context, session *remoteSessio
 
 func (m *RemoteManager) setStatus(session *remoteSession, status RemoteStatus) {
 	session.mu.Lock()
-	session.status = status
+	if !session.closed {
+		session.status = status
+	}
+	if status.State == "error" && !session.closed {
+		if session.retryDelay == 0 {
+			session.retryDelay = time.Second
+		} else {
+			session.retryDelay *= 2
+			if session.retryDelay > 30*time.Second {
+				session.retryDelay = 30 * time.Second
+			}
+		}
+		session.retryAt = time.Now().Add(session.retryDelay)
+		session.cancel()
+	}
 	session.mu.Unlock()
 }
 

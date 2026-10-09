@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
@@ -80,14 +79,40 @@ func prepareRemoteMCP(ctx context.Context, stderrWriter io.Writer, local mcpTool
 	for _, tool := range local.ListTools() {
 		usedNames[tool.Function.Name] = struct{}{}
 	}
-	for _, server := range servers {
-		response, err := brokerMCPDo(ctx, brokerproto.Request{
-			MCPAction: "start",
-			MCPServer: server.Name,
-			MCPURL:    server.URL,
-		})
-		if err != nil {
-			return nil, fmt.Errorf("starting MCP server %q: %w", server.Name, err)
+	type startResult struct {
+		response brokerproto.Response
+		err      error
+	}
+	started := make([]startResult, len(servers))
+	jobs := make(chan int)
+	var workers sync.WaitGroup
+	for range 4 {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			for index := range jobs {
+				server := servers[index]
+				started[index].response, started[index].err = brokerMCPDo(ctx, brokerproto.Request{
+					MCPAction: "start", MCPServer: server.Name, MCPURL: server.URL, MCPIncludeTools: true,
+				})
+			}
+		}()
+	}
+	for index := range servers {
+		select {
+		case jobs <- index:
+		case <-ctx.Done():
+			close(jobs)
+			workers.Wait()
+			return nil, ctx.Err()
+		}
+	}
+	close(jobs)
+	workers.Wait()
+	for index, server := range servers {
+		response := started[index].response
+		if started[index].err != nil {
+			return nil, fmt.Errorf("starting MCP server %q: %w", server.Name, started[index].err)
 		}
 		status, err := remoteStatus(response)
 		if err != nil {
@@ -121,7 +146,7 @@ func prepareRemoteMCP(ctx context.Context, stderrWriter io.Writer, local mcpTool
 				case <-time.After(200 * time.Millisecond):
 				}
 			}
-			response, err = brokerMCPDo(ctx, brokerproto.Request{MCPAction: "status", MCPServer: server.Name})
+			response, err = brokerMCPDo(ctx, brokerproto.Request{MCPAction: "status", MCPServer: server.Name, MCPIncludeTools: true})
 			if err != nil {
 				return nil, fmt.Errorf("waiting for MCP server %q: %w", server.Name, err)
 			}
@@ -133,11 +158,15 @@ func prepareRemoteMCP(ctx context.Context, stderrWriter io.Writer, local mcpTool
 		if status.Error != "" {
 			return nil, fmt.Errorf("MCP server %q: %s", server.Name, status.Error)
 		}
-		response, err = brokerMCPDo(ctx, brokerproto.Request{MCPAction: "list", MCPServer: server.Name})
-		if err != nil {
-			return nil, fmt.Errorf("listing tools from MCP server %q: %w", server.Name, err)
+		tools := response.MCPTools
+		if !response.MCPToolsReady {
+			response, err = brokerMCPDo(ctx, brokerproto.Request{MCPAction: "list", MCPServer: server.Name})
+			if err != nil {
+				return nil, fmt.Errorf("listing tools from MCP server %q: %w", server.Name, err)
+			}
+			tools = response.MCPTools
 		}
-		for _, remote := range response.MCPTools {
+		for _, remote := range tools {
 			name := mcpclient.ToolFunctionName(server.Name, remote.Name)
 			if _, exists := usedNames[name]; exists {
 				return nil, fmt.Errorf("remote MCP tool name collision for %q", name)
@@ -223,10 +252,6 @@ func logRemoteMCPFallback(ctx context.Context) {
 }
 
 func loadRemoteMCPServers() ([]mcpclient.RemoteServer, error) {
-	root, err := ashWorkspaceDir()
-	if err != nil {
-		return nil, err
-	}
 	cwd, err := osGetwd()
 	if err != nil {
 		return nil, err
@@ -235,21 +260,7 @@ func loadRemoteMCPServers() ([]mcpclient.RemoteServer, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, path := range []string{
-		filepath.Join(root, allowFileName),
-		filepath.Join(cwd, allowFileName),
-		filepath.Join(home, allowFileName),
-	} {
-		content, err := osReadFile(path)
-		if errors.Is(err, os.ErrNotExist) {
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("reading MCP registrations from %s: %w", path, err)
-		}
-		return mcpclient.RemoteServersFromAllowlist(string(content))
-	}
-	return nil, nil
+	return mcpclient.ResolveRemoteServers(home, cwd, osReadFile)
 }
 
 func (s remoteToolShim) ListTools() []toolDefinition {

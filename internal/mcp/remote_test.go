@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -21,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"ash/internal/brokerproto"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
 	"golang.org/x/oauth2"
@@ -92,6 +94,31 @@ func TestRemoteManagerStatusNowReturnsQueuedAuthorizationURL(t *testing.T) {
 	if _, err := manager.StatusNow("missing"); err == nil {
 		t.Fatal("StatusNow() accepted an unknown session")
 	}
+}
+
+func TestRemoteManagerRejectsURLChangeBeforeRetryingFailedSession(t *testing.T) {
+	manager := NewRemoteManager(context.Background(), nil)
+	sessionCtx, cancel := context.WithCancel(manager.ctx)
+	session := &remoteSession{
+		config:   RemoteServer{Name: "remote", URL: "https://old.example/mcp"},
+		ctx:      sessionCtx,
+		cancel:   cancel,
+		status:   RemoteStatus{State: "error", Error: "temporary failure"},
+		retryAt:  time.Now().Add(-time.Second),
+		authURL:  make(chan string, 1),
+		callback: make(chan authorizationCallback, 1),
+		done:     make(chan struct{}),
+	}
+	manager.sessions[session.config.Name] = session
+
+	_, err := manager.Start(context.Background(), RemoteServer{Name: "remote", URL: "https://new.example/mcp"})
+	if err == nil || !strings.Contains(err.Error(), "different URL") {
+		t.Fatalf("Start() error = %v, want server URL mismatch", err)
+	}
+	if manager.sessions[session.config.Name] != session {
+		t.Fatal("URL mismatch replaced the retryable session")
+	}
+	manager.Close()
 }
 
 func TestEncryptedCredentialStorageRoundTrip(t *testing.T) {
@@ -200,6 +227,830 @@ func TestRemoteServersFromAllowlistRejectsInvalidAndDuplicateURLs(t *testing.T) 
 	}
 }
 
+func TestResolveRemoteServersUsesFirstExistingFile(t *testing.T) {
+	home := t.TempDir()
+	cwd := t.TempDir()
+	workspacePath := filepath.Join(home, ".ash", ".ash_allow")
+	if err := os.MkdirAll(filepath.Dir(workspacePath), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(workspacePath, []byte("https://workspace.example/mcp\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(cwd, ".ash_allow"), []byte("https://cwd.example/mcp\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	servers, err := ResolveRemoteServers(home, cwd, os.ReadFile)
+	if err != nil {
+		t.Fatalf("ResolveRemoteServers() error = %v", err)
+	}
+	if len(servers) != 1 || servers[0].URL != "https://workspace.example/mcp" {
+		t.Fatalf("ResolveRemoteServers() = %+v, want workspace registration only", servers)
+	}
+	if err := os.WriteFile(workspacePath, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	servers, err = ResolveRemoteServers(home, cwd, os.ReadFile)
+	if err != nil {
+		t.Fatalf("ResolveRemoteServers() with empty first file error = %v", err)
+	}
+	if len(servers) != 0 {
+		t.Fatalf("ResolveRemoteServers() with empty first file = %+v, want no registrations", servers)
+	}
+}
+
+func TestRemoteManagerCachesCompleteLegacyToolCatalog(t *testing.T) {
+	server := mcp.NewServer(&mcp.Implementation{Name: "legacy-cache-test", Version: "1"}, &mcp.ServerOptions{
+		PageSize:     1,
+		Capabilities: &mcp.ServerCapabilities{Tools: &mcp.ToolCapabilities{}},
+	})
+	for _, name := range []string{"echo", "zeta"} {
+		mcp.AddTool(server, &mcp.Tool{
+			Name:        name,
+			Description: "Tool " + name,
+			InputSchema: map[string]any{"type": "object", "properties": map[string]any{"value": map[string]any{"type": "string"}}},
+		}, func(context.Context, *mcp.CallToolRequest, map[string]any) (*mcp.CallToolResult, any, error) {
+			return &mcp.CallToolResult{}, nil, nil
+		})
+	}
+	streamableHandler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server }, nil)
+	var listRequests atomic.Int32
+	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("reading request body: %v", err)
+			return
+		}
+		if len(body) == 0 {
+			r.Body = io.NopCloser(bytes.NewReader(body))
+			streamableHandler.ServeHTTP(w, r)
+			return
+		}
+		var request struct {
+			Method string `json:"method"`
+		}
+		if err := json.Unmarshal(body, &request); err != nil {
+			t.Errorf("decoding request body: %v", err)
+			return
+		}
+		if request.Method == "server/discover" {
+			http.Error(w, "legacy server", http.StatusNotFound)
+			return
+		}
+		if request.Method == "tools/list" {
+			listRequests.Add(1)
+		}
+		r.Body = io.NopCloser(bytes.NewReader(body))
+		streamableHandler.ServeHTTP(w, r)
+	}))
+	defer httpServer.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	manager := NewRemoteManager(ctx, &systemCredentialStorage{directory: t.TempDir(), key: make([]byte, 32), native: unavailableKeyring{}})
+	defer manager.Close()
+	status, err := manager.Start(ctx, RemoteServer{Name: "legacy", URL: httpServer.URL})
+	if err != nil || status.State != "connected" {
+		t.Fatalf("Start() = %+v, %v; want connected", status, err)
+	}
+	session := manager.sessions["legacy"]
+	if got := session.client.InitializeResult().ProtocolVersion; got >= "2026-07-28" {
+		t.Fatalf("protocol = %q, want negotiated legacy protocol", got)
+	}
+	tools, err := manager.ListToolsContext(ctx, "legacy")
+	if err != nil {
+		t.Fatalf("ListToolsContext() error = %v", err)
+	}
+	if len(tools) != 2 || tools[0].Name != "echo" || tools[1].Name != "zeta" {
+		t.Fatalf("ListToolsContext() = %+v, want both paginated tools in name order", tools)
+	}
+	wantRequests := int32(2)
+	if got := listRequests.Load(); got != wantRequests {
+		t.Fatalf("tools/list requests = %d, want %d (both pages)", got, wantRequests)
+	}
+	properties := tools[0].InputSchema["properties"].(map[string]any)
+	properties["value"].(map[string]any)["type"] = "mutated"
+	tools, err = manager.ListToolsContext(ctx, "legacy")
+	if err != nil {
+		t.Fatalf("cached ListToolsContext() error = %v", err)
+	}
+	if got := tools[0].InputSchema["properties"].(map[string]any)["value"].(map[string]any)["type"]; got != "string" {
+		t.Fatalf("cached schema was mutated through returned catalog: type = %v", got)
+	}
+	if got := listRequests.Load(); got != wantRequests {
+		t.Fatalf("cached tools/list requests = %d, want %d", got, wantRequests)
+	}
+	session.mu.Lock()
+	session.toolsExpiry = time.Now().Add(-time.Second)
+	session.mu.Unlock()
+	if _, err := manager.ListToolsContext(ctx, "legacy"); err != nil {
+		t.Fatalf("expired ListToolsContext() error = %v", err)
+	}
+	if got := listRequests.Load(); got != wantRequests*2 {
+		t.Fatalf("refreshed tools/list requests = %d, want %d", got, wantRequests*2)
+	}
+}
+
+func TestRemoteManagerRefreshesCatalogAfterLegacyNotification(t *testing.T) {
+	server := mcp.NewServer(&mcp.Implementation{Name: "legacy-notification-test", Version: "1"}, &mcp.ServerOptions{
+		Capabilities: &mcp.ServerCapabilities{Tools: &mcp.ToolCapabilities{ListChanged: true}},
+	})
+	addTestTool := func(name string) {
+		mcp.AddTool(server, &mcp.Tool{
+			Name: name, InputSchema: map[string]any{"type": "object", "properties": map[string]any{}},
+		}, func(context.Context, *mcp.CallToolRequest, map[string]any) (*mcp.CallToolResult, any, error) {
+			return &mcp.CallToolResult{}, nil, nil
+		})
+	}
+	addTestTool("before")
+	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server }, nil)
+	var listRequests atomic.Int32
+	refreshed := make(chan struct{}, 1)
+	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			handler.ServeHTTP(w, r)
+			return
+		}
+		payload, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("reading request body: %v", err)
+			return
+		}
+		if len(payload) > 0 {
+			var request struct {
+				Method string `json:"method"`
+			}
+			if err := json.Unmarshal(payload, &request); err != nil {
+				t.Errorf("decoding request body: %v", err)
+				return
+			}
+			if request.Method == "tools/list" && listRequests.Add(1) > 1 {
+				select {
+				case refreshed <- struct{}{}:
+				default:
+				}
+			}
+		}
+		r.Body = io.NopCloser(bytes.NewReader(payload))
+		handler.ServeHTTP(w, r)
+	}))
+	defer httpServer.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	manager := NewRemoteManager(ctx, &systemCredentialStorage{directory: t.TempDir(), key: make([]byte, 32), native: unavailableKeyring{}})
+	defer manager.Close()
+	status, err := manager.Start(ctx, RemoteServer{Name: "legacy-notify", URL: httpServer.URL})
+	if err != nil || status.State != "connected" {
+		t.Fatalf("Start() = %+v, %v; want connected", status, err)
+	}
+	if tools, err := manager.ListToolsContext(ctx, "legacy-notify"); err != nil || len(tools) != 1 {
+		t.Fatalf("initial ListToolsContext() = %d tools, %v; want one tool", len(tools), err)
+	}
+
+	addTestTool("after")
+	select {
+	case <-refreshed:
+	case <-ctx.Done():
+		t.Fatal("tool-list notification did not trigger a catalog refresh")
+	}
+	tools, err := manager.ListToolsContext(ctx, "legacy-notify")
+	if err != nil {
+		t.Fatalf("refreshed ListToolsContext() error = %v", err)
+	}
+	if len(tools) != 2 || tools[0].Name != "after" || tools[1].Name != "before" {
+		t.Fatalf("refreshed tools = %+v, want sorted after/before catalog", tools)
+	}
+}
+
+func TestRemoteManagerRechecksCatalogAfterNotificationDuringRefresh(t *testing.T) {
+	server := mcp.NewServer(&mcp.Implementation{Name: "notification-race-test", Version: "1"}, &mcp.ServerOptions{
+		Capabilities: &mcp.ServerCapabilities{Tools: &mcp.ToolCapabilities{ListChanged: true}},
+	})
+	addCatalogTestTools(server, "initial")
+	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server }, nil)
+	var listRequests atomic.Int32
+	refreshEntered := make(chan struct{}, 1)
+	releaseRefresh := make(chan struct{})
+	thirdListRequest := make(chan struct{}, 1)
+	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			handler.ServeHTTP(w, r)
+			return
+		}
+		payload, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("reading request body: %v", err)
+			return
+		}
+		var request struct {
+			Method string `json:"method"`
+		}
+		if len(payload) > 0 {
+			if err := json.Unmarshal(payload, &request); err != nil {
+				t.Errorf("decoding request: %v", err)
+				return
+			}
+		}
+		if request.Method == "server/discover" {
+			http.Error(w, "legacy server", http.StatusNotFound)
+			return
+		}
+		if request.Method == "tools/list" {
+			switch count := listRequests.Add(1); count {
+			case 2:
+				refreshEntered <- struct{}{}
+				select {
+				case <-releaseRefresh:
+				case <-r.Context().Done():
+					return
+				}
+			case 3:
+				thirdListRequest <- struct{}{}
+			}
+		}
+		r.Body = io.NopCloser(bytes.NewReader(payload))
+		handler.ServeHTTP(w, r)
+	}))
+	defer httpServer.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	manager := NewRemoteManager(ctx, &systemCredentialStorage{directory: t.TempDir(), key: make([]byte, 32), native: unavailableKeyring{}})
+	defer manager.Close()
+	status, err := manager.Start(ctx, RemoteServer{Name: "notification-race", URL: httpServer.URL})
+	if err != nil || status.State != "connected" {
+		t.Fatalf("Start() = %+v, %v; want connected", status, err)
+	}
+	if tools, err := manager.ListToolsContext(ctx, "notification-race"); err != nil || len(tools) != 1 {
+		t.Fatalf("initial ListToolsContext() = %d tools, %v; want one tool", len(tools), err)
+	}
+
+	addCatalogTestTools(server, "trigger")
+	select {
+	case <-refreshEntered:
+	case <-ctx.Done():
+		t.Fatal("first notification did not start a refresh")
+	}
+	addCatalogTestTools(server, "during")
+	close(releaseRefresh)
+	select {
+	case <-thirdListRequest:
+	case <-ctx.Done():
+		t.Fatal("notification during refresh did not trigger another discovery")
+	}
+
+	tools, err := manager.ListToolsContext(ctx, "notification-race")
+	if err != nil {
+		t.Fatalf("ListToolsContext() after refresh: %v", err)
+	}
+	if len(tools) != 3 || tools[0].Name != "during" || tools[1].Name != "initial" || tools[2].Name != "trigger" {
+		t.Fatalf("refreshed catalog = %+v, want during/initial/trigger", tools)
+	}
+}
+
+func TestRemoteManagerCoalescesConcurrentCatalogReaders(t *testing.T) {
+	server := mcp.NewServer(&mcp.Implementation{Name: "coalescing-test", Version: "1"}, &mcp.ServerOptions{
+		Capabilities: &mcp.ServerCapabilities{Tools: &mcp.ToolCapabilities{}},
+	})
+	mcp.AddTool(server, &mcp.Tool{
+		Name: "echo", InputSchema: map[string]any{"type": "object", "properties": map[string]any{}},
+	}, func(context.Context, *mcp.CallToolRequest, map[string]any) (*mcp.CallToolResult, any, error) {
+		return &mcp.CallToolResult{}, nil, nil
+	})
+	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server }, nil)
+	var listRequests atomic.Int32
+	listEntered := make(chan struct{}, 1)
+	releaseList := make(chan struct{})
+	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			w.WriteHeader(http.StatusMethodNotAllowed)
+			return
+		}
+
+		payload, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("reading request body: %v", err)
+			return
+		}
+		var request struct {
+			Method string `json:"method"`
+		}
+		if len(payload) > 0 {
+			if err := json.Unmarshal(payload, &request); err != nil {
+				t.Errorf("decoding request body: %v", err)
+				return
+			}
+		}
+		if request.Method == "tools/list" {
+			if listRequests.Add(1) == 1 {
+				listEntered <- struct{}{}
+			}
+			select {
+			case <-releaseList:
+			case <-r.Context().Done():
+				return
+			}
+		}
+		r.Body = io.NopCloser(bytes.NewReader(payload))
+		handler.ServeHTTP(w, r)
+	}))
+	defer httpServer.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	manager := NewRemoteManager(ctx, &systemCredentialStorage{directory: t.TempDir(), key: make([]byte, 32), native: unavailableKeyring{}})
+	defer manager.Close()
+	status, err := manager.Start(ctx, RemoteServer{Name: "coalescing", URL: httpServer.URL})
+	if err != nil || status.State != "connected" {
+		t.Fatalf("Start() = %+v, %v; want connected", status, err)
+	}
+	const readers = 8
+	results := make(chan error, readers)
+	for range readers {
+		go func() {
+			tools, err := manager.ListToolsContext(ctx, "coalescing")
+			if err == nil && len(tools) != 1 {
+				err = fmt.Errorf("tool count = %d, want 1", len(tools))
+			}
+			results <- err
+		}()
+	}
+	select {
+	case <-listEntered:
+	case <-ctx.Done():
+		t.Fatal("no tools/list request reached the server")
+	}
+	close(releaseList)
+	for range readers {
+		if err := <-results; err != nil {
+			t.Fatalf("concurrent ListToolsContext(): %v", err)
+		}
+	}
+	if got := listRequests.Load(); got != 1 {
+		t.Fatalf("tools/list request count = %d, want one coalesced request", got)
+	}
+}
+
+func TestRemoteManagerRejectsInvalidToolCatalogPages(t *testing.T) {
+	var repeatedCursor string
+	for _, test := range []struct {
+		name      string
+		configure func(*mcp.Server)
+		intercept func(http.ResponseWriter, *http.Request, http.Handler, int) bool
+		wantError string
+	}{
+		{
+			name: "repeated cursor",
+			configure: func(server *mcp.Server) {
+				addCatalogTestTools(server, "alpha", "beta")
+			},
+			intercept: func(w http.ResponseWriter, r *http.Request, handler http.Handler, listPage int) bool {
+				if listPage == 0 {
+					return false
+				}
+				recorder := httptest.NewRecorder()
+				handler.ServeHTTP(recorder, r)
+				var response map[string]any
+				data := strings.TrimPrefix(recorder.Body.String(), "event: message\ndata: ")
+				data = strings.TrimSuffix(data, "\n\n")
+				if err := json.Unmarshal([]byte(data), &response); err != nil {
+					t.Errorf("decoding tools/list response: %v", err)
+					return true
+				}
+				result, ok := response["result"].(map[string]any)
+				if !ok {
+					t.Errorf("tools/list response has no result object: %s", recorder.Body.String())
+					return true
+				}
+				if listPage == 1 {
+					cursor, ok := result["nextCursor"].(string)
+					if !ok || cursor == "" {
+						t.Errorf("first tools/list page has no next cursor: %s", recorder.Body.String())
+						return true
+					}
+					repeatedCursor = cursor
+				} else {
+					result["nextCursor"] = repeatedCursor
+				}
+				payload, err := json.Marshal(response)
+				if err != nil {
+					t.Errorf("encoding tools/list response: %v", err)
+					return true
+				}
+				copyMCPResponse(w, recorder, append(append([]byte("event: message\ndata: "), payload...), []byte("\n\n")...))
+				return true
+			},
+			wantError: "repeated a tools/list pagination cursor",
+		},
+		{
+			name: "page failure",
+			configure: func(server *mcp.Server) {
+				addCatalogTestTools(server, "alpha", "beta")
+			},
+			intercept: func(w http.ResponseWriter, _ *http.Request, _ http.Handler, listPage int) bool {
+				if listPage > 1 && listPage%2 == 0 {
+					http.Error(w, "page unavailable", http.StatusInternalServerError)
+					return true
+				}
+				return false
+			},
+			wantError: "listing tools",
+		},
+		{
+			name: "catalog exceeds broker budget",
+			configure: func(server *mcp.Server) {
+				mcp.AddTool(server, &mcp.Tool{
+					Name: "oversized", Description: strings.Repeat("x", brokerproto.MaxBody),
+					InputSchema: map[string]any{"type": "object"},
+				}, func(context.Context, *mcp.CallToolRequest, map[string]any) (*mcp.CallToolResult, any, error) {
+					return &mcp.CallToolResult{}, nil, nil
+				})
+			},
+			wantError: "catalog exceeds broker response limit",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			repeatedCursor = ""
+			server := mcp.NewServer(&mcp.Implementation{Name: "invalid-catalog-test", Version: "1"}, &mcp.ServerOptions{
+				PageSize:     1,
+				Capabilities: &mcp.ServerCapabilities{Tools: &mcp.ToolCapabilities{}},
+			})
+			test.configure(server)
+			handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server }, nil)
+			var listPages atomic.Int32
+			httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodGet {
+					w.WriteHeader(http.StatusMethodNotAllowed)
+					return
+				}
+				payload, err := io.ReadAll(r.Body)
+				if err != nil {
+					t.Errorf("reading request body: %v", err)
+					return
+				}
+				var request struct {
+					Method string `json:"method"`
+				}
+				if len(payload) > 0 {
+					if err := json.Unmarshal(payload, &request); err != nil {
+						t.Errorf("decoding request body: %v", err)
+						return
+					}
+				}
+				if request.Method == "server/discover" {
+					http.Error(w, "legacy server", http.StatusNotFound)
+					return
+				}
+				listPage := 0
+				if request.Method == "tools/list" {
+					listPage = int(listPages.Add(1))
+				}
+				r.Body = io.NopCloser(bytes.NewReader(payload))
+				if test.intercept != nil && test.intercept(w, r, handler, listPage) {
+					return
+				}
+				handler.ServeHTTP(w, r)
+			}))
+			defer httpServer.Close()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+			defer cancel()
+			manager := NewRemoteManager(ctx, &systemCredentialStorage{directory: t.TempDir(), key: make([]byte, 32), native: unavailableKeyring{}})
+			defer manager.Close()
+			status, err := manager.Start(ctx, RemoteServer{Name: "invalid-catalog", URL: httpServer.URL})
+			if err != nil || status.State != "connected" {
+				t.Fatalf("Start() = %+v, %v; want connected", status, err)
+			}
+			_, err = manager.ListToolsContext(ctx, "invalid-catalog")
+			if err == nil || !strings.Contains(err.Error(), test.wantError) {
+				t.Fatalf("ListToolsContext() error = %v, want error containing %q", err, test.wantError)
+			}
+		})
+	}
+}
+
+func TestRemoteManagerHandlesEmptyAndUnsupportedToolCatalogs(t *testing.T) {
+	for _, test := range []struct {
+		name         string
+		capabilities *mcp.ServerCapabilities
+		wantRequests int32
+	}{
+		{
+			name: "empty catalog",
+			capabilities: &mcp.ServerCapabilities{
+				Tools: &mcp.ToolCapabilities{},
+			},
+			wantRequests: 1,
+		},
+		{
+			name:         "tools unsupported",
+			capabilities: &mcp.ServerCapabilities{},
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			server := mcp.NewServer(&mcp.Implementation{Name: "empty-catalog-test", Version: "1"}, &mcp.ServerOptions{
+				Capabilities: test.capabilities,
+			})
+			handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server }, &mcp.StreamableHTTPOptions{Stateless: true})
+			var listRequests atomic.Int32
+			httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodGet {
+					w.WriteHeader(http.StatusMethodNotAllowed)
+					return
+				}
+				payload, err := io.ReadAll(r.Body)
+				if err != nil {
+					t.Errorf("reading request body: %v", err)
+					return
+				}
+				var request struct {
+					Method string `json:"method"`
+				}
+				if len(payload) > 0 {
+					if err := json.Unmarshal(payload, &request); err != nil {
+						t.Errorf("decoding request: %v", err)
+						return
+					}
+				}
+				if request.Method == "server/discover" {
+					http.Error(w, "legacy server", http.StatusNotFound)
+					return
+				}
+				if request.Method == "tools/list" {
+					listRequests.Add(1)
+				}
+				r.Body = io.NopCloser(bytes.NewReader(payload))
+				handler.ServeHTTP(w, r)
+			}))
+			defer httpServer.Close()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			manager := NewRemoteManager(ctx, &systemCredentialStorage{directory: t.TempDir(), key: make([]byte, 32), native: unavailableKeyring{}})
+			defer manager.Close()
+			status, err := manager.Start(ctx, RemoteServer{Name: "empty-catalog", URL: httpServer.URL})
+			if err != nil || status.State != "connected" {
+				t.Fatalf("Start() = %+v, %v; want connected", status, err)
+			}
+			tools, err := manager.ListToolsContext(ctx, "empty-catalog")
+			if err != nil {
+				t.Fatalf("ListToolsContext() error = %v", err)
+			}
+			if len(tools) != 0 {
+				t.Fatalf("ListToolsContext() returned %d tools, want an empty catalog", len(tools))
+			}
+			if got := listRequests.Load(); got != test.wantRequests {
+				t.Fatalf("tools/list requests = %d, want %d", got, test.wantRequests)
+			}
+		})
+	}
+}
+
+func addCatalogTestTools(server *mcp.Server, names ...string) {
+	for _, name := range names {
+		mcp.AddTool(server, &mcp.Tool{
+			Name: name, InputSchema: map[string]any{"type": "object"},
+		}, func(context.Context, *mcp.CallToolRequest, map[string]any) (*mcp.CallToolResult, any, error) {
+			return &mcp.CallToolResult{}, nil, nil
+		})
+	}
+}
+
+func copyMCPResponse(w http.ResponseWriter, recorder *httptest.ResponseRecorder, payload []byte) {
+	for name, values := range recorder.Header() {
+		for _, value := range values {
+			w.Header().Add(name, value)
+		}
+	}
+	w.Header().Del("Content-Length")
+	w.WriteHeader(recorder.Code)
+	_, _ = w.Write(payload)
+}
+
+func TestRemoteManagerDoesNotDowngradeAfterDiscoveryServerFailure(t *testing.T) {
+	server := mcp.NewServer(&mcp.Implementation{Name: "protocol-failure-test", Version: "1"}, &mcp.ServerOptions{
+		Capabilities:              &mcp.ServerCapabilities{Tools: &mcp.ToolCapabilities{}},
+		SupportedProtocolVersions: mcp.SupportedProtocolVersions(),
+	})
+	handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server }, &mcp.StreamableHTTPOptions{Stateless: true})
+	var discoveryRequests, initializeRequests atomic.Int32
+	httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		payload, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("reading request body: %v", err)
+			return
+		}
+		var request struct {
+			Method string `json:"method"`
+		}
+		if err := json.Unmarshal(payload, &request); err != nil {
+			t.Errorf("decoding request: %v", err)
+			return
+		}
+		switch request.Method {
+		case "server/discover":
+			discoveryRequests.Add(1)
+			http.Error(w, "temporary server failure", http.StatusInternalServerError)
+			return
+		case "initialize":
+			initializeRequests.Add(1)
+		}
+		r.Body = io.NopCloser(bytes.NewReader(payload))
+		handler.ServeHTTP(w, r)
+	}))
+	defer httpServer.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	manager := NewRemoteManager(ctx, &systemCredentialStorage{directory: t.TempDir(), key: make([]byte, 32), native: unavailableKeyring{}})
+	defer manager.Close()
+	status, err := manager.Start(ctx, RemoteServer{Name: "protocol-failure", URL: httpServer.URL})
+	if err != nil {
+		t.Fatalf("Start() error = %v, want status-based failure", err)
+	}
+	if status.State != "error" || !strings.Contains(status.Error, "newest MCP protocol discovery failed") {
+		t.Fatalf("Start() status = %+v, want discovery failure without downgrade", status)
+	}
+	if got := discoveryRequests.Load(); got != 1 {
+		t.Fatalf("server/discover requests = %d, want 1", got)
+	}
+	if got := initializeRequests.Load(); got != 0 {
+		t.Fatalf("legacy initialize requests = %d, want 0 after server failure", got)
+	}
+}
+
+func TestProtocolNegotiationProbePreservesLongLivedSSE(t *testing.T) {
+	firstEvent := "event: message\ndata: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"supportedVersions\":[\"2026-07-28\"]}}\n\n"
+	laterEvent := "event: message\ndata: {\"jsonrpc\":\"2.0\",\"method\":\"notifications/tools/list_changed\"}\n\n"
+	reader, writer := io.Pipe()
+	response := &http.Response{
+		StatusCode: http.StatusOK,
+		Header:     http.Header{"Content-Type": []string{"text/event-stream"}},
+		Body:       reader,
+	}
+	releaseWriter := make(chan struct{})
+	writerDone := make(chan struct{})
+	go func() {
+		_, _ = io.WriteString(writer, firstEvent)
+		close(writerDone)
+		<-releaseWriter
+		_, _ = io.WriteString(writer, laterEvent)
+		_ = writer.Close()
+	}()
+
+	_, valid, modern := responseDiscoveryProtocol(response)
+	if !valid || !modern {
+		t.Fatalf("responseDiscoveryProtocol() = valid %t, modern %t; want a modern discovery result", valid, modern)
+	}
+	<-writerDone
+	close(releaseWriter)
+	payload, err := io.ReadAll(response.Body)
+	if err != nil {
+		t.Fatalf("reading preserved SSE stream: %v", err)
+	}
+	if string(payload) != firstEvent+laterEvent {
+		t.Fatalf("preserved SSE stream = %q, want both initial response and later event", payload)
+	}
+	if err := response.Body.Close(); err != nil {
+		t.Fatalf("closing SSE body: %v", err)
+	}
+}
+
+func TestRemoteManagerHonorsModernToolCatalogTTL(t *testing.T) {
+	for _, test := range []struct {
+		name           string
+		ttlMillis      int
+		wantSecondCall bool
+	}{
+		{name: "positive TTL", ttlMillis: 60_000},
+		{name: "zero TTL", ttlMillis: 0, wantSecondCall: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var cacheableResponses atomic.Int32
+			server := mcp.NewServer(&mcp.Implementation{Name: "modern-cache-test", Version: "1"}, &mcp.ServerOptions{
+				Capabilities:              &mcp.ServerCapabilities{Tools: &mcp.ToolCapabilities{}},
+				SupportedProtocolVersions: mcp.SupportedProtocolVersions(),
+				SetCacheable: func(_ context.Context, _ mcp.Request, cacheable *mcp.Cacheable) {
+					cacheable.TTLMs = test.ttlMillis
+					cacheableResponses.Add(1)
+				},
+			})
+			mcp.AddTool(server, &mcp.Tool{
+				Name: "echo", InputSchema: map[string]any{"type": "object", "properties": map[string]any{}},
+			}, func(context.Context, *mcp.CallToolRequest, map[string]any) (*mcp.CallToolResult, any, error) {
+				return &mcp.CallToolResult{}, nil, nil
+			})
+			handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server }, &mcp.StreamableHTTPOptions{Stateless: true})
+			httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodGet {
+					w.WriteHeader(http.StatusMethodNotAllowed)
+					return
+				}
+				handler.ServeHTTP(w, r)
+			}))
+			defer httpServer.Close()
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			manager := NewRemoteManager(ctx, &systemCredentialStorage{directory: t.TempDir(), key: make([]byte, 32), native: unavailableKeyring{}})
+			defer manager.Close()
+			status, err := manager.Start(ctx, RemoteServer{Name: "modern", URL: httpServer.URL})
+			if err != nil || status.State != "connected" {
+				t.Fatalf("Start() = %+v, %v; want connected", status, err)
+			}
+			session := manager.sessions["modern"]
+			if got := session.client.InitializeResult().ProtocolVersion; got < "2026-07-28" {
+				t.Fatalf("protocol = %q, want modern protocol", got)
+			}
+			if _, err := manager.ListToolsContext(ctx, "modern"); err != nil {
+				t.Fatalf("first ListToolsContext() error = %v", err)
+			}
+			responsesAfterFirstList := cacheableResponses.Load()
+			if _, err := manager.ListToolsContext(ctx, "modern"); err != nil {
+				t.Fatalf("second ListToolsContext() error = %v", err)
+			}
+			responsesAfterSecondList := cacheableResponses.Load()
+			if test.wantSecondCall && responsesAfterSecondList <= responsesAfterFirstList {
+				t.Fatalf("cacheable responses after second list = %d, want an additional response after zero TTL", responsesAfterSecondList)
+			}
+			if !test.wantSecondCall && responsesAfterSecondList != responsesAfterFirstList {
+				t.Fatalf("cacheable responses after second list = %d, want cached response count %d", responsesAfterSecondList, responsesAfterFirstList)
+			}
+		})
+	}
+}
+
+func BenchmarkRemoteManagerCatalog(b *testing.B) {
+	for _, cold := range []bool{true, false} {
+		name := "Warm"
+		if cold {
+			name = "ColdDiscovery"
+		}
+		b.Run(name, func(b *testing.B) {
+			server := mcp.NewServer(&mcp.Implementation{Name: "catalog-benchmark", Version: "1"}, &mcp.ServerOptions{
+				PageSize:     1,
+				Capabilities: &mcp.ServerCapabilities{Tools: &mcp.ToolCapabilities{}},
+			})
+			mcp.AddTool(server, &mcp.Tool{
+				Name: "echo", InputSchema: map[string]any{"type": "object", "properties": map[string]any{}},
+			}, func(context.Context, *mcp.CallToolRequest, map[string]any) (*mcp.CallToolResult, any, error) {
+				return &mcp.CallToolResult{}, nil, nil
+			})
+			var listRequests atomic.Int64
+			handler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return server }, nil)
+			httpServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == http.MethodPost {
+					body, err := io.ReadAll(r.Body)
+					if err != nil {
+						b.Errorf("reading request: %v", err)
+						return
+					}
+					var request struct {
+						Method string `json:"method"`
+					}
+					if json.Unmarshal(body, &request) == nil && request.Method == "tools/list" {
+						listRequests.Add(1)
+					}
+					r.Body = io.NopCloser(bytes.NewReader(body))
+				}
+				handler.ServeHTTP(w, r)
+			}))
+			defer httpServer.Close()
+
+			ctx, cancel := context.WithCancel(context.Background())
+			manager := NewRemoteManager(ctx, &systemCredentialStorage{directory: b.TempDir(), key: make([]byte, 32), native: unavailableKeyring{}})
+			defer cancel()
+			defer manager.Close()
+			status, err := manager.Start(ctx, RemoteServer{Name: "benchmark", URL: httpServer.URL})
+			if err != nil || status.State != "connected" {
+				b.Fatalf("Start() = %+v, %v; want connected", status, err)
+			}
+			if _, err := manager.ListToolsContext(ctx, "benchmark"); err != nil {
+				b.Fatalf("initial ListToolsContext(): %v", err)
+			}
+			session := manager.sessions["benchmark"]
+			b.ResetTimer()
+			for range b.N {
+				if cold {
+					session.mu.Lock()
+					session.toolsExpiry = time.Time{}
+					session.mu.Unlock()
+				}
+				if _, err := manager.ListToolsContext(ctx, "benchmark"); err != nil {
+					b.Fatalf("ListToolsContext(): %v", err)
+				}
+			}
+			b.StopTimer()
+			b.ReportMetric(float64(listRequests.Load())/float64(b.N), "list-requests/op")
+		})
+	}
+}
+
 func TestToolFunctionNameIsStableAndQualified(t *testing.T) {
 	first := ToolFunctionName("server one", "tool/a")
 	if first != ToolFunctionName("server one", "tool/a") {
@@ -215,6 +1066,7 @@ func TestToolFunctionNameIsStableAndQualified(t *testing.T) {
 
 func TestRemoteManagerHTTPToolRoundTrip(t *testing.T) {
 	var getRequests atomic.Int32
+	var listRequests atomic.Int32
 	server := mcp.NewServer(&mcp.Implementation{Name: "test", Version: "1"}, nil)
 	mcp.AddTool(server, &mcp.Tool{
 		Name:        "echo",
@@ -230,6 +1082,20 @@ func TestRemoteManagerHTTPToolRoundTrip(t *testing.T) {
 		if r.Method == http.MethodGet {
 			getRequests.Add(1)
 		}
+		payload, err := io.ReadAll(r.Body)
+		if err != nil {
+			t.Errorf("reading MCP request: %v", err)
+			return
+		}
+		var request struct {
+			Method string `json:"method"`
+		}
+		if len(payload) > 0 {
+			if err := json.Unmarshal(payload, &request); err == nil && request.Method == "tools/list" {
+				listRequests.Add(1)
+			}
+		}
+		r.Body = io.NopCloser(bytes.NewReader(payload))
 		streamableHandler.ServeHTTP(w, r)
 	})
 	httpServer := httptest.NewServer(handler)
@@ -259,6 +1125,7 @@ func TestRemoteManagerHTTPToolRoundTrip(t *testing.T) {
 	if len(tools) != 1 || tools[0].Name != "echo" {
 		t.Fatalf("ListTools() = %+v, want echo", tools)
 	}
+	listRequestsAfterDiscovery := listRequests.Load()
 	result, err := manager.CallTool(ctx, "test", "echo", map[string]any{"value": "hello"})
 	if err != nil {
 		t.Fatalf("CallTool() error = %v", err)
@@ -268,6 +1135,9 @@ func TestRemoteManagerHTTPToolRoundTrip(t *testing.T) {
 	}
 	if got := getRequests.Load(); got != 0 {
 		t.Fatalf("client opened %d standalone SSE streams to a stateless server, want none", got)
+	}
+	if got := listRequests.Load(); got != listRequestsAfterDiscovery {
+		t.Fatalf("tools/list requests after tools/call = %d, want unchanged at %d", got, listRequestsAfterDiscovery)
 	}
 }
 

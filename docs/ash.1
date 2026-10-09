@@ -279,6 +279,9 @@ instead.
 .B AI_TIMEOUT
 Optional request timeout. Default is 3m.
 .TP
+.B ASH_BROKER_AI_WARMUP
+Optional. Defaults to 1, sending one bounded, unauthenticated HEAD request to the AI endpoint's origin at broker startup, using the same HTTP connection pool as AI requests. Set to 0 to disable it. Redirects are not followed. An HTTP error status does not prove that transport warm-up failed or that the AI API is unhealthy. It does not warm a local model.
+.TP
 .B ASH_HISTORY_MAX
 Optional max number of history messages retained per key. Default is 40.
 .TP
@@ -367,11 +370,20 @@ have not been accessed in the last 24 hours and removes the entire directory.
 .PP
 On macOS, Linux, and FreeBSD, installed Bash and zsh wrappers lazily start one unprivileged
 broker per interactive shell. The broker keeps a bounded HTTPS connection pool
-alive across separate ash processes over a private Unix socket. Subshells reuse
+alive across separate ash processes over a private Unix socket, using TCP HTTP/1.1
+or HTTP/2 (not QUIC/HTTP/3). Subshells reuse
 their parent shell's broker; independent shells use independent brokers. Broker
 failure falls back to direct HTTPS. Broker credentials are ephemeral and are not
 written to scheduler configuration; a non-secret lease expires after shell
 activity stops. Scheduled jobs use direct HTTPS by default.
+.PP
+The broker warms registered MCP server sessions and complete tool catalogs in
+the background after binding its socket. This does not delay shell startup and
+does not open a browser for OAuth; pending authorization is handled by an
+interactive ash command. Legacy tool metadata is cached in memory for five
+minutes and invalidated by supported change notifications. Newer MCP protocol
+cache directives, including zero-TTL responses, are honored. A failed refresh
+is reported rather than silently serving stale metadata.
 .TP
 .B SHELL
 Shell detection input for
