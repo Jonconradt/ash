@@ -175,6 +175,28 @@ func TestVerboseDebugLogsUseStructuredJSON(t *testing.T) {
 	}
 }
 
+func TestUserVisibleLogsUsePlainText(t *testing.T) {
+	origWriter := debugWriter
+	origJSON := debugJSONLogging
+	t.Cleanup(func() {
+		debugWriter = origWriter
+		debugJSONLogging = origJSON
+	})
+
+	var buf bytes.Buffer
+	t.Setenv("ASH_VERBOSE", "")
+	configureDebugLogging(&buf)
+
+	slog.Warn("AI took longer than 3m0s, so we should probably try again later", "EID", "80FzBwhZ")
+	output := strings.TrimSpace(buf.String())
+	if !strings.HasPrefix(output, "⚠️ warning: AI took longer than 3m0s") {
+		t.Fatalf("expected plain-text warning with attention prefix, got %q", output)
+	}
+	if strings.Contains(output, `"time"`) || strings.Contains(output, `"EID"`) || strings.Contains(output, "80FzBwhZ") {
+		t.Fatalf("expected user-visible message without structured log fields, got %q", output)
+	}
+}
+
 func TestSchedulerLogFilePathUsesSanitizedSessionID(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

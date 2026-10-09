@@ -116,6 +116,6 @@ adding to the global-stub-var pattern; prefer constructor/parameter-injected dep
 
 - History is stored under the user workspace directory and is retained with a bounded cleanup policy.
 - Shell integrations check `~/.ash/.ash_snooze_until` before automatic wrapper and command-not-found routing. Direct `ash` invocations bypass this check.
-- Debug logging can be enabled with ASH_VERBOSE and optionally written to a rotating log file.
+- User-visible messages are plain text by default. ASH_VERBOSE enables structured JSON debug logging, which can optionally be written to a rotating log file.
 - Tool execution is restricted by allowlist and path containment rules. Ash resolves the allowlist once per request, uses it for enforcement and tool schemas, and renders eligible managed scripts through the internal `$TOOLS_DIR_LIST` prompt substitution.
 - `ash install` auto-configures `AI_ENDPOINT`/`AI_MODEL`/`AI_AUTH_TOKEN`: it checks for an already-set cloud provider API key (12 providers, see [ai_autoconfig.go](internal/app/ai_autoconfig.go)), then a running local inference server, then falls back to an interactive numbered menu; AWS Bedrock is intentionally excluded (see [issue #4](https://github.com/Jonconradt/ash/issues/4)).

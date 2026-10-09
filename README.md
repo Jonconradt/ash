@@ -336,8 +336,8 @@ Notes:
 - `ASH_RETRY_MAX_ATTEMPTS` (optional): Max retry attempts for retryable AI failures. Default `3`.
 - `ASH_RETRY_BASE_DELAY` (optional): Base retry backoff delay. Default `250ms`.
 - `ASH_RETRY_MAX_DELAY` (optional): Maximum retry backoff delay. Default `2s`.
-- `ASH_VERBOSE` (optional): Enable verbose debug logging and an execution dashboard printed before exit (`1`, `y`/`yes`, `true`, `on`, or `debug`, case-insensitive). The dashboard reports stage timings, tool-call count, total input/output tokens when available, and total realtime.
-- `ASH_LOG_FILE` (optional): File path for verbose debug logs.
+- `ASH_VERBOSE` (optional): Enable structured JSON debug logging and an execution dashboard printed before exit (`1`, `y`/`yes`, `true`, `on`, or `debug`, case-insensitive). The dashboard reports stage timings, tool-call count, total input/output tokens when available, and total realtime. User-visible messages are plain text when verbose logging is disabled.
+- `ASH_LOG_FILE` (optional): File path for verbose JSON debug logs.
 - `ASH_LOG_MAX_BYTES` (optional): Max log size before rotation when `ASH_LOG_FILE` is used. Default `1048576` (1 MiB).
 - `ASH_LOG_FORMAT` (scheduler/internal): Log format set to `json` for scheduled invocations.
 - `ASH_BROKER_SOCKET`, `ASH_BROKER_TOKEN`, and `ASH_BROKER_LEASE` (internal): Ephemeral per-shell broker settings. They are created by the installed Bash/zsh/Fish wrappers and should not be persisted or copied into scheduled jobs.

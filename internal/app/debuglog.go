@@ -1,7 +1,9 @@
 package app
 
 import (
+	"context"
 	"errors"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -30,6 +32,13 @@ func newStructuredLogger(w io.Writer, level slog.Level) *slog.Logger {
 		},
 	})
 	return slog.New(localize.NewSlogHandler(handler))
+}
+
+func newUserVisibleLogger(w io.Writer) *slog.Logger {
+	if w == nil {
+		w = os.Stderr
+	}
+	return slog.New(localize.NewSlogHandler(userVisibleHandler{writer: w, mu: &sync.Mutex{}}))
 }
 
 // configureDebugLogging wires debug logging to stderr or a rotating log file based on the current environment.
@@ -65,10 +74,45 @@ func configureDebugLogging(writers ...io.Writer) {
 		level = slog.LevelDebug
 	}
 
-	appLogger = newStructuredLogger(currentWriter, level)
+	if verboseLoggingEnabled() {
+		appLogger = newStructuredLogger(currentWriter, level)
+	} else {
+		appLogger = newUserVisibleLogger(currentWriter)
+	}
 	debugWriter = currentWriter
 	debugJSONLogging = true
 	slog.SetDefault(appLogger)
+}
+
+type userVisibleHandler struct {
+	writer io.Writer
+	mu     *sync.Mutex
+}
+
+func (h userVisibleHandler) Enabled(_ context.Context, level slog.Level) bool {
+	return level >= slog.LevelInfo
+}
+
+func (h userVisibleHandler) Handle(_ context.Context, record slog.Record) error {
+	prefix := "ℹ️ "
+	if record.Level >= slog.LevelError {
+		prefix = "❌ error: "
+	} else if record.Level >= slog.LevelWarn {
+		prefix = "⚠️ warning: "
+	}
+
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	_, err := fmt.Fprintln(h.writer, prefix+record.Message)
+	return err
+}
+
+func (h userVisibleHandler) WithAttrs([]slog.Attr) slog.Handler {
+	return h
+}
+
+func (h userVisibleHandler) WithGroup(string) slog.Handler {
+	return h
 }
 
 type rotatingSchedulerLogWriter struct {
