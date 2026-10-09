@@ -9,13 +9,15 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"ash/internal/localize"
 )
 
 func newStructuredLogger(w io.Writer, level slog.Level) *slog.Logger {
 	if w == nil {
 		w = os.Stderr
 	}
-	return slog.New(slog.NewJSONHandler(w, &slog.HandlerOptions{
+	handler := slog.NewJSONHandler(w, &slog.HandlerOptions{
 		Level: level,
 		ReplaceAttr: func(groups []string, attr slog.Attr) slog.Attr {
 			if attr.Key == slog.MessageKey {
@@ -26,7 +28,8 @@ func newStructuredLogger(w io.Writer, level slog.Level) *slog.Logger {
 			}
 			return attr
 		},
-	}))
+	})
+	return slog.New(localize.NewSlogHandler(handler))
 }
 
 // configureDebugLogging wires debug logging to stderr or a rotating log file based on the current environment.

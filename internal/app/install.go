@@ -61,7 +61,7 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 
 	shellName, dryRun, overwrite, err := parseInstallArgs(args)
 	if err != nil {
-		slog.Error(fmt.Sprintf("install error: %v", err), "EID", "EpbG2YtZ")
+		slog.Error(localize.Format("log.install.error", []any{err}), "EID", "EpbG2YtZ")
 		printUsage(stderr)
 		return 1
 	}
@@ -71,14 +71,14 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 	}
 	if !dryRun {
 		if err := installPreferredLanguage(stdout); err != nil {
-			_, _ = fmt.Fprintf(stderr, "install error: %v\n", err)
+			_, _ = fmt.Fprintln(stderr, localize.Format("log.install.error", []any{err}))
 			return 1
 		}
 	}
 
 	rcPath, err := rcPathForShell(shellName)
 	if err != nil {
-		slog.Error(fmt.Sprintf("install error: %v", err), "EID", "n0lHsTQp")
+		slog.Error(localize.Format("log.install.error", []any{err}), "EID", "n0lHsTQp")
 		return 1
 	}
 
@@ -88,24 +88,24 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	if err := ensureInstallShellWrapper(shellName, dryRun, stdout); err != nil {
-		slog.Error(fmt.Sprintf("install error: %v", err), "EID", "RtRyQwEX")
+		slog.Error(localize.Format("log.install.error", []any{err}), "EID", "RtRyQwEX")
 		return 1
 	}
 	if err := ensureShellPostInstall(shellName, dryRun, stdout); err != nil {
-		slog.Error(fmt.Sprintf("install error: %v", err), "EID", "bnjrQttE")
+		slog.Error(localize.Format("log.install.error", []any{err}), "EID", "bnjrQttE")
 		return 1
 	}
 	activeWrapperPath, err := installShellWrapperPath(shellName)
 	if err != nil {
-		slog.Error(fmt.Sprintf("install error: %v", err), "EID", "3f0v2Kx1")
+		slog.Error(localize.Format("log.install.error", []any{err}), "EID", "3f0v2Kx1")
 		return 1
 	}
 	if err := installEmbeddedBootstrapAssets(overwrite, activeWrapperPath, stdout); err != nil {
-		slog.Error(fmt.Sprintf("install error: %v", err), "EID", "Hrs2Jw5A")
+		slog.Error(localize.Format("log.install.error", []any{err}), "EID", "Hrs2Jw5A")
 		return 1
 	}
 	if err := maybeAdoptBundledAllowlistEntries(stdout, dryRun); err != nil {
-		slog.Error(fmt.Sprintf("install error: %v", err), "EID", "WnGm9KpQ")
+		slog.Error(localize.Format("log.install.error", []any{err}), "EID", "WnGm9KpQ")
 		return 1
 	}
 	if !dryRun {
@@ -122,11 +122,11 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 	if hasManagedBlock {
 		if strings.TrimSpace(existingBlock) == strings.TrimSpace(block) {
 			if err := finalizeInstallWorkspace(); err != nil {
-				slog.Error(fmt.Sprintf("install error: %v", err), "EID", "Ez8nV4zY")
+				slog.Error(localize.Format("log.install.error", []any{err}), "EID", "Ez8nV4zY")
 				return 1
 			}
 			if err := maybeConfigureInstallEnv(stdout, stderr, dryRun); err != nil {
-				slog.Error(fmt.Sprintf("install error: %v", err), "EID", "j6SE1V4c")
+				slog.Error(localize.Format("log.install.error", []any{err}), "EID", "j6SE1V4c")
 				return 1
 			}
 			_, _ = fmt.Fprintln(stdout, localize.Format("install.already_present", []any{rcPath}))
@@ -159,11 +159,11 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 			return 1
 		}
 		if err := finalizeInstallWorkspace(); err != nil {
-			slog.Error(fmt.Sprintf("install error: %v", err), "EID", "J6UlMz4P")
+			slog.Error(localize.Format("log.install.error", []any{err}), "EID", "J6UlMz4P")
 			return 1
 		}
 		if err := maybeConfigureInstallEnv(stdout, stderr, dryRun); err != nil {
-			slog.Error(fmt.Sprintf("install error: %v", err), "EID", "55cquv9b")
+			slog.Error(localize.Format("log.install.error", []any{err}), "EID", "55cquv9b")
 			return 1
 		}
 
@@ -193,11 +193,11 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	if err := finalizeInstallWorkspace(); err != nil {
-		slog.Error(fmt.Sprintf("install error: %v", err), "EID", "SyhbVcO3")
+		slog.Error(localize.Format("log.install.error", []any{err}), "EID", "SyhbVcO3")
 		return 1
 	}
 	if err := maybeConfigureInstallEnv(stdout, stderr, dryRun); err != nil {
-		slog.Error(fmt.Sprintf("install error: %v", err), "EID", "BwUzNiql")
+		slog.Error(localize.Format("log.install.error", []any{err}), "EID", "BwUzNiql")
 		return 1
 	}
 
@@ -781,10 +781,10 @@ func installRecommendation() (string, error) {
 		if strings.TrimSpace(existing) == strings.TrimSpace(expected) {
 			return "", nil
 		}
-		return fmt.Sprintf("ash install for %s is outdated. Run: ash install --shell %s", shellName, shellName), nil
+		return localize.Format("log.install.outdated", []any{shellName, shellName}), nil
 	}
 
-	return fmt.Sprintf("ash is not installed for %s. Run: ash install --shell %s", shellName, shellName), nil
+	return localize.Format("log.install.missing", []any{shellName, shellName}), nil
 }
 
 // bashInstalledViaProfileSourcing reports whether bash is already configured to source ash through .bash_profile.

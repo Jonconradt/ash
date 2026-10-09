@@ -104,7 +104,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 		stdinPrompt, err := readPromptFromStdin()
 		if err != nil {
-			slog.Error(fmt.Sprintf("failed to read stdin prompt: %v", err), "EID", "f9hH5RjM")
+			slog.Error(localize.Format("log.ash.stdin_read_failed", []any{err}), "EID", "f9hH5RjM")
 			return 1
 		}
 		args = []string{stdinPrompt}
@@ -182,7 +182,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	slog.Debug("ash session started", "session_id", sessionID, "version", executionDashboardVersion(), "provider", aiCfg.Provider, "ollama_openai_api", aiCfg.OllamaOpenAIAPI, "stream_requested", streamingEnabled(), "EID", "vN2wSb8Q")
 
 	if recommendation, err := installRecommendation(); err == nil && recommendation != "" {
-		slog.Info(recommendation, "EID", "Ss6EkIfE")
+		slog.Info(localize.LogMessage(recommendation), "EID", "Ss6EkIfE")
 	}
 
 	userInput := strings.TrimSpace(strings.Join(args, " "))
@@ -193,25 +193,25 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 	historyPath, err := getHistoryPath()
 	if err != nil {
-		slog.Error(fmt.Sprintf("failed to resolve history path: %v", err), "EID", "7rF5MhPj")
+		slog.Error(localize.Format("log.ash.history_path_failed", []any{err}), "EID", "7rF5MhPj")
 		return 1
 	}
 
 	history, err := loadHistory(historyPath)
 	if err != nil {
-		slog.Error(fmt.Sprintf("failed to load history: %v", err), "EID", "UxY51gAq")
+		slog.Error(localize.Format("log.ash.history_load_failed", []any{err}), "EID", "UxY51gAq")
 		return 1
 	}
 
 	allowlist, err := loadAllowlistedCommands()
 	if err != nil {
-		slog.Error(fmt.Sprintf("failed to read %s: %v", allowFileName, err), "EID", "f6qdSTFE")
+		slog.Error(localize.Format("log.ash.file_read_failed", []any{allowFileName, err}), "EID", "f6qdSTFE")
 		return 1
 	}
 
 	systemPrompt, err := readSystemPromptWithAllowlist(allowlist)
 	if err != nil {
-		slog.Error(fmt.Sprintf("failed to read %s: %v", systemFileName, err), "EID", "8N3r3Vz0")
+		slog.Error(localize.Format("log.ash.file_read_failed", []any{systemFileName, err}), "EID", "8N3r3Vz0")
 		return 1
 	}
 	systemPrompt = buildSystemPrompt(systemPrompt, timeNow())
@@ -248,7 +248,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 			return 130
 		}
 		if errors.Is(err, context.DeadlineExceeded) {
-			slog.Warn(fmt.Sprintf("AI took longer than %s, so we should probably try again later", timeout), "EID", "80FzBwhZ")
+			slog.Warn(localize.Format("log.ash.timeout", []any{timeout}), "EID", "80FzBwhZ")
 			return 1
 		}
 		var statusErr chatStatusError
@@ -265,7 +265,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 				return 1
 			}
 		}
-		slog.Error(fmt.Sprintf("%s request failed: %v", aiCfg.Provider, err), "EID", "XflUmD5L")
+		slog.Error(localize.Format("log.ash.provider_request_failed", []any{aiCfg.Provider, err}), "EID", "XflUmD5L")
 		return 1
 	}
 
@@ -288,7 +288,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		if scratchRoot, scratchErr := ashScratchRoot(); scratchErr == nil {
 			outDir := filepath.Join(scratchRoot, "attachments", requestID)
 			if written, writeErr := writeResponseAttachments(outDir, replyAttachments); writeErr != nil {
-				slog.Warn(fmt.Sprintf("failed to save returned attachments: %v", writeErr), "EID", "b3Kx9Qmz")
+				slog.Warn(localize.Format("log.ash.attachment_save_failed", []any{writeErr}), "EID", "b3Kx9Qmz")
 			} else {
 				for _, path := range written {
 					attachmentOutput := stdout
@@ -306,7 +306,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	history.Conversations[aiCfg.HistoryKey] = conversation
 
 	if err := saveHistory(historyPath, history); err != nil {
-		slog.Warn(fmt.Sprintf("warning: failed to save history: %v", err), "EID", "NIRzpBgV")
+		slog.Warn(localize.Format("log.ash.history_save_failed", []any{err}), "EID", "NIRzpBgV")
 	}
 
 	return 0

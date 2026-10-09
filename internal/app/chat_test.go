@@ -8,11 +8,34 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"ash/internal/localize"
 )
+
+func TestCloudErrorMessagesUseSelectedLanguage(t *testing.T) {
+	if err := localize.Init("zh_CN", filepath.Join("..", "localize", "languages")); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := localize.Init("en_US", ""); err != nil {
+			t.Errorf("restore English translator: %v", err)
+		}
+	})
+
+	message := randomCloudBusy503Message()
+	if strings.HasPrefix(message, "The ") {
+		t.Fatalf("cloud humor was not translated: %q", message)
+	}
+	got := withStatusDetail(message, chatStatusError{StatusCode: http.StatusServiceUnavailable, Body: "busy"})
+	if !strings.Contains(got, "服务器返回") || !strings.Contains(got, "503: busy") {
+		t.Fatalf("cloud status detail was not localized or preserved: %q", got)
+	}
+}
 
 func TestChatRetriesTransientFailures(t *testing.T) {
 	t.Setenv(brokerSocketEnv, "")

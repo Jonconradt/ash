@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"ash/internal/localize"
 	"ash/internal/model"
 )
 
@@ -325,40 +326,40 @@ func renderExecutionDashboard(metrics *executionMetrics, ansi bool) string {
 		}
 		return cyan + value + reset
 	}
-	header := fmt.Sprintf("ASH %s EXECUTION SUMMARY", executionDashboardVersion())
+	header := localize.Format("dashboard.title", []any{executionDashboardVersion()})
 	if ansi {
 		header = bold + header + reset
 	}
 	snap := metrics.snapshot()
-	inputTokens := "N/A"
+	inputTokens := localize.Text("dashboard.not_available")
 	if snap.InputTokensAvailable {
 		inputTokens = strconv.Itoa(snap.InputTokens)
 	}
-	outputTokens := "N/A"
+	outputTokens := localize.Text("dashboard.not_available")
 	if snap.OutputTokensAvailable {
 		outputTokens = strconv.Itoa(snap.OutputTokens)
 	}
 	var b strings.Builder
 	fmt.Fprintf(&b, "\n%s\n", header)
-	fmt.Fprintf(&b, "%-20s %s\n", style("Loading defaults"), formatMetricDuration(metrics.stageDuration(metricsStageDefaults)))
-	fmt.Fprintf(&b, "%-20s %s\n", style("Connecting to AI server"), formatMetricDuration(metrics.stageDuration(metricsStageConnect)))
-	connectionStatus := "no"
+	fmt.Fprintf(&b, "%-20s %s\n", style(localize.Text("dashboard.loading_defaults")), formatMetricDuration(metrics.stageDuration(metricsStageDefaults)))
+	fmt.Fprintf(&b, "%-20s %s\n", style(localize.Text("dashboard.connecting")), formatMetricDuration(metrics.stageDuration(metricsStageConnect)))
+	connectionStatus := localize.Text("dashboard.connection_no")
 	metrics.mu.RLock()
 	if metrics.connectionObserved && metrics.connectionReused {
-		connectionStatus = "yes"
+		connectionStatus = localize.Text("dashboard.connection_yes")
 	}
 	metrics.mu.RUnlock()
-	fmt.Fprintf(&b, "%-20s %s\n", style("Connection reused"), connectionStatus)
-	fmt.Fprintf(&b, "%-20s %s\n", style("AI processing"), formatMetricDuration(metrics.stageDuration(metricsStageAIProcessing)))
-	fmt.Fprintf(&b, "%-20s %d\n", style("AI round trips"), snap.AIRoundTrips)
-	fmt.Fprintf(&b, "%-20s %d tools (%s)\n", style("Tool calls"), snap.ToolCalls, formatMetricDuration(snap.ToolDuration))
-	writeCountBreakdown(&b, style("  by tool"), snap.ToolCallCounts)
-	fmt.Fprintf(&b, "%-20s %d (%s), canceled %d, timed out %d, failed %d\n", style("Sub-agents"), snap.SubAgentCalls, formatMetricDuration(snap.SubAgentDuration), snap.SubAgentCanceled, snap.SubAgentTimedOut, snap.SubAgentFailed)
-	fmt.Fprintf(&b, "%-20s %s\n", style("Input tokens"), inputTokens)
-	fmt.Fprintf(&b, "%-20s %s\n", style("Output tokens"), outputTokens)
-	writeCountBreakdown(&b, style("Scratch files written"), snap.ScratchWrites)
-	writeCountBreakdown(&b, style("Scratch files executed"), snap.ScratchExecs)
-	fmt.Fprintf(&b, "%-20s %s\n", style("Total realtime"), formatMetricDuration(metrics.totalDuration()))
+	fmt.Fprintf(&b, "%-20s %s\n", style(localize.Text("dashboard.connection_reused")), connectionStatus)
+	fmt.Fprintf(&b, "%-20s %s\n", style(localize.Text("dashboard.ai_processing")), formatMetricDuration(metrics.stageDuration(metricsStageAIProcessing)))
+	fmt.Fprintf(&b, "%-20s %d\n", style(localize.Text("dashboard.ai_round_trips")), snap.AIRoundTrips)
+	fmt.Fprintf(&b, "%-20s %s\n", style(localize.Text("dashboard.tool_calls")), localize.Format("dashboard.tool_calls_value", []any{snap.ToolCalls, formatMetricDuration(snap.ToolDuration)}))
+	writeCountBreakdown(&b, style(localize.Text("dashboard.by_tool")), snap.ToolCallCounts)
+	fmt.Fprintf(&b, "%-20s %s\n", style(localize.Text("dashboard.sub_agents")), localize.Format("dashboard.sub_agents_value", []any{snap.SubAgentCalls, formatMetricDuration(snap.SubAgentDuration), snap.SubAgentCanceled, snap.SubAgentTimedOut, snap.SubAgentFailed}))
+	fmt.Fprintf(&b, "%-20s %s\n", style(localize.Text("dashboard.input_tokens")), inputTokens)
+	fmt.Fprintf(&b, "%-20s %s\n", style(localize.Text("dashboard.output_tokens")), outputTokens)
+	writeCountBreakdown(&b, style(localize.Text("dashboard.scratch_written")), snap.ScratchWrites)
+	writeCountBreakdown(&b, style(localize.Text("dashboard.scratch_executed")), snap.ScratchExecs)
+	fmt.Fprintf(&b, "%-20s %s\n", style(localize.Text("dashboard.total_realtime")), formatMetricDuration(metrics.totalDuration()))
 	return b.String()
 }
 
@@ -379,7 +380,7 @@ func logExecutionSummary(requestID string, metrics *executionMetrics) {
 		return
 	}
 	snap := metrics.snapshot()
-	slog.Info("execution summary",
+	slog.Info(localize.Text("log.execution_summary"),
 		"request_id", requestID,
 		"version", executionDashboardVersion(),
 		"defaults_ms", metrics.stageDuration(metricsStageDefaults).Milliseconds(),

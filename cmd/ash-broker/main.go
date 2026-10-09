@@ -72,7 +72,7 @@ func aiTimeout() time.Duration {
 // Kept as a minimal, self-contained duplicate of ash's support.go helper so
 // this binary never needs to import ash's own packages.
 func newBrokerLogger(w io.Writer) *slog.Logger {
-	return slog.New(slog.NewJSONHandler(w, &slog.HandlerOptions{
+	handler := slog.NewJSONHandler(w, &slog.HandlerOptions{
 		ReplaceAttr: func(groups []string, attr slog.Attr) slog.Attr {
 			if attr.Key == slog.MessageKey {
 				attr.Key = "message"
@@ -82,10 +82,19 @@ func newBrokerLogger(w io.Writer) *slog.Logger {
 			}
 			return attr
 		},
-	}))
+	})
+	return slog.New(localize.NewSlogHandler(handler))
 }
 
 func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+	if home, err := os.UserHomeDir(); err == nil {
+		if err := localize.Init(os.Getenv("LANG"), filepath.Join(home, ".ash", "languages")); err != nil {
+			if fallbackErr := localize.Init("en_US", ""); fallbackErr != nil {
+				_, _ = fmt.Fprintln(stderr, localize.Format("log.broker.language_error", []any{fallbackErr}))
+				return 1
+			}
+		}
+	}
 	logger := newBrokerLogger(stderr)
 	var socket string
 	var parentPID int
@@ -117,7 +126,7 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 				return 2
 			}
 		default:
-			logger.Error(fmt.Sprintf("unknown broker option %q", args[index]), "EID", "Jp2VtR6w")
+			logger.Error(localize.Format("log.broker.unknown_option", []any{args[index]}), "EID", "Jp2VtR6w")
 			return 2
 		}
 	}
@@ -133,21 +142,21 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 	}
 	credentialKey := os.Getenv("ASH_MCP_CREDENTIAL_KEY")
 	if err := os.Unsetenv("ASH_MCP_CREDENTIAL_KEY"); err != nil {
-		logger.Error(fmt.Sprintf("failed to clear MCP credential key from broker environment: %v", err), "EID", "Mc8wQx2v")
+		logger.Error(localize.Format("log.broker.clear_credential_failed", []any{err}), "EID", "Mc8wQx2v")
 		return 1
 	}
 	home, err := os.UserHomeDir()
 	if err != nil {
-		logger.Error(fmt.Sprintf("failed to locate home directory for MCP credentials: %v", err), "EID", "Fh4TzP9b")
+		logger.Error(localize.Format("log.broker.home_failed", []any{err}), "EID", "Fh4TzP9b")
 		return 1
 	}
 	if err := localize.Init(os.Getenv("LANG"), filepath.Join(home, ".ash", "languages")); err != nil {
-		_, _ = fmt.Fprintf(stderr, "language catalog error: %v\n", err)
+		_, _ = fmt.Fprintln(stderr, localize.Format("log.broker.language_error", []any{err}))
 		return 1
 	}
 	credentialStorage, err := mcp.NewCredentialStorage(filepath.Join(home, ".ash", "mcp"), credentialKey)
 	if err != nil {
-		logger.Error(fmt.Sprintf("failed to initialize MCP credential storage: %v", err), "EID", "Xk7NfV3c")
+		logger.Error(localize.Format("log.broker.credential_storage_failed", []any{err}), "EID", "Xk7NfV3c")
 		return 1
 	}
 	endpointURL, err := url.Parse(endpoint)
@@ -157,13 +166,13 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 	}
 	aiWarmup, err := aiWarmupEnabled()
 	if err != nil {
-		logger.Error(fmt.Sprintf("invalid AI broker warm-up setting: %v", err), "EID", "AiWarmUp1")
+		logger.Error(localize.Format("log.broker.warmup_setting_invalid", []any{err}), "EID", "AiWarmUp1")
 		return 2
 	}
 	allowedHost := endpointURL.Host
 	// #nosec G703 -- the broker socket path is supplied by the same-user shell setup.
 	if err := os.MkdirAll(filepath.Dir(socket), 0o700); err != nil {
-		logger.Error(fmt.Sprintf("failed to create broker socket directory: %v", err), "EID", "Vd4KpS7m")
+		logger.Error(localize.Format("log.broker.socket_directory_failed", []any{err}), "EID", "Vd4KpS7m")
 		return 1
 	}
 	dialCtx, cancelDial := context.WithTimeout(ctx, 50*time.Millisecond)
@@ -177,7 +186,7 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 	_ = os.Remove(socket)
 	listener, listenErr := (&net.ListenConfig{}).Listen(ctx, "unix", socket)
 	if listenErr != nil {
-		logger.Error(fmt.Sprintf("failed to listen on broker socket: %v", listenErr), "EID", "Bn7ZtL4p")
+		logger.Error(localize.Format("log.broker.listen_failed", []any{listenErr}), "EID", "Bn7ZtL4p")
 		return 1
 	}
 	defer func() {
@@ -187,7 +196,7 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 	}()
 	// #nosec G703 -- the broker socket path is supplied by the same-user shell setup.
 	if err := os.Chmod(socket, 0o600); err != nil {
-		logger.Error(fmt.Sprintf("failed to secure broker socket permissions: %v", err), "EID", "Kw3RmV8t")
+		logger.Error(localize.Format("log.broker.socket_permissions_failed", []any{err}), "EID", "Kw3RmV8t")
 		return 1
 	}
 	client := newBrokerHTTPClient()
@@ -296,12 +305,12 @@ func warmAIConnection(ctx context.Context, client *http.Client, endpoint string)
 func warmConfiguredMCP(ctx context.Context, logger *slog.Logger, manager *mcp.RemoteManager, home string) {
 	cwd, err := os.Getwd()
 	if err != nil {
-		logger.Error(fmt.Sprintf("resolving working directory for MCP warm-up: %v", err), "EID", "McPWrk01")
+		logger.Error(localize.Format("log.broker.mcp_working_directory_failed", []any{err}), "EID", "McPWrk01")
 		return
 	}
 	servers, err := mcp.ResolveRemoteServers(home, cwd, os.ReadFile)
 	if err != nil {
-		logger.Error(fmt.Sprintf("loading MCP registrations for broker warm-up: %v", err), "EID", "McPWrk02")
+		logger.Error(localize.Format("log.broker.mcp_registrations_failed", []any{err}), "EID", "McPWrk02")
 		return
 	}
 	if len(servers) == 0 {

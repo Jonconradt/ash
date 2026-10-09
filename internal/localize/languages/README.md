@@ -48,6 +48,17 @@ overrides (for example, `es_MX` inheriting from `es_ES`).
 - Preserve all formatting placeholders and their argument order, such as `%s`,
   `%v`, and `%q`. Do not translate placeholder syntax or change the arguments
   passed by the Go call site.
+- Randomized cloud-error humor uses numbered key groups such as
+  `log.cloud.busy.1` through `log.cloud.busy.5`, `log.cloud.server.1` through
+  `log.cloud.server.5`, and `log.cloud.rate_limit.1` through
+  `log.cloud.rate_limit.5`. Keep every numbered key in every locale so each
+  language retains the same variety and random selection can find a message.
+  These lines do not need to be literal translations: write concise, natural,
+  culturally appropriate humor for the locale while keeping the underlying
+  meaning clear (the service is busy, encountered an error, or is rate
+  limiting requests). Avoid humor that could be insulting or confusing, and
+  do not remove or rewrite the separate server status/detail text, which
+  remains useful for troubleshooting.
 - Keep regional catalogs sparse: declare the intended parent and include only
   actual regional wording changes. Do not copy the entire parent catalog into
   a dialect pack.

@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"ash/internal/localize"
 	"ash/internal/model"
 )
 
@@ -110,6 +111,9 @@ var cloudRateLimit429Messages = []string{
 
 // randomCloudBusy503Message returns a humorous retry message for transient 503 service-busy responses.
 func randomCloudBusy503Message() string {
+	if localize.Locale() != "en_US" {
+		return randomLocalizedCloudMessage("log.cloud.busy")
+	}
 	if len(cloudBusy503Messages) == 0 {
 		return "The cloud model is distracted and too busy right now. Please try again shortly."
 	}
@@ -119,6 +123,9 @@ func randomCloudBusy503Message() string {
 
 // randomCloudServer500Message returns a humorous retry message for transient 500 server errors.
 func randomCloudServer500Message() string {
+	if localize.Locale() != "en_US" {
+		return randomLocalizedCloudMessage("log.cloud.server")
+	}
 	if len(cloudServer500Messages) == 0 {
 		return "The server hit an internal error. Please try again shortly."
 	}
@@ -128,11 +135,19 @@ func randomCloudServer500Message() string {
 
 // randomCloudRateLimit429Message returns a humorous retry message for 429 rate-limit responses.
 func randomCloudRateLimit429Message() string {
+	if localize.Locale() != "en_US" {
+		return randomLocalizedCloudMessage("log.cloud.rate_limit")
+	}
 	if len(cloudRateLimit429Messages) == 0 {
 		return "The server is rate limiting requests. Please try again shortly."
 	}
 	idx := int(timeNow().UnixNano() % int64(len(cloudRateLimit429Messages)))
 	return cloudRateLimit429Messages[idx]
+}
+
+func randomLocalizedCloudMessage(key string) string {
+	index := int(timeNow().UnixNano() % 5)
+	return localize.Text(fmt.Sprintf("%s.%d", key, index+1))
 }
 
 // withStatusDetail appends the server's status code (and any response body) to a
@@ -142,7 +157,7 @@ func withStatusDetail(message string, statusErr chatStatusError) string {
 	if body := strings.TrimSpace(statusErr.Body); body != "" {
 		detail += ": " + body
 	}
-	return fmt.Sprintf("%s (server said: %s)", message, detail)
+	return localize.Format("log.cloud.status_detail", []any{message, detail})
 }
 
 // chatStream sends a chat request and streams incremental text deltas to onDelta as they

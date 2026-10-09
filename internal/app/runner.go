@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"strings"
 	"time"
+
+	"ash/internal/localize"
 )
 
 var chatExecutor = chat
@@ -50,10 +52,10 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 	repeatLimit := toolRepeatLimit()
 	lastCallSignature := ""
 	repeatCount := 0
-	slog.Debug("Tool loop started", "request_id", requestIDFromContext(ctx), "max_iters", maxIters, "tools", len(tools), "EID", "kLt1nKGy")
+	slog.Debug(localize.Text("log.runner.loop_started"), "request_id", requestIDFromContext(ctx), "max_iters", maxIters, "tools", len(tools), "EID", "kLt1nKGy")
 
 	for i := 0; i <= maxIters; i++ {
-		slog.Debug("Tool loop iteration", "request_id", requestIDFromContext(ctx), "iteration", i+1, "message_count", len(messages), "EID", "K9mhqboH")
+		slog.Debug(localize.Text("log.runner.loop_iteration"), "request_id", requestIDFromContext(ctx), "iteration", i+1, "message_count", len(messages), "EID", "K9mhqboH")
 		roundMessages := append([]message{}, messages...)
 		stateMessage := buildExecutionStateMessage(userInput, tasks, observations, relevanceWindow())
 		defenseMessage := buildPromptInjectionDefenseMessage()
@@ -92,7 +94,7 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 		messages = append(messages, assistant)
 
 		if len(assistant.ToolCalls) == 0 {
-			slog.Debug("Assistant returned no tool calls", "request_id", requestIDFromContext(ctx), "EID", "lEPk12rd")
+			slog.Debug(localize.Text("log.runner.no_tool_calls"), "request_id", requestIDFromContext(ctx), "EID", "lEPk12rd")
 			// A reply that is only thinking output is a truncated turn, not a finished
 			// answer: continue it instead of discarding the effort. The assistant turn
 			// is already in messages; providers that support it (e.g. Ollama thinking
@@ -105,7 +107,7 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 				// When the prompt is execution-style, fold the forced tool-use nudge
 				// into this single retry so both fixes cost one round trip, not two.
 				forceToolUse := shouldForceToolRetry(userInput, "", tools)
-				slog.Debug("Assistant reply had no content, requesting continuation", "request_id", requestIDFromContext(ctx), "reasoning_bytes", len(assistant.Reasoning), "force_tool_use", forceToolUse, "EID", "Zt5rQw2K")
+				slog.Debug(localize.Text("log.runner.empty_reply"), "request_id", requestIDFromContext(ctx), "reasoning_bytes", len(assistant.Reasoning), "force_tool_use", forceToolUse, "EID", "Zt5rQw2K")
 				messages = append(messages, message{
 					Role:    "system",
 					Content: reasoningContinuationInstruction(forceToolUse),
@@ -123,7 +125,7 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 
 			if !forcedToolRetryUsed && shouldForceToolRetry(userInput, assistant.Content, tools) {
 				forcedToolRetryUsed = true
-				slog.Debug("Execution-style prompt detected, forcing one retry with tool-use instruction", "request_id", requestIDFromContext(ctx), "EID", "aDx9FvQa")
+				slog.Debug(localize.Text("log.runner.execution_prompt_retry"), "request_id", requestIDFromContext(ctx), "EID", "aDx9FvQa")
 				messages = append(messages, message{
 					Role:    "system",
 					Content: "When a user asks to run or execute code/commands and tools are available, call an appropriate tool instead of only explaining.",
@@ -158,7 +160,7 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 				requestArgs = append(requestArgs, "args", sanitizeArgsForLog(call.Function.Arguments))
 			}
 			requestArgs = append(requestArgs, "EID", "iYWCHf8N")
-			slog.Debug("Tool invocation requested", append(requestArgs, "EID", "Iuz4RCQq")...,
+			slog.Debug(localize.Text("log.runner.tool_requested"), append(requestArgs, "EID", "Iuz4RCQq")...,
 			)
 			toolStarted := time.Now()
 			toolResult := shim.CallTool(ctx, toolName, call.Function.Arguments)
@@ -172,7 +174,7 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 				resultArgs = append(resultArgs, "output_preview", previewForLog(toolResult))
 			}
 			resultArgs = append(resultArgs, "EID", "L6UuVgEs")
-			slog.Debug("Tool invocation result", append(resultArgs, "EID", "0kEcQZWa")...,
+			slog.Debug(localize.Text("log.runner.tool_result"), append(resultArgs, "EID", "0kEcQZWa")...,
 			)
 			observation := parseToolObservation(toolResult)
 			if observation.Command == "" {
@@ -196,7 +198,7 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 				repeatCount = 1
 			}
 			if repeatCount >= repeatLimit {
-				slog.Debug("Repeated identical tool call detected", "request_id", requestIDFromContext(ctx), "name", toolName, "repeat_count", repeatCount, "EID", "aHt3RqXe")
+				slog.Debug(localize.Text("log.runner.repeated_tool_call"), "request_id", requestIDFromContext(ctx), "name", toolName, "repeat_count", repeatCount, "EID", "aHt3RqXe")
 				messages = append(messages, message{
 					Role:    "system",
 					Content: "That exact tool call already produced this result. Use the existing observation to answer, or call a different tool with different arguments; do not repeat the same call.",

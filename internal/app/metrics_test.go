@@ -2,10 +2,13 @@ package app
 
 import (
 	"bytes"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"ash/internal/localize"
 )
 
 func TestVerboseLoggingEnabledAcceptsTruthyValues(t *testing.T) {
@@ -87,6 +90,31 @@ func TestRenderExecutionDashboard(t *testing.T) {
 	} {
 		if !strings.Contains(output, expected) {
 			t.Errorf("dashboard missing %q:\n%s", expected, output)
+		}
+	}
+}
+
+func TestRenderExecutionDashboardUsesSelectedLanguage(t *testing.T) {
+	if err := localize.Init("zh", filepath.Join("..", "localize", "languages")); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := localize.Init("en_US", ""); err != nil {
+			t.Errorf("restore English translator: %v", err)
+		}
+	})
+
+	metrics := newExecutionMetrics(time.Now())
+	metrics.finish(time.Now())
+	output := renderExecutionDashboard(metrics, false)
+	for _, expected := range []string{"执行摘要", "加载默认设置", "连接 AI 服务器", "连接已复用", "不可用"} {
+		if !strings.Contains(output, expected) {
+			t.Errorf("localized dashboard missing %q:\n%s", expected, output)
+		}
+	}
+	for _, unexpected := range []string{"EXECUTION SUMMARY", "Loading defaults", "Connecting to AI server", "Connection reused", "N/A"} {
+		if strings.Contains(output, unexpected) {
+			t.Errorf("localized dashboard contains English label %q:\n%s", unexpected, output)
 		}
 	}
 }

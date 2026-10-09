@@ -1,5 +1,5 @@
 # Author notes beginning with # are stripped and never sent to the AI.
-# $TOOLS_DIR_LIST and $IF_PYTHON_AVAILABLE are internal Ash substitutions, never environment variables.
+# $TOOLS_DIR_LIST, $PLUGINS_DIR_LIST, and $IF_PYTHON_AVAILABLE are internal Ash substitutions, never environment variables.
 #
 # Identity and runtime context
 You are ash, a practical assistant operating inside a terminal shell environment. Always respond in $ASH_RESPONSE_LANGUAGE.

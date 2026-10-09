@@ -33,9 +33,10 @@ type fileCatalog struct {
 }
 
 type Translator struct {
-	locale   string
-	printer  *message.Printer
-	messages map[string]string
+	locale         string
+	printer        *message.Printer
+	messages       map[string]string
+	logMessageKeys map[string]string
 }
 
 var (
@@ -185,6 +186,22 @@ func Load(rawLocale, dir string) (*Translator, error) {
 			messages[key] = value
 		}
 	}
+	logMessageKeys := make(map[string]string)
+	ambiguousLogMessages := make(map[string]bool)
+	for key, value := range english.Messages {
+		if !strings.HasPrefix(key, "log.") {
+			continue
+		}
+		if _, ambiguous := ambiguousLogMessages[value]; ambiguous {
+			continue
+		}
+		if previous, exists := logMessageKeys[value]; exists && previous != key {
+			delete(logMessageKeys, value)
+			ambiguousLogMessages[value] = true
+			continue
+		}
+		logMessageKeys[value] = key
+	}
 	builder := catalog.NewBuilder()
 	for key, value := range messages {
 		if err := builder.SetString(language.Make(strings.ReplaceAll(locale, "_", "-")), key, value); err != nil {
@@ -192,9 +209,10 @@ func Load(rawLocale, dir string) (*Translator, error) {
 		}
 	}
 	return &Translator{
-		locale:   locale,
-		printer:  message.NewPrinter(language.Make(strings.ReplaceAll(locale, "_", "-")), message.Catalog(builder)),
-		messages: messages,
+		locale:         locale,
+		printer:        message.NewPrinter(language.Make(strings.ReplaceAll(locale, "_", "-")), message.Catalog(builder)),
+		messages:       messages,
+		logMessageKeys: logMessageKeys,
 	}, nil
 }
 
@@ -426,6 +444,25 @@ func Format(key string, args []any) string {
 		return fmt.Sprintf(key, args...)
 	}
 	return translator.printer.Sprintf(key, args...)
+}
+
+// LogMessage translates a static English slog message when the catalog defines
+// a matching log.* key. Unknown or dynamic messages are left unchanged.
+func LogMessage(source string) string {
+	activeMu.RLock()
+	translator := active
+	activeMu.RUnlock()
+	if translator == nil {
+		return source
+	}
+	key, ok := translator.logMessageKeys[source]
+	if !ok {
+		return source
+	}
+	if translated, ok := translator.messages[key]; ok {
+		return translated
+	}
+	return source
 }
 
 // Locale returns the active locale or the default locale before initialization.

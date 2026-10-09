@@ -1,7 +1,9 @@
 package localize
 
 import (
+	"bytes"
 	"encoding/json"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -105,5 +107,31 @@ func TestValidateDirReportsMissingKeysByLocale(t *testing.T) {
 func TestValidateBundledCatalogs(t *testing.T) {
 	if err := ValidateDir("languages"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestSlogHandlerTranslatesMessageAndPreservesEID(t *testing.T) {
+	if err := Init("zh", "languages"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if err := Init("en_US", ""); err != nil {
+			t.Errorf("restore English translator: %v", err)
+		}
+	})
+
+	var output bytes.Buffer
+	logger := slog.New(NewSlogHandler(slog.NewJSONHandler(&output, &slog.HandlerOptions{Level: slog.LevelDebug})))
+	logger.Debug("Tool loop iteration", "EID", "K9mhqboH")
+
+	var record map[string]any
+	if err := json.Unmarshal(output.Bytes(), &record); err != nil {
+		t.Fatalf("parse JSON log record: %v", err)
+	}
+	if got, want := record["msg"], "工具循环迭代"; got != want {
+		t.Fatalf("translated slog message = %v, want %q", got, want)
+	}
+	if got, want := record["EID"], "K9mhqboH"; got != want {
+		t.Fatalf("slog EID = %v, want unchanged %q", got, want)
 	}
 }
