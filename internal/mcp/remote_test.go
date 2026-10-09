@@ -158,6 +158,78 @@ func TestEncryptedCredentialStorageRoundTrip(t *testing.T) {
 	}
 }
 
+func TestPersistedTokenSourceCoordinatesConcurrentRefresh(t *testing.T) {
+	var refreshes atomic.Int32
+	tokenServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "invalid form", http.StatusBadRequest)
+			return
+		}
+		if r.Form.Get("grant_type") != "refresh_token" || r.Form.Get("refresh_token") != "old-refresh-token" {
+			http.Error(w, "unexpected refresh request", http.StatusBadRequest)
+			return
+		}
+		refreshes.Add(1)
+		time.Sleep(25 * time.Millisecond)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = io.WriteString(w, `{"access_token":"new-access-token","refresh_token":"new-refresh-token","token_type":"Bearer","expires_in":3600}`)
+	}))
+	defer tokenServer.Close()
+
+	store := &systemCredentialStorage{directory: t.TempDir(), key: make([]byte, 32), native: unavailableKeyring{}}
+	key := "mcp-concurrent-refresh"
+	record := persistedOAuth{
+		Config: oauth2.Config{
+			ClientID: "test-client",
+			Endpoint: oauth2.Endpoint{TokenURL: tokenServer.URL},
+		},
+		Token: oauth2.Token{
+			AccessToken:  "expired-access-token",
+			RefreshToken: "old-refresh-token",
+			TokenType:    "Bearer",
+			Expiry:       time.Now().Add(-time.Minute),
+		},
+	}
+	if err := savePersistedOAuth(store, key, record); err != nil {
+		t.Fatalf("saving expired credentials: %v", err)
+	}
+
+	newSource := func() oauth2.TokenSource {
+		tokenSource := record.Config.TokenSource(context.Background(), &record.Token)
+		return newPersistedTokenSource(tokenSource, record, store, key, context.Background())
+	}
+	sources := []oauth2.TokenSource{newSource(), newSource()}
+	results := make(chan *oauth2.Token, len(sources))
+	errors := make(chan error, len(sources))
+	var workers sync.WaitGroup
+	for _, source := range sources {
+		workers.Add(1)
+		go func(source oauth2.TokenSource) {
+			defer workers.Done()
+			token, err := source.Token()
+			if err != nil {
+				errors <- err
+				return
+			}
+			results <- token
+		}(source)
+	}
+	workers.Wait()
+	close(results)
+	close(errors)
+	for err := range errors {
+		t.Errorf("Token() error = %v", err)
+	}
+	for token := range results {
+		if token.AccessToken != "new-access-token" || token.RefreshToken != "new-refresh-token" {
+			t.Errorf("Token() = %+v, want the shared refreshed credentials", token)
+		}
+	}
+	if got := refreshes.Load(); got != 1 {
+		t.Fatalf("refresh requests = %d, want exactly one", got)
+	}
+}
+
 func TestCredentialStorageRejectsWeakKey(t *testing.T) {
 	for _, key := range []string{"short", "0123456789"} {
 		if _, err := NewCredentialStorage(t.TempDir(), key); err == nil {

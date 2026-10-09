@@ -27,6 +27,10 @@ type CredentialStorage interface {
 
 type credentialStorage = CredentialStorage
 
+type credentialRefreshLocker interface {
+	LockRefresh(server string) (func() error, error)
+}
+
 type systemCredentialStorage struct {
 	directory string
 	key       []byte
@@ -137,6 +141,47 @@ func (s *systemCredentialStorage) Set(server string, value []byte) error {
 	ciphertext = append(ciphertext, nonce...)
 	ciphertext = append(ciphertext, sealed...)
 	return s.writeEncrypted(ciphertext)
+}
+
+func (s *systemCredentialStorage) LockRefresh(server string) (func() error, error) {
+	if server == "" || filepath.Base(server) != server || server == "." || server == ".." {
+		return nil, errors.New("invalid MCP credential identifier")
+	}
+	return acquireCredentialFileLock(filepath.Join(s.directory, server+".refresh.lock"))
+}
+
+func acquireCredentialFileLock(path string) (func() error, error) {
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0o600)
+	if err != nil {
+		return nil, fmt.Errorf("opening MCP credential refresh lock: %w", err)
+	}
+	info, err := file.Stat()
+	if err != nil {
+		_ = file.Close()
+		return nil, fmt.Errorf("checking MCP credential refresh lock: %w", err)
+	}
+	if !info.Mode().IsRegular() {
+		_ = file.Close()
+		return nil, errors.New("MCP credential refresh lock must be a regular file")
+	}
+	// #nosec G302 -- Lock files are private to the current user.
+	if err := file.Chmod(0o600); err != nil {
+		_ = file.Close()
+		return nil, fmt.Errorf("securing MCP credential refresh lock: %w", err)
+	}
+	unlockPlatform, err := lockCredentialFile(file)
+	if err != nil {
+		_ = file.Close()
+		return nil, fmt.Errorf("locking MCP credentials for refresh: %w", err)
+	}
+	return func() error {
+		unlockErr := unlockPlatform()
+		closeErr := file.Close()
+		if unlockErr != nil || closeErr != nil {
+			return fmt.Errorf("releasing MCP credential refresh lock: %w", errors.Join(unlockErr, closeErr))
+		}
+		return nil
+	}, nil
 }
 
 func (s *systemCredentialStorage) getEncrypted(server string) ([]byte, error) {

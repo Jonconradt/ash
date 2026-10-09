@@ -1123,30 +1123,24 @@ func (m *RemoteManager) connect(managerCtx context.Context, session *remoteSessi
 		RequestRefreshToken:             true,
 		Client:                          oauthHTTPClient,
 	}
-	saveCredential := func(record persistedOAuth) error {
-		payload, err := json.Marshal(record)
-		if err != nil {
-			return fmt.Errorf("encoding OAuth credentials: %w", err)
-		}
-		return m.credential.Set(credentialID(session.config), payload)
-	}
+	credentialKey := credentialID(session.config)
+	refreshContext := context.WithValue(managerCtx, oauth2.HTTPClient, oauthHTTPClient)
 	oauthConfig.NewTokenSource = func(ctx context.Context, config *oauth2.Config, token *oauth2.Token) (oauth2.TokenSource, error) {
 		record := persistedOAuth{Config: *config, Token: *token}
-		if err := saveCredential(record); err != nil {
+		if err := savePersistedOAuth(m.credential, credentialKey, record); err != nil {
 			return nil, fmt.Errorf("persisting OAuth credentials: %w", err)
 		}
-		return newPersistedTokenSource(config.TokenSource(ctx, token), record, saveCredential), nil
+		return newPersistedTokenSource(config.TokenSource(ctx, token), record, m.credential, credentialKey, ctx), nil
 	}
-	if saved, loadErr := m.credential.Get(credentialID(session.config)); loadErr == nil {
-		var record persistedOAuth
-		if err := json.Unmarshal(saved, &record); err != nil {
-			m.setStatus(session, RemoteStatus{State: "error", Error: "stored MCP credentials are invalid"})
-			return
-		}
-		tokenSource := record.Config.TokenSource(managerCtx, &record.Token)
-		oauthConfig.InitialTokenSource = newPersistedTokenSource(tokenSource, record, saveCredential)
+	if record, loadErr := loadPersistedOAuth(m.credential, credentialKey); loadErr == nil {
+		tokenSource := record.Config.TokenSource(refreshContext, &record.Token)
+		oauthConfig.InitialTokenSource = newPersistedTokenSource(tokenSource, record, m.credential, credentialKey, refreshContext)
 	} else if !errors.Is(loadErr, errCredentialNotFound) {
-		m.setStatus(session, RemoteStatus{State: "error", Error: loadErr.Error()})
+		if errors.Is(loadErr, errInvalidPersistedOAuth) {
+			m.setStatus(session, RemoteStatus{State: "error", Error: "stored MCP credentials are invalid"})
+		} else {
+			m.setStatus(session, RemoteStatus{State: "error", Error: loadErr.Error()})
+		}
 		return
 	}
 	oauthHandler, err = auth.NewAuthorizationCodeHandler(oauthConfig)
@@ -1308,31 +1302,84 @@ func credentialID(server RemoteServer) string {
 }
 
 type persistedTokenSource struct {
-	mu     sync.Mutex
-	source oauth2.TokenSource
-	record persistedOAuth
-	save   func(persistedOAuth) error
+	mu      sync.Mutex
+	source  oauth2.TokenSource
+	record  persistedOAuth
+	storage CredentialStorage
+	key     string
+	ctx     context.Context
 }
 
-func newPersistedTokenSource(source oauth2.TokenSource, record persistedOAuth, save func(persistedOAuth) error) oauth2.TokenSource {
-	return &persistedTokenSource{source: source, record: record, save: save}
+var errInvalidPersistedOAuth = errors.New("stored MCP credentials are invalid")
+
+func loadPersistedOAuth(storage CredentialStorage, key string) (persistedOAuth, error) {
+	payload, err := storage.Get(key)
+	if err != nil {
+		return persistedOAuth{}, err
+	}
+	var record persistedOAuth
+	if err := json.Unmarshal(payload, &record); err != nil {
+		return persistedOAuth{}, errInvalidPersistedOAuth
+	}
+	return record, nil
 }
 
-func (s *persistedTokenSource) Token() (*oauth2.Token, error) {
-	token, err := s.source.Token()
+func savePersistedOAuth(storage CredentialStorage, key string, record persistedOAuth) error {
+	payload, err := json.Marshal(record)
+	if err != nil {
+		return fmt.Errorf("encoding OAuth credentials: %w", err)
+	}
+	return storage.Set(key, payload)
+}
+
+func newPersistedTokenSource(source oauth2.TokenSource, record persistedOAuth, storage CredentialStorage, key string, ctx context.Context) oauth2.TokenSource {
+	return &persistedTokenSource{source: source, record: record, storage: storage, key: key, ctx: ctx}
+}
+
+func (s *persistedTokenSource) Token() (token *oauth2.Token, resultErr error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.record.Token.Valid() {
+		return s.source.Token()
+	}
+	if locker, ok := s.storage.(credentialRefreshLocker); ok {
+		unlock, err := locker.LockRefresh(s.key)
+		if err != nil {
+			return nil, fmt.Errorf("locking MCP credentials for refresh: %w", err)
+		}
+		defer func() {
+			if err := unlock(); err != nil && resultErr == nil {
+				token = nil
+				resultErr = err
+			}
+		}()
+	}
+	latest, err := loadPersistedOAuth(s.storage, s.key)
+	if err != nil {
+		return nil, fmt.Errorf("reloading MCP credentials before refresh: %w", err)
+	}
+	if !sameOAuthToken(latest.Token, s.record.Token) {
+		s.record = latest
+		s.source = s.record.Config.TokenSource(s.ctx, &s.record.Token)
+	}
+	token, err = s.source.Token()
 	if err != nil {
 		return nil, err
 	}
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if token.AccessToken != s.record.Token.AccessToken ||
-		token.RefreshToken != s.record.Token.RefreshToken ||
-		token.TokenType != s.record.Token.TokenType ||
-		!token.Expiry.Equal(s.record.Token.Expiry) {
-		s.record.Token = *token
-		if err := s.save(s.record); err != nil {
+	if !sameOAuthToken(*token, s.record.Token) {
+		updated := s.record
+		updated.Token = *token
+		if err := savePersistedOAuth(s.storage, s.key, updated); err != nil {
 			return nil, fmt.Errorf("persisting refreshed MCP credentials: %w", err)
 		}
+		s.record = updated
 	}
 	return token, nil
+}
+
+func sameOAuthToken(a, b oauth2.Token) bool {
+	return a.AccessToken == b.AccessToken &&
+		a.RefreshToken == b.RefreshToken &&
+		a.TokenType == b.TokenType &&
+		a.Expiry.Equal(b.Expiry)
 }
