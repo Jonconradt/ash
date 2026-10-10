@@ -3,7 +3,7 @@
 # This file allows you to explicitly block specific Unix commands, managed tools,
 # and native plugins from being executed by ash (via run_unix_command and
 # run_unix_pipeline), even if they appear in .ash_allow or are discovered in
-# ~/.ash/tools/ or ~/.ash/plugins/.
+# $XDG_DATA_HOME/ash/tools/ or $XDG_DATA_HOME/ash/plugins/ (default: ~/.local/share/ash/).
 #
 # Format rules:
 # - One command per line (preferred), or comma-separated on one line.

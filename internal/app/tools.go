@@ -557,7 +557,7 @@ func (s localToolShim) callUnixCommand(ctx context.Context, args map[string]any)
 		}
 	}
 
-	// Native binary plugins run directly from ~/.ash/plugins/.
+	// Native binary plugins run directly from the user or system plugin directory.
 	if pluginPath, ok := managedNativePlugin(commandName); ok {
 		return toolCommandRunner(ctx, pluginPath, argv, toolTimeout(), toolOutputLimit())
 	}

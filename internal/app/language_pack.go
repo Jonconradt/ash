@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"ash/internal/localize"
+	"github.com/Jonconradt/ash/internal/localize"
 )
 
 const maxLanguagePackBytes = 1 << 20
@@ -189,7 +189,7 @@ func downloadLanguageCatalog(locale string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create language pack request: %w", err)
 	}
-	request.Header.Set("User-Agent", "ash/"+ashVersion)
+	request.Header.Set("User-Agent", "github.com/Jonconradt/ash/"+ashVersion)
 	response, err := (&http.Client{Timeout: 15 * time.Second}).Do(request)
 	if err != nil {
 		return nil, fmt.Errorf("request language pack for %s: %w", locale, err)

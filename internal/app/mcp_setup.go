@@ -11,9 +11,9 @@ import (
 	"syscall"
 	"time"
 
-	"ash/internal/brokerproto"
-	"ash/internal/localize"
-	mcpclient "ash/internal/mcp"
+	"github.com/Jonconradt/ash/internal/brokerproto"
+	"github.com/Jonconradt/ash/internal/localize"
+	mcpclient "github.com/Jonconradt/ash/internal/mcp"
 )
 
 type mcpAddOptions struct {

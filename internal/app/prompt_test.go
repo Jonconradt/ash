@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"ash/internal/localize"
+	"github.com/Jonconradt/ash/internal/localize"
 )
 
 func TestSystemPromptUsesResolvedResponseLanguage(t *testing.T) {
@@ -39,35 +39,26 @@ func TestReadSystemPrompt(t *testing.T) {
 	cwd := t.TempDir()
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 
 	if err := os.Chdir(cwd); err != nil {
 		t.Fatalf("Chdir failed: %v", err)
 	}
 
-	homePrompt := "home prompt"
-	if err := os.WriteFile(filepath.Join(home, systemFileName), []byte(homePrompt), 0o600); err != nil {
-		t.Fatalf("write home prompt: %v", err)
+	legacyHomePrompt := "legacy home prompt"
+	if err := os.WriteFile(filepath.Join(home, systemFileName), []byte(legacyHomePrompt), 0o600); err != nil {
+		t.Fatalf("write legacy home prompt: %v", err)
 	}
-
-	prompt, err := readSystemPrompt()
-	if err != nil {
-		t.Fatalf("readSystemPrompt error: %v", err)
-	}
-	if prompt != homePrompt {
-		t.Fatalf("expected home prompt, got %q", prompt)
-	}
-
 	cwdPrompt := "cwd prompt"
 	if err := os.WriteFile(filepath.Join(cwd, systemFileName), []byte(cwdPrompt), 0o600); err != nil {
 		t.Fatalf("write cwd prompt: %v", err)
 	}
-
-	prompt, err = readSystemPrompt()
+	prompt, err := readSystemPrompt()
 	if err != nil {
 		t.Fatalf("readSystemPrompt error: %v", err)
 	}
-	if prompt != cwdPrompt {
-		t.Fatalf("expected cwd prompt, got %q", prompt)
+	if prompt != "" {
+		t.Fatalf("expected legacy home and cwd prompts to be ignored, got %q", prompt)
 	}
 
 	canonicalPrompt := "canonical prompt"
@@ -107,8 +98,12 @@ func TestReadSystemPromptExpandsEnvironmentVariables(t *testing.T) {
 	}
 
 	content := "one=$ASH_TEST_ONE two=${ASH_TEST_TWO} missing=$ASH_TEST_MISSING"
-	if err := os.WriteFile(filepath.Join(cwd, systemFileName), []byte(content), 0o600); err != nil {
-		t.Fatalf("write cwd prompt: %v", err)
+	configPath := filepath.Join(home, ashWorkspaceDirName)
+	if err := os.MkdirAll(configPath, 0o700); err != nil {
+		t.Fatalf("mkdir config workspace: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(configPath, systemFileName), []byte(content), 0o600); err != nil {
+		t.Fatalf("write config prompt: %v", err)
 	}
 
 	prompt, err := readSystemPrompt()
@@ -184,10 +179,11 @@ func TestExpandSystemPromptConditionalInstructionsAndComments(t *testing.T) {
 func TestToolDirectoryListIsInternalAndFiltersEligibleScripts(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("XDG_DATA_HOME", filepath.Join(home, ".local", "share"))
 	t.Setenv("TOOLS_DIR_LIST", "environment-value-must-not-appear")
 	t.Setenv("IF_PYTHON_AVAILABLE", "environment-value-must-not-appear")
 
-	toolsDir := filepath.Join(home, ashWorkspaceDirName, "tools")
+	toolsDir := filepath.Join(home, ".local", "share", "ash", "tools")
 	if err := os.MkdirAll(toolsDir, 0o700); err != nil {
 		t.Fatalf("mkdir tools directory: %v", err)
 	}
@@ -249,14 +245,19 @@ func TestReadSystemPromptExpandsUname(t *testing.T) {
 	cwd := t.TempDir()
 	home := t.TempDir()
 	t.Setenv("HOME", home)
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
 	t.Setenv("UNAME", "env-uname")
 
 	if err := os.Chdir(cwd); err != nil {
 		t.Fatalf("Chdir failed: %v", err)
 	}
 
-	if err := os.WriteFile(filepath.Join(cwd, systemFileName), []byte("host=$UNAME"), 0o600); err != nil {
-		t.Fatalf("write cwd prompt: %v", err)
+	configPath := filepath.Join(home, ashWorkspaceDirName)
+	if err := os.MkdirAll(configPath, 0o700); err != nil {
+		t.Fatalf("mkdir config workspace: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(configPath, systemFileName), []byte("host=$UNAME"), 0o600); err != nil {
+		t.Fatalf("write config prompt: %v", err)
 	}
 
 	execLookPath = func(file string) (string, error) {
@@ -301,13 +302,13 @@ func TestReadSystemPromptErrors(t *testing.T) {
 		osReadFile = origReadFile
 	})
 
-	t.Run("getwd error", func(t *testing.T) {
+	t.Run("getwd is not consulted", func(t *testing.T) {
 		osUserHomeDir = func() (string, error) { return "/tmp/home", nil }
 		osReadFile = func(string) ([]byte, error) { return nil, os.ErrNotExist }
 		osGetwd = func() (string, error) { return "", errors.New("cwd fail") }
 		_, err := readSystemPrompt()
-		if err == nil || !strings.Contains(err.Error(), "cwd fail") {
-			t.Fatalf("expected cwd fail error, got %v", err)
+		if err != nil {
+			t.Fatalf("readSystemPrompt should not consult the current directory: %v", err)
 		}
 		osGetwd = origGetwd
 		osReadFile = origReadFile

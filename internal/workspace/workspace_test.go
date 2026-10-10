@@ -8,7 +8,7 @@ import (
 
 func TestWorkspaceRoot(t *testing.T) {
 	home := "/home/testuser"
-	expected := filepath.Join(home, DirName)
+	expected := filepath.Join(home, ".config", DirName)
 	if got := Root(home); got != expected {
 		t.Errorf("Root(%q) = %q, want %q", home, got, expected)
 	}

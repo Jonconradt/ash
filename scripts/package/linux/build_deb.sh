@@ -4,7 +4,7 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  build_deb.sh --app-name <name> --version <vX.Y.Z> --arch <amd64|arm64> --binary <path> --install-path </path> --man-page <path> --man-install-path </path> [--localized-man-dir <dir>] --output <path.deb>
+  build_deb.sh --app-name <name> --version <vX.Y.Z> --arch <amd64|arm64> --binary <path> --broker <path> --plugins-dir <dir> --license-file <path> --install-path </path> --plugin-install-path </path> --license-install-path </path> --man-page <path> --man-install-path </path> [--localized-man-dir <dir>] --output <path.deb>
 EOF
 }
 
@@ -12,7 +12,12 @@ app_name=""
 version=""
 arch=""
 binary_path=""
+broker_path=""
+plugins_dir=""
+license_file=""
 install_path=""
+plugin_install_path=""
+license_install_path=""
 man_page_path=""
 man_install_path=""
 localized_man_dir=""
@@ -36,8 +41,28 @@ while [[ $# -gt 0 ]]; do
       binary_path="${2:-}"
       shift 2
       ;;
+    --broker)
+      broker_path="${2:-}"
+      shift 2
+      ;;
+    --plugins-dir)
+      plugins_dir="${2:-}"
+      shift 2
+      ;;
+    --license-file)
+      license_file="${2:-}"
+      shift 2
+      ;;
     --install-path)
       install_path="${2:-}"
+      shift 2
+      ;;
+    --plugin-install-path)
+      plugin_install_path="${2:-}"
+      shift 2
+      ;;
+    --license-install-path)
+      license_install_path="${2:-}"
       shift 2
       ;;
     --man-page)
@@ -68,7 +93,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$app_name" || -z "$version" || -z "$arch" || -z "$binary_path" || -z "$install_path" || -z "$man_page_path" || -z "$man_install_path" || -z "$output_path" ]]; then
+if [[ -z "$app_name" || -z "$version" || -z "$arch" || -z "$binary_path" || -z "$broker_path" || -z "$plugins_dir" || -z "$license_file" || -z "$install_path" || -z "$plugin_install_path" || -z "$license_install_path" || -z "$man_page_path" || -z "$man_install_path" || -z "$output_path" ]]; then
   echo "all arguments are required" >&2
   usage >&2
   exit 1
@@ -83,9 +108,25 @@ if [[ "$man_install_path" != /* ]]; then
   echo "man install path must be absolute: $man_install_path" >&2
   exit 1
 fi
+if [[ "$plugin_install_path" != /* || "$license_install_path" != /* ]]; then
+  echo "plugin and license install paths must be absolute" >&2
+  exit 1
+fi
 
-if [[ ! -x "$binary_path" ]]; then
-  echo "binary not found or not executable: $binary_path" >&2
+for executable in "$binary_path" "$broker_path"; do
+  if [[ ! -x "$executable" ]]; then
+    echo "binary not found or not executable: $executable" >&2
+    exit 1
+  fi
+done
+
+if [[ ! -f "$license_file" ]]; then
+  echo "license file not found: $license_file" >&2
+  exit 1
+fi
+
+if [[ ! -d "$plugins_dir" ]] || [[ -z "$(find "$plugins_dir" -maxdepth 1 -type f -perm -111 -print -quit)" ]]; then
+  echo "executable plugins not found in: $plugins_dir" >&2
   exit 1
 fi
 
@@ -119,9 +160,14 @@ trap cleanup EXIT
 payload_root="$stage_dir/root"
 target_dir="$payload_root$install_path"
 target_man_dir="$payload_root$man_install_path"
+target_plugin_dir="$payload_root$plugin_install_path"
 mkdir -p "$target_dir"
 mkdir -p "$target_man_dir"
+mkdir -p "$target_plugin_dir" "$(dirname "$payload_root$license_install_path")"
 install -m 0755 "$binary_path" "$target_dir/$app_name"
+install -m 0755 "$broker_path" "$target_dir/ash-broker"
+find "$plugins_dir" -maxdepth 1 -type f -perm -111 -exec install -m 0755 {} "$target_plugin_dir/" \;
+install -m 0644 "$license_file" "$payload_root$license_install_path"
 install -m 0644 "$man_page_path" "$target_man_dir/$app_name.1"
 if [[ -n "$localized_man_dir" ]]; then
   if [[ ! -d "$localized_man_dir" ]]; then
@@ -154,8 +200,6 @@ fpm -s dir -t deb \
   -n "$app_name" \
   -v "$clean_version" \
   --architecture "$arch" \
-  --depends python3 \
-  --depends python3-venv \
   --prefix / \
   -C "$payload_root" \
   -p "$output_path" \

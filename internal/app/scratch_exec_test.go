@@ -12,7 +12,7 @@ func TestCallToolWriteScratchFileRecordsScratchWriteMetric(t *testing.T) {
 	shim := localToolShim{}
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv("SESSION_ID", "session_123")
+	t.Setenv("ASH_SESSION_ID", "session_123")
 
 	metrics := newExecutionMetrics(time.Now())
 	ctx := withExecutionMetrics(context.Background(), metrics)
@@ -35,7 +35,7 @@ func TestCallToolAppendScratchFileRecordsScratchWriteMetric(t *testing.T) {
 	shim := localToolShim{}
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv("SESSION_ID", "session_123")
+	t.Setenv("ASH_SESSION_ID", "session_123")
 
 	metrics := newExecutionMetrics(time.Now())
 	ctx := withExecutionMetrics(context.Background(), metrics)
@@ -56,7 +56,7 @@ func TestCallToolEditScratchFileRecordsScratchWriteMetric(t *testing.T) {
 	shim := localToolShim{}
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv("SESSION_ID", "session_123")
+	t.Setenv("ASH_SESSION_ID", "session_123")
 
 	metrics := newExecutionMetrics(time.Now())
 	ctx := withExecutionMetrics(context.Background(), metrics)
@@ -84,9 +84,9 @@ func TestRunUnixCommandScratchPathArgCountedAsScratchExec(t *testing.T) {
 
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv("SESSION_ID", "session_123")
+	t.Setenv("ASH_SESSION_ID", "session_123")
 
-	scriptPath := filepath.Join(home, ".ash", "scratch", "session_123", "plan", "run.sh")
+	scriptPath := filepath.Join(home, ".local", "state", "ash", "scratch", "session_123", "plan", "run.sh")
 	shim := localToolShim{allowlist: map[string]struct{}{"bash": {}}}
 	metrics := newExecutionMetrics(time.Now())
 	ctx := withExecutionMetrics(context.Background(), metrics)
@@ -116,7 +116,7 @@ func TestRunUnixCommandOutsideScratchRootNotCountedAsScratchExec(t *testing.T) {
 
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv("SESSION_ID", "session_123")
+	t.Setenv("ASH_SESSION_ID", "session_123")
 
 	shim := localToolShim{allowlist: map[string]struct{}{"echo": {}}}
 	metrics := newExecutionMetrics(time.Now())
@@ -152,9 +152,9 @@ func TestRunUnixCommandRelativeScratchPathStillCountedAsScratchExec(t *testing.T
 
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv("SESSION_ID", "session_123")
+	t.Setenv("ASH_SESSION_ID", "session_123")
 
-	scratchSessionDir := filepath.Join(home, ".ash", "scratch", "session_123", "plan")
+	scratchSessionDir := filepath.Join(home, ".local", "state", "ash", "scratch", "session_123", "plan")
 	osGetwd = func() (string, error) { return scratchSessionDir, nil }
 
 	shim := localToolShim{allowlist: map[string]struct{}{"bash": {}}}
@@ -179,7 +179,7 @@ func TestScratchFileToolsRejectHiddenDotfilePaths(t *testing.T) {
 	shim := localToolShim{}
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv("SESSION_ID", "session_123")
+	t.Setenv("ASH_SESSION_ID", "session_123")
 	t.Setenv("ASH_STRICT", "")
 	ctx := context.Background()
 

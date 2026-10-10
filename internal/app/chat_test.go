@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"ash/internal/localize"
+	"github.com/Jonconradt/ash/internal/localize"
 )
 
 func TestCloudErrorMessagesUseSelectedLanguage(t *testing.T) {
@@ -54,8 +54,8 @@ func TestChatRetriesTransientFailures(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	t.Setenv("AI_ENDPOINT", srv.URL)
-	t.Setenv("AI_MODEL", "test-model")
+	t.Setenv("ASH_AI_ENDPOINT", srv.URL)
+	t.Setenv("ASH_AI_MODEL", "test-model")
 	t.Setenv("ASH_RETRY_MAX_ATTEMPTS", "3")
 	t.Setenv("ASH_RETRY_BASE_DELAY", "0s")
 	t.Setenv("ASH_RETRY_MAX_DELAY", "0s")
@@ -199,7 +199,7 @@ func TestChat(t *testing.T) {
 			timeoutSeen.Store(int64(timeout))
 			return &http.Client{Timeout: timeout}
 		}
-		t.Setenv("AI_TIMEOUT", "20ms")
+		t.Setenv("ASH_AI_TIMEOUT", "20ms")
 
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			time.Sleep(100 * time.Millisecond)
@@ -594,7 +594,7 @@ func TestVerboseSessionLogReportsOllamaOpenAIAPIAndStreamRequest(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			home := t.TempDir()
 			t.Setenv("HOME", home)
-			t.Setenv("SESSION_ID", "")
+			t.Setenv("ASH_SESSION_ID", "")
 			t.Setenv("ASH_VERBOSE", "true")
 			t.Setenv(ashEnvAlwaysOpenAIAPI, tt.alwaysOpenAI)
 			t.Setenv("ASH_STREAM", tt.stream)

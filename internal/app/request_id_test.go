@@ -156,8 +156,8 @@ func TestRunGeneratesDifferentRequestIDPerInvocation(t *testing.T) {
 		_, _ = w.Write([]byte(`{"message":{"role":"assistant","content":"ok"}}`))
 	}))
 	defer srv.Close()
-	t.Setenv("AI_ENDPOINT", srv.URL)
-	t.Setenv("AI_MODEL", "llama3.1")
+	t.Setenv("ASH_AI_ENDPOINT", srv.URL)
+	t.Setenv("ASH_AI_MODEL", "llama3.1")
 
 	runOnce := func() string {
 		var stdout bytes.Buffer

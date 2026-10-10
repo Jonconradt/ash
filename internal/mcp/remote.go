@@ -25,8 +25,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"ash/internal/brokerproto"
-	"ash/internal/workspace"
+	"github.com/Jonconradt/ash/internal/brokerproto"
+	"github.com/Jonconradt/ash/internal/workspace"
 	"github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -82,27 +82,20 @@ func RemoteServersFromAllowlist(raw string) ([]RemoteServer, error) {
 	return servers, nil
 }
 
-// ResolveRemoteServers reads the first existing .ash_allow file using Ash's
-// workspace, working-directory, then home-directory precedence.
+// ResolveRemoteServers reads registered remote servers from the user's XDG config.
 func ResolveRemoteServers(home, cwd string, readFile func(string) ([]byte, error)) ([]RemoteServer, error) {
 	if readFile == nil {
 		readFile = os.ReadFile
 	}
-	for _, path := range []string{
-		filepath.Join(workspace.Root(home), ".ash_allow"),
-		filepath.Join(cwd, ".ash_allow"),
-		filepath.Join(home, ".ash_allow"),
-	} {
-		content, err := readFile(path)
-		if errors.Is(err, os.ErrNotExist) {
-			continue
-		}
-		if err != nil {
-			return nil, fmt.Errorf("reading MCP registrations from %s: %w", path, err)
-		}
-		return RemoteServersFromAllowlist(string(content))
+	path := filepath.Join(workspace.Root(home), ".ash_allow")
+	content, err := readFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
 	}
-	return nil, nil
+	if err != nil {
+		return nil, fmt.Errorf("reading MCP registrations from %s: %w", path, err)
+	}
+	return RemoteServersFromAllowlist(string(content))
 }
 
 func remoteServerName(urlText string) string {

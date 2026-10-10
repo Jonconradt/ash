@@ -13,24 +13,13 @@ import (
 	"strconv"
 	"strings"
 
-	"ash/internal/localize"
-	"ash/internal/uistyle"
+	"github.com/Jonconradt/ash/internal/localize"
+	"github.com/Jonconradt/ash/internal/uistyle"
 )
 
 const (
 	installStartMarker = "# >>> ash install >>>"
 	installEndMarker   = "# <<< ash install <<<"
-
-	// Wraps PATH in sentinel colons, strips any existing $HOME/.ash/tools or $HOME/.local/bin
-	// entries wherever they occur, then prepends fresh copies. This stays idempotent no matter
-	// how many times .ash_env is sourced in one shell, and even if another rc file (or an
-	// external tool re-sourcing rc files) already added one of these directories elsewhere.
-	managedPathExportLine = `PATH=":$PATH:"
-PATH="${PATH//:$HOME\/.local\/bin:/:}"
-PATH="${PATH//:$HOME\/.ash\/tools:/:}"
-PATH="${PATH#:}"
-PATH="${PATH%:}"
-export PATH="$HOME/.ash/tools:$HOME/.local/bin:$PATH"`
 )
 
 type endpointPreset struct {
@@ -58,49 +47,70 @@ var installEndpointPresets = []endpointPreset{
 // runInstall runs the requested operation.
 func runInstall(args []string, stdout, stderr io.Writer) int {
 	configureDebugLogging(stderr)
+	if len(args) == 1 && (args[0] == "-h" || args[0] == "--help") {
+		_, _ = fmt.Fprintln(stdout, localize.Text("usage.install"))
+		return 0
+	}
 
-	shellName, dryRun, overwrite, err := parseInstallArgs(args)
+	shellName, dryRun, overwrite, shellIntegration, disableShellIntegration, err := parseInstallArgs(args)
 	if err != nil {
 		slog.Error(localize.Format("log.install.error", []any{err}), "EID", "EpbG2YtZ")
 		printUsage(stderr)
-		return 1
+		return 2
 	}
 
 	if shellName == "" {
 		shellName = defaultInstallShell(os.Getenv("SHELL"))
 	}
-	if !dryRun {
-		if err := installPreferredLanguage(stdout); err != nil {
-			_, _ = fmt.Fprintln(stderr, localize.Format("log.install.error", []any{err}))
-			return 1
-		}
-	}
-
 	rcPath, err := rcPathForShell(shellName)
 	if err != nil {
 		slog.Error(localize.Format("log.install.error", []any{err}), "EID", "n0lHsTQp")
 		return 1
 	}
+	if disableShellIntegration {
+		if dryRun {
+			_, _ = fmt.Fprintln(stdout, localize.Text("install.dry_run_no_changes"))
+			return 0
+		}
+		existing, err := readFileIfExists(rcPath)
+		if err != nil {
+			slog.Error("install error: failed to read rc file", "path", rcPath, "error", err, "EID", "8sVwxmK2")
+			return 1
+		}
+		updated, removed := removeManagedInstallBlock(existing)
+		if !removed {
+			_, _ = fmt.Fprintln(stdout, localize.Text("install.dry_run_no_changes"))
+			return 0
+		}
+		if err := osWriteFile(rcPath, []byte(updated), 0o600); err != nil {
+			slog.Error("install error: failed to remove managed shell block", "path", rcPath, "error", err, "EID", "x5Uw4JbQ")
+			return 1
+		}
+		_, _ = fmt.Fprintln(stdout, localize.Format("install.shell_integration_removed", []any{rcPath}))
+		return 0
+	}
 
 	block := installSourceBlockForShell(shellName)
 	if block == "" {
 		slog.Error("install error: unsupported shell", "shell", shellName, "EID", "ZIw1nK74")
-		return 1
+		return 2
 	}
 	if err := ensureInstallShellWrapper(shellName, dryRun, stdout); err != nil {
 		slog.Error(localize.Format("log.install.error", []any{err}), "EID", "RtRyQwEX")
 		return 1
 	}
-	if err := ensureShellPostInstall(shellName, dryRun, stdout); err != nil {
-		slog.Error(localize.Format("log.install.error", []any{err}), "EID", "bnjrQttE")
-		return 1
+	if shellIntegration {
+		if err := ensureShellPostInstall(shellName, dryRun, stdout); err != nil {
+			slog.Error(localize.Format("log.install.error", []any{err}), "EID", "bnjrQttE")
+			return 1
+		}
 	}
 	activeWrapperPath, err := installShellWrapperPath(shellName)
 	if err != nil {
 		slog.Error(localize.Format("log.install.error", []any{err}), "EID", "3f0v2Kx1")
 		return 1
 	}
-	if err := installEmbeddedBootstrapAssets(overwrite, activeWrapperPath, stdout); err != nil {
+	if err := installEmbeddedBootstrapAssets(overwrite, activeWrapperPath, dryRun, stdout); err != nil {
 		slog.Error(localize.Format("log.install.error", []any{err}), "EID", "Hrs2Jw5A")
 		return 1
 	}
@@ -108,8 +118,22 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 		slog.Error(localize.Format("log.install.error", []any{err}), "EID", "WnGm9KpQ")
 		return 1
 	}
-	if !dryRun {
-		provisionPythonEnv(stdout)
+
+	if !shellIntegration {
+		if dryRun {
+			_, _ = fmt.Fprintln(stdout, localize.Text("install.dry_run_no_changes"))
+			return 0
+		}
+		if err := finalizeInstallWorkspace(); err != nil {
+			slog.Error(localize.Format("log.install.error", []any{err}), "EID", "SyhbVcO3")
+			return 1
+		}
+		if err := maybeConfigureInstallEnv(stdout, stderr, false); err != nil {
+			slog.Error(localize.Format("log.install.error", []any{err}), "EID", "BwUzNiql")
+			return 1
+		}
+		_, _ = fmt.Fprintln(stdout, localize.Text("install.assets_only"))
+		return 0
 	}
 
 	existing, err := readFileIfExists(rcPath)
@@ -121,6 +145,10 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 	existingBlock, hasManagedBlock := extractManagedInstallBlock(existing)
 	if hasManagedBlock {
 		if strings.TrimSpace(existingBlock) == strings.TrimSpace(block) {
+			if dryRun {
+				_, _ = fmt.Fprintln(stdout, localize.Text("install.dry_run_no_changes"))
+				return 0
+			}
 			if err := finalizeInstallWorkspace(); err != nil {
 				slog.Error(localize.Format("log.install.error", []any{err}), "EID", "Ez8nV4zY")
 				return 1
@@ -304,9 +332,8 @@ func shouldConfigureInstallEnv() (bool, error) {
 		return false, err
 	}
 
-	// The bootstrap asset sync step (installEmbeddedBootstrapAssets) unconditionally writes a
-	// template .ash_env for SESSION_ID/PATH/etc. before this runs, so mere file existence cannot
-	// signal "already configured"; check for a real AI_ENDPOINT export instead.
+	// Asset sync creates the managed environment file even before AI settings exist,
+	// so check for a configured endpoint rather than treating file existence as setup.
 	content, err := osReadFile(path)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
@@ -513,55 +540,26 @@ func buildManagedAshEnv(values map[string]string) string {
 
 	var b strings.Builder
 	b.WriteString("# managed by ash install\n")
-	b.WriteString("export SESSION_ID=`head -c 100 /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1`\n")
-	b.WriteString(managedPathExportLine + "\n")
+	b.WriteString("if [ -z \"${ASH_SESSION_ID:-}\" ]; then\n")
+	b.WriteString("\texport ASH_SESSION_ID=\"$(head -c 100 /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)\"\n")
+	b.WriteString("fi\n")
 	for _, key := range keys {
 		fmt.Fprintf(&b, "export %s=%s\n", key, shellQuote(values[key]))
 	}
 	return b.String()
 }
 
-// finalizeInstallWorkspace syncs canonical config files into the workspace and hardens workspace permissions.
+// finalizeInstallWorkspace hardens ash's private config and data directories.
 func finalizeInstallWorkspace() error {
-	if err := syncCanonicalConfigFilesFromCWD(); err != nil {
-		return err
-	}
-	if err := hardenAshWorkspacePermissions(); err != nil {
-		return err
-	}
-	return nil
-}
-
-// syncCanonicalConfigFilesFromCWD copies the current directory's ash config files into the canonical workspace directory when present.
-func syncCanonicalConfigFilesFromCWD() error {
-	root, err := ashWorkspaceDir()
-	if err != nil {
-		return err
-	}
-	if err := osMkdirAll(root, 0o700); err != nil {
-		return err
-	}
-
-	cwd, err := osGetwd()
-	if err != nil {
-		return err
-	}
-
-	for _, name := range []string{systemFileName, allowFileName, denyFileName} {
-		srcPath := filepath.Join(cwd, name)
-		content, readErr := osReadFile(srcPath)
-		if errors.Is(readErr, os.ErrNotExist) {
-			continue
+	for _, rootFn := range []func() (string, error){ashWorkspaceDir, ashDataDir} {
+		root, err := rootFn()
+		if err != nil {
+			return err
 		}
-		if readErr != nil {
-			return fmt.Errorf("failed to read %s: %w", srcPath, readErr)
-		}
-		dstPath := filepath.Join(root, name)
-		if writeErr := osWriteFile(dstPath, content, 0o600); writeErr != nil {
-			return fmt.Errorf("failed to write %s: %w", dstPath, writeErr)
+		if err := hardenPrivateDirectory(root); err != nil {
+			return err
 		}
 	}
-
 	return nil
 }
 
@@ -571,6 +569,10 @@ func hardenAshWorkspacePermissions() error {
 	if err != nil {
 		return err
 	}
+	return hardenPrivateDirectory(root)
+}
+
+func hardenPrivateDirectory(root string) error {
 	if err := osMkdirAll(root, 0o700); err != nil {
 		return err
 	}
@@ -626,24 +628,31 @@ func hardenAshWorkspacePermissions() error {
 }
 
 // parseInstallArgs validates command-line arguments for the install subcommand and returns the parsed options.
-func parseInstallArgs(args []string) (shellName string, dryRun bool, overwrite bool, err error) {
+func parseInstallArgs(args []string) (shellName string, dryRun bool, overwrite bool, shellIntegration bool, disableShellIntegration bool, err error) {
 	for i := 0; i < len(args); i++ {
 		switch args[i] {
 		case "--dry-run":
 			dryRun = true
 		case "--overwrite":
 			overwrite = true
+		case "--shell-integration":
+			shellIntegration = true
+		case "--disable-shell-integration":
+			disableShellIntegration = true
 		case "--shell":
 			i++
 			if i >= len(args) {
-				return "", false, false, errors.New("--shell requires a value")
+				return "", false, false, false, false, errors.New("--shell requires a value")
 			}
 			shellName = strings.TrimSpace(strings.ToLower(args[i]))
 		default:
-			return "", false, false, fmt.Errorf("unknown install argument: %s", args[i])
+			return "", false, false, false, false, fmt.Errorf("unknown install argument: %s", args[i])
 		}
 	}
-	return shellName, dryRun, overwrite, nil
+	if shellIntegration && disableShellIntegration {
+		return "", false, false, false, false, errors.New("--shell-integration and --disable-shell-integration cannot be used together")
+	}
+	return shellName, dryRun, overwrite, shellIntegration, disableShellIntegration, nil
 }
 
 // detectShellName returns the canonical shell name for a shell executable path, or empty if unsupported.
@@ -745,6 +754,25 @@ func replaceManagedInstallBlock(existing, block string) (string, bool) {
 	return b.String(), true
 }
 
+func removeManagedInstallBlock(existing string) (string, bool) {
+	start := strings.Index(existing, installStartMarker)
+	if start < 0 {
+		return existing, false
+	}
+	endRel := strings.Index(existing[start:], installEndMarker)
+	if endRel < 0 {
+		return existing, false
+	}
+	end := start + endRel + len(installEndMarker)
+	if end < len(existing) && existing[end] == '\n' {
+		end++
+	}
+	if start >= 2 && existing[start-2:start] == "\n\n" {
+		start--
+	}
+	return existing[:start] + existing[end:], true
+}
+
 // installRecommendation returns guidance for installing or updating ash for the current shell, if needed.
 func installRecommendation() (string, error) {
 	shellName := detectShellName(os.Getenv("SHELL"))
@@ -799,7 +827,11 @@ func bashInstalledViaProfileSourcing() (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	if !strings.Contains(profileContent, ".ash/.ash_bashrc") {
+	configHome := strings.TrimSpace(os.Getenv("XDG_CONFIG_HOME"))
+	if configHome == "" {
+		configHome = filepath.Join(home, ".config")
+	}
+	if !strings.Contains(profileContent, filepath.Join(configHome, "ash", ".ash_bashrc")) {
 		return false, nil
 	}
 

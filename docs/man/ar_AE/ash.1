@@ -32,14 +32,18 @@ ash \- مساعد Shell عملي لسير عمل الأوامر غير المو�
 .B ASH_SAY_TEXT=1
 لفرض إخراج النص.
 .PP
-يضيف الأمر الفرعي
+يثبّت الأمر الفرعي
 .B install
-كتلة تكامل مُدارة إلى ملفات بدء تشغيل Shell. أثناء التثبيت، يتم اختيار اللغة وفقاً لـ
+الموارد المُدارة. لا يتم تعديل ملفات بدء تشغيل Shell إلا عند تحديد
+.B --shell-integration .
+أثناء التثبيت، يتم اختيار اللغة وفقاً لـ
 .B ASH_LANG
 (إذا تم تعيينه)، وإلا وفقاً لـ
 .B LANG
 وتُحفظ حزم اللغة المتاحة في
-.IR ~/.ash/languages/ .
+.IR $XDG_DATA_HOME/ash/languages/
+(افتراضياً
+.IR ~/.local/share/ash/languages/ ).
 .SH الأوامر
 .TP
 .B ash [النص...]
@@ -66,6 +70,12 @@ ash \- مساعد Shell عملي لسير عمل الأوامر غير المو�
 .BI --shell " shell"
 يحدد Shell المطلوب تثبيته.
 .TP
+.B --shell-integration
+يمكّن الكتلة المُدارة أو يحدّثها في ملف بدء تشغيل Shell.
+.TP
+.B --disable-shell-integration
+يزيل الكتلة المُدارة فقط من ملف بدء تشغيل Shell.
+.TP
 .B --dry-run
 يعرض معاينة للتغييرات دون كتابة الملفات.
 .TP
@@ -91,7 +101,7 @@ ash \- مساعد Shell عملي لسير عمل الأوامر غير المو�
 .B ASH_LANG
 اللغات المدعومة هي en_US وzh_CN وzh_TW وes_ES وar_AE وid_ID؛ عند غياب ترجمة للمنطقة، يُستخدم كتالوج اللغة المتاح.
 .TP
-.B AI_ENDPOINT, AI_MODEL, AI_AUTH_TOKEN
+.B ASH_AI_ENDPOINT, ASH_AI_MODEL, ASH_AI_AUTH_TOKEN
 تحدد نقطة نهاية الذكاء الاصطناعي والنموذج وبيانات الاعتماد.
 .TP
 .B ASH_SAY_TEXT
@@ -100,10 +110,10 @@ ash \- مساعد Shell عملي لسير عمل الأوامر غير المو�
 .
 .SH الملفات
 .TP
-.I ~/.ash/languages/
+.I $XDG_DATA_HOME/ash/languages/
 كتالوجات اللغة التي يثبتها المستخدم.
 .TP
-.I ~/.ash/.ash_env
+.I $XDG_CONFIG_HOME/ash/.ash_env
 إعداد بيئة الذكاء الاصطناعي المُدار.
 .SH حالة الخروج
 .TP

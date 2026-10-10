@@ -27,16 +27,17 @@ import (
 	"syscall"
 	"time"
 
-	"ash/internal/brokerproto"
-	"ash/internal/localize"
-	"ash/internal/mcp"
-	"ash/internal/scratchlife"
+	"github.com/Jonconradt/ash/internal/brokerproto"
+	"github.com/Jonconradt/ash/internal/localize"
+	"github.com/Jonconradt/ash/internal/mcp"
+	"github.com/Jonconradt/ash/internal/scratchlife"
+	"github.com/Jonconradt/ash/internal/workspace"
 )
 
 const (
 	brokerTokenEnv          = "ASH_BROKER_TOKEN"
-	aiEndpointEnv           = "AI_ENDPOINT"
-	aiTimeoutEnv            = "AI_TIMEOUT"
+	aiEndpointEnv           = "ASH_AI_ENDPOINT"
+	aiTimeoutEnv            = "ASH_AI_TIMEOUT"
 	aiWarmupEnv             = "ASH_BROKER_AI_WARMUP"
 	defaultAITimeout        = 3 * time.Minute
 	brokerParentPollTick    = 5 * time.Second
@@ -45,6 +46,8 @@ const (
 	aiWarmupTimeout         = 5 * time.Second
 	aiWarmupMaxResponseBody = 64 * 1024
 )
+
+var version = "dev"
 
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
@@ -88,8 +91,18 @@ func newBrokerLogger(w io.Writer) *slog.Logger {
 }
 
 func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+	if len(args) == 1 {
+		switch args[0] {
+		case "-h", "--help":
+			_, _ = fmt.Fprintln(stdout, localize.Text("usage.broker"))
+			return 0
+		case "--version", "version":
+			_, _ = fmt.Fprintln(stdout, version)
+			return 0
+		}
+	}
 	if home, err := os.UserHomeDir(); err == nil {
-		if err := localize.Init(localize.EnvironmentLocale(), filepath.Join(home, ".ash", "languages")); err != nil {
+		if err := localize.Init(localize.EnvironmentLocale(), filepath.Join(workspace.Root(home), "languages")); err != nil {
 			if fallbackErr := localize.Init("en_US", ""); fallbackErr != nil {
 				_, _ = fmt.Fprintln(stderr, localize.Format("log.broker.language_error", []any{fallbackErr}))
 				return 1
@@ -97,6 +110,17 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 		}
 	}
 	logger := newBrokerLogger(stderr)
+	if err := workspace.ValidateBaseDirs(); err != nil {
+		logger.Error(err.Error())
+		return 2
+	}
+	if raw := strings.TrimSpace(os.Getenv(aiTimeoutEnv)); raw != "" {
+		parsed, err := time.ParseDuration(raw)
+		if err != nil || parsed <= 0 {
+			logger.Error(aiTimeoutEnv + " must be a positive duration")
+			return 2
+		}
+	}
 	var socket string
 	var sessionID string
 	var parentPID int
@@ -128,12 +152,6 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 				return 2
 			}
 			sessionID = args[index]
-		case "--lease":
-			index++
-			if index >= len(args) {
-				logger.Error("--lease requires a value", "EID", "Zx9MdC4v")
-				return 2
-			}
 		default:
 			logger.Error(localize.Format("log.broker.unknown_option", []any{args[index]}), "EID", "Jp2VtR6w")
 			return 2
@@ -163,7 +181,7 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 		logger.Error(localize.Format("log.broker.home_failed", []any{err}), "EID", "Fh4TzP9b")
 		return 1
 	}
-	scratchRoot := filepath.Join(home, ".ash", "scratch")
+	scratchRoot := filepath.Join(workspace.StateRoot(home), "scratch")
 	scratchLock, err := scratchlife.Acquire(scratchRoot, sessionID)
 	if err != nil {
 		logger.Error(localize.Format("log.scratch.lifecycle_failed", []any{err}), "error", err)
@@ -174,18 +192,14 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 			logger.Warn(localize.Format("log.scratch.lifecycle_failed", []any{err}), "error", err)
 		}
 	}()
-	if err := localize.Init(localize.EnvironmentLocale(), filepath.Join(home, ".ash", "languages")); err != nil {
-		_, _ = fmt.Fprintln(stderr, localize.Format("log.broker.language_error", []any{err}))
-		return 1
-	}
-	credentialStorage, err := mcp.NewCredentialStorage(filepath.Join(home, ".ash", "mcp"), credentialKey)
+	credentialStorage, err := mcp.NewCredentialStorage(filepath.Join(workspace.DataRoot(home), "mcp"), credentialKey)
 	if err != nil {
 		logger.Error(localize.Format("log.broker.credential_storage_failed", []any{err}), "EID", "Xk7NfV3c")
 		return 1
 	}
 	endpointURL, err := url.Parse(endpoint)
 	if err != nil || endpointURL.Host == "" {
-		logger.Error("ash-broker requires a valid AI_ENDPOINT host", "EID", "Ft6BwX2n")
+		logger.Error("ash-broker requires a valid ASH_AI_ENDPOINT host", "EID", "Ft6BwX2n")
 		return 2
 	}
 	aiWarmup, err := aiWarmupEnabled()

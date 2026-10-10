@@ -31,9 +31,16 @@ case ${1:-} in
     ;;
 esac
 
+shell_name=$(basename "${SHELL:-}")
+case $shell_name in
+  bash|zsh|fish) install_shell=$shell_name ;;
+  *) fail "unsupported shell: ${shell_name:-unknown} (supported shells: bash, zsh, fish)" ;;
+esac
+
 command -v tar >/dev/null 2>&1 || fail "tar is required"
 command -v uname >/dev/null 2>&1 || fail "uname is required"
 command -v install >/dev/null 2>&1 || fail "install is required"
+command -v cosign >/dev/null 2>&1 || fail "cosign is required to verify release signatures; install Sigstore cosign and rerun"
 
 if command -v curl >/dev/null 2>&1; then
   downloader=curl
@@ -75,6 +82,12 @@ case $os in
   *) fail "unsupported operating system: $os" ;;
 esac
 
+data_home=${XDG_DATA_HOME:-"$HOME/.local/share"}
+case $data_home in
+  /*) ;;
+  *) fail "XDG_DATA_HOME must be an absolute path: $data_home" ;;
+esac
+
 machine=$(uname -m)
 case $machine in
   x86_64|amd64) goarch=amd64 ;;
@@ -111,6 +124,13 @@ download_base="https://github.com/$repository/releases/download/$tag"
 
 download "$download_base/$asset" "$tmp_dir/$asset" || fail "could not download $asset"
 download "$download_base/SHA256SUMS" "$tmp_dir/SHA256SUMS" || fail "could not download SHA256SUMS"
+download "$download_base/SHA256SUMS.sigstore.json" "$tmp_dir/SHA256SUMS.sigstore.json" || fail "could not download signature bundle"
+
+cosign verify-blob "$tmp_dir/SHA256SUMS" \
+  --bundle "$tmp_dir/SHA256SUMS.sigstore.json" \
+  --certificate-identity "https://github.com/$repository/.github/workflows/release.yml@refs/tags/$tag" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+  >/dev/null || fail "release signature verification failed"
 
 expected=$(awk -v name="$asset" '$2 == name { print $1; exit }' "$tmp_dir/SHA256SUMS")
 [ -n "$expected" ] || fail "SHA256SUMS does not contain $asset"
@@ -129,27 +149,13 @@ install -m 0755 "$tmp_dir/$base" "$install_dir/ash" 2>/dev/null || {
   chmod 0755 "$install_dir/ash" || fail "could not make ash executable"
 }
 
-# This installer is published from the site branch and must cope with whichever
-# release is currently latest, including ones cut before the broker binary split.
-# Releases up to v0.20.0 named the broker after the versioned binary; later ones use
-# a plain "ash-broker" entry so pre-split clients can still self-update.
-if [ -f "$tmp_dir/ash-broker" ]; then
-  broker_source="$tmp_dir/ash-broker"
-elif [ -f "$tmp_dir/$base-broker" ]; then
-  broker_source="$tmp_dir/$base-broker"
-else
-  broker_source=''
-fi
-if [ -n "$broker_source" ]; then
-  install -m 0755 "$broker_source" "$install_dir/ash-broker" 2>/dev/null || {
-    cp "$broker_source" "$install_dir/ash-broker" || fail "could not install ash-broker to $install_dir"
-    chmod 0755 "$install_dir/ash-broker" || fail "could not make ash-broker executable"
-  }
-else
-  printf 'ash installer: %s does not ship ash-broker; connection reuse will be disabled\n' "$tag" >&2
-fi
+[ -f "$tmp_dir/ash-broker" ] || fail "release archive did not contain ash-broker"
+install -m 0755 "$tmp_dir/ash-broker" "$install_dir/ash-broker" 2>/dev/null || {
+  cp "$tmp_dir/ash-broker" "$install_dir/ash-broker" || fail "could not install ash-broker to $install_dir"
+  chmod 0755 "$install_dir/ash-broker" || fail "could not make ash-broker executable"
+}
 
-plugins_dir="$HOME/.ash/plugins"
+plugins_dir="$data_home/ash/plugins"
 mkdir -p "$plugins_dir" || fail "could not create plugins directory $plugins_dir"
 chmod 700 "$plugins_dir" 2>/dev/null || true
 if [ -d "$tmp_dir/plugins" ]; then
@@ -167,19 +173,6 @@ if [ -d "$tmp_dir/plugins" ]; then
 else
   printf 'ash installer: %s does not ship plugins; native plugins will be unavailable\n' "$tag" >&2
 fi
-
-# Broker daemons are long-lived per-shell processes; kill stale ones so open
-# shells respawn a fresh broker running the binary just installed. The second
-# pattern catches pre-migration daemons started as "<binary> broker ..." (a
-# subcommand of the main binary) before the broker moved to its own executable.
-pkill -f "$install_dir/ash-broker" >/dev/null 2>&1 || true
-pkill -f "broker --socket .*--parent-pid" >/dev/null 2>&1 || true
-
-shell_name=$(basename "${SHELL:-}")
-case $shell_name in
-  zsh) install_shell=zsh ;;
-  *) install_shell=bash ;;
-esac
 
 # When this script itself is piped (curl ... | sh), stdin is the script body, not the user's
 # terminal, so interactive prompts must read from /dev/tty instead. The device node can exist
@@ -280,13 +273,27 @@ ensure_python_venv() {
 
 ensure_python_venv
 
+shell_integration=no
 if [ "$have_tty" = yes ]; then
-  "$install_dir/ash" install --shell "$install_shell" < /dev/tty
+  printf 'Enable %s shell integration by editing its startup file? [y/N] ' "$install_shell" >&2
+  answer=''
+  read -r answer < /dev/tty || answer=''
+  case $answer in
+    y|Y|yes|Yes|YES) shell_integration=yes ;;
+  esac
+fi
+
+if [ "$shell_integration" = yes ]; then
+  "$install_dir/ash" install --shell "$install_shell" --shell-integration < /dev/tty
 else
   "$install_dir/ash" install --shell "$install_shell"
 fi
 
 printf 'ash %s installed to %s/ash\n' "$tag" "$install_dir"
+if [ "$shell_integration" != yes ]; then
+  printf 'Shell integration was not enabled. Run: ash install --shell %s --shell-integration\n' "$install_shell"
+fi
+printf 'Open a new shell to use the installed ash-broker; existing shell sessions keep their running broker.\n'
 case :$PATH: in
   *:"$install_dir":*) ;;
   *) printf 'Open a new shell to pick up %s on PATH.\n' "$install_dir" ;;

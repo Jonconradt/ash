@@ -223,7 +223,7 @@ func TestLoadAllowlistedCommands(t *testing.T) {
 		}
 	})
 
-	t.Run("cwd file wins over home", func(t *testing.T) {
+	t.Run("cwd and home files are ignored", func(t *testing.T) {
 		t.Setenv("ASH_ALLOW", "")
 		home := t.TempDir()
 		cwd := t.TempDir()
@@ -243,11 +243,8 @@ func TestLoadAllowlistedCommands(t *testing.T) {
 		if err != nil {
 			t.Fatalf("loadAllowlistedCommands error: %v", err)
 		}
-		if len(allowed) != 1 {
-			t.Fatalf("expected one allowlisted command, got %#v", allowed)
-		}
-		if _, ok := allowed["ps"]; !ok {
-			t.Fatalf("expected cwd allowlist to win, got %#v", allowed)
+		if len(allowed) != 0 {
+			t.Fatalf("expected cwd and home policy files to be ignored, got %#v", allowed)
 		}
 	})
 

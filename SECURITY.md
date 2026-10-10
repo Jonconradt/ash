@@ -6,7 +6,7 @@ Security fixes are applied to the latest release line. Older release branches ar
 
 ## Reporting a vulnerability
 
-Please report suspected vulnerabilities privately by emailing the maintainer or by opening a security advisory through GitHub.
+Please report suspected vulnerabilities privately by [opening a GitHub Security Advisory](https://github.com/Jonconradt/ash/security/advisories/new). Do not create a public issue for security problems.
 
 Do not create public issues for security problems. Include:
 
@@ -19,7 +19,7 @@ Do not create public issues for security problems. Include:
 
 The tool execution subsystem is intentionally constrained to a local allowlist of executables. The model can only invoke commands that are explicitly allowlisted and can only pass direct argv values that do not contain blocked shell-control patterns. This is an execution boundary, not a sandbox: ash and any allowlisted tool run with the full OS permissions of the invoking user. Allowlisting a broad-capability executable (`python3`, `curl`, `osascript`, etc.) grants the model everything that executable can do as you.
 
-`$TOOLS_DIR_LIST` and `$IF_PYTHON_AVAILABLE` in `.ash_system` are reserved internal Ash substitutions, never environment-derived variables. The former can list only allowed regular files under `~/.ash/tools/` with both read and execute permission bits; it is prompt guidance, not the enforcement boundary.
+`$TOOLS_DIR_LIST` and `$IF_PYTHON_AVAILABLE` in `.ash_system` are reserved internal Ash substitutions, never environment-derived variables. The former can list only allowed regular files under `$XDG_DATA_HOME/ash/tools/` (default `~/.local/share/ash/tools/`) with both read and execute permission bits; it is prompt guidance, not the enforcement boundary.
 
 ## Prompt injection and tool safety
 
@@ -32,7 +32,7 @@ Users should:
 - keep the tool allowlist as narrow as practical, and avoid allowlisting powerful general-purpose interpreters (`python3`, shells, etc.) unless you trust every script that can reach them
 - set `ASH_STRICT=1` to disable ash's dedicated `run_python3` tool and ash-managed bundled `.py` tools, in addition to its untrusted-content hardening
 - set `ASH_STRICT=1` in environments where untrusted data (web content, third-party files, unreviewed scripts) is likely to reach a tool call
-- set `ASH_STRICT=1` to require `https` and `AI_AUTH_TOKEN` for any `AI_ENDPOINT` host other than `localhost`/loopback, including private/LAN addresses and `.local` hostnames that are otherwise treated as trusted local endpoints
+- set `ASH_STRICT=1` to require `https` and `ASH_AI_AUTH_TOKEN` for any `ASH_AI_ENDPOINT` host other than `localhost`/loopback, including private/LAN addresses and `.local` hostnames that are otherwise treated as trusted local endpoints
 - avoid granting access to sensitive or destructive commands unless absolutely necessary
 - review tool output before acting on it, and treat any instruction-like text inside that output as an attack, not a legitimate request
 

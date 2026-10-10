@@ -39,11 +39,11 @@ func getHistoryPath() (string, error) {
 		return "", err
 	}
 
-	home, err := osUserHomeDir()
+	stateDir, err := ashStateDir()
 	if err != nil {
 		return "", err
 	}
-	historyDir := filepath.Join(home, ashWorkspaceDirName, historyDirName)
+	historyDir := filepath.Join(stateDir, historyDirName)
 	if err := osMkdirAll(historyDir, 0o700); err != nil {
 		return "", err
 	}
@@ -80,11 +80,11 @@ func cleanupWorkspaceRetention(maxAge, budget time.Duration) {
 
 // cleanupHistoryRetention removes history files older than maxAge until the deadline passes.
 func cleanupHistoryRetention(maxAge time.Duration, deadline time.Time) {
-	home, err := osUserHomeDir()
+	stateDir, err := ashStateDir()
 	if err != nil {
 		return
 	}
-	historyDir := filepath.Join(home, ashWorkspaceDirName, historyDirName)
+	historyDir := filepath.Join(stateDir, historyDirName)
 	entries, err := os.ReadDir(historyDir)
 	if err != nil {
 		return
@@ -113,11 +113,10 @@ func cleanupHistoryRetention(maxAge time.Duration, deadline time.Time) {
 // that exited without running their shutdown trap. A socket with a live listener is kept
 // regardless of age; the broker ignores the lease file, so removing one is always safe.
 func cleanupRuntimeRetention(maxAge time.Duration, deadline time.Time) {
-	home, err := osUserHomeDir()
+	runtimeDir, err := ashRuntimeDir()
 	if err != nil {
 		return
 	}
-	runtimeDir := filepath.Join(home, ashWorkspaceDirName, runtimeDirName)
 	entries, err := os.ReadDir(runtimeDir)
 	if err != nil {
 		return

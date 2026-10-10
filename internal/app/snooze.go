@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"ash/internal/localize"
+	"github.com/Jonconradt/ash/internal/localize"
 )
 
 const (
@@ -53,7 +53,7 @@ func runSnooze(args []string, stdout, stderr io.Writer) int {
 }
 
 func snoozeFilePath() (string, error) {
-	root, err := ashWorkspaceDir()
+	root, err := ashStateDir()
 	if err != nil {
 		return "", err
 	}

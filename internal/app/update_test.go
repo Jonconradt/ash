@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -345,14 +346,14 @@ func TestInstallUpgradeArchiveInstallsAshAndBroker(t *testing.T) {
 	var archive bytes.Buffer
 	gzipWriter := gzip.NewWriter(&archive)
 	tarWriter := tar.NewWriter(gzipWriter)
-	ash := []byte("#!/bin/sh\nmkdir -p \"$2\"\nfor asset in .ash_env .ash_allow .ash_deny .ash_bashrc .ash_zshrc .ash_system; do\n  printf candidate > \"$2/$asset\"\ndone\n")
+	ash := []byte("#!/bin/sh\nmkdir -p \"$2\"\nfor asset in .ash_env .ash_allow .ash_deny .ash_bashrc .ash_zshrc .ash_fish.fish .ash_fish_env.fish .ash_system; do\n  printf candidate > \"$2/$asset\"\ndone\n")
 	broker := []byte("new ash-broker binary")
 	plugin := []byte("#!/bin/sh\nprintf plugin\n")
 	for _, entry := range []struct {
 		name string
 		data []byte
 	}{
-		{name: "ash", data: ash},
+		{name: upgradeAssetName("v1.2.3", runtime.GOOS, runtime.GOARCH), data: ash},
 		{name: "ash-broker", data: broker},
 		{name: "plugins/calculator", data: plugin},
 	} {
@@ -374,6 +375,20 @@ func TestInstallUpgradeArchiveInstallsAshAndBroker(t *testing.T) {
 	originalHome := osUserHomeDir
 	osUserHomeDir = func() (string, error) { return home, nil }
 	t.Cleanup(func() { osUserHomeDir = originalHome })
+	updateBinDir := filepath.Join(home, ".local", "bin")
+	if err := os.MkdirAll(updateBinDir, 0o700); err != nil {
+		t.Fatalf("create user-local bin: %v", err)
+	}
+	updateExecutable := filepath.Join(updateBinDir, "ash")
+	if err := os.WriteFile(updateExecutable, []byte("#!/bin/sh\n"), 0o700); err != nil {
+		t.Fatalf("create current ash executable: %v", err)
+	}
+	originalExecutable := osExecutable
+	osExecutable = func() (string, error) { return updateExecutable, nil }
+	t.Cleanup(func() { osExecutable = originalExecutable })
+	if _, err := userLocalInstallDirectory(); err != nil {
+		t.Fatalf("self-update ownership check failed: %v", err)
+	}
 	originalProvisionPythonEnv := provisionPythonEnv
 	provisionPythonEnv = func(io.Writer) {}
 	t.Cleanup(func() { provisionPythonEnv = originalProvisionPythonEnv })
@@ -382,9 +397,9 @@ func TestInstallUpgradeArchiveInstallsAshAndBroker(t *testing.T) {
 		t.Fatalf("installUpgradeArchive() error = %v", err)
 	}
 	for path, want := range map[string][]byte{
-		filepath.Join(home, ".local", "bin", "ash"):                       ash,
-		filepath.Join(home, ".local", "bin", "ash-broker"):                broker,
-		filepath.Join(home, ashWorkspaceDirName, "plugins", "calculator"): plugin,
+		filepath.Join(home, ".local", "bin", "ash"):                            ash,
+		filepath.Join(home, ".local", "bin", "ash-broker"):                     broker,
+		filepath.Join(home, ".local", "share", "ash", "plugins", "calculator"): plugin,
 	} {
 		got, err := os.ReadFile(path)
 		if err != nil {
@@ -401,7 +416,7 @@ func TestInstallUpgradeArchiveInstallsAshAndBroker(t *testing.T) {
 			t.Errorf("%s mode = %o, want 755", path, info.Mode().Perm())
 		}
 	}
-	pluginsInfo, err := os.Stat(filepath.Join(home, ashWorkspaceDirName, "plugins"))
+	pluginsInfo, err := os.Stat(filepath.Join(home, ".local", "share", "ash", "plugins"))
 	if err != nil {
 		t.Fatalf("expected plugins directory to be created: %v", err)
 	}
@@ -461,71 +476,95 @@ func TestInstallUpgradeArchiveRollbackKeepsPreviousBinaryExecutable(t *testing.T
 	}
 }
 
-func TestExportUpgradeAssetsIncludesLegacyToolsForOldUpdaters(t *testing.T) {
+func TestExportUpgradeAssetsOmitsLegacyToolsAsset(t *testing.T) {
 	candidate := t.TempDir()
 	if err := exportUpgradeAssets("", candidate); err != nil {
 		t.Fatal(err)
 	}
-	content, err := os.ReadFile(filepath.Join(candidate, legacyToolsFileName))
+	if _, err := os.Stat(filepath.Join(candidate, legacyToolsFileName)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("legacy tools asset exists or could not be checked: %v", err)
+	}
+}
+
+func TestFindUpgradeBinariesRequireCanonicalNames(t *testing.T) {
+	root := t.TempDir()
+	const expectedAsh = "ash-v1.0.0-linux-amd64"
+	for _, name := range []string{expectedAsh, "ash-broker"} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(name), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	ash, err := findUpgradeBinary(root, expectedAsh)
+	if err != nil || filepath.Base(ash) != expectedAsh {
+		t.Fatalf("findUpgradeBinary() = %q, %v", ash, err)
+	}
+	broker, err := findUpgradeBrokerBinary(root)
+	if err != nil || filepath.Base(broker) != "ash-broker" {
+		t.Fatalf("findUpgradeBrokerBinary() = %q, %v", broker, err)
+	}
+
+	if err := os.Rename(filepath.Join(root, "ash-broker"), filepath.Join(root, expectedAsh+"-broker")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := findUpgradeBrokerBinary(root); err == nil {
+		t.Fatal("findUpgradeBrokerBinary() accepted a non-canonical broker name")
+	}
+}
+
+func TestRestoreUpgradeFilesRestoresFilesLinksAndCreatedDirectories(t *testing.T) {
+	root := t.TempDir()
+	original := filepath.Join(root, "original")
+	if err := os.WriteFile(original, []byte("before"), 0o640); err != nil {
+		t.Fatal(err)
+	}
+	link := filepath.Join(root, "link")
+	if err := os.Symlink("original", link); err != nil {
+		t.Fatal(err)
+	}
+	newTarget := filepath.Join(root, "new", "nested", "file")
+	targets := []string{original, link, newTarget}
+	directories, err := missingUpgradeDirectories(targets)
 	if err != nil {
-		t.Fatalf("expected legacy tools asset to be exported: %v", err)
-	}
-	if bytes.Contains(content, []byte(pluginsDirListToken)) {
-		t.Fatalf("legacy tools asset must not contain %s", pluginsDirListToken)
-	}
-}
-
-// Clients released before the broker split matched any "ash-v*" entry as the ash binary, so a
-// versioned broker name made them abort with "archive contains 2 executable ash files". The
-// release tarball therefore has to use a plain "ash-broker" entry.
-func TestFindUpgradeBinaryIgnoresBrokerEntryNames(t *testing.T) {
-	const expectedName = "ash-v0.20.0-linux-amd64"
-	for _, brokerName := range []string{"ash-broker", expectedName + "-broker"} {
-		t.Run(brokerName, func(t *testing.T) {
-			root := t.TempDir()
-			for _, name := range []string{expectedName, brokerName} {
-				if err := os.WriteFile(filepath.Join(root, name), []byte(name), 0o600); err != nil {
-					t.Fatal(err)
-				}
-			}
-			binary, err := findUpgradeBinary(root, expectedName)
-			if err != nil {
-				t.Fatalf("findUpgradeBinary() error = %v", err)
-			}
-			if filepath.Base(binary) != expectedName {
-				t.Errorf("findUpgradeBinary() = %s, want %s", filepath.Base(binary), expectedName)
-			}
-			broker, err := findUpgradeBrokerBinary(root)
-			if err != nil {
-				t.Fatalf("findUpgradeBrokerBinary() error = %v", err)
-			}
-			if filepath.Base(broker) != brokerName {
-				t.Errorf("findUpgradeBrokerBinary() = %s, want %s", filepath.Base(broker), brokerName)
-			}
-		})
-	}
-}
-
-// Pre-split clients only replace the ash binary, so a machine can be on the newest version and
-// still be missing ash-broker; the version short-circuit must not strand it there.
-func TestInstalledBrokerBinaryExists(t *testing.T) {
-	home := t.TempDir()
-	originalHome := osUserHomeDir
-	osUserHomeDir = func() (string, error) { return home, nil }
-	t.Cleanup(func() { osUserHomeDir = originalHome })
-
-	if installedBrokerBinaryExists() {
-		t.Fatal("installedBrokerBinaryExists() = true before ash-broker was installed")
-	}
-	binDir := filepath.Join(home, ".local", "bin")
-	if err := os.MkdirAll(binDir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(binDir, "ash-broker"), []byte("broker"), 0o755); err != nil {
+	snapshots, err := snapshotUpgradeFiles(append(directories, targets...))
+	if err != nil {
 		t.Fatal(err)
 	}
-	if !installedBrokerBinaryExists() {
-		t.Error("installedBrokerBinaryExists() = false after ash-broker was installed")
+
+	if err := os.WriteFile(original, []byte("candidate"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(link); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(link, []byte("not a link"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Dir(newTarget), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(newTarget, []byte("new"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := restoreUpgradeFiles(snapshots); err != nil {
+		t.Fatalf("restoreUpgradeFiles() error = %v", err)
+	}
+	got, err := os.ReadFile(original)
+	if err != nil || string(got) != "before" {
+		t.Fatalf("restored original = %q, %v", got, err)
+	}
+	info, err := os.Stat(original)
+	if err != nil || info.Mode().Perm() != 0o640 {
+		t.Fatalf("restored original mode = %v, %v", info, err)
+	}
+	linkTarget, err := os.Readlink(link)
+	if err != nil || linkTarget != "original" {
+		t.Fatalf("restored symlink = %q, %v", linkTarget, err)
+	}
+	if _, err := os.Stat(filepath.Dir(newTarget)); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("created directory survived rollback: %v", err)
 	}
 }
 
@@ -539,7 +578,7 @@ func TestSyncUpgradeAssetsPreservesEnvironmentValues(t *testing.T) {
 	if err := os.MkdirAll(workspace, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(workspace, ".ash_env"), []byte("export AI_MODEL='keep-me'\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(workspace, ".ash_env"), []byte("export ASH_AI_MODEL='keep-me'\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	candidate := filepath.Join(home, "candidate-assets")
@@ -553,7 +592,7 @@ func TestSyncUpgradeAssetsPreservesEnvironmentValues(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(content), "AI_MODEL='keep-me'") {
+	if !strings.Contains(string(content), "ASH_AI_MODEL='keep-me'") {
 		t.Fatalf(".ash_env lost configured value: %q", content)
 	}
 }

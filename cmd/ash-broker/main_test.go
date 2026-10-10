@@ -21,7 +21,7 @@ import (
 	"testing"
 	"time"
 
-	"ash/internal/brokerproto"
+	"github.com/Jonconradt/ash/internal/brokerproto"
 )
 
 func TestRunBrokerRequiresParentPID(t *testing.T) {
@@ -38,7 +38,7 @@ func TestRunBrokerRequiresParentPID(t *testing.T) {
 
 func TestBrokerSocketReadyWhileMCPStartupIsBlocked(t *testing.T) {
 	home := t.TempDir()
-	registrationPath := filepath.Join(home, ".ash", ".ash_allow")
+	registrationPath := filepath.Join(home, ".config", "ash", ".ash_allow")
 	if err := os.MkdirAll(filepath.Dir(registrationPath), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -105,7 +105,7 @@ func TestBrokerSocketReadyWhileMCPStartupIsBlocked(t *testing.T) {
 		case <-time.After(10 * time.Millisecond):
 		}
 	}
-	sessionLock := filepath.Join(home, ".ash", "scratch", "startup-test", ".ash_scratch_lock")
+	sessionLock := filepath.Join(home, ".local", "state", "ash", "scratch", "startup-test", ".ash_scratch_lock")
 	if _, err := os.Stat(sessionLock); err != nil {
 		t.Fatalf("broker socket became ready without its scratch lock: %v", err)
 	}

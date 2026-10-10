@@ -207,7 +207,7 @@ func TestWorkspaceAndScratchFileAdversarialPathTraversal(t *testing.T) {
 
 	tmpHome := t.TempDir()
 	t.Setenv("HOME", tmpHome)
-	t.Setenv("SESSION_ID", "test_session_123")
+	t.Setenv("ASH_SESSION_ID", "test_session_123")
 
 	traversalPaths := []string{
 		"../../../../etc/passwd",

@@ -59,7 +59,7 @@ func TestStreamingEnabled(t *testing.T) {
 	}
 }
 
-func TestLoadAllowlistedCommandsFallsBackToLegacyAshTools(t *testing.T) {
+func TestLoadAllowlistedCommandsIgnoresLegacyAshTools(t *testing.T) {
 	home := t.TempDir()
 	cwd := t.TempDir()
 	originalCwd, err := os.Getwd()
@@ -85,8 +85,8 @@ func TestLoadAllowlistedCommandsFallsBackToLegacyAshTools(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, ok := allowed["ls"]; !ok {
-		t.Fatalf("expected ls from legacy %s fallback", legacyToolsFileName)
+	if _, ok := allowed["ls"]; ok {
+		t.Fatalf("legacy %s must not be imported", legacyToolsFileName)
 	}
 }
 
@@ -102,13 +102,54 @@ func TestParseAllowlistFileIgnoresRemoteMCPURLs(t *testing.T) {
 	}
 }
 
+func TestManagedPluginRootsAndUserOverride(t *testing.T) {
+	home := t.TempDir()
+	dataRoot := filepath.Join(home, "data")
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_DATA_HOME", dataRoot)
+	pluginDir := filepath.Join(dataRoot, "ash", "plugins")
+	if err := os.MkdirAll(pluginDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	pluginPath := filepath.Join(pluginDir, "calculator")
+	if err := os.WriteFile(pluginPath, []byte("user plugin"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	path, ok := managedNativePlugin("calculator")
+	if !ok || path != pluginPath {
+		t.Fatalf("managedNativePlugin() = (%q, %v), want (%q, true)", path, ok, pluginPath)
+	}
+	plugins, err := eligiblePlugins()
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, name := range plugins {
+		found = found || name == "calculator"
+	}
+	if !found {
+		t.Fatalf("eligiblePlugins() = %v, want calculator", plugins)
+	}
+
+	if got := systemPluginRoot("linux"); got != "/usr/lib/ash/plugins" {
+		t.Fatalf("systemPluginRoot(linux) = %q", got)
+	}
+	if got := systemPluginRoot("darwin"); got != "/usr/local/lib/ash/plugins" {
+		t.Fatalf("systemPluginRoot(darwin) = %q", got)
+	}
+	if got := systemPluginRoot("windows"); got != "" {
+		t.Fatalf("systemPluginRoot(windows) = %q, want empty", got)
+	}
+}
+
 // TestParseAIConfigFromEnvOllamaOpenAIAPIDefault covers the ASH_ALWAYS_OPENAI_API
 // default (on) end-to-end through parseAIConfigFromEnv, separately from the raw
 // provider-detection table above which explicitly disables it.
 func TestParseAIConfigFromEnvOllamaOpenAIAPIDefault(t *testing.T) {
-	t.Setenv("AI_ENDPOINT", "http://localhost:11434")
-	t.Setenv("AI_MODEL", "llama3.1")
-	t.Setenv("AI_PROVIDER", "")
+	t.Setenv("ASH_AI_ENDPOINT", "http://localhost:11434")
+	t.Setenv("ASH_AI_MODEL", "llama3.1")
+	t.Setenv("ASH_AI_PROVIDER", "")
 	t.Setenv(ashEnvAlwaysOpenAIAPI, "")
 
 	cfg, err := parseAIConfigFromEnv()
@@ -143,8 +184,8 @@ func TestParseAIConfigFromEnv(t *testing.T) {
 		{
 			name: "local endpoint without auth",
 			env: map[string]string{
-				"AI_ENDPOINT": "http://localhost:11434",
-				"AI_MODEL":    "llama3.1",
+				"ASH_AI_ENDPOINT": "http://localhost:11434",
+				"ASH_AI_MODEL":    "llama3.1",
 			},
 			wantBaseURL:    "http://localhost:11434",
 			wantModel:      "llama3.1",
@@ -155,10 +196,10 @@ func TestParseAIConfigFromEnv(t *testing.T) {
 		{
 			name: "cloud endpoint with bearer auth",
 			env: map[string]string{
-				"AI_ENDPOINT":   "https://api.example.com/ollama",
-				"AI_MODEL":      "mistral",
-				"AI_AUTH_TYPE":  "bearer",
-				"AI_AUTH_TOKEN": "abc123",
+				"ASH_AI_ENDPOINT":   "https://api.example.com/ollama",
+				"ASH_AI_MODEL":      "mistral",
+				"ASH_AI_AUTH_TYPE":  "bearer",
+				"ASH_AI_AUTH_TOKEN": "abc123",
 			},
 			wantBaseURL:    "https://api.example.com/ollama",
 			wantModel:      "mistral",
@@ -170,10 +211,10 @@ func TestParseAIConfigFromEnv(t *testing.T) {
 		{
 			name: "auto-detect openai provider",
 			env: map[string]string{
-				"AI_ENDPOINT":   "https://api.openai.com/v1",
-				"AI_MODEL":      "gpt-4.1-mini",
-				"AI_AUTH_TYPE":  "bearer",
-				"AI_AUTH_TOKEN": "openai-token",
+				"ASH_AI_ENDPOINT":   "https://api.openai.com/v1",
+				"ASH_AI_MODEL":      "gpt-4.1-mini",
+				"ASH_AI_AUTH_TYPE":  "bearer",
+				"ASH_AI_AUTH_TOKEN": "openai-token",
 			},
 			wantBaseURL:    "https://api.openai.com/v1",
 			wantModel:      "gpt-4.1-mini",
@@ -185,9 +226,9 @@ func TestParseAIConfigFromEnv(t *testing.T) {
 		{
 			name: "optional provider override",
 			env: map[string]string{
-				"AI_ENDPOINT": "http://localhost:11434",
-				"AI_MODEL":    "llama3.1",
-				"AI_PROVIDER": "google",
+				"ASH_AI_ENDPOINT": "http://localhost:11434",
+				"ASH_AI_MODEL":    "llama3.1",
+				"ASH_AI_PROVIDER": "google",
 			},
 			wantBaseURL:    "http://localhost:11434",
 			wantModel:      "llama3.1",
@@ -198,9 +239,9 @@ func TestParseAIConfigFromEnv(t *testing.T) {
 		{
 			name: "cache disabled optional override",
 			env: map[string]string{
-				"AI_ENDPOINT": "http://localhost:11434",
-				"AI_MODEL":    "llama3.1",
-				"AI_CACHE":    "off",
+				"ASH_AI_ENDPOINT": "http://localhost:11434",
+				"ASH_AI_MODEL":    "llama3.1",
+				"ASH_AI_CACHE":    "off",
 			},
 			wantBaseURL:    "http://localhost:11434",
 			wantModel:      "llama3.1",
@@ -209,34 +250,34 @@ func TestParseAIConfigFromEnv(t *testing.T) {
 			wantUseCache:   false,
 		},
 		{
-			name: "legacy AI env rejected",
+			name: "legacy AI env is ignored",
 			env: map[string]string{
 				"AI": "ollama://localhost/llama3.1",
 			},
-			wantErr: "AI is no longer supported",
+			wantErr: "export ASH_AI_ENDPOINT=",
 		},
 		{
 			name: "missing endpoint",
 			env: map[string]string{
-				"AI_MODEL": "llama3.1",
-				"SHELL":    "/bin/zsh",
+				"ASH_AI_MODEL": "llama3.1",
+				"SHELL":        "/bin/zsh",
 			},
-			wantErr: "Please add these lines to your ~/.zshrc file",
+			wantErr: "export ASH_AI_ENDPOINT=",
 		},
 		{
 			name: "missing model",
 			env: map[string]string{
-				"AI_ENDPOINT": "http://localhost:11434",
-				"SHELL":       "/bin/bash",
+				"ASH_AI_ENDPOINT": "http://localhost:11434",
+				"SHELL":           "/bin/bash",
 			},
-			wantErr: "Please add these lines to your ~/.bashrc file",
+			wantErr: "export ASH_AI_ENDPOINT=",
 		},
 		{
 			name: "token enables bearer auth",
 			env: map[string]string{
-				"AI_ENDPOINT":   "http://localhost:11434",
-				"AI_MODEL":      "llama3.1",
-				"AI_AUTH_TOKEN": "abc",
+				"ASH_AI_ENDPOINT":   "http://localhost:11434",
+				"ASH_AI_MODEL":      "llama3.1",
+				"ASH_AI_AUTH_TOKEN": "abc",
 			},
 			wantBaseURL:    "http://localhost:11434",
 			wantModel:      "llama3.1",
@@ -248,9 +289,9 @@ func TestParseAIConfigFromEnv(t *testing.T) {
 		{
 			name: "auth type is ignored",
 			env: map[string]string{
-				"AI_ENDPOINT":  "http://localhost:11434",
-				"AI_MODEL":     "llama3.1",
-				"AI_AUTH_TYPE": "basic",
+				"ASH_AI_ENDPOINT":  "http://localhost:11434",
+				"ASH_AI_MODEL":     "llama3.1",
+				"ASH_AI_AUTH_TYPE": "basic",
 			},
 			wantBaseURL:    "http://localhost:11434",
 			wantModel:      "llama3.1",
@@ -261,51 +302,63 @@ func TestParseAIConfigFromEnv(t *testing.T) {
 		{
 			name: "cloud endpoint requires https",
 			env: map[string]string{
-				"AI_ENDPOINT":   "http://api.example.com",
-				"AI_MODEL":      "llama3.1",
-				"AI_AUTH_TYPE":  "bearer",
-				"AI_AUTH_TOKEN": "abc",
+				"ASH_AI_ENDPOINT":   "http://api.example.com",
+				"ASH_AI_MODEL":      "llama3.1",
+				"ASH_AI_AUTH_TYPE":  "bearer",
+				"ASH_AI_AUTH_TOKEN": "abc",
 			},
-			wantErr: "AI_ENDPOINT must use https for cloud endpoints",
+			wantErr: "ASH_AI_ENDPOINT must use https for cloud endpoints",
 		},
 		{
 			name: "cloud endpoint requires auth",
 			env: map[string]string{
-				"AI_ENDPOINT": "https://api.example.com",
-				"AI_MODEL":    "llama3.1",
-				"SHELL":       "/bin/zsh",
+				"ASH_AI_ENDPOINT": "https://api.example.com",
+				"ASH_AI_MODEL":    "llama3.1",
+				"SHELL":           "/bin/zsh",
 			},
-			wantErr: "export AI_AUTH_TOKEN='your-token'",
+			wantErr: "export ASH_AI_AUTH_TOKEN='your-token'",
+		},
+		{
+			name: "bedrock uses aws credentials without bearer token",
+			env: map[string]string{
+				"ASH_AI_ENDPOINT": "https://bedrock-runtime.us-east-1.amazonaws.com",
+				"ASH_AI_MODEL":    "anthropic.claude-3-sonnet",
+			},
+			wantBaseURL:    "https://bedrock-runtime.us-east-1.amazonaws.com",
+			wantModel:      "anthropic.claude-3-sonnet",
+			wantHistoryKey: "https://bedrock-runtime.us-east-1.amazonaws.com/anthropic.claude-3-sonnet",
+			wantProvider:   providerBedrock,
+			wantUseCache:   true,
 		},
 		{
 			name: "invalid provider override",
 			env: map[string]string{
-				"AI_ENDPOINT": "http://localhost:11434",
-				"AI_MODEL":    "llama3.1",
-				"AI_PROVIDER": "unsupported-provider",
+				"ASH_AI_ENDPOINT": "http://localhost:11434",
+				"ASH_AI_MODEL":    "llama3.1",
+				"ASH_AI_PROVIDER": "unsupported-provider",
 			},
-			wantErr: "AI_PROVIDER must be one of",
+			wantErr: "ASH_AI_PROVIDER must be one of",
 		},
 		{
 			name: "invalid cache override",
 			env: map[string]string{
-				"AI_ENDPOINT": "http://localhost:11434",
-				"AI_MODEL":    "llama3.1",
-				"AI_CACHE":    "sometimes",
+				"ASH_AI_ENDPOINT": "http://localhost:11434",
+				"ASH_AI_MODEL":    "llama3.1",
+				"ASH_AI_CACHE":    "sometimes",
 			},
-			wantErr: "AI_CACHE must be a boolean-like value",
+			wantErr: "ASH_AI_CACHE must be a boolean-like value",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Setenv("AI", "")
-			t.Setenv("AI_ENDPOINT", "")
-			t.Setenv("AI_MODEL", "")
-			t.Setenv("AI_AUTH_TYPE", "")
-			t.Setenv("AI_AUTH_TOKEN", "")
-			t.Setenv("AI_PROVIDER", "")
-			t.Setenv("AI_CACHE", "")
+			t.Setenv("ASH_AI_ENDPOINT", "")
+			t.Setenv("ASH_AI_MODEL", "")
+			t.Setenv("ASH_AI_AUTH_TYPE", "")
+			t.Setenv("ASH_AI_AUTH_TOKEN", "")
+			t.Setenv("ASH_AI_PROVIDER", "")
+			t.Setenv("ASH_AI_CACHE", "")
 			t.Setenv(ashEnvAlwaysOpenAIAPI, "0")
 			t.Setenv("SHELL", "")
 			for k, v := range tt.env {
@@ -374,7 +427,7 @@ func TestParseAIEndpointValidation(t *testing.T) {
 	}
 }
 
-// TestParseAIEndpointSchemeDefaulting covers AI_ENDPOINT values that omit a
+// TestParseAIEndpointSchemeDefaulting covers ASH_AI_ENDPOINT values that omit a
 // scheme: local/LAN/bare hostnames default to http, everything else to https.
 func TestParseAIEndpointSchemeDefaulting(t *testing.T) {
 	tests := []struct {
@@ -470,7 +523,7 @@ func TestResolveAIProviderValidation(t *testing.T) {
 	}
 
 	_, err = resolveAIProvider("unsupported", "http://localhost:11434", "localhost")
-	if err == nil || !strings.Contains(err.Error(), "AI_PROVIDER must be one of") {
+	if err == nil || !strings.Contains(err.Error(), "ASH_AI_PROVIDER must be one of") {
 		t.Fatalf("expected invalid provider error, got %v", err)
 	}
 }

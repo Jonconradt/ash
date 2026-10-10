@@ -16,10 +16,9 @@ import (
 	"time"
 )
 
-// TestMain keeps the suite from building real virtualenvs during install/upgrade tests.
+// TestMain keeps the suite from building real virtualenvs during explicit provisioning tests.
 func TestMain(m *testing.M) {
 	provisionPythonEnv = func(io.Writer) {}
-	restartStaleBrokerDaemons = func(string) {}
 	os.Exit(m.Run())
 }
 
@@ -59,8 +58,8 @@ func TestRun(t *testing.T) {
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
 		code := run(nil, &stdout, &stderr)
-		if code != 1 {
-			t.Fatalf("expected exit code 1, got %d", code)
+		if code != 2 {
+			t.Fatalf("expected usage exit code 2, got %d", code)
 		}
 		if !strings.Contains(stderr.String(), "usage: ash") {
 			t.Fatalf("expected usage message, got %q", stderr.String())
@@ -90,8 +89,8 @@ func TestRun(t *testing.T) {
 		defer srv.Close()
 
 		t.Setenv("AI", "")
-		t.Setenv("AI_ENDPOINT", srv.URL)
-		t.Setenv("AI_MODEL", "llama3.1")
+		t.Setenv("ASH_AI_ENDPOINT", srv.URL)
+		t.Setenv("ASH_AI_MODEL", "llama3.1")
 
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
@@ -119,8 +118,8 @@ func TestRun(t *testing.T) {
 		readPromptFromStdin = func() (string, error) { return "   \n\t", nil }
 
 		t.Setenv("AI", "")
-		t.Setenv("AI_ENDPOINT", "http://localhost:11434")
-		t.Setenv("AI_MODEL", "llama3.1")
+		t.Setenv("ASH_AI_ENDPOINT", "http://localhost:11434")
+		t.Setenv("ASH_AI_MODEL", "llama3.1")
 
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
@@ -151,8 +150,8 @@ func TestRun(t *testing.T) {
 		defer srv.Close()
 
 		t.Setenv("AI", "")
-		t.Setenv("AI_ENDPOINT", srv.URL)
-		t.Setenv("AI_MODEL", "llama3.1")
+		t.Setenv("ASH_AI_ENDPOINT", srv.URL)
+		t.Setenv("ASH_AI_MODEL", "llama3.1")
 
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
@@ -171,8 +170,8 @@ func TestRun(t *testing.T) {
 
 	t.Run("missing AI env", func(t *testing.T) {
 		t.Setenv("AI", "")
-		t.Setenv("AI_ENDPOINT", "")
-		t.Setenv("AI_MODEL", "")
+		t.Setenv("ASH_AI_ENDPOINT", "")
+		t.Setenv("ASH_AI_MODEL", "")
 		t.Setenv("SHELL", "/bin/bash")
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
@@ -180,30 +179,30 @@ func TestRun(t *testing.T) {
 		if code != 1 {
 			t.Fatalf("expected exit code 1, got %d", code)
 		}
-		if !strings.Contains(stderr.String(), "Please add these lines to your ~/.bashrc file") {
+		if !strings.Contains(stderr.String(), "export ASH_AI_ENDPOINT=") {
 			t.Fatalf("expected AI env error, got %q", stderr.String())
 		}
 	})
 
-	t.Run("legacy AI env is rejected", func(t *testing.T) {
+	t.Run("legacy AI env is ignored", func(t *testing.T) {
 		t.Setenv("AI", "ollama://localhost/llama3.1")
-		t.Setenv("AI_ENDPOINT", "")
-		t.Setenv("AI_MODEL", "")
+		t.Setenv("ASH_AI_ENDPOINT", "")
+		t.Setenv("ASH_AI_MODEL", "")
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
 		code := run([]string{"hello"}, &stdout, &stderr)
 		if code != 1 {
 			t.Fatalf("expected exit code 1, got %d", code)
 		}
-		if !strings.Contains(stderr.String(), "AI is no longer supported") {
+		if !strings.Contains(stderr.String(), "export ASH_AI_ENDPOINT=") {
 			t.Fatalf("expected invalid AI error, got %q", stderr.String())
 		}
 	})
 
 	t.Run("empty input", func(t *testing.T) {
 		t.Setenv("AI", "")
-		t.Setenv("AI_ENDPOINT", "http://localhost:11434")
-		t.Setenv("AI_MODEL", "llama3.1")
+		t.Setenv("ASH_AI_ENDPOINT", "http://localhost:11434")
+		t.Setenv("ASH_AI_MODEL", "llama3.1")
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
 		code := run([]string{"   "}, &stdout, &stderr)
@@ -222,8 +221,8 @@ func TestRun(t *testing.T) {
 		if err := os.Chdir(cwd); err != nil {
 			t.Fatalf("Chdir failed: %v", err)
 		}
-		t.Setenv("SESSION_ID", "historyError")
-		path := filepath.Join(home, ashWorkspaceDirName, historyDirName, "historyError.json")
+		t.Setenv("ASH_SESSION_ID", "historyError")
+		path := filepath.Join(home, ".local", "state", "ash", historyDirName, "historyError.json")
 		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 			t.Fatalf("mkdir history dir: %v", err)
 		}
@@ -232,8 +231,8 @@ func TestRun(t *testing.T) {
 		}
 
 		t.Setenv("AI", "")
-		t.Setenv("AI_ENDPOINT", "http://localhost:11434")
-		t.Setenv("AI_MODEL", "llama3.1")
+		t.Setenv("ASH_AI_ENDPOINT", "http://localhost:11434")
+		t.Setenv("ASH_AI_MODEL", "llama3.1")
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
 		code := run([]string{"hello"}, &stdout, &stderr)
@@ -254,8 +253,8 @@ func TestRun(t *testing.T) {
 		}
 
 		t.Setenv("AI", "")
-		t.Setenv("AI_ENDPOINT", "http://127.0.0.1:1")
-		t.Setenv("AI_MODEL", "llama3.1")
+		t.Setenv("ASH_AI_ENDPOINT", "http://127.0.0.1:1")
+		t.Setenv("ASH_AI_MODEL", "llama3.1")
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
 		code := run([]string{"hello"}, &stdout, &stderr)
@@ -285,8 +284,8 @@ func TestRun(t *testing.T) {
 		pickCloudBusy503Message = func() string { return "cloud test fallback message" }
 
 		t.Setenv("AI", "")
-		t.Setenv("AI_ENDPOINT", srv.URL)
-		t.Setenv("AI_MODEL", "llama3.1")
+		t.Setenv("ASH_AI_ENDPOINT", srv.URL)
+		t.Setenv("ASH_AI_MODEL", "llama3.1")
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
 		code := run([]string{"hello"}, &stdout, &stderr)
@@ -319,8 +318,8 @@ func TestRun(t *testing.T) {
 		pickCloudServer500Message = func() string { return "cloud 500 test fallback message" }
 
 		t.Setenv("AI", "")
-		t.Setenv("AI_ENDPOINT", srv.URL)
-		t.Setenv("AI_MODEL", "llama3.1")
+		t.Setenv("ASH_AI_ENDPOINT", srv.URL)
+		t.Setenv("ASH_AI_MODEL", "llama3.1")
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
 		code := run([]string{"hello"}, &stdout, &stderr)
@@ -353,8 +352,8 @@ func TestRun(t *testing.T) {
 		pickCloudRateLimit429Message = func() string { return "cloud 429 test fallback message" }
 
 		t.Setenv("AI", "")
-		t.Setenv("AI_ENDPOINT", srv.URL)
-		t.Setenv("AI_MODEL", "llama3.1")
+		t.Setenv("ASH_AI_ENDPOINT", srv.URL)
+		t.Setenv("ASH_AI_MODEL", "llama3.1")
 		t.Setenv("ASH_RETRY_BASE_DELAY", "1ms")
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
@@ -392,8 +391,8 @@ func TestRun(t *testing.T) {
 		defer srv.Close()
 
 		t.Setenv("AI", "")
-		t.Setenv("AI_ENDPOINT", srv.URL)
-		t.Setenv("AI_MODEL", "llama3.1")
+		t.Setenv("ASH_AI_ENDPOINT", srv.URL)
+		t.Setenv("ASH_AI_MODEL", "llama3.1")
 
 		originalRenderer := markdownRenderer
 		t.Cleanup(func() { markdownRenderer = originalRenderer })
@@ -404,7 +403,7 @@ func TestRun(t *testing.T) {
 			return "\x1b[1mbold 🙂\x1b[0m", nil
 		}
 
-		t.Setenv("SESSION_ID", "historySuccess")
+		t.Setenv("ASH_SESSION_ID", "historySuccess")
 
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
@@ -416,7 +415,7 @@ func TestRun(t *testing.T) {
 			t.Fatalf("expected raw markdown on non-terminal stdout, got %q", stdout.String())
 		}
 
-		content, err := os.ReadFile(filepath.Join(home, ashWorkspaceDirName, historyDirName, "historySuccess.json"))
+		content, err := os.ReadFile(filepath.Join(home, ".local", "state", "ash", historyDirName, "historySuccess.json"))
 		if err != nil {
 			t.Fatalf("read history file: %v", err)
 		}
@@ -443,8 +442,8 @@ func TestRun(t *testing.T) {
 		defer srv.Close()
 
 		t.Setenv("AI", "")
-		t.Setenv("AI_ENDPOINT", srv.URL)
-		t.Setenv("AI_MODEL", "llama3.1")
+		t.Setenv("ASH_AI_ENDPOINT", srv.URL)
+		t.Setenv("ASH_AI_MODEL", "llama3.1")
 
 		originalWrite := osWriteFile
 		t.Cleanup(func() { osWriteFile = originalWrite })
@@ -479,8 +478,8 @@ func TestRun(t *testing.T) {
 		}
 
 		t.Setenv("AI", "")
-		t.Setenv("AI_ENDPOINT", "http://localhost:11434")
-		t.Setenv("AI_MODEL", "llama3.1")
+		t.Setenv("ASH_AI_ENDPOINT", "http://localhost:11434")
+		t.Setenv("ASH_AI_MODEL", "llama3.1")
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
 		code := run([]string{"hello"}, &stdout, &stderr)
@@ -508,8 +507,8 @@ func TestRun(t *testing.T) {
 		osUserHomeDir = func() (string, error) { return "", errors.New("no home") }
 
 		t.Setenv("AI", "")
-		t.Setenv("AI_ENDPOINT", "http://localhost:11434")
-		t.Setenv("AI_MODEL", "llama3.1")
+		t.Setenv("ASH_AI_ENDPOINT", "http://localhost:11434")
+		t.Setenv("ASH_AI_MODEL", "llama3.1")
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
 		code := run([]string{"hello"}, &stdout, &stderr)
@@ -534,7 +533,11 @@ func TestRun(t *testing.T) {
 		if err := os.Chdir(cwd); err != nil {
 			t.Fatalf("Chdir failed: %v", err)
 		}
-		if err := os.WriteFile(filepath.Join(cwd, systemFileName), []byte("sys-msg"), 0o600); err != nil {
+		configDir := filepath.Join(home, ashWorkspaceDirName)
+		if err := os.MkdirAll(configDir, 0o700); err != nil {
+			t.Fatalf("mkdir config directory: %v", err)
+		}
+		if err := os.WriteFile(filepath.Join(configDir, systemFileName), []byte("sys-msg"), 0o600); err != nil {
 			t.Fatalf("write system file: %v", err)
 		}
 
@@ -548,8 +551,8 @@ func TestRun(t *testing.T) {
 		defer srv.Close()
 
 		t.Setenv("AI", "")
-		t.Setenv("AI_ENDPOINT", srv.URL)
-		t.Setenv("AI_MODEL", "llama3.1")
+		t.Setenv("ASH_AI_ENDPOINT", srv.URL)
+		t.Setenv("ASH_AI_MODEL", "llama3.1")
 
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer
@@ -595,8 +598,8 @@ func TestMainEntrypoint(t *testing.T) {
 	cmd.Env = append(os.Environ(),
 		"ASH_MAIN_HELPER=1",
 		"AI=",
-		"AI_ENDPOINT="+srv.URL,
-		"AI_MODEL=llama3.1",
+		"ASH_AI_ENDPOINT="+srv.URL,
+		"ASH_AI_MODEL=llama3.1",
 		"HOME="+home,
 	)
 

@@ -22,7 +22,7 @@ import (
 	"testing"
 	"time"
 
-	"ash/internal/brokerproto"
+	"github.com/Jonconradt/ash/internal/brokerproto"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/modelcontextprotocol/go-sdk/oauthex"
 	"golang.org/x/oauth2"
@@ -299,10 +299,11 @@ func TestRemoteServersFromAllowlistRejectsInvalidAndDuplicateURLs(t *testing.T) 
 	}
 }
 
-func TestResolveRemoteServersUsesFirstExistingFile(t *testing.T) {
+func TestResolveRemoteServersUsesOnlyUserConfiguration(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", "")
 	home := t.TempDir()
 	cwd := t.TempDir()
-	workspacePath := filepath.Join(home, ".ash", ".ash_allow")
+	workspacePath := filepath.Join(home, ".config", "ash", ".ash_allow")
 	if err := os.MkdirAll(filepath.Dir(workspacePath), 0o700); err != nil {
 		t.Fatal(err)
 	}
@@ -328,6 +329,16 @@ func TestResolveRemoteServersUsesFirstExistingFile(t *testing.T) {
 	}
 	if len(servers) != 0 {
 		t.Fatalf("ResolveRemoteServers() with empty first file = %+v, want no registrations", servers)
+	}
+	if err := os.Remove(workspacePath); err != nil {
+		t.Fatal(err)
+	}
+	servers, err = ResolveRemoteServers(home, cwd, os.ReadFile)
+	if err != nil {
+		t.Fatalf("ResolveRemoteServers() without user config error = %v", err)
+	}
+	if len(servers) != 0 {
+		t.Fatalf("ResolveRemoteServers() imported working-directory registration: %+v", servers)
 	}
 }
 

@@ -100,7 +100,7 @@ func TestManagedPythonScriptResolvesOnlyInstalledPyTools(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
-	toolsDir := filepath.Join(home, ".ash", "tools")
+	toolsDir := filepath.Join(home, ".local", "share", "ash", "tools")
 	if err := os.MkdirAll(toolsDir, 0o700); err != nil {
 		t.Fatalf("mkdir tools: %v", err)
 	}
@@ -127,7 +127,7 @@ func TestHardenAshWorkspacePermissionsPreservesExecutableBit(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 
-	toolsDir := filepath.Join(home, ".ash", "tools")
+	toolsDir := filepath.Join(home, ".local", "share", "ash", "tools")
 	if err := os.MkdirAll(toolsDir, 0o700); err != nil {
 		t.Fatalf("mkdir tools: %v", err)
 	}
@@ -135,7 +135,11 @@ func TestHardenAshWorkspacePermissionsPreservesExecutableBit(t *testing.T) {
 	if err := os.WriteFile(script, []byte("#!/usr/bin/env python3\n"), 0o700); err != nil {
 		t.Fatalf("write script: %v", err)
 	}
-	plain := filepath.Join(home, ".ash", ".ash_system")
+	configDir := filepath.Join(home, ".config", "ash")
+	if err := os.MkdirAll(configDir, 0o700); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+	plain := filepath.Join(configDir, ".ash_system")
 	if err := os.WriteFile(plain, []byte("system prompt\n"), 0o600); err != nil {
 		t.Fatalf("write plain file: %v", err)
 	}
@@ -169,15 +173,15 @@ func TestRequirementsTxtIsNotInstalledAsTool(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	var out strings.Builder
-	if err := installEmbeddedBootstrapAssets(true, "", &out); err != nil {
+	if err := installEmbeddedBootstrapAssets(true, "", false, &out); err != nil {
 		t.Fatalf("installEmbeddedBootstrapAssets: %v", err)
 	}
 
-	if _, err := os.Stat(filepath.Join(home, ".ash", "tools", "requirements.txt")); !os.IsNotExist(err) {
-		t.Fatal("requirements.txt must not be installed into ~/.ash/tools")
+	if _, err := os.Stat(filepath.Join(home, ".local", "share", "ash", "tools", "requirements.txt")); !os.IsNotExist(err) {
+		t.Fatal("requirements.txt must not be installed into XDG data tools")
 	}
 	for _, want := range []string{"yfinance.py", "wikipedia.py", "headlines.py"} {
-		info, err := os.Stat(filepath.Join(home, ".ash", "tools", want))
+		info, err := os.Stat(filepath.Join(home, ".local", "share", "ash", "tools", want))
 		if err != nil {
 			t.Fatalf("expected %s to be installed: %v", want, err)
 		}

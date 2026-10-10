@@ -12,7 +12,7 @@ import (
 	"strings"
 	"testing"
 
-	"ash/internal/brokerproto"
+	"github.com/Jonconradt/ash/internal/brokerproto"
 )
 
 func TestRemoteToolShimCallsBroker(t *testing.T) {

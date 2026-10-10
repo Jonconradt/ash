@@ -17,15 +17,15 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
-	"ash/internal/uistyle"
+	"github.com/Jonconradt/ash/internal/uistyle"
 
 	protocommon "github.com/sigstore/protobuf-specs/gen/pb-go/common/v1"
 	rekorV1 "github.com/sigstore/protobuf-specs/gen/pb-go/rekor/v1"
@@ -79,6 +79,15 @@ type upgradeAssetChange struct {
 	backup       []byte
 	hadBackup    bool
 	backupChoice bool
+}
+
+type upgradeFileSnapshot struct {
+	path        string
+	content     []byte
+	mode        os.FileMode
+	symlinkPath string
+	exists      bool
+	directory   bool
 }
 
 type upgradeRelease struct {
@@ -267,7 +276,7 @@ func runUpgrade(args []string, stdout, stderr io.Writer) int {
 		current, parseErr := parseUpgradeVersion(ashVersion)
 		if parseErr == nil {
 			candidate, candidateErr := parseUpgradeVersion(release.TagName)
-			if candidateErr == nil && compareUpgradeVersions(candidate, current) <= 0 && installedBrokerBinaryExists() {
+			if candidateErr == nil && compareUpgradeVersions(candidate, current) <= 0 {
 				_, _ = fmt.Fprintf(stdout, "ash is already up to date at %s\n", ashVersion)
 				return 0
 			}
@@ -289,6 +298,10 @@ func runUpgrade(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 	signatureErr := verifyUpgradeManifestSignature(manifest, bundle, release.TagName)
+	if signatureErr != nil {
+		_, _ = fmt.Fprintf(stderr, "ash update: signature verification failed: %v\n", signatureErr)
+		return 1
+	}
 	checksums, err := parseUpgradeChecksums(manifest)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "ash update: signed checksum manifest is invalid: %v\n", err)
@@ -308,7 +321,7 @@ func runUpgrade(args []string, stdout, stderr io.Writer) int {
 		_, _ = fmt.Fprintf(stderr, "WARNING: ash update refused release %s: %v\n", release.TagName, err)
 		return 1
 	}
-	if err := installUpgradeArchiveWithSignature(archive, release.TagName, options, signatureErr, stdout); err != nil {
+	if err := installUpgradeArchiveWithSignature(archive, release.TagName, options, nil, stdout); err != nil {
 		_, _ = fmt.Fprintf(stderr, "ash update: %v\n", err)
 		return 1
 	}
@@ -357,6 +370,17 @@ func verifyUpgradeManifestSignature(manifest, bundle []byte, version string) err
 		return fmt.Errorf("verify Sigstore bundle: %w", err)
 	}
 	return nil
+}
+
+func embeddedUpgradeAsset(name string) ([]byte, error) {
+	if name == ".ash_fish_env.fish" {
+		env, err := readEmbeddedBootstrapAsset("ash_bootstrap/.ash_env")
+		if err != nil {
+			return nil, err
+		}
+		return buildFishEnvironmentFile(string(env)), nil
+	}
+	return readEmbeddedBootstrapAsset(filepath.ToSlash(filepath.Join("ash_bootstrap", name)))
 }
 
 func verifyLegacyUpgradeBundle(manifest []byte, bundle legacyUpgradeBundle, version string) error {
@@ -476,6 +500,9 @@ func installUpgradeArchive(content []byte, version string, options upgradeOption
 }
 
 func installUpgradeArchiveWithSignature(content []byte, version string, options upgradeOptions, signatureErr error, stdout io.Writer) error {
+	if signatureErr != nil {
+		return fmt.Errorf("signature verification failed: %w", signatureErr)
+	}
 	staging, err := os.MkdirTemp("", "ash-upgrade-")
 	if err != nil {
 		return err
@@ -485,22 +512,18 @@ func installUpgradeArchiveWithSignature(content []byte, version string, options 
 	if err != nil {
 		return err
 	}
-	if signatureErr != nil || len(unsupportedEntries) > 0 {
-		if !shouldPromptInstallEnv() {
-			if signatureErr != nil {
-				return fmt.Errorf("signature verification failed and interactive confirmation is unavailable: %w", signatureErr)
-			}
-			return errors.New("archive contains unsupported entries and interactive confirmation is unavailable")
-		}
-		confirmed, err := confirmUpgradeExceptions(os.Stdin, stdout, version, unsupportedEntries, signatureErr)
-		if err != nil {
-			return err
-		}
-		if !confirmed {
-			return errors.New("update canceled by user")
-		}
+	if len(unsupportedEntries) > 0 {
+		return errors.New("archive contains unsupported entries")
 	}
 	binaryPath, err := findUpgradeBinary(staging, upgradeAssetName(version, runtime.GOOS, runtime.GOARCH))
+	if err != nil {
+		return err
+	}
+	brokerPath, err := findUpgradeBrokerBinary(staging)
+	if err != nil {
+		return fmt.Errorf("release is missing required ash-broker: %w", err)
+	}
+	pluginNames, err := upgradePluginNames(filepath.Join(staging, "plugins"))
 	if err != nil {
 		return err
 	}
@@ -508,80 +531,88 @@ func installUpgradeArchiveWithSignature(content []byte, version string, options 
 	if err := exportUpgradeAssets(binaryPath, candidateAssets); err != nil {
 		return err
 	}
-	home, err := osUserHomeDir()
+	destinationDir, err := userLocalInstallDirectory()
 	if err != nil {
 		return err
 	}
-	destinationDir, err := ensureUserLocalBinDir(home)
+	configRoot, err := ashWorkspaceDir()
+	if err != nil {
+		return err
+	}
+	dataRoot, err := ashDataDir()
 	if err != nil {
 		return err
 	}
 	destination := filepath.Join(destinationDir, "ash")
-	// #nosec G304 -- destination is the fixed user-local ~/.local/bin/ash path.
-	previousBinary, previousErr := os.ReadFile(destination)
-	if previousErr != nil && !errors.Is(previousErr, os.ErrNotExist) {
-		return previousErr
+	targets := []string{
+		destination,
+		filepath.Join(destinationDir, "ash-broker"),
 	}
-	hadPreviousBinary := previousErr == nil
-	if err := replaceUpgradeFile(binaryPath, destination, 0o755); err != nil {
+	for _, name := range []string{".ash_env", ".ash_allow", ".ash_deny", ".ash_bashrc", ".ash_zshrc", ".ash_fish.fish", ".ash_fish_env.fish", ".ash_system"} {
+		assetPath := filepath.Join(configRoot, name)
+		targets = append(targets, assetPath, assetPath+".bak")
+	}
+	for _, name := range pluginNames {
+		targets = append(targets, filepath.Join(dataRoot, "plugins", name))
+	}
+	directories, err := missingUpgradeDirectories(targets)
+	if err != nil {
 		return err
 	}
-	// The ash-broker binary is optional in the archive so older release tarballs
-	// (and minimal test fixtures) without one still update successfully.
-	if brokerPath, brokerErr := findUpgradeBrokerBinary(staging); brokerErr == nil {
-		if err := replaceUpgradeFile(brokerPath, filepath.Join(destinationDir, "ash-broker"), 0o755); err != nil {
-			return err
+	targets = append(directories, targets...)
+	snapshots, err := snapshotUpgradeFiles(targets)
+	if err != nil {
+		return err
+	}
+	rollback := func(cause error) error {
+		if rollbackErr := restoreUpgradeFiles(snapshots); rollbackErr != nil {
+			return errors.Join(cause, fmt.Errorf("restore previous installation: %w", rollbackErr))
 		}
+		return cause
+	}
+
+	if err := replaceUpgradeFile(binaryPath, destination, 0o755); err != nil {
+		return rollback(err)
+	}
+	if err := replaceUpgradeFile(brokerPath, filepath.Join(destinationDir, "ash-broker"), 0o755); err != nil {
+		return rollback(err)
 	}
 	if err := syncUpgradeAssets(candidateAssets, options, stdout); err != nil {
-		if hadPreviousBinary {
-			_ = writeUpgradeAsset(destination, previousBinary, true)
-		} else {
-			_ = os.Remove(destination)
-		}
-		return err
+		return rollback(err)
 	}
-	if err := syncUpgradePlugins(filepath.Join(staging, "plugins"), home, stdout); err != nil {
-		return err
+	if err := syncUpgradePlugins(filepath.Join(staging, "plugins"), stdout); err != nil {
+		return rollback(err)
 	}
-	restartStaleBrokerDaemons(destinationDir)
-	provisionPythonEnv(stdout)
 	// ashCommit belongs to the binary being replaced, so reporting it here would name the
 	// version just left behind; the installed build's commit shows up in ASH_VERBOSE output.
 	_, _ = fmt.Fprintf(stdout, "updated ash to %s at %s\n", version, destination)
 	return nil
 }
 
-// restartStaleBrokerDaemons kills any running ash-broker daemon (including
-// pre-migration daemons started as "<binary> broker ...") after an upgrade
-// replaces the binaries, so open shells respawn a fresh broker on next
-// invocation instead of continuing to run stale code indefinitely. Failures
-// (e.g. pkill unavailable, or no matching process) are ignored: this is a
-// best-effort nicety, not required for the upgrade itself to succeed.
-var restartStaleBrokerDaemons = func(destinationDir string) {
-	// #nosec G204 -- destinationDir is the fixed ~/.local/bin path, not attacker-controlled input.
-	_ = exec.Command("pkill", "-f", filepath.Join(destinationDir, "ash-broker")).Run()
-	_ = exec.Command("pkill", "-f", "broker --socket .*--parent-pid").Run()
-}
-
-func ensureUserLocalBinDir(home string) (string, error) {
-	destinationDir := filepath.Join(home, ".local", "bin")
-	if err := os.MkdirAll(destinationDir, 0o700); err != nil {
-		return "", fmt.Errorf("create %s: %w", destinationDir, err)
-	}
-	return destinationDir, nil
-}
-
-// installedBrokerBinaryExists reports whether ash-broker sits next to the installed ash.
-// Clients released before the broker split only replace the ash binary, so a machine that
-// crossed that boundary can be on the newest version yet still be missing the broker.
-var installedBrokerBinaryExists = func() bool {
+// userLocalInstallDirectory refuses to overwrite binaries owned by another installer.
+func userLocalInstallDirectory() (string, error) {
 	home, err := osUserHomeDir()
 	if err != nil {
-		return true
+		return "", err
 	}
-	info, err := os.Stat(filepath.Join(home, ".local", "bin", "ash-broker"))
-	return err == nil && info.Mode().IsRegular()
+	executable, err := osExecutable()
+	if err != nil {
+		return "", err
+	}
+	resolved, err := filepath.EvalSymlinks(executable)
+	if err != nil {
+		return "", fmt.Errorf("resolve current executable: %w", err)
+	}
+	localBin := filepath.Join(home, ".local", "bin")
+	resolvedLocalBin, err := filepath.EvalSymlinks(localBin)
+	if err != nil {
+		return "", fmt.Errorf("resolve user-local bin directory: %w", err)
+	}
+	relative, err := filepath.Rel(resolvedLocalBin, resolved)
+	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || filepath.Base(resolved) != "ash" {
+		return "", errors.New("self-update is available only for ash installed under ~/.local/bin; use the owning package manager or installer")
+	}
+	return filepath.Dir(resolved), nil
 }
 
 func runUpgradeAssetExport(args []string, stdout, stderr io.Writer) int {
@@ -612,9 +643,9 @@ func exportUpgradeAssets(binaryPath, destination string) error {
 		{source: "ash_bootstrap/.ash_env", name: ".ash_env"},
 		{source: "ash_bootstrap/.ash_allow", name: ".ash_allow"},
 		{source: "ash_bootstrap/.ash_deny", name: ".ash_deny"},
-		{source: "ash_bootstrap/.ash_tools", name: legacyToolsFileName},
 		{source: "ash_bootstrap/.ash_bashrc", name: ".ash_bashrc"},
 		{source: "ash_bootstrap/.ash_zshrc", name: ".ash_zshrc"},
+		{source: "ash_bootstrap/.ash_fish.fish", name: ".ash_fish.fish"},
 		{source: "ash_bootstrap/.ash_system", name: ".ash_system"},
 	}
 	// #nosec G703 -- destination is supplied only by the private internal export path.
@@ -635,38 +666,49 @@ func exportUpgradeAssets(binaryPath, destination string) error {
 }
 
 func syncUpgradeAssets(candidateRoot string, options upgradeOptions, stdout io.Writer) error {
-	home, err := osUserHomeDir()
+	destinationRoot, err := ashWorkspaceDir()
 	if err != nil {
 		return err
 	}
-	destinationRoot := filepath.Join(home, ashWorkspaceDirName)
 	if err := os.MkdirAll(destinationRoot, 0o700); err != nil {
 		return err
 	}
-	if err := os.MkdirAll(filepath.Join(destinationRoot, "plugins"), 0o700); err != nil {
+	dataRoot, err := ashDataDir()
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Join(dataRoot, "plugins"), 0o700); err != nil {
 		return fmt.Errorf("create managed plugins directory: %w", err)
 	}
-	assets := []string{".ash_env", ".ash_allow", ".ash_deny", ".ash_bashrc", ".ash_zshrc", ".ash_system"}
+	assets := []string{".ash_env", ".ash_allow", ".ash_deny", ".ash_bashrc", ".ash_zshrc", ".ash_fish.fish", ".ash_fish_env.fish", ".ash_system"}
+	candidateFiles := make(map[string][]byte, len(assets))
+	for _, name := range assets {
+		if name == ".ash_fish_env.fish" {
+			continue
+		}
+		// #nosec G304 -- source is inside private staging and uses fixed asset names.
+		content, err := os.ReadFile(filepath.Join(candidateRoot, name))
+		if err != nil {
+			return fmt.Errorf("read candidate %s: %w", name, err)
+		}
+		if name == ".ash_env" {
+			values, err := preservedAshEnvValues(filepath.Join(destinationRoot, name))
+			if err != nil {
+				return err
+			}
+			content = []byte(buildManagedAshEnv(values))
+		}
+		candidateFiles[name] = content
+	}
+	candidateFiles[".ash_fish_env.fish"] = buildFishEnvironmentFile(string(candidateFiles[".ash_env"]))
 	var reader *bufio.Reader
 	if !options.replace && !options.skipCustomized && stdinIsInteractive() {
 		reader = bufio.NewReader(os.Stdin)
 	}
 	changes := make([]upgradeAssetChange, 0, len(assets))
 	for _, name := range assets {
-		source := filepath.Join(candidateRoot, name)
 		target := filepath.Join(destinationRoot, name)
-		// #nosec G304 -- source is inside private staging and uses fixed asset names.
-		candidate, err := os.ReadFile(source)
-		if err != nil {
-			return fmt.Errorf("read candidate %s: %w", name, err)
-		}
-		if name == ".ash_env" {
-			values, err := preservedAshEnvValues(target)
-			if err != nil {
-				return err
-			}
-			candidate = []byte(buildManagedAshEnv(values))
-		}
+		candidate := candidateFiles[name]
 		// #nosec G304 -- target is derived from the fixed ~/.ash asset names.
 		current, readErr := os.ReadFile(target)
 		if errors.Is(readErr, os.ErrNotExist) {
@@ -676,7 +718,7 @@ func syncUpgradeAssets(candidateRoot string, options upgradeOptions, stdout io.W
 		if readErr != nil {
 			return readErr
 		}
-		baseline, err := readEmbeddedBootstrapAsset(filepath.ToSlash(filepath.Join("ash_bootstrap", name)))
+		baseline, err := embeddedUpgradeAsset(name)
 		if err != nil {
 			return err
 		}
@@ -730,31 +772,21 @@ func syncUpgradeAssets(candidateRoot string, options upgradeOptions, stdout io.W
 	return nil
 }
 
-func syncUpgradePlugins(candidateRoot, home string, stdout io.Writer) error {
-	destinationRoot := filepath.Join(home, ashWorkspaceDirName, "plugins")
+func syncUpgradePlugins(candidateRoot string, stdout io.Writer) error {
+	dataRoot, err := ashDataDir()
+	if err != nil {
+		return err
+	}
+	destinationRoot := filepath.Join(dataRoot, "plugins")
 	if err := os.MkdirAll(destinationRoot, 0o700); err != nil {
 		return err
 	}
-	entries, err := os.ReadDir(candidateRoot)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
+	names, err := upgradePluginNames(candidateRoot)
 	if err != nil {
-		return fmt.Errorf("read candidate plugins: %w", err)
+		return err
 	}
-	for _, entry := range entries {
-		name := entry.Name()
-		if entry.IsDir() || normalizeToolName(name) != name {
-			return fmt.Errorf("invalid plugin archive entry %q", name)
-		}
+	for _, name := range names {
 		source := filepath.Join(candidateRoot, name)
-		info, err := entry.Info()
-		if err != nil {
-			return err
-		}
-		if !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
-			return fmt.Errorf("plugin archive entry %q is not executable", name)
-		}
 		target := filepath.Join(destinationRoot, name)
 		if err := replaceUpgradeFile(source, target, 0o755); err != nil {
 			return err
@@ -762,6 +794,32 @@ func syncUpgradePlugins(candidateRoot, home string, stdout io.Writer) error {
 		_, _ = fmt.Fprintf(stdout, "installed %s\n", target)
 	}
 	return nil
+}
+
+func upgradePluginNames(candidateRoot string) ([]string, error) {
+	entries, err := os.ReadDir(candidateRoot)
+	if err != nil {
+		return nil, fmt.Errorf("read candidate plugins: %w", err)
+	}
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		name := entry.Name()
+		if entry.IsDir() || normalizeToolName(name) != name {
+			return nil, fmt.Errorf("invalid plugin archive entry %q", name)
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return nil, err
+		}
+		if !info.Mode().IsRegular() || info.Mode().Perm()&0o111 == 0 {
+			return nil, fmt.Errorf("plugin archive entry %q is not executable", name)
+		}
+		names = append(names, name)
+	}
+	if len(names) == 0 {
+		return nil, errors.New("release archive contains no executable plugins")
+	}
+	return names, nil
 }
 
 func rollbackUpgradeAssets(changes []upgradeAssetChange) {
@@ -783,17 +841,21 @@ func rollbackUpgradeAssets(changes []upgradeAssetChange) {
 }
 
 func writeUpgradeAsset(destination string, content []byte, executable bool) error {
+	mode := os.FileMode(0o600)
+	if executable {
+		mode = 0o700
+	}
+	return writeUpgradeAssetMode(destination, content, mode)
+}
+
+func writeUpgradeAssetMode(destination string, content []byte, mode os.FileMode) error {
 	temporary, err := os.CreateTemp(filepath.Dir(destination), ".ash-asset-*")
 	if err != nil {
 		return err
 	}
 	temporaryPath := temporary.Name()
-	defer func() { _ = os.Remove(temporaryPath) }()
-	mode := os.FileMode(0o600)
-	if executable {
-		mode = 0o700
-	}
-	if err := temporary.Chmod(mode); err != nil {
+	defer func() { _ = os.Remove(temporaryPath) }() // #nosec G703 -- temporaryPath is the unique file created above.
+	if err := temporary.Chmod(mode.Perm()); err != nil {
 		_ = temporary.Close()
 		return err
 	}
@@ -808,19 +870,168 @@ func writeUpgradeAsset(destination string, content []byte, executable bool) erro
 	if err := temporary.Close(); err != nil {
 		return err
 	}
-	backup := destination + ".upgrade-old"
-	if err := os.Remove(backup); err != nil && !errors.Is(err, os.ErrNotExist) {
+	return os.Rename(temporaryPath, destination) // #nosec G703 -- destination is an updater-owned target; the temporary file is created beside it.
+}
+
+func snapshotUpgradeFiles(paths []string) ([]upgradeFileSnapshot, error) {
+	seen := make(map[string]struct{}, len(paths))
+	snapshots := make([]upgradeFileSnapshot, 0, len(paths))
+	for _, path := range paths {
+		if _, exists := seen[path]; exists {
+			continue
+		}
+		seen[path] = struct{}{}
+		snapshot, err := snapshotUpgradeFile(path)
+		if err != nil {
+			return nil, err
+		}
+		snapshots = append(snapshots, snapshot)
+	}
+	return snapshots, nil
+}
+
+func snapshotUpgradeFile(path string) (upgradeFileSnapshot, error) {
+	snapshot := upgradeFileSnapshot{path: path}
+	info, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return snapshot, nil
+	}
+	if err != nil {
+		return upgradeFileSnapshot{}, err
+	}
+	snapshot.exists = true
+	snapshot.mode = info.Mode().Perm()
+	if info.Mode()&os.ModeSymlink != 0 {
+		target, err := os.Readlink(path)
+		if err != nil {
+			return upgradeFileSnapshot{}, err
+		}
+		snapshot.symlinkPath = target
+		return snapshot, nil
+	}
+	if info.IsDir() {
+		snapshot.directory = true
+		return snapshot, nil
+	}
+	if !info.Mode().IsRegular() {
+		return upgradeFileSnapshot{}, fmt.Errorf("upgrade target %s is not a regular file", path)
+	}
+	snapshot.content, err = os.ReadFile(path) // #nosec G304 -- callers pass only the updater's enumerated installation paths.
+	if err != nil {
+		return upgradeFileSnapshot{}, err
+	}
+	return snapshot, nil
+}
+
+func restoreUpgradeFiles(snapshots []upgradeFileSnapshot) error {
+	var restoreErrors []error
+	for index := len(snapshots) - 1; index >= 0; index-- {
+		previous := snapshots[index]
+		current, err := snapshotUpgradeFile(previous.path)
+		if err != nil {
+			restoreErrors = append(restoreErrors, fmt.Errorf("inspect %s: %w", previous.path, err))
+			continue
+		}
+		if snapshotsEqual(previous, current) {
+			continue
+		}
+		if !previous.exists {
+			if err := os.Remove(previous.path); err != nil && !errors.Is(err, os.ErrNotExist) && !errors.Is(err, os.ErrExist) {
+				restoreErrors = append(restoreErrors, fmt.Errorf("remove %s: %w", previous.path, err))
+			}
+			continue
+		}
+		if previous.directory {
+			if current.exists && !current.directory {
+				restoreErrors = append(restoreErrors, fmt.Errorf("restore directory %s: path is not a directory", previous.path))
+				continue
+			}
+			if !current.exists {
+				if err := os.MkdirAll(previous.path, previous.mode); err != nil {
+					restoreErrors = append(restoreErrors, fmt.Errorf("restore directory %s: %w", previous.path, err))
+					continue
+				}
+			}
+			if err := os.Chmod(previous.path, previous.mode); err != nil {
+				restoreErrors = append(restoreErrors, fmt.Errorf("restore directory mode %s: %w", previous.path, err))
+			}
+			continue
+		}
+		if previous.symlinkPath != "" {
+			if err := restoreUpgradeSymlink(previous.path, previous.symlinkPath); err != nil {
+				restoreErrors = append(restoreErrors, fmt.Errorf("restore symlink %s: %w", previous.path, err))
+			}
+			continue
+		}
+		if err := writeUpgradeAssetMode(previous.path, previous.content, previous.mode); err != nil {
+			restoreErrors = append(restoreErrors, fmt.Errorf("restore %s: %w", previous.path, err))
+		}
+	}
+	return errors.Join(restoreErrors...)
+}
+
+func snapshotsEqual(left, right upgradeFileSnapshot) bool {
+	if left.exists != right.exists {
+		return false
+	}
+	if !left.exists {
+		return true
+	}
+	if left.directory || right.directory {
+		return left.directory == right.directory && left.mode == right.mode
+	}
+	if left.symlinkPath != "" || right.symlinkPath != "" {
+		return left.symlinkPath == right.symlinkPath
+	}
+	return left.mode == right.mode && bytes.Equal(left.content, right.content)
+}
+
+func missingUpgradeDirectories(targets []string) ([]string, error) {
+	missing := make(map[string]struct{})
+	for _, target := range targets {
+		for directory := filepath.Dir(target); directory != "." && directory != string(filepath.Separator); directory = filepath.Dir(directory) {
+			_, err := os.Lstat(directory)
+			if err == nil {
+				break
+			}
+			if !errors.Is(err, os.ErrNotExist) {
+				return nil, err
+			}
+			missing[directory] = struct{}{}
+		}
+	}
+	directories := make([]string, 0, len(missing))
+	for directory := range missing {
+		directories = append(directories, directory)
+	}
+	sort.Slice(directories, func(i, j int) bool {
+		depth := func(path string) int { return strings.Count(filepath.Clean(path), string(filepath.Separator)) }
+		if depth(directories[i]) == depth(directories[j]) {
+			return directories[i] < directories[j]
+		}
+		return depth(directories[i]) < depth(directories[j])
+	})
+	return directories, nil
+}
+
+func restoreUpgradeSymlink(path, target string) error {
+	temporary, err := os.CreateTemp(filepath.Dir(path), ".ash-rollback-link-*")
+	if err != nil {
 		return err
 	}
-	if err := os.Rename(destination, backup); err != nil && !errors.Is(err, os.ErrNotExist) {
+	temporaryPath := temporary.Name()
+	if err := temporary.Close(); err != nil {
+		_ = os.Remove(temporaryPath)
 		return err
 	}
-	if err := os.Rename(temporaryPath, destination); err != nil {
-		_ = os.Rename(backup, destination)
+	if err := os.Remove(temporaryPath); err != nil {
 		return err
 	}
-	_ = os.Remove(backup)
-	return nil
+	defer func() { _ = os.Remove(temporaryPath) }()
+	if err := os.Symlink(target, temporaryPath); err != nil {
+		return err
+	}
+	return os.Rename(temporaryPath, path)
 }
 
 func confirmUpgradeExceptions(reader io.Reader, stdout io.Writer, version string, entries []unsupportedUpgradeArchiveEntry, signatureErr error) (bool, error) {
@@ -931,10 +1142,7 @@ func findUpgradeBinary(root, expectedName string) (string, error) {
 			return err
 		}
 		name := filepath.Base(path)
-		if strings.HasSuffix(name, "-broker") {
-			return nil
-		}
-		if info.Mode().IsRegular() && (name == expectedName || name == "ash" || strings.HasPrefix(name, "ash-v")) {
+		if info.Mode().IsRegular() && name == expectedName {
 			matches = append(matches, path)
 		}
 		return nil
@@ -948,7 +1156,7 @@ func findUpgradeBinary(root, expectedName string) (string, error) {
 	return matches[0], nil
 }
 
-// findUpgradeBrokerBinary locates the optional ash-broker executable in an extracted archive.
+// findUpgradeBrokerBinary locates the required ash-broker executable in an extracted archive.
 func findUpgradeBrokerBinary(root string) (string, error) {
 	var matches []string
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
@@ -956,7 +1164,7 @@ func findUpgradeBrokerBinary(root string) (string, error) {
 			return err
 		}
 		name := filepath.Base(path)
-		if info.Mode().IsRegular() && (name == "ash-broker" || strings.HasSuffix(name, "-broker")) {
+		if info.Mode().IsRegular() && name == "ash-broker" {
 			matches = append(matches, path)
 		}
 		return nil
@@ -976,40 +1184,7 @@ func replaceUpgradeFile(source, destination string, mode os.FileMode) error {
 	if err != nil {
 		return err
 	}
-	temporary, err := os.CreateTemp(filepath.Dir(destination), ".ash-upgrade-*")
-	if err != nil {
-		return err
-	}
-	temporaryPath := temporary.Name()
-	defer func() { _ = os.Remove(temporaryPath) }()
-	if err := temporary.Chmod(mode); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if _, err := temporary.Write(data); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Sync(); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Close(); err != nil {
-		return err
-	}
-	backup := destination + ".old"
-	if err := os.Remove(backup); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	if err := os.Rename(destination, backup); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return err
-	}
-	if err := os.Rename(temporaryPath, destination); err != nil {
-		_ = os.Rename(backup, destination)
-		return err
-	}
-	_ = os.Remove(backup)
-	return nil
+	return writeUpgradeAssetMode(destination, data, mode)
 }
 
 func promptUpgradeAsset(reader *bufio.Reader, writer io.Writer, path string) (byte, error) {

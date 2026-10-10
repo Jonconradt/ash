@@ -21,7 +21,8 @@
 # Internet and current information search tools
 # -----------------------------------------------------------------------------
 # $TOOLS_DIR_LIST is an internal Ash directive, not an environment variable. As a complete line,
-# it allows readable, executable regular files in ~/.ash/tools/. Replace it with literal bare names
+# it allows readable, executable regular files in ${XDG_DATA_HOME:-$HOME/.local/share}/ash/tools/.
+# Replace it with literal bare names
 # to use a fixed, restrictive tool-script policy.
 $TOOLS_DIR_LIST
 

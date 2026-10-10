@@ -7,27 +7,28 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
-	mcpclient "ash/internal/mcp"
+	mcpclient "github.com/Jonconradt/ash/internal/mcp"
 )
 
 const (
 	// #nosec G101 -- these are environment variable names, not secrets.
-	aiEnvEndpoint = "AI_ENDPOINT"
+	aiEnvEndpoint = "ASH_AI_ENDPOINT"
 	// #nosec G101 -- these are environment variable names, not secrets.
-	aiEnvModel = "AI_MODEL"
+	aiEnvModel = "ASH_AI_MODEL"
 	// #nosec G101 -- these are environment variable names, not secrets.
-	aiEnvAuthType = "AI_AUTH_TYPE"
+	aiEnvAuthType = "ASH_AI_AUTH_TYPE"
 	// #nosec G101 -- these are environment variable names, not secrets.
-	aiEnvAuthToken = "AI_AUTH_TOKEN"
+	aiEnvAuthToken = "ASH_AI_AUTH_TOKEN"
 	// #nosec G101 -- these are environment variable names, not secrets.
-	aiEnvProvider = "AI_PROVIDER"
+	aiEnvProvider = "ASH_AI_PROVIDER"
 	// #nosec G101 -- these are environment variable names, not secrets.
-	aiEnvCache = "AI_CACHE"
+	aiEnvCache = "ASH_AI_CACHE"
 	// ashEnvAlwaysOpenAIAPI, when truthy, routes the Ollama provider through the
 	// OpenAI-compatible adapter instead of the hand-rolled Ollama one, for manual
 	// testing of whether the Ollama-specific implementation is still required.
@@ -47,10 +48,6 @@ type aiConfig struct {
 
 // parseAIConfigFromEnv parses and validates input values.
 func parseAIConfigFromEnv() (aiConfig, error) {
-	if legacy := strings.TrimSpace(os.Getenv("AI")); legacy != "" {
-		return aiConfig{}, errors.New("AI is no longer supported; use AI_ENDPOINT and AI_MODEL")
-	}
-
 	rawEndpoint := strings.TrimSpace(os.Getenv(aiEnvEndpoint))
 	model := strings.TrimSpace(os.Getenv(aiEnvModel))
 	authToken := strings.TrimSpace(os.Getenv(aiEnvAuthToken))
@@ -76,12 +73,18 @@ func parseAIConfigFromEnv() (aiConfig, error) {
 	if err != nil {
 		return aiConfig{}, err
 	}
+	if rawTimeout := strings.TrimSpace(os.Getenv("ASH_AI_TIMEOUT")); rawTimeout != "" {
+		timeout, err := time.ParseDuration(rawTimeout)
+		if err != nil || timeout <= 0 {
+			return aiConfig{}, errors.New("ASH_AI_TIMEOUT must be a positive duration")
+		}
+	}
 
 	if isCloudAIHost(host) {
 		if scheme != "https" {
-			return aiConfig{}, errors.New("AI_ENDPOINT must use https for cloud endpoints")
+			return aiConfig{}, errors.New("ASH_AI_ENDPOINT must use https for cloud endpoints")
 		}
-		if authToken == "" {
+		if provider != providerBedrock && authToken == "" {
 			return aiConfig{}, missingAIEnvSetupError()
 		}
 	}
@@ -216,14 +219,14 @@ func parseAIEndpoint(value string) (baseURL string, host string, scheme string, 
 
 	scheme = strings.ToLower(strings.TrimSpace(u.Scheme))
 	if hasScheme && scheme != "http" && scheme != "https" {
-		return "", "", "", errors.New("AI_ENDPOINT scheme must be http or https")
+		return "", "", "", errors.New("ASH_AI_ENDPOINT scheme must be http or https")
 	}
 	host = strings.TrimSpace(u.Hostname())
 	if host == "" {
-		return "", "", "", errors.New("AI_ENDPOINT host is required")
+		return "", "", "", errors.New("ASH_AI_ENDPOINT host is required")
 	}
 	if strings.TrimSpace(u.RawQuery) != "" || strings.TrimSpace(u.Fragment) != "" {
-		return "", "", "", errors.New("AI_ENDPOINT must not include query or fragment")
+		return "", "", "", errors.New("ASH_AI_ENDPOINT must not include query or fragment")
 	}
 
 	if !hasScheme {
@@ -276,34 +279,12 @@ func readSystemPrompt() (string, error) {
 
 // readSystemPromptWithAllowlist renders the selected prompt against one resolved tool policy.
 func readSystemPromptWithAllowlist(allowlist map[string]struct{}) (string, error) {
-	if root, err := ashWorkspaceDir(); err == nil {
-		canonicalPath := filepath.Join(root, systemFileName)
-		if content, err := osReadFile(canonicalPath); err == nil {
-			return expandSystemPromptWithAllowlist(string(content), allowlist), nil
-		} else if !errors.Is(err, os.ErrNotExist) {
-			return "", err
-		}
-	}
-
-	cwd, err := osGetwd()
+	root, err := ashWorkspaceDir()
 	if err != nil {
 		return "", err
 	}
-
-	cwdPath := filepath.Join(cwd, systemFileName)
-	if content, err := osReadFile(cwdPath); err == nil {
-		return expandSystemPromptWithAllowlist(string(content), allowlist), nil
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return "", err
-	}
-
-	home, err := osUserHomeDir()
-	if err != nil {
-		return "", err
-	}
-
-	homePath := filepath.Join(home, systemFileName)
-	if content, err := osReadFile(homePath); err == nil {
+	canonicalPath := filepath.Join(root, systemFileName)
+	if content, err := osReadFile(canonicalPath); err == nil {
 		return expandSystemPromptWithAllowlist(string(content), allowlist), nil
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return "", err
@@ -338,40 +319,18 @@ func loadDenylistedCommands() (map[string]struct{}, error) {
 	return loadDenylistedCommandsFromSource()
 }
 
-// loadDenylistedCommandsFromSource resolves the raw denylist from env, cwd, or home.
+// loadDenylistedCommandsFromSource resolves the raw denylist from env or user config.
 func loadDenylistedCommandsFromSource() (map[string]struct{}, error) {
 	if raw := strings.TrimSpace(os.Getenv("ASH_DENY")); raw != "" {
 		return parseAllowlistCSV(raw), nil
 	}
 
-	if root, err := ashWorkspaceDir(); err == nil {
-		canonicalPath := filepath.Join(root, denyFileName)
-		if content, err := osReadFile(canonicalPath); err == nil {
-			return parseDenylistFile(string(content)), nil
-		} else if !errors.Is(err, os.ErrNotExist) {
-			return nil, err
-		}
-	}
-
-	cwd, err := osGetwd()
+	root, err := ashWorkspaceDir()
 	if err != nil {
 		return nil, err
 	}
-
-	cwdPath := filepath.Join(cwd, denyFileName)
-	if content, err := osReadFile(cwdPath); err == nil {
-		return parseDenylistFile(string(content)), nil
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return nil, err
-	}
-
-	home, err := osUserHomeDir()
-	if err != nil {
-		return nil, err
-	}
-
-	homePath := filepath.Join(home, denyFileName)
-	if content, err := osReadFile(homePath); err == nil {
+	canonicalPath := filepath.Join(root, denyFileName)
+	if content, err := osReadFile(canonicalPath); err == nil {
 		return parseDenylistFile(string(content)), nil
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
@@ -380,53 +339,18 @@ func loadDenylistedCommandsFromSource() (map[string]struct{}, error) {
 	return map[string]struct{}{}, nil
 }
 
-// loadAllowlistedCommandsFromSource resolves the raw allowlist from env, cwd, or home, before any post-processing.
+// loadAllowlistedCommandsFromSource resolves the raw allowlist from env or user config.
 func loadAllowlistedCommandsFromSource() (map[string]struct{}, error) {
 	if raw := strings.TrimSpace(os.Getenv("ASH_ALLOW")); raw != "" {
 		return parseAllowlistCSV(raw), nil
 	}
 
-	if root, err := ashWorkspaceDir(); err == nil {
-		canonicalPath := filepath.Join(root, allowFileName)
-		if content, err := osReadFile(canonicalPath); err == nil {
-			return parseAllowlistFileWithTokens(string(content))
-		} else if !errors.Is(err, os.ErrNotExist) {
-			return nil, err
-		}
-		legacyPath := filepath.Join(root, legacyToolsFileName)
-		if content, err := osReadFile(legacyPath); err == nil {
-			return parseAllowlistFileWithTokens(string(content))
-		} else if !errors.Is(err, os.ErrNotExist) {
-			return nil, err
-		}
-	}
-
-	cwd, err := osGetwd()
+	root, err := ashWorkspaceDir()
 	if err != nil {
 		return nil, err
 	}
-
-	cwdPath := filepath.Join(cwd, allowFileName)
-	if content, err := osReadFile(cwdPath); err == nil {
-		return parseAllowlistFileWithTokens(string(content))
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return nil, err
-	}
-
-	home, err := osUserHomeDir()
-	if err != nil {
-		return nil, err
-	}
-
-	homePath := filepath.Join(home, allowFileName)
-	if content, err := osReadFile(homePath); err == nil {
-		return parseAllowlistFileWithTokens(string(content))
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return nil, err
-	}
-
-	legacyHomePath := filepath.Join(home, legacyToolsFileName)
-	if content, err := osReadFile(legacyHomePath); err == nil {
+	canonicalPath := filepath.Join(root, allowFileName)
+	if content, err := osReadFile(canonicalPath); err == nil {
 		return parseAllowlistFileWithTokens(string(content))
 	} else if !errors.Is(err, os.ErrNotExist) {
 		return nil, err
@@ -575,7 +499,7 @@ func expandSystemPromptWithAllowlist(prompt string, allowlist map[string]struct{
 
 // eligibleToolScripts returns readable, executable regular files in Ash's managed tools directory.
 func eligibleToolScripts() ([]string, error) {
-	root, err := ashWorkspaceDir()
+	root, err := ashDataDir()
 	if err != nil {
 		return nil, err
 	}
@@ -625,32 +549,37 @@ func renderEligibleToolScripts(allowlist map[string]struct{}) string {
 
 // eligiblePlugins returns readable, executable regular files in Ash's managed plugins directory.
 func eligiblePlugins() ([]string, error) {
-	root, err := ashWorkspaceDir()
+	roots, err := managedPluginRoots()
 	if err != nil {
 		return nil, err
 	}
-	entries, err := os.ReadDir(filepath.Join(root, "plugins"))
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	plugins := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		if entry.IsDir() || normalizeToolName(entry.Name()) != entry.Name() {
+	pluginsByName := make(map[string]struct{})
+	for _, root := range roots {
+		entries, err := os.ReadDir(root)
+		if errors.Is(err, os.ErrNotExist) {
 			continue
 		}
-		info, err := entry.Info()
 		if err != nil {
 			return nil, err
 		}
-		mode := info.Mode()
-		if !mode.IsRegular() || mode.Perm()&0o444 == 0 || mode.Perm()&0o111 == 0 {
-			continue
+		for _, entry := range entries {
+			if entry.IsDir() || normalizeToolName(entry.Name()) != entry.Name() {
+				continue
+			}
+			info, err := entry.Info()
+			if err != nil {
+				return nil, err
+			}
+			mode := info.Mode()
+			if !mode.IsRegular() || mode.Perm()&0o444 == 0 || mode.Perm()&0o111 == 0 {
+				continue
+			}
+			pluginsByName[entry.Name()] = struct{}{}
 		}
-		plugins = append(plugins, entry.Name())
+	}
+	plugins := make([]string, 0, len(pluginsByName))
+	for name := range pluginsByName {
+		plugins = append(plugins, name)
 	}
 	sort.Strings(plugins)
 	return plugins, nil
@@ -673,25 +602,50 @@ func renderEligiblePlugins(allowlist map[string]struct{}) string {
 	return strings.Join(allowed, ", ")
 }
 
-// managedNativePlugin resolves an installed plugin name to its executable path in ~/.ash/plugins/.
+// managedNativePlugin resolves an installed plugin name to its executable path.
 func managedNativePlugin(name string) (string, bool) {
 	if normalizeToolName(name) != name {
 		return "", false
 	}
-	root, err := ashWorkspaceDir()
+	roots, err := managedPluginRoots()
 	if err != nil {
 		return "", false
 	}
-	pluginPath := filepath.Join(root, "plugins", name)
-	info, err := os.Stat(pluginPath)
-	if err != nil || info.IsDir() {
-		return "", false
+	for _, root := range roots {
+		pluginPath := filepath.Join(root, name)
+		info, err := os.Stat(pluginPath)
+		if err != nil || info.IsDir() {
+			continue
+		}
+		mode := info.Mode()
+		if mode.IsRegular() && mode.Perm()&0o444 != 0 && mode.Perm()&0o111 != 0 {
+			return pluginPath, true
+		}
 	}
-	mode := info.Mode()
-	if !mode.IsRegular() || mode.Perm()&0o444 == 0 || mode.Perm()&0o111 == 0 {
-		return "", false
+	return "", false
+}
+
+func managedPluginRoots() ([]string, error) {
+	dataRoot, err := ashDataDir()
+	if err != nil {
+		return nil, err
 	}
-	return pluginPath, true
+	roots := []string{filepath.Join(dataRoot, "plugins")}
+	if systemRoot := systemPluginRoot(runtime.GOOS); systemRoot != "" {
+		roots = append(roots, systemRoot)
+	}
+	return roots, nil
+}
+
+func systemPluginRoot(goos string) string {
+	switch goos {
+	case "linux":
+		return "/usr/lib/ash/plugins"
+	case "darwin", "freebsd":
+		return "/usr/local/lib/ash/plugins"
+	default:
+		return ""
+	}
 }
 
 func stripSystemPromptComments(prompt string) string {
@@ -718,7 +672,7 @@ func historyLimit() int {
 
 // aiTimeout returns the configured AI request timeout, or the default when unset or invalid.
 func aiTimeout() time.Duration {
-	if raw := strings.TrimSpace(os.Getenv("AI_TIMEOUT")); raw != "" {
+	if raw := strings.TrimSpace(os.Getenv("ASH_AI_TIMEOUT")); raw != "" {
 		if parsed, err := time.ParseDuration(raw); err == nil && parsed > 0 {
 			return parsed
 		}

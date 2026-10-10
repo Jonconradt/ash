@@ -30,14 +30,16 @@ func bashInstallWrapperContent() string {
 func fallbackBashInstallWrapperContent() string {
 	return strings.TrimSpace(`
 ` + installStartMarker + `
-[ -f "$HOME/.ash/.ash_env" ] && . "$HOME/.ash/.ash_env"
 case "$-" in
 	*i*) ;;
 	*) return ;;
 esac
+_ash_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/ash"
+_ash_state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/ash"
+[[ -f "$_ash_config_dir/.ash_env" ]] && . "$_ash_config_dir/.ash_env"
 
 _ash_prompt_processing_enabled() {
-	local snooze_file="$HOME/.ash/.ash_snooze_until"
+	local snooze_file="$_ash_state_dir/.ash_snooze_until"
 	local expires_at now
 	if [[ ! -r "$snooze_file" ]]; then
 		return 0
@@ -50,11 +52,22 @@ _ash_prompt_processing_enabled() {
 	(( expires_at <= now ))
 }
 
-command_not_found_handle() {
+	if [[ "${_ASH_WRAPS_COMMAND_NOT_FOUND:-}" != 1 ]]; then
+		if declare -F command_not_found_handle >/dev/null 2>&1; then
+			eval "$(declare -f command_not_found_handle | sed '1s/command_not_found_handle/_ash_original_command_not_found_handle/')"
+		fi
+		_ASH_WRAPS_COMMAND_NOT_FOUND=1
+	fi
+
+	command_not_found_handle() {
 	if _ash_prompt_processing_enabled; then
 		_ash_ensure_broker >/dev/null 2>&1
 		[[ -n "${ASH_BROKER_LEASE:-}" ]] && touch "$ASH_BROKER_LEASE"
 		ash "$@"
+		return $?
+	fi
+	if declare -F _ash_original_command_not_found_handle >/dev/null 2>&1; then
+		_ash_original_command_not_found_handle "$@"
 		return $?
 	fi
 	return 127
@@ -305,39 +318,16 @@ func ensureBashProfileSourcingForInstall(dryRun bool, stdout io.Writer) error {
 	return osWriteFile(profilePath, []byte(updated), 0o600)
 }
 func normalizeBashProfileForInstall(content, bashRCLine string) string {
-	lines := strings.Split(content, "\n")
-	filtered := make([]string, 0, len(lines)+1)
-	hasBashRC := false
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		switch {
-		case trimmed == "":
-			filtered = append(filtered, line)
-		case strings.Contains(trimmed, ".ash/.ash_env") || strings.Contains(trimmed, ".ash/.ash_bashrc"):
-			continue
-		default:
-			if isBashRCSourceLine(trimmed) {
-				if hasBashRC {
-					continue
-				}
-				hasBashRC = true
-				filtered = append(filtered, bashRCLine)
-				continue
-			}
-			filtered = append(filtered, line)
+	for _, line := range strings.Split(content, "\n") {
+		if isBashRCSourceLine(strings.TrimSpace(line)) {
+			return content
 		}
 	}
 
-	updated := strings.Join(filtered, "\n")
-	if !hasBashRC {
-		if updated != "" && !strings.HasSuffix(updated, "\n") {
-			updated += "\n"
-		}
-		updated += bashRCLine + "\n"
-	} else if content != "" && strings.HasSuffix(content, "\n") && !strings.HasSuffix(updated, "\n") {
-		updated += "\n"
+	if content != "" && !strings.HasSuffix(content, "\n") {
+		content += "\n"
 	}
-	return updated
+	return content + bashRCLine + "\n"
 }
 
 func isBashRCSourceLine(line string) bool {

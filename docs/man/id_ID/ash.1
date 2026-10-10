@@ -35,13 +35,17 @@ untuk memaksa keluaran teks.
 .PP
 Subperintah
 .B install
-menambahkan blok integrasi terkelola ke berkas awal shell. Saat instalasi, bahasa
+memasang aset terkelola. Berkas awal shell hanya diubah jika
+.B --shell-integration
+digunakan. Saat instalasi, bahasa
 dipilih berdasarkan
 .B ASH_LANG
 (jika ditetapkan) atau
 .B LANG
 dan paket bahasa yang tersedia disimpan di
-.IR ~/.ash/languages/ .
+.IR $XDG_DATA_HOME/ash/languages/
+(default
+.IR ~/.local/share/ash/languages/ ).
 .SH PERINTAH
 .TP
 .B ash [teks...]
@@ -68,6 +72,12 @@ Melampirkan gambar atau dokumen ke permintaan. Dapat digunakan berulang kali.
 .BI --shell " shell"
 Memilih shell yang akan dipasang secara eksplisit.
 .TP
+.B --shell-integration
+Mengaktifkan atau memperbarui blok terkelola di berkas awal shell.
+.TP
+.B --disable-shell-integration
+Menghapus hanya blok terkelola dari berkas awal shell.
+.TP
 .B --dry-run
 Meninjau perubahan berkas tanpa menulisnya.
 .TP
@@ -93,7 +103,7 @@ Memilih bahasa antarmuka jika
 .B ASH_LANG
 tidak ditetapkan. Mendukung en_US, zh_CN, zh_TW, es_ES, ar_AE, dan id_ID. Jika terjemahan dialek tidak tersedia, katalog bahasa yang tersedia akan digunakan.
 .TP
-.B AI_ENDPOINT, AI_MODEL, AI_AUTH_TOKEN
+.B ASH_AI_ENDPOINT, ASH_AI_MODEL, ASH_AI_AUTH_TOKEN
 Mengatur endpoint, model, dan kredensial AI.
 .TP
 .B ASH_SAY_TEXT
@@ -102,10 +112,10 @@ Menonaktifkan keluaran suara jika diatur ke
 .
 .SH BERKAS
 .TP
-.I ~/.ash/languages/
+.I $XDG_DATA_HOME/ash/languages/
 Katalog bahasa yang dipasang pengguna.
 .TP
-.I ~/.ash/.ash_env
+.I $XDG_CONFIG_HOME/ash/.ash_env
 Konfigurasi lingkungan AI terkelola.
 .SH STATUS KELUAR
 .TP

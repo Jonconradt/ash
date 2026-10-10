@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"ash/internal/localize"
+	"github.com/Jonconradt/ash/internal/localize"
 )
 
 const managedVenvDirName = "venv"
@@ -20,7 +20,7 @@ var provisionPythonEnv = provisionManagedPythonEnv
 
 // managedVenvPython returns the interpreter path inside the ash-managed virtualenv.
 func managedVenvPython() (string, error) {
-	root, err := ashWorkspaceDir()
+	root, err := ashDataDir()
 	if err != nil {
 		return "", err
 	}
@@ -67,7 +67,7 @@ func managedPythonScript(name string) (string, bool) {
 	if !strings.HasSuffix(name, ".py") {
 		return "", false
 	}
-	root, err := ashWorkspaceDir()
+	root, err := ashDataDir()
 	if err != nil {
 		return "", false
 	}
@@ -88,7 +88,7 @@ func provisionManagedPythonEnv(stdout io.Writer) {
 		return
 	}
 
-	root, err := ashWorkspaceDir()
+	root, err := ashDataDir()
 	if err != nil {
 		_, _ = fmt.Fprintln(stdout, localize.Format("install.python.setup_skipped", []any{err}))
 		return

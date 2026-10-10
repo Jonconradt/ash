@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"ash/internal/localize"
+	"github.com/Jonconradt/ash/internal/localize"
 )
 
 //go:embed ash_bootstrap/.ash_env
@@ -47,8 +47,15 @@ func installSourceBlockFromAsset(srcPath string) string {
 	return strings.TrimSpace(installStartMarker + "\n" + string(body) + installEndMarker)
 }
 
-func installEmbeddedBootstrapAssets(overwrite bool, skipPath string, stdout io.Writer) error {
+func installEmbeddedBootstrapAssets(overwrite bool, skipPath string, dryRun bool, stdout io.Writer) error {
+	if dryRun {
+		return nil
+	}
 	root, err := ashWorkspaceDir()
+	if err != nil {
+		return err
+	}
+	dataRoot, err := ashDataDir()
 	if err != nil {
 		return err
 	}
@@ -100,7 +107,7 @@ func installEmbeddedBootstrapAssets(overwrite bool, skipPath string, stdout io.W
 	if err := installManagedAssetFile(filepath.Join(root, ".ash_fish_env.fish"), buildFishEnvironmentFile(string(envContent)), true, 0o600, stdout, false); err != nil {
 		return err
 	}
-	if err := osMkdirAll(filepath.Join(root, "plugins"), 0o700); err != nil {
+	if err := osMkdirAll(filepath.Join(dataRoot, "plugins"), 0o700); err != nil {
 		return fmt.Errorf("create managed plugins directory: %w", err)
 	}
 
@@ -108,16 +115,13 @@ func installEmbeddedBootstrapAssets(overwrite bool, skipPath string, stdout io.W
 	if err != nil {
 		return fmt.Errorf("read embedded tools directory: %w", err)
 	}
-	if err := removeLegacyToolScripts(root, entries, stdout); err != nil {
-		return err
-	}
 	for _, entry := range entries {
 		// requirements.txt drives venv provisioning; it is not a runnable tool.
 		if entry.IsDir() || entry.Name() == "requirements.txt" {
 			continue
 		}
 		srcPath := filepath.ToSlash(filepath.Join("ash_bootstrap", "tools", entry.Name()))
-		dstPath := filepath.Join(root, "tools", entry.Name())
+		dstPath := filepath.Join(dataRoot, "tools", entry.Name())
 		content, err := readEmbeddedBootstrapAsset(srcPath)
 		if err != nil {
 			return fmt.Errorf("read %s: %w", srcPath, err)
@@ -230,19 +234,12 @@ func parseShellExportValue(raw string) (string, bool) {
 func buildFishEnvironmentFile(content string) []byte {
 	var b strings.Builder
 	b.WriteString("# managed by ash install\n")
+	b.WriteString("if not set -q ASH_SESSION_ID\n")
+	b.WriteString("\tset -gx ASH_SESSION_ID (command head -c 100 /dev/urandom | command tr -dc 'a-zA-Z0-9' | command fold -w 16 | command head -n 1)\n")
+	b.WriteString("end\n")
 	for _, line := range strings.Split(content, "\n") {
 		key, value, ok := parseExportAssignment(line)
 		if !ok || !fishEnvironmentKeyAllowed(key) {
-			continue
-		}
-		if key == "SESSION_ID" {
-			b.WriteString("if not set -q SESSION_ID\n")
-			b.WriteString("\tset -gx SESSION_ID (command head -c 100 /dev/urandom | command tr -dc 'a-zA-Z0-9' | command fold -w 16 | command head -n 1)\n")
-			b.WriteString("end\n")
-			continue
-		}
-		if key == "PATH" {
-			b.WriteString("set -gx PATH \"$HOME/.ash/tools\" \"$HOME/.local/bin\" $PATH\n")
 			continue
 		}
 		b.WriteString("set -gx ")
@@ -255,62 +252,11 @@ func buildFishEnvironmentFile(content string) []byte {
 }
 
 func fishEnvironmentKeyAllowed(key string) bool {
-	if key == "SESSION_ID" || key == "PATH" {
-		return true
-	}
-	return strings.HasPrefix(key, "AI_") || strings.HasPrefix(key, "ASH_")
+	return strings.HasPrefix(key, "ASH_AI_")
 }
 
 func fishQuotedValue(value string) string {
 	return "'" + strings.ReplaceAll(strings.ReplaceAll(value, "\\", "\\\\"), "'", "\\'") + "'"
-}
-
-func removeLegacyToolScripts(root string, embeddedEntries []fs.DirEntry, stdout io.Writer) error {
-	pyScriptNames := make(map[string]struct{})
-	for _, entry := range embeddedEntries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if !strings.HasSuffix(name, ".py") {
-			continue
-		}
-		baseName := strings.TrimSuffix(name, ".py")
-		if baseName != "" {
-			pyScriptNames[baseName] = struct{}{}
-		}
-	}
-
-	toolsDir := filepath.Join(root, "tools")
-	entries, err := os.ReadDir(toolsDir)
-	if errors.Is(err, os.ErrNotExist) {
-		return nil
-	}
-	if err != nil {
-		return fmt.Errorf("read existing tools directory: %w", err)
-	}
-
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if strings.HasSuffix(name, ".py") {
-			continue
-		}
-		if _, ok := pyScriptNames[name]; !ok {
-			continue
-		}
-		legacyPath := filepath.Join(toolsDir, name)
-		if err := os.Remove(legacyPath); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("remove legacy tool script %s: %w", legacyPath, err)
-		}
-		if stdout != nil {
-			_, _ = fmt.Fprintf(stdout, "removed legacy tool script %s\n", legacyPath)
-		}
-	}
-
-	return nil
 }
 
 // missingAllowlistAdditions returns baseline entries absent from an existing policy file.

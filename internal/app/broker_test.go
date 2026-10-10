@@ -16,7 +16,7 @@ import (
 	"testing"
 	"time"
 
-	"ash/internal/brokerproto"
+	"github.com/Jonconradt/ash/internal/brokerproto"
 )
 
 // fakeBrokerListener starts a minimal test-double broker that decodes one brokerproto.Request

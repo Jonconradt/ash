@@ -27,8 +27,7 @@ func (a bedrockAdapter) Capabilities() providerCapabilities {
 // Converse API. Unlike every other provider, Bedrock authenticates via AWS SigV4
 // through the standard AWS credential chain (environment variables, ~/.aws/credentials,
 // SSO, instance role, etc.) rather than a bearer token; aiCfg.AuthToken/Authorization
-// are not used here — AI_AUTH_TOKEN only needs to be set to satisfy ash's generic
-// cloud-endpoint validation and is otherwise ignored for this provider.
+// are not used here.
 func (a bedrockAdapter) Send(ctx context.Context, aiCfg aiConfig, messages []message, tools []toolDefinition) (chatResponse, error) {
 	awsCfg, err := config.LoadDefaultConfig(ctx, config.WithHTTPClient(newAshHTTPClient()))
 	if err != nil {

@@ -7,7 +7,7 @@ FUZZ_TIME ?= 10s
 GOLANGCI_LINT_VERSION ?= v2.14.0
 RUFF_VERSION ?= 0.12.10
 MARKDOWNLINT_CLI2_VERSION ?= 0.23.2
-GOSEC_VERSION ?= v2.29.0
+GOSEC_VERSION ?= v2.29.1-0.20261009120814-7b1b5cebe007
 GOVULNCHECK_VERSION ?= v1.8.0
 STATICCHECK_VERSION ?= latest
 YAMLFMT_VERSION ?= latest
@@ -16,7 +16,7 @@ LOCAL_BIN_DIR ?= $(HOME)/.local/bin
 LOCAL_BINARY_PATH ?= $(LOCAL_BIN_DIR)/$(APP_NAME)
 PLUGINS_SRC_DIR ?= internal/app/ash_bootstrap/plugins_src
 PLUGINS_BIN_DIR ?= bin/plugins
-LOCAL_PLUGINS_DIR ?= $(HOME)/.ash/plugins
+LOCAL_PLUGINS_DIR ?= $(if $(XDG_DATA_HOME),$(XDG_DATA_HOME),$(HOME)/.local/share)/ash/plugins
 # Cross-compilation target for non-Go plugin toolchains (Rust); empty means "build
 # natively for the host", used by local dev builds. release-build-one sets these to
 # RELEASE_GOOS/RELEASE_ARCH so release plugin binaries match the release target.
@@ -47,10 +47,16 @@ RELEASE_VERSION ?= $(AUTO_RELEASE_VERSION)
 RELEASE_PKG_NAME ?= $(APP_NAME)-$(RELEASE_VERSION)-darwin-$(RELEASE_ARCH).pkg
 RELEASE_PKG_PATH ?= $(RELEASE_PACKAGE_DIR)/$(RELEASE_PKG_NAME)
 RELEASE_INSTALL_PATH ?= /usr/local/bin
+RELEASE_INSTALL_PATH_LINUX ?= /usr/bin
 MAN_PAGE_PATH ?= docs/ash.1
 LOCALIZED_MAN_DIR ?= docs/man
 MAN_INSTALL_PATH_LINUX ?= /usr/share/man/man1
 MAN_INSTALL_PATH_MACOS ?= /usr/local/share/man/man1
+PLUGIN_INSTALL_PATH_LINUX ?= /usr/lib/ash/plugins
+PLUGIN_INSTALL_PATH_MACOS ?= /usr/local/lib/ash/plugins
+LICENSE_INSTALL_PATH_LINUX ?= /usr/share/doc/ash/copyright
+LICENSE_INSTALL_PATH_RPM ?= /usr/share/licenses/ash/LICENSE
+LICENSE_INSTALL_PATH_MACOS ?= /usr/local/share/licenses/ash/LICENSE
 TARBALL_MAN_PATH ?= usr/share/man/man1
 RELEASE_NOTES_PATH ?= $(RELEASE_OUTPUT_DIR)/release-notes.md
 RELEASE_NOTES_ATTEMPTS ?= 5
@@ -74,16 +80,6 @@ config:
 # line on success and dumps its full output only when it fails, ending with one
 # success marker. Run `make V=1 verify` to stream each step's full output.
 verify:
-	@set -e; \
-	mod_before=$$(mktemp); \
-	sum_before=$$(mktemp); \
-	trap 'rm -f "$$mod_before" "$$sum_before"' EXIT; \
-	cp go.mod "$$mod_before"; \
-	cp go.sum "$$sum_before"; \
-	./scripts/dev/run-quiet.sh "go-get" go get -u all; \
-	if ! cmp -s "$$mod_before" go.mod || ! cmp -s "$$sum_before" go.sum; then \
-		./scripts/dev/run-quiet.sh "go-mod-tidy" go mod tidy; \
-	fi
 	@./scripts/dev/run-quiet.sh "lint"        $(MAKE) --no-print-directory lint
 	@./scripts/dev/run-quiet.sh "test"        $(MAKE) --no-print-directory test
 	@./scripts/dev/run-quiet.sh "test-race"   go test -race ./...
@@ -139,18 +135,14 @@ plugins-install: plugins-build
 
 build: lint test plugins-build plugins-install
 	@mkdir -p "$(LOCAL_BIN_DIR)"
-	@go build -o "$(LOCAL_BINARY_PATH)" -ldflags "-X ash/internal/app.ashVersion=$(BUILD_VERSION) -X ash/internal/app.ashCommit=$(BUILD_COMMIT) -X ash/internal/app.ashDevelopmentBuild=true" ./cmd/ash
+	@go build -o "$(LOCAL_BINARY_PATH)" -ldflags "-X github.com/Jonconradt/ash/internal/app.ashVersion=$(BUILD_VERSION) -X github.com/Jonconradt/ash/internal/app.ashCommit=$(BUILD_COMMIT) -X github.com/Jonconradt/ash/internal/app.ashDevelopmentBuild=true" ./cmd/ash
 	@go build -o "$(LOCAL_BIN_DIR)/ash-broker" ./cmd/ash-broker
 	@$(MAKE) restart-broker
 
-# Broker daemons are long-lived per-shell processes; kill stale ones so open
-# shells respawn a fresh broker running the binary just built. The second
-# pattern catches pre-migration daemons started as "<binary> broker ..." (a
-# subcommand of the main binary, possibly a renamed backup like ash.old)
-# before the broker moved to its own executable.
+# Existing shell brokers retain their in-memory image until their owning shell
+# exits. New shells will start the newly installed binary.
 restart-broker:
-	@pkill -f "$(LOCAL_BIN_DIR)/ash-broker" 2>/dev/null || true
-	@pkill -f "broker --socket .*--parent-pid" 2>/dev/null || true
+	@echo "restart-broker: existing shell brokers stop with their owning shells"
 
 lint: language-lint site-lint yaml-lint python-lint markdown-lint plugins-lint
 	@./scripts/dev/run-quiet.sh "golangci-lint" go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run ./...
@@ -219,7 +211,7 @@ staticcheck:
 
 install: test lint gosec plugins-build plugins-install
 	@mkdir -p "$(LOCAL_BIN_DIR)"
-	@go build -o "$(LOCAL_BINARY_PATH)" -ldflags "-X ash/internal/app.ashVersion=$(BUILD_VERSION) -X ash/internal/app.ashCommit=$(BUILD_COMMIT) -X ash/internal/app.ashDevelopmentBuild=true" ./cmd/ash
+	@go build -o "$(LOCAL_BINARY_PATH)" -ldflags "-X github.com/Jonconradt/ash/internal/app.ashVersion=$(BUILD_VERSION) -X github.com/Jonconradt/ash/internal/app.ashCommit=$(BUILD_COMMIT) -X github.com/Jonconradt/ash/internal/app.ashDevelopmentBuild=true" ./cmd/ash
 	@go build -o "$(LOCAL_BIN_DIR)/ash-broker" ./cmd/ash-broker
 	@$(MAKE) restart-broker
 	@"$(LOCAL_BINARY_PATH)" install --shell bash --overwrite
@@ -250,12 +242,13 @@ release-clean:
 
 release-build:
 	@mkdir -p "$(RELEASE_OUTPUT_DIR)"
-	GOOS=darwin GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X ash/internal/app.ashVersion=$(RELEASE_VERSION) -X ash/internal/app.ashCommit=$(RELEASE_COMMIT)" -o "$(RELEASE_OUTPUT_DIR)/$(APP_NAME)" ./cmd/ash
+	GOOS=darwin GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X github.com/Jonconradt/ash/internal/app.ashVersion=$(RELEASE_VERSION) -X github.com/Jonconradt/ash/internal/app.ashCommit=$(RELEASE_COMMIT)" -o "$(RELEASE_OUTPUT_DIR)/$(APP_NAME)" ./cmd/ash
 	GOOS=darwin GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "$(RELEASE_OUTPUT_DIR)/$(APP_NAME)-broker" ./cmd/ash-broker
+	$(MAKE) plugins-build PLUGINS_BIN_DIR="$(RELEASE_PLUGINS_BIN_DIR)" PLUGIN_TARGET_GOOS=darwin PLUGIN_TARGET_GOARCH="$(RELEASE_ARCH)"
 
 release-build-one:
 	@mkdir -p "$(RELEASE_OUTPUT_DIR)"
-	GOOS=$(RELEASE_GOOS) GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X ash/internal/app.ashVersion=$(RELEASE_VERSION) -X ash/internal/app.ashCommit=$(RELEASE_COMMIT)" -o "$(RELEASE_BINARY_PATH)" ./cmd/ash
+	GOOS=$(RELEASE_GOOS) GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X github.com/Jonconradt/ash/internal/app.ashVersion=$(RELEASE_VERSION) -X github.com/Jonconradt/ash/internal/app.ashCommit=$(RELEASE_COMMIT)" -o "$(RELEASE_BINARY_PATH)" ./cmd/ash
 	GOOS=$(RELEASE_GOOS) GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "$(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)-broker" ./cmd/ash-broker
 	$(MAKE) plugins-build PLUGINS_BIN_DIR="$(RELEASE_PLUGINS_BIN_DIR)" PLUGIN_TARGET_GOOS="$(RELEASE_GOOS)" PLUGIN_TARGET_GOARCH="$(RELEASE_ARCH)"
 
@@ -265,15 +258,18 @@ release-pkg:
 		--app-name "$(APP_NAME)" \
 		--version "$(RELEASE_VERSION)" \
 		--binary "$(RELEASE_OUTPUT_DIR)/$(APP_NAME)" \
+		--broker "$(RELEASE_OUTPUT_DIR)/$(APP_NAME)-broker" \
+		--plugins-dir "$(RELEASE_PLUGINS_BIN_DIR)" \
+		--license-file LICENSE \
 		--install-path "$(RELEASE_INSTALL_PATH)" \
+		--plugin-install-path "$(PLUGIN_INSTALL_PATH_MACOS)" \
+		--license-install-path "$(LICENSE_INSTALL_PATH_MACOS)" \
 		--man-page "$(MAN_PAGE_PATH)" \
 		--man-install-path "$(MAN_INSTALL_PATH_MACOS)" \
 		--localized-man-dir "$(LOCALIZED_MAN_DIR)" \
 		--output "$(RELEASE_PKG_PATH)"
 
-# The tarball broker entry must be named plain "ash-broker", not "<versioned-binary>-broker":
-# clients released before the broker split match any "ash-v*" file as the ash binary and abort
-# the upgrade with "archive contains 2 executable ash files".
+# Every release archive includes one ash executable, its broker, plugins, and license.
 release-pkg-one:
 	@mkdir -p "$(RELEASE_PACKAGE_DIR)"
 	@case "$(RELEASE_FORMAT)" in \
@@ -286,7 +282,12 @@ release-pkg-one:
 				--app-name "$(APP_NAME)" \
 				--version "$(RELEASE_VERSION)" \
 				--binary "$(RELEASE_BINARY_PATH)" \
+				--broker "$(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)-broker" \
+				--plugins-dir "$(RELEASE_PLUGINS_BIN_DIR)" \
+				--license-file LICENSE \
 				--install-path "$(RELEASE_INSTALL_PATH)" \
+				--plugin-install-path "$(PLUGIN_INSTALL_PATH_MACOS)" \
+				--license-install-path "$(LICENSE_INSTALL_PATH_MACOS)" \
 				--man-page "$(MAN_PAGE_PATH)" \
 				--man-install-path "$(MAN_INSTALL_PATH_MACOS)" \
 				--localized-man-dir "$(LOCALIZED_MAN_DIR)" \
@@ -298,7 +299,12 @@ release-pkg-one:
 				--version "$(RELEASE_VERSION)" \
 				--arch "$(RELEASE_ARCH)" \
 				--binary "$(RELEASE_BINARY_PATH)" \
-				--install-path "$(RELEASE_INSTALL_PATH)" \
+				--broker "$(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)-broker" \
+				--plugins-dir "$(RELEASE_PLUGINS_BIN_DIR)" \
+				--license-file LICENSE \
+				--install-path "$(RELEASE_INSTALL_PATH_LINUX)" \
+				--plugin-install-path "$(PLUGIN_INSTALL_PATH_LINUX)" \
+				--license-install-path "$(LICENSE_INSTALL_PATH_LINUX)" \
 				--man-page "$(MAN_PAGE_PATH)" \
 				--man-install-path "$(MAN_INSTALL_PATH_LINUX)" \
 				--localized-man-dir "$(LOCALIZED_MAN_DIR)" \
@@ -310,7 +316,12 @@ release-pkg-one:
 				--version "$(RELEASE_VERSION)" \
 				--arch "$(RELEASE_ARCH)" \
 				--binary "$(RELEASE_BINARY_PATH)" \
-				--install-path "$(RELEASE_INSTALL_PATH)" \
+				--broker "$(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)-broker" \
+				--plugins-dir "$(RELEASE_PLUGINS_BIN_DIR)" \
+				--license-file LICENSE \
+				--install-path "$(RELEASE_INSTALL_PATH_LINUX)" \
+				--plugin-install-path "$(PLUGIN_INSTALL_PATH_LINUX)" \
+				--license-install-path "$(LICENSE_INSTALL_PATH_RPM)" \
 				--man-page "$(MAN_PAGE_PATH)" \
 				--man-install-path "$(MAN_INSTALL_PATH_LINUX)" \
 				--localized-man-dir "$(LOCALIZED_MAN_DIR)" \
@@ -329,9 +340,10 @@ release-pkg-one:
 			trap 'rm -rf "$$tmp_dir"' EXIT; \
 			cp "$(RELEASE_BINARY_PATH)" "$$tmp_dir/$(notdir $(RELEASE_BINARY_PATH))"; \
 			cp "$(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)-broker" "$$tmp_dir/$(APP_NAME)-broker"; \
+			cp LICENSE "$$tmp_dir/LICENSE"; \
 			mkdir -p "$$tmp_dir/$(TARBALL_MAN_PATH)"; \
 			install -m 0644 "$(MAN_PAGE_PATH)" "$$tmp_dir/$(TARBALL_MAN_PATH)/$(APP_NAME).1"; \
-			tar_entries=("$(notdir $(RELEASE_BINARY_PATH))" "$(APP_NAME)-broker" "$(TARBALL_MAN_PATH)/$(APP_NAME).1" "plugins"); \
+			tar_entries=("$(notdir $(RELEASE_BINARY_PATH))" "$(APP_NAME)-broker" "LICENSE" "$(TARBALL_MAN_PATH)/$(APP_NAME).1" "plugins"); \
 			while IFS= read -r page; do \
 				locale="$$(basename "$$(dirname "$$page")")"; \
 				locale_man_dir="$$tmp_dir/usr/share/man/$$locale/man1"; \
@@ -353,6 +365,9 @@ release-validate:
 	@./scripts/package/macos/validate_pkg.sh \
 		--pkg "$(RELEASE_PKG_PATH)" \
 		--install-path "$(RELEASE_INSTALL_PATH)" \
+		--plugin-install-path "$(PLUGIN_INSTALL_PATH_MACOS)" \
+		--license-path "$(LICENSE_INSTALL_PATH_MACOS)" \
+		--plugins-dir "$(RELEASE_PLUGINS_BIN_DIR)" \
 		--man-path "$(MAN_INSTALL_PATH_MACOS)/$(APP_NAME).1" \
 		--app-name "$(APP_NAME)"
 	@shasum -a 256 "$(RELEASE_PKG_PATH)" > "$(RELEASE_PKG_PATH).sha256"
@@ -363,6 +378,9 @@ release-validate-one:
 			./scripts/package/macos/validate_pkg.sh \
 				--pkg "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).pkg" \
 				--install-path "$(RELEASE_INSTALL_PATH)" \
+				--plugin-install-path "$(PLUGIN_INSTALL_PATH_MACOS)" \
+				--license-path "$(LICENSE_INSTALL_PATH_MACOS)" \
+				--plugins-dir "$(RELEASE_PLUGINS_BIN_DIR)" \
 				--man-path "$(MAN_INSTALL_PATH_MACOS)/$(APP_NAME).1" \
 				--app-name "$(APP_NAME)"; \
 			shasum -a 256 "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).pkg" > "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).pkg.sha256"; \
@@ -370,7 +388,10 @@ release-validate-one:
 		deb) \
 			./scripts/package/linux/validate_deb.sh \
 				--pkg "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).deb" \
-				--install-path "$(RELEASE_INSTALL_PATH)" \
+				--install-path "$(RELEASE_INSTALL_PATH_LINUX)" \
+				--plugin-install-path "$(PLUGIN_INSTALL_PATH_LINUX)" \
+				--license-path "$(LICENSE_INSTALL_PATH_LINUX)" \
+				--plugins-dir "$(RELEASE_PLUGINS_BIN_DIR)" \
 				--man-path "$(MAN_INSTALL_PATH_LINUX)/$(APP_NAME).1" \
 				--app-name "$(APP_NAME)"; \
 			shasum -a 256 "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).deb" > "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).deb.sha256"; \
@@ -378,7 +399,10 @@ release-validate-one:
 		rpm) \
 			./scripts/package/linux/validate_rpm.sh \
 				--pkg "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).rpm" \
-				--install-path "$(RELEASE_INSTALL_PATH)" \
+				--install-path "$(RELEASE_INSTALL_PATH_LINUX)" \
+				--plugin-install-path "$(PLUGIN_INSTALL_PATH_LINUX)" \
+				--license-path "$(LICENSE_INSTALL_PATH_RPM)" \
+				--plugins-dir "$(RELEASE_PLUGINS_BIN_DIR)" \
 				--man-path "$(MAN_INSTALL_PATH_LINUX)/$(APP_NAME).1" \
 				--app-name "$(APP_NAME)"; \
 			shasum -a 256 "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).rpm" > "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).rpm.sha256"; \
@@ -386,11 +410,15 @@ release-validate-one:
 		tar.gz) \
 			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^$(notdir $(RELEASE_BINARY_PATH))$$"; \
 			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^$(APP_NAME)-broker$$"; \
+			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^LICENSE$$"; \
 			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^$(TARBALL_MAN_PATH)/$(APP_NAME)\.1$$"; \
 			for locale in zh_CN zh_TW es_ES ar_AE id_ID; do \
 				tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^usr/share/man/$$locale/man1/$(APP_NAME)\.1$$" || { echo "localized man page missing from tarball: $$locale"; exit 1; }; \
 			done; \
 			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^plugins/[^/]+$$"; \
+			while IFS= read -r plugin; do \
+				tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Fxq "plugins/$$(basename "$$plugin")" || { echo "plugin missing from tarball: $$plugin"; exit 1; }; \
+			done < <(find "$(RELEASE_PLUGINS_BIN_DIR)" -maxdepth 1 -type f -perm -111 -print); \
 			shasum -a 256 "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" > "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz.sha256"; \
 			;; \
 		*) \
@@ -403,19 +431,18 @@ release-checksums:
 	@set -euo pipefail; \
 	manifest="$(RELEASE_PACKAGE_DIR)/SHA256SUMS"; \
 	test -s "$$manifest"; \
-	for artifact in "$(RELEASE_PACKAGE_DIR)"/ash-*.tar.gz; do \
-		test -f "$$artifact"; \
-		name="$$(basename "$$artifact")"; \
-		count="$$(grep -Ec "^[0-9a-fA-F]{64}[[:space:]]+$$name$$" "$$manifest")"; \
-		test "$$count" -eq 1; \
-	done; \
-	for artifact in "$(RELEASE_PACKAGE_DIR)"/ash-language-*.json; do \
+	artifact_count=0; \
+	for artifact in "$(RELEASE_PACKAGE_DIR)"/ash-*.pkg "$(RELEASE_PACKAGE_DIR)"/ash-*.deb "$(RELEASE_PACKAGE_DIR)"/ash-*.rpm "$(RELEASE_PACKAGE_DIR)"/ash-*.tar.gz "$(RELEASE_PACKAGE_DIR)"/ash-*.msi "$(RELEASE_PACKAGE_DIR)"/ash-language-*.json "$(RELEASE_PACKAGE_DIR)/sbom.spdx.json"; do \
 		if [[ -f "$$artifact" ]]; then \
+			artifact_count=$$((artifact_count + 1)); \
 			name="$$(basename "$$artifact")"; \
 			count="$$(grep -Ec "^[0-9a-fA-F]{64}[[:space:]]+$$name$$" "$$manifest")"; \
 			test "$$count" -eq 1; \
 		fi; \
-	done
+	done; \
+	test "$$artifact_count" -gt 0; \
+	test -f "$(RELEASE_PACKAGE_DIR)/sbom.spdx.json"; \
+	grep -Eq "^[0-9a-fA-F]{64}[[:space:]]+sbom.spdx.json$$" "$$manifest"
 
 release-notes:
 	@mkdir -p "$(RELEASE_OUTPUT_DIR)"

@@ -1,32 +1,36 @@
 # >>> ash install >>>
-[ -f "$HOME/.ash/.ash_env" ] && . "$HOME/.ash/.ash_env"
+[[ -o interactive ]] || return
+_ash_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/ash"
+_ash_state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/ash"
+if [[ -n "${XDG_RUNTIME_DIR:-}" ]]; then
+	_ash_runtime_dir="$XDG_RUNTIME_DIR/ash"
+else
+	_ash_runtime_dir="$_ash_state_dir/runtime"
+fi
+[[ -f "$_ash_config_dir/.ash_env" ]] && . "$_ash_config_dir/.ash_env"
 
 zmodload -i zsh/datetime 2>/dev/null
 
 _ash_ensure_broker() {
 	local mcp_credential_key="${ASH_MCP_CREDENTIAL_KEY:-}"
 	unset ASH_MCP_CREDENTIAL_KEY
-	local session_id="${SESSION_ID:-}"
+	local session_id="${ASH_SESSION_ID:-}"
 	if [[ -z "$session_id" ]]; then
 		session_id="$(head -c 100 /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)"
 		[[ -n "$session_id" ]] || return 1
-		export SESSION_ID="$session_id"
+		export ASH_SESSION_ID="$session_id"
 	fi
-	[[ -n "${AI_ENDPOINT:-}" && -n "${AI_MODEL:-}" ]] || return 1
+	[[ -n "${ASH_AI_ENDPOINT:-}" && -n "${ASH_AI_MODEL:-}" ]] || return 1
 	# Without this probe a missing ash-broker reaches command_not_found_handler, which
 	# would forward the broker's own command line to the AI as a prompt.
 	command -v ash-broker >/dev/null 2>&1 || return 1
 	if [[ -n "${ASH_BROKER_SOCKET:-}" && -n "${ASH_BROKER_TOKEN:-}" && -S "$ASH_BROKER_SOCKET" && -n "${ASH_BROKER_PID:-}" ]] && kill -0 "$ASH_BROKER_PID" 2>/dev/null; then
 		return 0
 	fi
-	local runtime_dir="$HOME/.ash/runtime"
+	local runtime_dir="$_ash_runtime_dir"
 	local socket_path="$runtime_dir/$session_id.sock"
-	local lease_path="$runtime_dir/$session_id.lease"
 	local token
 	if ! mkdir -p -m 700 "$runtime_dir"; then
-		return 1
-	fi
-	if ! touch "$lease_path"; then
 		return 1
 	fi
 	token="$(head -c 32 /dev/urandom | LC_ALL=C od -An -tx1 | tr -d ' \n')"
@@ -35,14 +39,13 @@ _ash_ensure_broker() {
 	fi
 	# &! backgrounds and disowns atomically, so no job-control notice reaches the terminal.
 	local parent_pid="$$"
-	ASH_BROKER_TOKEN="$token" ASH_MCP_CREDENTIAL_KEY="$mcp_credential_key" command ash-broker --socket "$socket_path" --session-id "$session_id" --parent-pid "$parent_pid" --lease "$lease_path" </dev/null >/dev/null 2>&1 &!
+	ASH_BROKER_TOKEN="$token" ASH_MCP_CREDENTIAL_KEY="$mcp_credential_key" command ash-broker --socket "$socket_path" --session-id "$session_id" --parent-pid "$parent_pid" </dev/null >/dev/null 2>&1 &!
 	unset mcp_credential_key
 	local broker_pid=$!
 	local attempt
 	for attempt in {1..40}; do
 		if [[ -S "$socket_path" ]]; then
-			touch "$lease_path"
-			export ASH_BROKER_SOCKET="$socket_path" ASH_BROKER_TOKEN="$token" ASH_BROKER_PID="$broker_pid" ASH_BROKER_LEASE="$lease_path"
+			export ASH_BROKER_SOCKET="$socket_path" ASH_BROKER_TOKEN="$token" ASH_BROKER_PID="$broker_pid"
 			return 0
 		fi
 		if ! kill -0 "$broker_pid" 2>/dev/null; then
@@ -55,12 +58,11 @@ _ash_ensure_broker() {
 
 _ash_shutdown_broker() {
 	[[ -n "${ASH_BROKER_PID:-}" ]] && kill -TERM "$ASH_BROKER_PID" 2>/dev/null
-	[[ -n "${ASH_BROKER_LEASE:-}" ]] && rm -f "$ASH_BROKER_LEASE" 2>/dev/null
 	return 0
 }
 
 _ash_prompt_processing_enabled() {
-	local snooze_file="$HOME/.ash/.ash_snooze_until"
+	local snooze_file="$_ash_state_dir/.ash_snooze_until"
 	[[ -r "$snooze_file" ]] || return 0
 	local expires_at
 	read -r expires_at < "$snooze_file" 2>/dev/null || return 0
@@ -95,12 +97,11 @@ _ash_orig_accept_line=.accept-line
 _ash_accept_line() {
 	if [[ "$CONTEXT" == start ]] && _ash_should_route_buffer "$BUFFER"; then
 		_ash_ensure_broker >/dev/null 2>&1
-		[[ -n "${ASH_BROKER_LEASE:-}" ]] && touch "$ASH_BROKER_LEASE"
 		# Requoting the whole line keeps globs, reserved words, and a trailing ? away from zsh.
 		if [[ "${BUFFER%%[[:space:]]*}" == say ]] && command -v say >/dev/null 2>&1; then
 			BUFFER="ash --say ${(q-)BUFFER}"
 		else
-			BUFFER="ash ${(q-)BUFFER}"
+			BUFFER="ash -- ${(q-)BUFFER}"
 		fi
 	fi
 	zle "$_ash_orig_accept_line" -- "$@"
@@ -129,16 +130,25 @@ if autoload -Uz add-zsh-hook 2>/dev/null && whence add-zsh-hook >/dev/null 2>&1;
 	add-zsh-hook zshexit _ash_shutdown_broker
 fi
 
+if [[ "${_ASH_WRAPS_COMMAND_NOT_FOUND:-}" != 1 ]]; then
+	if (( $+functions[command_not_found_handler] )); then
+		functions -c command_not_found_handler _ash_original_command_not_found_handler
+	fi
+	_ASH_WRAPS_COMMAND_NOT_FOUND=1
+fi
+
 command_not_found_handler() {
 	[[ -o interactive ]] || return 127
 	if _ash_prompt_processing_enabled; then
 		_ash_ensure_broker >/dev/null 2>&1
-		[[ -n "${ASH_BROKER_LEASE:-}" ]] && touch "$ASH_BROKER_LEASE"
-		ash "$@"
-	else
-		return 127
+		ash -- "$@"
+		return $?
 	fi
-	return $?
+	if (( $+functions[_ash_original_command_not_found_handler] )); then
+		_ash_original_command_not_found_handler "$@"
+		return $?
+	fi
+	return 127
 }
 
 ash() {

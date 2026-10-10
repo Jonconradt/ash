@@ -1,10 +1,10 @@
 package app
 
 import (
-	"ash/internal/scratchlife"
-	"ash/internal/workspace"
 	"bufio"
 	"errors"
+	"github.com/Jonconradt/ash/internal/scratchlife"
+	"github.com/Jonconradt/ash/internal/workspace"
 	"os"
 	"path/filepath"
 	"sort"
@@ -21,13 +21,45 @@ func ashWorkspaceDir() (string, error) {
 	return workspace.Root(home), nil
 }
 
-// ashScratchRoot returns the canonical scratch directory under the user's ash workspace.
-func ashScratchRoot() (string, error) {
-	workspace, err := ashWorkspaceDir()
+func ashDataDir() (string, error) {
+	home, err := osUserHomeDir()
 	if err != nil {
 		return "", err
 	}
-	return filepath.Join(workspace, scratchDirName), nil
+	return workspace.DataRoot(home), nil
+}
+
+func ashStateDir() (string, error) {
+	home, err := osUserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return workspace.StateRoot(home), nil
+}
+
+func ashCacheDir() (string, error) {
+	home, err := osUserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return workspace.CacheRoot(home), nil
+}
+
+func ashRuntimeDir() (string, error) {
+	home, err := osUserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	return workspace.RuntimeRoot(home), nil
+}
+
+// ashScratchRoot returns the canonical scratch directory under the user's ash workspace.
+func ashScratchRoot() (string, error) {
+	stateDir, err := ashStateDir()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join(stateDir, scratchDirName), nil
 }
 
 func ashScratchSessionRoot() (string, error) {
@@ -107,7 +139,7 @@ func resolveWorkspacePath(root, userPath string) (absolute string, rel string, e
 			return "", "", relErr
 		}
 		if relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) {
-			return "", "", errors.New("path must be inside ~/.ash")
+			return "", "", errors.New("path must be inside the configured Ash workspace")
 		}
 		slashRel := filepath.ToSlash(relPath)
 		if hasBlockedDotSegment(slashRel) {
@@ -123,7 +155,7 @@ func resolveWorkspacePath(root, userPath string) (absolute string, rel string, e
 		return "", "", relErr
 	}
 	if relPath == ".." || strings.HasPrefix(relPath, ".."+string(filepath.Separator)) {
-		return "", "", errors.New("path must be inside ~/.ash")
+		return "", "", errors.New("path must be inside the configured Ash workspace")
 	}
 	slashRel := filepath.ToSlash(relPath)
 	if hasBlockedDotSegment(slashRel) {

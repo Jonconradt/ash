@@ -17,7 +17,7 @@ func TestGetHistoryPath(t *testing.T) {
 
 	home := t.TempDir()
 	osUserHomeDir = func() (string, error) { return home, nil }
-	t.Setenv("SESSION_ID", "abc123")
+	t.Setenv("ASH_SESSION_ID", "abc123")
 	t.Setenv("ASH_SCHEDULED_TASK", "")
 
 	path, err := getHistoryPath()
@@ -25,7 +25,7 @@ func TestGetHistoryPath(t *testing.T) {
 		t.Fatalf("getHistoryPath returned error: %v", err)
 	}
 
-	want := filepath.Join(home, ashWorkspaceDirName, historyDirName, "abc123.json")
+	want := filepath.Join(home, ".local", "state", "ash", historyDirName, "abc123.json")
 	if path != want {
 		t.Fatalf("path mismatch: got %q want %q", path, want)
 	}
@@ -37,7 +37,7 @@ func TestGetHistoryPathScheduled(t *testing.T) {
 
 	home := t.TempDir()
 	osUserHomeDir = func() (string, error) { return home, nil }
-	t.Setenv("SESSION_ID", "abc123")
+	t.Setenv("ASH_SESSION_ID", "abc123")
 	t.Setenv("ASH_SCHEDULED_TASK", "1")
 
 	path, err := getHistoryPath()
@@ -45,7 +45,7 @@ func TestGetHistoryPathScheduled(t *testing.T) {
 		t.Fatalf("getHistoryPath returned error: %v", err)
 	}
 
-	want := filepath.Join(home, ashWorkspaceDirName, historyDirName, "task_abc123.json")
+	want := filepath.Join(home, ".local", "state", "ash", historyDirName, "task_abc123.json")
 	if path != want {
 		t.Fatalf("path mismatch: got %q want %q", path, want)
 	}
@@ -57,14 +57,14 @@ func TestGetHistoryPathPreservesChildSessionID(t *testing.T) {
 
 	home := t.TempDir()
 	osUserHomeDir = func() (string, error) { return home, nil }
-	t.Setenv("SESSION_ID", "parent.abc123")
+	t.Setenv("ASH_SESSION_ID", "parent.abc123")
 	t.Setenv("ASH_SCHEDULED_TASK", "")
 
 	path, err := getHistoryPath()
 	if err != nil {
 		t.Fatalf("getHistoryPath returned error: %v", err)
 	}
-	want := filepath.Join(home, ashWorkspaceDirName, historyDirName, "parent.abc123.json")
+	want := filepath.Join(home, ".local", "state", "ash", historyDirName, "parent.abc123.json")
 	if path != want {
 		t.Fatalf("path mismatch: got %q want %q", path, want)
 	}
@@ -83,14 +83,14 @@ func TestGetHistoryPathError(t *testing.T) {
 
 func TestAITimeout(t *testing.T) {
 	t.Run("configured duration", func(t *testing.T) {
-		t.Setenv("AI_TIMEOUT", "45s")
+		t.Setenv("ASH_AI_TIMEOUT", "45s")
 		if got := aiTimeout(); got != 45*time.Second {
 			t.Fatalf("aiTimeout mismatch: got %s want %s", got, 45*time.Second)
 		}
 	})
 
 	t.Run("invalid falls back", func(t *testing.T) {
-		t.Setenv("AI_TIMEOUT", "not-a-duration")
+		t.Setenv("ASH_AI_TIMEOUT", "not-a-duration")
 		if got := aiTimeout(); got != defaultAITimeout {
 			t.Fatalf("aiTimeout fallback mismatch: got %s want %s", got, defaultAITimeout)
 		}

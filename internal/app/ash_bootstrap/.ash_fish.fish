@@ -1,10 +1,34 @@
 # >>> ash install >>>
-if test -f "$HOME/.ash/.ash_fish_env.fish"
-	source "$HOME/.ash/.ash_fish_env.fish"
-end
-
 if not status is-interactive
 	return
+end
+
+set -g __ash_config_base "$HOME/.config"
+set -g __ash_data_base "$HOME/.local/share"
+set -g __ash_state_base "$HOME/.local/state"
+if set -q XDG_CONFIG_HOME
+	string match -q '/*' -- "$XDG_CONFIG_HOME"; or return
+	set -g __ash_config_base "$XDG_CONFIG_HOME"
+end
+if set -q XDG_DATA_HOME
+	string match -q '/*' -- "$XDG_DATA_HOME"; or return
+	set -g __ash_data_base "$XDG_DATA_HOME"
+end
+if set -q XDG_STATE_HOME
+	string match -q '/*' -- "$XDG_STATE_HOME"; or return
+	set -g __ash_state_base "$XDG_STATE_HOME"
+end
+set -g __ash_config_dir "$__ash_config_base/ash"
+set -g __ash_data_dir "$__ash_data_base/ash"
+set -g __ash_state_dir "$__ash_state_base/ash"
+if set -q XDG_RUNTIME_DIR
+	string match -q '/*' -- "$XDG_RUNTIME_DIR"; or return
+	set -g __ash_runtime_dir "$XDG_RUNTIME_DIR/ash"
+else
+	set -g __ash_runtime_dir "$__ash_state_dir/runtime"
+end
+if test -f "$__ash_config_dir/.ash_fish_env.fish"
+	source "$__ash_config_dir/.ash_fish_env.fish"
 end
 
 function _ash_ensure_broker
@@ -13,10 +37,10 @@ function _ash_ensure_broker
 		set mcp_credential_key "$ASH_MCP_CREDENTIAL_KEY"
 		set -e ASH_MCP_CREDENTIAL_KEY
 	end
-	if not set -q AI_ENDPOINT; or not set -q AI_MODEL
+	if not set -q ASH_AI_ENDPOINT; or not set -q ASH_AI_MODEL
 		return 1
 	end
-	if test -z "$AI_ENDPOINT"; or test -z "$AI_MODEL"
+	if test -z "$ASH_AI_ENDPOINT"; or test -z "$ASH_AI_MODEL"
 		return 1
 	end
 	# Without this probe a missing ash-broker reaches fish_command_not_found, which
@@ -30,19 +54,17 @@ function _ash_ensure_broker
 		end
 	end
 
-	set -l runtime_dir "$HOME/.ash/runtime"
+	set -l runtime_dir "$__ash_runtime_dir"
 	set -l session_id ""
-	if set -q SESSION_ID; and test -n "$SESSION_ID"
-		set session_id "$SESSION_ID"
+	if set -q ASH_SESSION_ID; and test -n "$ASH_SESSION_ID"
+		set session_id "$ASH_SESSION_ID"
 	else
 		set session_id (command head -c 100 /dev/urandom | command tr -dc 'a-zA-Z0-9' | command fold -w 16 | command head -n 1)
 		test -n "$session_id"; or return 1
-		set -gx SESSION_ID "$session_id"
+		set -gx ASH_SESSION_ID "$session_id"
 	end
 	set -l socket_path "$runtime_dir/$session_id.sock"
-	set -l lease_path "$runtime_dir/$session_id.lease"
 	command mkdir -p -m 700 "$runtime_dir"; or return 1
-	command touch "$lease_path"; or return 1
 	set -l token (command head -c 32 /dev/urandom | command od -An -tx1 | string replace -a ' ' '' | string join '')
 	test -n "$token"; or return 1
 	set -l parent_pid $fish_pid
@@ -50,17 +72,15 @@ function _ash_ensure_broker
 	begin
 		set -lx ASH_BROKER_TOKEN "$token"
 		set -lx ASH_MCP_CREDENTIAL_KEY "$mcp_credential_key"
-		command ash-broker --socket "$socket_path" --session-id "$session_id" --parent-pid "$parent_pid" --lease "$lease_path" </dev/null >/dev/null 2>&1
+		command ash-broker --socket "$socket_path" --session-id "$session_id" --parent-pid "$parent_pid" </dev/null >/dev/null 2>&1
 	end &
 	set -l broker_pid $last_pid
 	disown "$broker_pid" 2>/dev/null; or true
 	for attempt in (command seq 1 40)
 		if test -S "$socket_path"
-			command touch "$lease_path"
 			set -gx ASH_BROKER_SOCKET "$socket_path"
 			set -gx ASH_BROKER_TOKEN "$token"
 			set -gx ASH_BROKER_PID "$broker_pid"
-			set -gx ASH_BROKER_LEASE "$lease_path"
 			return 0
 		end
 		command kill -0 "$broker_pid" 2>/dev/null; or return 1
@@ -70,7 +90,7 @@ function _ash_ensure_broker
 end
 
 function _ash_prompt_processing_enabled
-	set -l snooze_file "$HOME/.ash/.ash_snooze_until"
+	set -l snooze_file "$__ash_state_dir/.ash_snooze_until"
 	if not test -r "$snooze_file"
 		return 0
 	end
@@ -82,15 +102,23 @@ end
 
 function _ash_prepare_prompt
 	_ash_ensure_broker >/dev/null 2>&1
-	if set -q ASH_BROKER_LEASE; and test -n "$ASH_BROKER_LEASE"
-		command touch "$ASH_BROKER_LEASE"
+end
+
+if not set -q __ash_wrap_command_not_found
+	if functions -q fish_command_not_found
+		functions -c fish_command_not_found __ash_original_command_not_found
 	end
+	set -g __ash_wrap_command_not_found 1
 end
 
 function fish_command_not_found
 	if _ash_prompt_processing_enabled
 		_ash_prepare_prompt
-		command ash $argv
+		command ash -- $argv
+		return $status
+	end
+	if functions -q __ash_original_command_not_found
+		__ash_original_command_not_found $argv
 		return $status
 	end
 	return 127
@@ -220,7 +248,7 @@ function _ash_route_or_delegate
 	end
 	if _ash_should_route "$cmd" $argv
 		_ash_prepare_prompt
-		command ash "$cmd" $argv
+		command ash -- "$cmd" $argv
 		return $status
 	end
 	command "$cmd" $argv
@@ -238,7 +266,7 @@ function _ash_route_or_delegate_say
 			command ash --say "$cmd" $argv
 			return $status
 		end
-		command ash "$cmd" $argv
+		command ash -- "$cmd" $argv
 		return $status
 	end
 	command "$cmd" $argv
@@ -265,7 +293,7 @@ function Test
 	end
 	if _ash_should_route Test $argv
 		_ash_prepare_prompt
-		command ash Test $argv
+		command ash -- Test $argv
 		return $status
 	end
 	builtin test $argv
@@ -277,7 +305,7 @@ function Type
 	end
 	if _ash_should_route Type $argv
 		_ash_prepare_prompt
-		command ash Type $argv
+		command ash -- Type $argv
 		return $status
 	end
 	builtin type $argv

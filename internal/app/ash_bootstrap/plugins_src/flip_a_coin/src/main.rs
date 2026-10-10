@@ -9,6 +9,32 @@ const PLUGIN_NAME: &str = "flip_a_coin";
 
 fn get_ai_docs() -> String {
     r#"{
+  "schema_version": 1,
+  "name": "flip_a_coin",
+  "version": "1.0.0",
+  "input_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "properties": {
+      "--count": {"type": "integer", "minimum": 1, "default": 1},
+      "--format": {"type": "string", "enum": ["json", "text"], "default": "json"}
+    },
+    "additionalProperties": false
+  },
+  "output_schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "required": ["status"],
+    "properties": {
+      "status": {"type": "string", "enum": ["success", "error"]},
+      "result": {"type": "string", "enum": ["HEADS", "TAILS"]},
+      "flips": {"type": "array", "items": {"type": "string", "enum": ["HEADS", "TAILS"]}},
+      "heads_count": {"type": "integer", "minimum": 0},
+      "tails_count": {"type": "integer", "minimum": 0},
+      "error_message": {"type": "string"}
+    },
+    "additionalProperties": false
+  },
   "Capabilities": [
     "Simulate flipping one or more fair coins.",
     "Return random outcomes (HEADS or TAILS) with count statistics."

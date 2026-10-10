@@ -83,9 +83,9 @@
         <h2>The terminal stays<br><em>the center of gravity.</em></h2>
       </div>
       <div class="how-grid">
-        <div class="numbered"><span>01</span><h3>Install the shell integration</h3><p>ash works with bash, Fish, and zsh. Unknown commands become prompts without changing your normal command habits. Snooze when you need a break from automatic prompt processing.</p></div>
+        <div class="numbered"><span>01</span><h3>Opt in to shell integration</h3><p>ash works with bash, Fish, and zsh. The verified installer asks before adding its managed shell hook; unknown commands become prompts once you enable it. Snooze when you need a break from automatic prompt processing.</p></div>
         <div class="numbered"><span>02</span><h3>Easy updates</h3><p><code>ash update</code> keeps your installation up to date with the latest release. The command handles version checks, downloads, and verification automatically. No background or surprise updates.</p></div>
-        <div class="numbered"><span>03</span><h3>Stay in control</h3><p>Tool execution is constrained by explicit allow and deny lists and runs as your user. You decide what ash is allowed to touch. Add your own Python scripts to ~/.ash/tools or native plugins to ~/.ash/plugins.</p></div>
+        <div class="numbered"><span>03</span><h3>Stay in control</h3><p>Tool execution is constrained by explicit allow and deny lists and runs as your user. You decide what ash is allowed to touch. Add your own Python scripts to <code>$XDG_DATA_HOME/ash/tools</code> or native plugins to <code>$XDG_DATA_HOME/ash/plugins</code>.</p></div>
       </div>
     </section>
 
@@ -93,11 +93,11 @@
       <div class="page-width install-content">
         <div><p class="eyebrow">Start small</p><h2>Give your shell<br><em>some company.</em></h2></div>
         <div class="install-details">
-          <p>Linux, macOS, and FreeBSD users can install the latest release in one step. The installer verifies the download, installs to <code>~/.local/bin</code>, and configures detected Fish, zsh, or bash integration, falling back to bash.</p>
+          <p>Linux, macOS, and FreeBSD users can install the latest release in one step. Install Sigstore <code>cosign</code> first so the installer can verify the signed checksum manifest. It installs to <code>~/.local/bin</code> and asks before adding opt-in Fish, zsh, or bash shell integration.</p>
           <p><code>ash install</code> auto-configures your AI provider: it detects an already-set cloud provider API key or a running local inference server, otherwise it shows a numbered menu to pick a provider and model. Or set these yourself:</p>
-          <pre><code>export AI_AUTH_TOKEN='84…89'
-export AI_ENDPOINT='https://ollama.com'
-export AI_MODEL='gemma4:31b-cloud'
+          <pre><code>export ASH_AI_AUTH_TOKEN='your-token'
+export ASH_AI_ENDPOINT='https://ollama.com'
+export ASH_AI_MODEL='gemma4:31b-cloud'
 </code></pre>
           <p>Local, OpenAI, Anthropic, Google, Azure OpenAI, Mistral, Cohere, Groq, xAI, DeepSeek, Together AI, OpenRouter, HuggingFace, AWS Bedrock, and any other provider with an OpenAI compatible API are supported.</p>
           <div class="code-block-wrap">

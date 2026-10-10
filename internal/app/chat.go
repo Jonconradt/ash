@@ -14,8 +14,8 @@ import (
 	"sync"
 	"time"
 
-	"ash/internal/localize"
-	"ash/internal/model"
+	"github.com/Jonconradt/ash/internal/localize"
+	"github.com/Jonconradt/ash/internal/model"
 )
 
 // Shared wire-level chat/tool types live in internal/model so provider adapter

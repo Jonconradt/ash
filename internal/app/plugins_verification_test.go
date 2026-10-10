@@ -68,6 +68,23 @@ func TestAllPluginsVerification(t *testing.T) {
 			if _, ok := docsMap["Return format"]; !ok {
 				t.Errorf("%s --ai-docs missing 'Return format' key", pluginName)
 			}
+			for _, key := range []string{"schema_version", "name", "version", "input_schema", "output_schema"} {
+				if _, ok := docsMap[key]; !ok {
+					t.Errorf("%s --ai-docs missing %q key", pluginName, key)
+				}
+			}
+			if docsMap["schema_version"] != float64(1) {
+				t.Errorf("%s --ai-docs schema_version = %v, want 1", pluginName, docsMap["schema_version"])
+			}
+			if docsMap["name"] != pluginName || docsMap["version"] == "" {
+				t.Errorf("%s --ai-docs identity = %v %v", pluginName, docsMap["name"], docsMap["version"])
+			}
+			for _, key := range []string{"input_schema", "output_schema"} {
+				schema, ok := docsMap[key].(map[string]any)
+				if !ok || schema["type"] != "object" || schema["$schema"] != "https://json-schema.org/draft/2020-12/schema" {
+					t.Errorf("%s --ai-docs %s is not a JSON Schema 2020-12 object schema: %#v", pluginName, key, docsMap[key])
+				}
+			}
 
 			// 3. Test --version returns semantic version string
 			verCmd := exec.CommandContext(ctx, binPath, "--version")

@@ -14,9 +14,9 @@ import (
 	"syscall"
 	"time"
 
-	"ash/internal/localize"
-	"ash/internal/scratchlife"
-	"ash/internal/workspace"
+	"github.com/Jonconradt/ash/internal/localize"
+	"github.com/Jonconradt/ash/internal/scratchlife"
+	"github.com/Jonconradt/ash/internal/workspace"
 )
 
 var (
@@ -50,7 +50,7 @@ const (
 	scratchAccessFileName             = ".ash_scratch_access"
 	scratchCleanupMaxAge              = 48 * time.Hour
 	scratchCleanupIdleAge             = 24 * time.Hour
-	sessionIDEnvName                  = "SESSION_ID"
+	sessionIDEnvName                  = "ASH_SESSION_ID"
 	scheduledTaskEnvName              = "ASH_SCHEDULED_TASK"
 	historyDirName                    = "history"
 	runtimeDirName                    = "runtime"
@@ -59,7 +59,7 @@ const (
 	allowFileName                     = ".ash_allow"
 	denyFileName                      = ".ash_deny"
 	legacyToolsFileName               = ".ash_tools"
-	ashWorkspaceDirName               = workspace.DirName
+	ashWorkspaceDirName               = ".config/ash"
 	inventoryFileName                 = "inventory.md"
 	schedulerLogDirName               = "logs"
 	launchAgentsDirName               = "launchagents"
@@ -70,7 +70,6 @@ const (
 	maxAgentsEnvName                  = "ASH_MAX_AGENTS"
 )
 
-var sessionIDSanitizer = regexp.MustCompile(`[^A-Za-z0-9]+`)
 var sessionIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]+(?:\.[A-Za-z0-9_-]+)?$`)
 
 // Run executes the ash CLI for the given args and returns the process exit code.
@@ -84,8 +83,20 @@ func run(args []string, stdout, stderr io.Writer) int {
 		_, _ = fmt.Fprintln(stdout, executionDashboardVersion())
 		return 0
 	}
+	if len(args) == 1 && (args[0] == "-h" || args[0] == "--help") {
+		printUsage(stdout)
+		return 0
+	}
 	if !initLanguage(stderr) {
 		return 1
+	}
+	if err := workspace.ValidateBaseDirs(); err != nil {
+		_, _ = fmt.Fprintln(stderr, err)
+		return 1
+	}
+	literalPrompt := len(args) > 0 && args[0] == "--"
+	if literalPrompt {
+		args = args[1:]
 	}
 	voiceMode := len(args) > 0 && args[0] == "--say" && !speechTextOutputEnabled()
 	if voiceMode {
@@ -97,14 +108,14 @@ func run(args []string, stdout, stderr io.Writer) int {
 		metrics.finish(timeNow())
 		if verboseLoggingEnabled() && !voiceMode {
 			logExecutionSummary(summaryRequestID, metrics)
-			_, _ = io.WriteString(stdout, renderExecutionDashboard(metrics, writerIsTerminal(stdout)))
+			_, _ = io.WriteString(stderr, renderExecutionDashboard(metrics, writerIsTerminal(stderr)))
 		}
 	}()
 
 	if len(args) < 1 {
 		if stdinIsInteractive() {
 			printUsage(stderr)
-			return 1
+			return 2
 		}
 
 		stdinPrompt, err := readPromptFromStdin()
@@ -121,32 +132,32 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
-	if args[0] == "install" {
+	if !literalPrompt && args[0] == "install" {
 		return runInstall(args[1:], stdout, stderr)
 	}
-	if args[0] == "mcp" {
+	if !literalPrompt && args[0] == "mcp" {
 		return runMCP(args[1:], stdout, stderr)
 	}
-	if args[0] == "snooze" {
+	if !literalPrompt && args[0] == "snooze" {
 		return runSnooze(args[1:], stdout, stderr)
 	}
-	if args[0] == "broker" {
+	if !literalPrompt && args[0] == "broker" {
 		_, _ = fmt.Fprintln(stderr, localize.Text("ash.broker_moved"))
-		return 1
+		return 2
 	}
-	if args[0] == "route" {
+	if !literalPrompt && args[0] == "route" {
 		return runRoute(args[1:], stdout, stderr)
 	}
-	if args[0] == "update" {
+	if !literalPrompt && args[0] == "update" {
 		return runUpgrade(args[1:], stdout, stderr)
 	}
-	if args[0] == "--internal-export-assets" {
+	if !literalPrompt && args[0] == "--internal-export-assets" {
 		return runUpgradeAssetExport(args[1:], stdout, stderr)
 	}
-	if args[0] == "--internal-sync-route-words" {
+	if !literalPrompt && args[0] == "--internal-sync-route-words" {
 		return runSyncRouteWords(stdout, stderr)
 	}
-	if args[0] == "--internal-provision-python" {
+	if !literalPrompt && args[0] == "--internal-provision-python" {
 		provisionManagedPythonEnv(stdout)
 		return 0
 	}
@@ -154,7 +165,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	args, attachPaths, err := parseAttachFlags(args)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "%s\n", err)
-		return 1
+		return 2
 	}
 	attachments, err := loadAttachments(attachPaths)
 	if err != nil {
@@ -254,7 +265,10 @@ func run(args []string, stdout, stderr io.Writer) int {
 	ctx = withRequestID(ctx, requestID)
 	toolShim := prepareTools(ctx, stderr, localShim, stdinIsInteractive())
 
-	stopSpinner := startThinkingIndicator(stderr)
+	stopSpinner := func() {}
+	if writerIsTerminal(stderr) && strings.TrimSpace(os.Getenv("TERM")) != "dumb" {
+		stopSpinner = startThinkingIndicator(stderr)
+	}
 	assistantReply, updatedMessages, err := runToolLoop(ctx, aiCfg, userInput, messages, toolShim)
 	stopSpinner()
 	if err != nil {
@@ -294,10 +308,16 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 		if !spoken {
 			_, _ = fmt.Fprintln(stderr, localize.Text("ash.say_unavailable"))
-			_, _ = fmt.Fprint(stdout, renderAssistantOutput(assistantReply, writerIsTerminal(stdout)))
+			if _, err := fmt.Fprint(stdout, renderAssistantOutput(assistantReply, writerIsTerminal(stdout))); err != nil {
+				_, _ = fmt.Fprintln(stderr, localize.Format("log.ash.output_write_failed", []any{err}))
+				return 1
+			}
 		}
 	} else {
-		_, _ = fmt.Fprint(stdout, renderAssistantOutput(assistantReply, writerIsTerminal(stdout)))
+		if _, err := fmt.Fprint(stdout, renderAssistantOutput(assistantReply, writerIsTerminal(stdout))); err != nil {
+			_, _ = fmt.Fprintln(stderr, localize.Format("log.ash.output_write_failed", []any{err}))
+			return 1
+		}
 	}
 
 	if replyAttachments := finalAssistantAttachments(updatedMessages); len(replyAttachments) > 0 {
@@ -307,11 +327,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 				slog.Warn(localize.Format("log.ash.attachment_save_failed", []any{writeErr}), "EID", "b3Kx9Qmz")
 			} else {
 				for _, path := range written {
-					attachmentOutput := stdout
-					if voiceMode {
-						attachmentOutput = stderr
-					}
-					_, _ = fmt.Fprint(attachmentOutput, localize.Format("ash.saved_attachment", []any{path}))
+					_, _ = fmt.Fprintln(stderr, localize.Format("ash.saved_attachment", []any{path}))
 				}
 			}
 		}
@@ -334,5 +350,4 @@ func printUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, localize.Text("usage.ash.install"))
 	_, _ = fmt.Fprintln(w, localize.Text("usage.ash.mcp"))
 	_, _ = fmt.Fprintln(w, localize.Text("usage.ash.update"))
-	_, _ = fmt.Fprintln(w, localize.Text("usage.ash.broker"))
 }

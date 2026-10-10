@@ -15,7 +15,7 @@ import (
 	"strconv"
 	"strings"
 
-	"ash/internal/brokerproto"
+	"github.com/Jonconradt/ash/internal/brokerproto"
 )
 
 const (

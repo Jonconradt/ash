@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"ash/internal/localize"
+	"github.com/Jonconradt/ash/internal/localize"
 )
 
 var chatExecutor = chat

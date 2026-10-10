@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"ash/internal/localize"
+	"github.com/Jonconradt/ash/internal/localize"
 )
 
 func TestVerboseLoggingEnabledAcceptsTruthyValues(t *testing.T) {
@@ -233,13 +233,13 @@ func TestRunPrintsDashboardOnEarlyExitWhenVerbose(t *testing.T) {
 	t.Setenv("ASH_VERBOSE", "Yes")
 
 	var stdout, stderr bytes.Buffer
-	if code := run(nil, &stdout, &stderr); code != 1 {
-		t.Fatalf("run returned %d, want 1", code)
+	if code := run(nil, &stdout, &stderr); code != 2 {
+		t.Fatalf("run returned %d, want usage code 2", code)
 	}
-	if !strings.Contains(stdout.String(), "ASH v0.17.1 EXECUTION SUMMARY") {
-		t.Fatalf("dashboard was not written to stdout: %q", stdout.String())
+	if !strings.Contains(stderr.String(), "ASH v0.17.1 EXECUTION SUMMARY") {
+		t.Fatalf("dashboard was not written to stderr: %q", stderr.String())
 	}
-	if strings.Contains(stdout.String(), "\033[") {
-		t.Fatalf("buffered dashboard should not contain ANSI escapes: %q", stdout.String())
+	if strings.Contains(stderr.String(), "\033[") {
+		t.Fatalf("buffered dashboard should not contain ANSI escapes: %q", stderr.String())
 	}
 }

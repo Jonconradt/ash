@@ -18,9 +18,9 @@ func TestBuildScheduledInvocationScript(t *testing.T) {
 
 	osExecutable = func() (string, error) { return "/usr/local/bin/ash", nil }
 	osGetwd = func() (string, error) { return "/tmp/project", nil }
-	t.Setenv("AI_ENDPOINT", "http://localhost:11434")
-	t.Setenv("AI_MODEL", "llama3.1")
-	t.Setenv("SESSION_ID", "session_ABC123")
+	t.Setenv("ASH_AI_ENDPOINT", "http://localhost:11434")
+	t.Setenv("ASH_AI_MODEL", "llama3.1")
+	t.Setenv("ASH_SESSION_ID", "session_ABC123")
 	t.Setenv("HOME", "/Users/tester")
 	t.Setenv("PATH", "/usr/bin:/bin")
 	t.Setenv("ASH_VERBOSE", "")
@@ -32,16 +32,16 @@ func TestBuildScheduledInvocationScript(t *testing.T) {
 	if !strings.Contains(got, "cd '/tmp/project'") {
 		t.Fatalf("expected cwd cd command, got %q", got)
 	}
-	if !strings.Contains(got, "AI_ENDPOINT='http://localhost:11434'") {
-		t.Fatalf("expected AI_ENDPOINT env assignment, got %q", got)
+	if !strings.Contains(got, "ASH_AI_ENDPOINT='http://localhost:11434'") {
+		t.Fatalf("expected ASH_AI_ENDPOINT env assignment, got %q", got)
 	}
-	if !strings.Contains(got, "AI_MODEL='llama3.1'") {
-		t.Fatalf("expected AI_MODEL env assignment, got %q", got)
+	if !strings.Contains(got, "ASH_AI_MODEL='llama3.1'") {
+		t.Fatalf("expected ASH_AI_MODEL env assignment, got %q", got)
 	}
 	if !strings.Contains(got, "ASH_VERBOSE='1'") {
 		t.Fatalf("expected verbose logging to be enabled, got %q", got)
 	}
-	if !strings.Contains(got, "ASH_LOG_FILE='") || !strings.Contains(got, "/.ash/logs/task_sessionABC123.log'") {
+	if !strings.Contains(got, "ASH_LOG_FILE='") || !strings.Contains(got, "/.local/state/ash/logs/task_session_ABC123.log'") {
 		t.Fatalf("expected scheduler log file assignment, got %q", got)
 	}
 	if !strings.Contains(got, "ASH_LOG_FORMAT='json'") {
@@ -57,22 +57,21 @@ func TestBuildScheduledInvocationScript(t *testing.T) {
 
 func TestBuildManagedAshEnvIncludesSessionIDLine(t *testing.T) {
 	got := buildManagedAshEnv(map[string]string{
-		"AI_ENDPOINT": "http://localhost:11434",
-		"AI_MODEL":    "llama3.1",
+		"ASH_AI_ENDPOINT": "http://localhost:11434",
+		"ASH_AI_MODEL":    "llama3.1",
 	})
 
-	wantSessionLine := "export SESSION_ID=`head -c 100 /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1`\n"
-	if !strings.Contains(got, wantSessionLine) {
-		t.Fatalf("expected managed ash env to include SESSION_ID export line, got %q", got)
+	if !strings.Contains(got, `if [ -z "${ASH_SESSION_ID:-}" ]; then`) {
+		t.Fatalf("expected managed ash env to initialize only an absent ASH_SESSION_ID, got %q", got)
 	}
-	if !strings.Contains(got, "export AI_ENDPOINT='http://localhost:11434'\n") {
-		t.Fatalf("expected managed ash env to include AI_ENDPOINT export, got %q", got)
+	if !strings.Contains(got, "export ASH_AI_ENDPOINT='http://localhost:11434'\n") {
+		t.Fatalf("expected managed ash env to include ASH_AI_ENDPOINT export, got %q", got)
 	}
-	if !strings.Contains(got, "export AI_MODEL='llama3.1'\n") {
-		t.Fatalf("expected managed ash env to include AI_MODEL export, got %q", got)
+	if !strings.Contains(got, "export ASH_AI_MODEL='llama3.1'\n") {
+		t.Fatalf("expected managed ash env to include ASH_AI_MODEL export, got %q", got)
 	}
-	if !strings.Contains(got, managedPathExportLine+"\n") {
-		t.Fatalf("expected managed ash env to include tools PATH export, got %q", got)
+	if strings.Contains(got, "PATH=") {
+		t.Fatalf("managed ash environment must not change PATH, got %q", got)
 	}
 }
 
@@ -143,8 +142,8 @@ func TestRecurringJobLineRoundTrip(t *testing.T) {
 		osExecutable = origExecutable
 	})
 
-	t.Setenv("AI_ENDPOINT", "http://localhost:11434")
-	t.Setenv("AI_MODEL", "llama3.1")
+	t.Setenv("ASH_AI_ENDPOINT", "http://localhost:11434")
+	t.Setenv("ASH_AI_MODEL", "llama3.1")
 	t.Setenv("HOME", "/Users/tester")
 	t.Setenv("PATH", "/usr/bin:/bin")
 

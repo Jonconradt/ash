@@ -1,35 +1,39 @@
 # >>> ash install >>>
-[ -f "$HOME/.ash/.ash_env" ] && . "$HOME/.ash/.ash_env"
 case "$-" in
 	*i*) ;;
 	*) return ;;
 esac
+_ash_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/ash"
+_ash_data_dir="${XDG_DATA_HOME:-$HOME/.local/share}/ash"
+_ash_state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/ash"
+if [[ -n "${XDG_RUNTIME_DIR:-}" ]]; then
+	_ash_runtime_dir="$XDG_RUNTIME_DIR/ash"
+else
+	_ash_runtime_dir="$_ash_state_dir/runtime"
+fi
+[[ -f "$_ash_config_dir/.ash_env" ]] && . "$_ash_config_dir/.ash_env"
 
 _ash_ensure_broker() {
 	local mcp_credential_key="${ASH_MCP_CREDENTIAL_KEY:-}"
 	unset ASH_MCP_CREDENTIAL_KEY
-	local session_id="${SESSION_ID:-}"
+	local session_id="${ASH_SESSION_ID:-}"
 	if [[ -z "$session_id" ]]; then
 		session_id="$(head -c 100 /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)"
 		[[ -n "$session_id" ]] || return 1
-		export SESSION_ID="$session_id"
+		export ASH_SESSION_ID="$session_id"
 	fi
-	[[ -n "${AI_ENDPOINT:-}" && -n "${AI_MODEL:-}" ]] || return 1
+	[[ -n "${ASH_AI_ENDPOINT:-}" && -n "${ASH_AI_MODEL:-}" ]] || return 1
 	# Without this probe a missing ash-broker reaches command_not_found_handle, which
 	# would forward the broker's own command line to the AI as a prompt.
 	command -v ash-broker >/dev/null 2>&1 || return 1
 	if [[ -n "${ASH_BROKER_SOCKET:-}" && -n "${ASH_BROKER_TOKEN:-}" && -S "$ASH_BROKER_SOCKET" && -n "${ASH_BROKER_PID:-}" ]] && kill -0 "$ASH_BROKER_PID" 2>/dev/null; then
 		return 0
 	fi
-	local runtime_dir="$HOME/.ash/runtime"
+	local runtime_dir="$_ash_runtime_dir"
 	local socket_path="$runtime_dir/$session_id.sock"
-	local lease_path="$runtime_dir/$session_id.lease"
 	local token
 	runtime_dir="${runtime_dir%/}"
 	if ! mkdir -p -m 700 "$runtime_dir"; then
-		return 1
-	fi
-	if ! touch "$lease_path"; then
 		return 1
 	fi
 	token="$(head -c 32 /dev/urandom | LC_ALL=C od -An -tx1 | tr -d ' \n')"
@@ -40,7 +44,7 @@ _ash_ensure_broker() {
 	# pid is handed back through a file because $! is not visible to the parent.
 	local pid_path="$runtime_dir/$session_id.pid"
 	local parent_pid="$BASHPID"
-	( ASH_BROKER_TOKEN="$token" ASH_MCP_CREDENTIAL_KEY="$mcp_credential_key" command ash-broker --socket "$socket_path" --session-id "$session_id" --parent-pid "$parent_pid" --lease "$lease_path" </dev/null >/dev/null 2>&1 & printf '%s' "$!" > "$pid_path" )
+	( ASH_BROKER_TOKEN="$token" ASH_MCP_CREDENTIAL_KEY="$mcp_credential_key" command ash-broker --socket "$socket_path" --session-id "$session_id" --parent-pid "$parent_pid" </dev/null >/dev/null 2>&1 & printf '%s' "$!" > "$pid_path" )
 	unset mcp_credential_key
 	local broker_pid
 	broker_pid="$(cat "$pid_path" 2>/dev/null)"
@@ -51,8 +55,7 @@ _ash_ensure_broker() {
 	local attempt
 	for attempt in {1..40}; do
 		if [[ -S "$socket_path" ]]; then
-			touch "$lease_path"
-			export ASH_BROKER_SOCKET="$socket_path" ASH_BROKER_TOKEN="$token" ASH_BROKER_PID="$broker_pid" ASH_BROKER_LEASE="$lease_path"
+			export ASH_BROKER_SOCKET="$socket_path" ASH_BROKER_TOKEN="$token" ASH_BROKER_PID="$broker_pid"
 			return 0
 		fi
 		if ! kill -0 "$broker_pid" 2>/dev/null; then
@@ -66,7 +69,7 @@ _ash_ensure_broker() {
 _ash_ensure_broker >/dev/null 2>&1
 
 _ash_prompt_processing_enabled() {
-	local snooze_file="$HOME/.ash/.ash_snooze_until"
+	local snooze_file="$_ash_state_dir/.ash_snooze_until"
 	local expires_at now
 	if [[ ! -r "$snooze_file" ]]; then
 		return 0
@@ -79,11 +82,21 @@ _ash_prompt_processing_enabled() {
 	(( expires_at <= now ))
 }
 
+if [[ "${_ASH_WRAPS_COMMAND_NOT_FOUND:-}" != 1 ]]; then
+	if declare -F command_not_found_handle >/dev/null 2>&1; then
+		eval "$(declare -f command_not_found_handle | sed '1s/command_not_found_handle/_ash_original_command_not_found_handle/')"
+	fi
+	_ASH_WRAPS_COMMAND_NOT_FOUND=1
+fi
+
 command_not_found_handle() {
 	if _ash_prompt_processing_enabled; then
 		_ash_ensure_broker >/dev/null 2>&1
-		[[ -n "${ASH_BROKER_LEASE:-}" ]] && touch "$ASH_BROKER_LEASE"
-		ash "$@"
+		ash -- "$@"
+		return $?
+	fi
+	if declare -F _ash_original_command_not_found_handle >/dev/null 2>&1; then
+		_ash_original_command_not_found_handle "$@"
 		return $?
 	fi
 	return 127
@@ -92,7 +105,6 @@ command_not_found_handle() {
 ash() {
 	if [[ "${1:-}" == "mcp" && "${2:-}" == "add" ]]; then
 		_ash_ensure_broker >/dev/null 2>&1
-		[[ -n "${ASH_BROKER_LEASE:-}" ]] && touch "$ASH_BROKER_LEASE"
 	fi
 	command ash "$@"
 }
@@ -142,8 +154,7 @@ _ash_route_or_delegate() {
 	fi
   if _ash_should_route "$cmd" "$@"; then
 	_ash_ensure_broker >/dev/null 2>&1
-		[[ -n "${ASH_BROKER_LEASE:-}" ]] && touch "$ASH_BROKER_LEASE"
-    ash "$cmd" "$@"
+	ash -- "$cmd" "$@"
     return $?
   fi
   command "$cmd" "$@"
@@ -158,8 +169,7 @@ _ash_route_or_delegate_builtin() {
 	fi
   if _ash_should_route "$builtin_name" "$@"; then
 	_ash_ensure_broker >/dev/null 2>&1
-		[[ -n "${ASH_BROKER_LEASE:-}" ]] && touch "$ASH_BROKER_LEASE"
-    ash "$builtin_name" "$@"
+	ash -- "$builtin_name" "$@"
     return $?
   fi
   builtin "$builtin_name" "$@"
@@ -177,7 +187,7 @@ _ash_route_or_delegate_say() {
 			ash --say "$cmd" "$@"
 			return $?
 		fi
-		ash "$cmd" "$@"
+		ash -- "$cmd" "$@"
 		return $?
 	fi
 	command "$cmd" "$@"

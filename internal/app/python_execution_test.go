@@ -62,8 +62,8 @@ func TestCallPython3(t *testing.T) {
 
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv("SESSION_ID", "python_session")
-	root := filepath.Join(home, ".ash", "scratch", "python_session")
+	t.Setenv("ASH_SESSION_ID", "python_session")
+	root := filepath.Join(home, ".local", "state", "ash", "scratch", "python_session")
 	scriptPath := filepath.Join(root, "work.py")
 	if err := os.MkdirAll(root, 0o700); err != nil {
 		t.Fatalf("mkdir scratch root: %v", err)
@@ -193,7 +193,7 @@ func TestCallUnixCommandBlocksManagedPythonToolWhenStrict(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("ASH_STRICT", "1")
-	toolsDir := filepath.Join(home, ".ash", "tools")
+	toolsDir := filepath.Join(home, ".local", "share", "ash", "tools")
 	if err := os.MkdirAll(toolsDir, 0o700); err != nil {
 		t.Fatalf("mkdir tools: %v", err)
 	}

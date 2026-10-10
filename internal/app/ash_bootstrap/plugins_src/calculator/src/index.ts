@@ -9,6 +9,31 @@ const VERSION = "1.0.0";
 
 function getAiDocs(): string {
   const docs = {
+    schema_version: 1,
+    name: PLUGIN_NAME,
+    version: VERSION,
+    input_schema: {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "object",
+      properties: {
+        "--expr": { type: "string" },
+        "--format": { type: "string", enum: ["json", "text"], default: "json" }
+      },
+      required: ["--expr"],
+      additionalProperties: false
+    },
+    output_schema: {
+      $schema: "https://json-schema.org/draft/2020-12/schema",
+      type: "object",
+      required: ["status"],
+      properties: {
+        status: { type: "string", enum: ["success", "error"] },
+        expression: { type: "string" },
+        result: { type: "number" },
+        error_message: { type: "string" }
+      },
+      additionalProperties: false
+    },
     Capabilities: [
       "Safely evaluate mathematical expressions and formulas.",
       "Support arithmetic (+, -, *, /, %, ^), parentheses, constants (pi, e), and standard math functions (sin, cos, tan, sqrt, log, ln, exp, abs, floor, ceil, round)."

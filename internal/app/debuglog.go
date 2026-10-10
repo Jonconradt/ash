@@ -13,7 +13,7 @@ import (
 	"strings"
 	"sync"
 
-	"ash/internal/localize"
+	"github.com/Jonconradt/ash/internal/localize"
 )
 
 func newStructuredLogger(w io.Writer, level slog.Level) *slog.Logger {

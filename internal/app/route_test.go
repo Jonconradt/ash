@@ -123,7 +123,7 @@ func TestZshBootstrapAssetShape(t *testing.T) {
 	asset := string(content)
 
 	for _, want := range []string{
-		`[[ -n "${AI_ENDPOINT:-}" && -n "${AI_MODEL:-}" ]] || return 1`,
+		`[[ -n "${ASH_AI_ENDPOINT:-}" && -n "${ASH_AI_MODEL:-}" ]] || return 1`,
 		`--parent-pid "$parent_pid"`,
 		"add-zsh-hook zshexit _ash_shutdown_broker",
 		"zle -N accept-line _ash_accept_line",

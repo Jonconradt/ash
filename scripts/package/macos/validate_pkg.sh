@@ -4,13 +4,16 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  validate_pkg.sh --pkg <path.pkg> --install-path </path> --man-path </path/name.1> --app-name <name>
+  validate_pkg.sh --pkg <path.pkg> --install-path </path> --plugin-install-path </path> --license-path </path> --plugins-dir <dir> --man-path </path/name.1> --app-name <name>
 EOF
 }
 
 pkg_path=""
 install_path=""
 man_path=""
+plugin_install_path=""
+license_path=""
+plugins_dir=""
 app_name=""
 
 while [[ $# -gt 0 ]]; do
@@ -25,6 +28,18 @@ while [[ $# -gt 0 ]]; do
       ;;
     --man-path)
       man_path="${2:-}"
+      shift 2
+      ;;
+    --plugin-install-path)
+      plugin_install_path="${2:-}"
+      shift 2
+      ;;
+    --license-path)
+      license_path="${2:-}"
+      shift 2
+      ;;
+    --plugins-dir)
+      plugins_dir="${2:-}"
       shift 2
       ;;
     --app-name)
@@ -43,7 +58,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$pkg_path" || -z "$install_path" || -z "$man_path" || -z "$app_name" ]]; then
+if [[ -z "$pkg_path" || -z "$install_path" || -z "$plugin_install_path" || -z "$license_path" || -z "$plugins_dir" || -z "$man_path" || -z "$app_name" ]]; then
   echo "all arguments are required" >&2
   usage >&2
   exit 1
@@ -60,13 +75,28 @@ if ! command -v pkgutil >/dev/null 2>&1; then
 fi
 
 expected_path="${install_path%/}/$app_name"
+expected_broker_path="${install_path%/}/ash-broker"
 expected_man_path="${man_path%/}"
-payload_list="$(pkgutil --payload-files "$pkg_path")"
+expected_license_path="${license_path#/}"
+payload_list="$(pkgutil --payload-files "$pkg_path" | sed 's#^\./##')"
 
 if [[ -z "$payload_list" ]]; then
   echo "package payload listing is empty: $pkg_path" >&2
   exit 1
 fi
+for expected in "${expected_broker_path#/}" "$expected_license_path"; do
+  if ! grep -Fxq "$expected" <<<"$payload_list"; then
+    echo "expected payload entry missing: /$expected" >&2
+    exit 1
+  fi
+done
+while IFS= read -r plugin; do
+  expected_plugin="${plugin_install_path#/}/${plugin##*/}"
+  if ! grep -Fxq "$expected_plugin" <<<"$payload_list"; then
+    echo "native plugin missing from package: /$expected_plugin" >&2
+    exit 1
+  fi
+done < <(find "$plugins_dir" -maxdepth 1 -type f -perm -111 -print)
 
 if ! pkgutil --check-signature "$pkg_path" >/dev/null 2>&1; then
   echo "warning: package signature check could not be completed (unsigned package expected)" >&2

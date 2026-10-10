@@ -123,9 +123,9 @@ func TestSpeakAssistantReplyReturnsNativeSayFailure(t *testing.T) {
 
 func TestRunSayModeSpeaksAssistantReply(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
-	t.Setenv("SESSION_ID", "say-test")
-	t.Setenv("AI_ENDPOINT", "http://localhost:11434")
-	t.Setenv("AI_MODEL", "test-model")
+	t.Setenv("ASH_SESSION_ID", "say-test")
+	t.Setenv("ASH_AI_ENDPOINT", "http://localhost:11434")
+	t.Setenv("ASH_AI_MODEL", "test-model")
 	t.Setenv("ASH_VERBOSE", "0")
 	t.Setenv("ASH_STREAM", "0")
 	t.Setenv(ashEnvAlwaysOpenAIAPI, "0")

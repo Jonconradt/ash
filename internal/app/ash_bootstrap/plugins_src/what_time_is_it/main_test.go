@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"ash/internal/plugin"
+	"github.com/Jonconradt/ash/internal/plugin"
 )
 
 func TestAIDocsSchema(t *testing.T) {
@@ -23,9 +23,21 @@ func TestAIDocsSchema(t *testing.T) {
 		t.Fatalf("AIDocs() is not valid JSON: %v", err)
 	}
 
-	for _, key := range []string{"Capabilities", "Arguments", "Return format", "Usage guidance for the AI"} {
+	for _, key := range []string{"schema_version", "name", "version", "input_schema", "output_schema", "Capabilities", "Arguments", "Return format", "Usage guidance for the AI"} {
 		if _, ok := docs[key]; !ok {
 			t.Errorf("missing expected key %q in AIDocs", key)
+		}
+	}
+	if docs["schema_version"] != float64(1) {
+		t.Errorf("schema_version = %v, want 1", docs["schema_version"])
+	}
+	if docs["name"] != p.Name() || docs["version"] != p.Version() {
+		t.Errorf("plugin identity = %v %v, want %s %s", docs["name"], docs["version"], p.Name(), p.Version())
+	}
+	for _, key := range []string{"input_schema", "output_schema"} {
+		schema, ok := docs[key].(map[string]any)
+		if !ok || schema["type"] != "object" || schema["$schema"] != "https://json-schema.org/draft/2020-12/schema" {
+			t.Errorf("%s is not a JSON Schema 2020-12 object schema: %#v", key, docs[key])
 		}
 	}
 }

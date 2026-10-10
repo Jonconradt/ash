@@ -23,7 +23,7 @@ func TestSchedulerDebugLoggingRotatesJSON(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("ASH_VERBOSE", "1")
-	t.Setenv("ASH_LOG_FILE", filepath.Join(home, ".ash", "logs", "scheduler.log"))
+	t.Setenv("ASH_LOG_FILE", filepath.Join(home, ".local", "state", "ash", "logs", "scheduler.log"))
 	t.Setenv("ASH_LOG_FORMAT", "json")
 	t.Setenv("ASH_LOG_MAX_BYTES", "220")
 
@@ -35,7 +35,7 @@ func TestSchedulerDebugLoggingRotatesJSON(t *testing.T) {
 	slog.Debug("first ", "request_id", requestIDGenerator(), "value", strings.Repeat("a", 120), "EID", "IXk2kUYH")
 	slog.Debug("second ", "request_id", requestIDGenerator(), "value", strings.Repeat("b", 120), "EID", "x1z9lqDJ")
 
-	currentPath := filepath.Join(home, ".ash", "logs", "scheduler.log")
+	currentPath := filepath.Join(home, ".local", "state", "ash", "logs", "scheduler.log")
 	rotatedPath := currentPath + ".1"
 
 	currentData, err := os.ReadFile(currentPath)
@@ -129,7 +129,7 @@ func runAndCaptureFirstDebugEntry(t *testing.T) map[string]any {
 
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv("SESSION_ID", "")
+	t.Setenv("ASH_SESSION_ID", "")
 	t.Setenv("ASH_VERBOSE", "1")
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -137,8 +137,8 @@ func runAndCaptureFirstDebugEntry(t *testing.T) map[string]any {
 		_, _ = w.Write([]byte(`{"message":{"role":"assistant","content":"ok"}}`))
 	}))
 	defer srv.Close()
-	t.Setenv("AI_ENDPOINT", srv.URL)
-	t.Setenv("AI_MODEL", "llama3.1")
+	t.Setenv("ASH_AI_ENDPOINT", srv.URL)
+	t.Setenv("ASH_AI_MODEL", "llama3.1")
 
 	var stdout bytes.Buffer
 	var stderr syncBuffer
@@ -234,36 +234,22 @@ func TestUserVisibleLogsUsePlainText(t *testing.T) {
 	}
 }
 
-func TestSchedulerLogFilePathUsesSanitizedSessionID(t *testing.T) {
+func TestSchedulerLogFilePathRejectsInvalidSessionID(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv("SESSION_ID", "abC-12_3.!@Z")
+	t.Setenv("ASH_SESSION_ID", "abC-12_3.!@Z")
 
-	scheduledPath, err := schedulerLogFilePath(true)
-	if err != nil {
-		t.Fatalf("schedulerLogFilePath scheduled error: %v", err)
-	}
-	wantScheduled := filepath.Join(home, ".ash", "logs", "task_abC123Z.log")
-	if scheduledPath != wantScheduled {
-		t.Fatalf("scheduled log path = %q, want %q", scheduledPath, wantScheduled)
-	}
-
-	interactivePath, err := schedulerLogFilePath(false)
-	if err != nil {
-		t.Fatalf("schedulerLogFilePath interactive error: %v", err)
-	}
-	wantInteractive := filepath.Join(home, ".ash", "logs", "abC123Z.log")
-	if interactivePath != wantInteractive {
-		t.Fatalf("interactive log path = %q, want %q", interactivePath, wantInteractive)
+	if _, err := schedulerLogFilePath(true); err == nil {
+		t.Fatal("expected invalid session ID to be rejected")
 	}
 }
 
 func TestSchedulerLogFilePathRequiresSessionID(t *testing.T) {
-	t.Setenv("SESSION_ID", "")
+	t.Setenv("ASH_SESSION_ID", "")
 	if _, err := schedulerLogFilePath(true); err == nil {
-		t.Fatalf("expected error when SESSION_ID is missing")
-	} else if !strings.Contains(err.Error(), "SESSION_ID is required") {
-		t.Fatalf("expected SESSION_ID requirement in error, got %q", err.Error())
+		t.Fatalf("expected error when ASH_SESSION_ID is missing")
+	} else if !strings.Contains(err.Error(), "ASH_SESSION_ID is required") {
+		t.Fatalf("expected ASH_SESSION_ID requirement in error, got %q", err.Error())
 	}
 }
 

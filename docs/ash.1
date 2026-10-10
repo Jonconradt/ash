@@ -9,6 +9,7 @@ ash \- practical shell assistant for command-not-found workflows
 .B ash
 .B install
 .RI [ --shell " bash|fish|zsh" ]
+.RI [ --shell-integration | --disable-shell-integration ]
 .RI [ --dry-run ]
 .RI [ --overwrite ]
 .br
@@ -64,7 +65,9 @@ are recognized as well.
 .PP
 The
 .B install
-subcommand adds a managed integration block to shell startup files.
+subcommand installs managed assets. Shell startup files are changed only when
+.B --shell-integration
+is supplied.
 For bash, the target is
 .I ~/.bashrc
 and for zsh the target is
@@ -90,8 +93,8 @@ MIME-sniffed, and sent to providers/models that support multimodal input
 (currently OpenAI). Any attachments returned by the model are saved under
 the scratch directory and their paths printed.
 .TP
-.B ash install [--shell bash|fish|zsh] [--dry-run]
-Install or update shell integration.
+.B ash install [--shell bash|fish|zsh] [--shell-integration|--disable-shell-integration] [--dry-run]
+Install or update managed assets and optionally enable or disable shell integration.
 .IP
 .B --shell
 Select a shell explicitly. When omitted,
@@ -100,8 +103,14 @@ uses the current shell when possible and defaults to
 .B bash
 when the shell cannot be detected.
 .IP
+.B --shell-integration
+Add or update the managed block in the selected shell startup file.
+.IP
+.B --disable-shell-integration
+Remove only the managed block from the selected shell startup file.
+.IP
 .B --dry-run
-Preview file changes without writing.
+Preview file changes without writing; the operation is read-only.
 .TP
 .B ash mcp add URL [--no-browser]
 Connect and register a remote MCP server in the effective
@@ -118,12 +127,14 @@ When run interactively without
 .B --dry-run,
 .B ash install
 also configures
-.IR ~/.ash/.ash_env
+.IR $XDG_CONFIG_HOME/ash/.ash_env
+(default
+.IR ~/.config/ash/.ash_env )
 with
-.BR AI_ENDPOINT ,
-.BR AI_MODEL ,
+.BR ASH_AI_ENDPOINT ,
+.BR ASH_AI_MODEL ,
 and
-.B AI_AUTH_TOKEN
+.B ASH_AI_AUTH_TOKEN
 when they are not already set. It first checks the environment for an
 already-configured cloud provider key
 (for example
@@ -176,12 +187,14 @@ to resume processing immediately. The snooze is shared by installed shell
 integrations and does not disable explicit
 .B ash
 commands. Its expiry is stored in
-.IR ~/.ash/.ash_snooze_until .
+.IR $XDG_STATE_HOME/ash/.ash_snooze_until
+(default
+.IR ~/.local/state/ash/.ash_snooze_until ).
 After updating an existing installation, reload the shell startup file once so
 the current shell loads the snooze-aware integration.
 .TP
 .B ash update [--version vX.Y.Z] [--yes|--skip-customized]
-Download and install the latest stable macOS or Linux release for the current
+Download and install the latest stable macOS, Linux, or FreeBSD release for the current
 architecture into
 .IR ~/.local/bin/ash .
 The release's
@@ -193,19 +206,18 @@ confirmation is required to continue; do not approve unless you independently
 trust the release source. Missing verification data or a mismatched archive
 digest aborts the update. Unsupported archive entries are listed for approval;
 their payloads are skipped, and trailing-slash paths are created as directories.
-These confirmations are refused in non-interactive runs. Customized files under
-.IR ~/.ash
-are skipped by default;
+These confirmations are refused in non-interactive runs. Customized managed
+assets under the XDG configuration and data directories are skipped by default;
 .B --yes
 replaces them and
 .B --skip-customized
 explicitly keeps them.
 .SH ENVIRONMENT
 .TP
-.B AI_ENDPOINT
+.B ASH_AI_ENDPOINT
 Required. Base URL for the chat API endpoint.
 .TP
-.B AI_MODEL
+.B ASH_AI_MODEL
 Required. Model name sent to the endpoint.
 .TP
 .B OLLAMA_KEEP_ALIVE
@@ -220,13 +232,13 @@ changing it. A duration such as
 .B 30m
 keeps the model warm for a bounded period.
 .TP
-.B AI_AUTH_TOKEN
+.B ASH_AI_AUTH_TOKEN
 Optional bearer token for authenticated endpoints. When set, it is sent as
-bearer authentication and is required for cloud endpoints. Private/LAN
-addresses (RFC1918 IPv4, IPv6 ULA) and .local mDNS hostnames are treated as
-non-cloud (like localhost) unless ASH_STRICT is enabled.
+bearer authentication and is required for cloud endpoints except AWS Bedrock.
+Private/LAN addresses (RFC1918 IPv4, IPv6 ULA) and .local mDNS hostnames are
+treated as non-cloud (like localhost) unless ASH_STRICT is enabled.
 .TP
-.B AI_PROVIDER
+.B ASH_AI_PROVIDER
 Optional provider override. Supported values:
 .B ollama,
 .B openai,
@@ -239,7 +251,7 @@ When unset,
 .B ash
 auto-detects provider from the endpoint host/path.
 .TP
-.B AI_CACHE
+.B ASH_AI_CACHE
 Optional provider-native cache toggle.
 Defaults to enabled when the active provider supports native caching.
 Set to a false-like value (for example,
@@ -274,15 +286,7 @@ Optional max size in bytes for a single
 .B --attach
 file. Default is 10485760 (10 MiB). Files larger than this are rejected.
 .TP
-.B AI
-Legacy setting that is no longer supported.
-Use
-.B AI_ENDPOINT
-and
-.B AI_MODEL
-instead.
-.TP
-.B AI_TIMEOUT
+.B ASH_AI_TIMEOUT
 Optional request timeout. Default is 3m.
 .TP
 .B ASH_BROKER_AI_WARMUP
@@ -297,13 +301,17 @@ Optional comma-separated allowlist for
 and
 .B run_unix_pipeline
 tool executables. When unset,
-.I ~/.ash/.ash_allow
+.I $XDG_CONFIG_HOME/ash/.ash_allow
+(default
+.IR ~/.config/ash/.ash_allow )
 is used if present. Standalone $TOOLS_DIR_LIST and $PLUGINS_DIR_LIST lines in that file are
 internal Ash directives that permit eligible managed tool scripts and native plugins.
 .TP
 .B ASH_DENY
 Optional comma-separated denylist for commands, tools, and plugins. When unset,
-.I ~/.ash/.ash_deny
+.I $XDG_CONFIG_HOME/ash/.ash_deny
+(default
+.IR ~/.config/ash/.ash_deny )
 is used if present. Denied commands are blocked unconditionally.
 .TP
 .B ASH_TOOL_TIMEOUT
@@ -347,8 +355,11 @@ Optional maximum log file size before rotation when
 .B ASH_LOG_FILE
 is used. Default is 1048576.
 .TP
+.B ASH_SESSION_ID
+Ash session identifier used for persistent history/log naming. Generated when
+absent; invalid explicit values are rejected. The generic
 .B SESSION_ID
-Session identifier used for persistent history/log file naming. Generated automatically when missing for interactive runs; required for some scheduled logging paths.
+variable is ignored.
 .PP
 The AI may use a
 .B run_sub_agent
@@ -365,7 +376,9 @@ execution is enabled. On Unix, timeout and Control-C terminate the child
 process group.
 .PP
 Ash also maintains a session-scoped scratch workspace under
-.IR ~/.ash/scratch/<session-id>/ .
+.IR $XDG_STATE_HOME/ash/scratch/<session-id>/ .
+(The default state directory is
+.IR ~/.local/state/ash .)
 This scratch area is for temporary notes, plans, helper files, and one-off script
 fragments. The session ID is resolved automatically from the active ash session;
 AI callers do not need to remember or provide it. Scratch files are kept within
@@ -418,32 +431,32 @@ and install recommendations.
 Internal scheduler flag. Set by ash-managed scheduled invocations.
 .TP
 .B HOME
-Determines the ash workspace location under
-.I ~/.ash.
+Used to resolve unset XDG base directories.
 .TP
 .B PATH
 Used to locate executables for tool commands and helper utilities.
 .B ash install
-prepends
-.I ~/.ash/tools
-and
-.I ~/.local/bin
-via the managed
-.I ~/.ash/.ash_env
-file.
+does not add Ash tools to
+.BR PATH .
 .TP
 .B ASH_PYTHON
 Interpreter used for bundled Python tools. Defaults to the managed virtualenv at
-.I ~/.ash/venv
+.I $XDG_DATA_HOME/ash/venv
+(default
+.IR ~/.local/share/ash/venv )
 when present, otherwise system
 .IR python3 .
 .SH FILES
 .TP
-.I ~/.ash/.ash_system
+.I $XDG_CONFIG_HOME/ash/.ash_system
+(default
+.IR ~/.config/ash/.ash_system )
 Canonical system prompt file. $TOOLS_DIR_LIST, $PLUGINS_DIR_LIST, and $IF_PYTHON_AVAILABLE are
 reserved internal Ash substitutions, not environment variables.
 .TP
-.I ~/.ash/.ash_allow
+.I $XDG_CONFIG_HOME/ash/.ash_allow
+(default
+.IR ~/.config/ash/.ash_allow )
 Canonical command, tool, and plugin allowlist file. Replace its standalone $TOOLS_DIR_LIST and $PLUGINS_DIR_LIST directives
 with literal bare names for a fixed restrictive policy. A line beginning with http:// or https://
 registers a remote Streamable HTTP MCP server instead of a shell command. Its local name is the
@@ -460,27 +473,32 @@ sessions receive a warning; non-interactive sessions suppress the expected failu
 jobs do not inherit the per-shell broker and cannot use remote MCP tools. Prompts that depend on
 MCP may complete without the requested data or action; do not schedule such prompts.
 .TP
-.I ~/.ash/.ash_deny
+.I $XDG_CONFIG_HOME/ash/.ash_deny
+(default
+.IR ~/.config/ash/.ash_deny )
 Canonical command, tool, and plugin denylist file for explicitly blocking specific executables.
 .TP
-.I ~/.ash/plugins/
+.I $XDG_DATA_HOME/ash/plugins/
+(default
+.IR ~/.local/share/ash/plugins/ )
 Directory holding installed native binary plugins.
 .TP
-.I ~/.ash/venv/
+.I $XDG_DATA_HOME/ash/venv/
 Managed virtualenv holding third-party dependencies for bundled Python tools. Built
 by
 .BR "ash install" ;
-installation does not complete until the bundled dependencies are ready. On
-Debian and Ubuntu, the package install declares
-.B python3-venv
-as a dependency. Other install methods require Python 3 with venv support.
+setup is attempted but does not block installation when Python or network
+access is unavailable. Python 3 with venv support is needed to use bundled
+Python tools.
 .TP
-.I ~/.ash/history/
+.I $XDG_STATE_HOME/ash/history/
+(default
+.IR ~/.local/state/ash/history/ )
 Conversation history files.
 .TP
-.I ~/.ash/scratch/
+.I $XDG_STATE_HOME/ash/scratch/
 Session-scoped scratch directory for temporary notes, plans, and helper files. The
-directory is keyed by the active SESSION_ID and is cleaned up automatically when
+directory is keyed by the active ASH_SESSION_ID and is cleaned up automatically when
 it is stale and idle beyond the configured retention window.
 .SH EXIT STATUS
 .B ash
@@ -491,8 +509,8 @@ It returns non-zero when configuration, network requests, or tool execution fail
 .B echo "summarize this directory" | ash
 Read prompt text from stdin.
 .TP
-.B ash install --shell bash
-Install managed bash integration.
+.B ash install --shell bash --shell-integration
+Enable managed bash integration.
 .TP
 .B ash install --shell zsh --dry-run
 Preview zsh integration changes.

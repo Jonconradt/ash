@@ -4,7 +4,7 @@ package main
 import (
 	"os"
 
-	"ash/internal/app"
+	"github.com/Jonconradt/ash/internal/app"
 )
 
 func main() {

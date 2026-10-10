@@ -17,8 +17,8 @@ import (
 	"sync"
 	"time"
 
-	"ash/internal/brokerproto"
-	mcpclient "ash/internal/mcp"
+	"github.com/Jonconradt/ash/internal/brokerproto"
+	mcpclient "github.com/Jonconradt/ash/internal/mcp"
 )
 
 type remoteToolRef struct {

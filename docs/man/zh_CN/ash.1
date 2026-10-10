@@ -35,12 +35,16 @@ ash \- 用于命令未找到工作流的实用 Shell 助手
 可强制以文本输出。
 .PP
 .B install
-子命令会向 Shell 启动文件添加受管理的集成区块。安装时会根据
+子命令会安装受管理的资源。只有指定
+.B --shell-integration
+时才会修改 Shell 启动文件。安装时会根据
 .B ASH_LANG
 （若已设置）或
 .B LANG
 选择语言，并将可用语言包存放在
-.IR ~/.ash/languages/ 。
+.IR $XDG_DATA_HOME/ash/languages/
+(默认路径为
+.IR ~/.local/share/ash/languages/ )。
 .SH 命令
 .TP
 .B ash [文本...]
@@ -67,6 +71,12 @@ ash \- 用于命令未找到工作流的实用 Shell 助手
 .BI --shell " shell"
 指定要安装的 Shell。
 .TP
+.B --shell-integration
+在 Shell 启动文件中启用或更新受管理的区块。
+.TP
+.B --disable-shell-integration
+仅从 Shell 启动文件中移除受管理的区块。
+.TP
 .B --dry-run
 预览文件变更但不写入。
 .TP
@@ -92,7 +102,7 @@ ash \- 用于命令未找到工作流的实用 Shell 助手
 .B ASH_LANG
 时选择界面语言。支持 en_US、zh_CN、zh_TW、es_ES、ar_AE 和 id_ID；缺少方言翻译时会使用相应语言目录。
 .TP
-.B AI_ENDPOINT, AI_MODEL, AI_AUTH_TOKEN
+.B ASH_AI_ENDPOINT, ASH_AI_MODEL, ASH_AI_AUTH_TOKEN
 配置 AI 服务端点、模型和凭据。
 .TP
 .B ASH_SAY_TEXT
@@ -101,10 +111,10 @@ ash \- 用于命令未找到工作流的实用 Shell 助手
 时停用语音输出。
 .SH 文件
 .TP
-.I ~/.ash/languages/
+.I $XDG_DATA_HOME/ash/languages/
 用户安装的语言目录和语言包。
 .TP
-.I ~/.ash/.ash_env
+.I $XDG_CONFIG_HOME/ash/.ash_env
 受管理的 AI 环境配置。
 .SH 退出状态
 .TP

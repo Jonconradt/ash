@@ -31,6 +31,10 @@ func attachmentMaxBytes() int64 {
 func parseAttachFlags(args []string) (remaining []string, paths []string, err error) {
 	remaining = make([]string, 0, len(args))
 	for i := 0; i < len(args); i++ {
+		if args[i] == "--" {
+			remaining = append(remaining, args[i+1:]...)
+			break
+		}
 		if args[i] != "--attach" {
 			remaining = append(remaining, args[i])
 			continue

@@ -1,4 +1,4 @@
-module ash
+module github.com/Jonconradt/ash
 
 go 1.27.2
 

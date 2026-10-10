@@ -26,7 +26,7 @@ func TestWorkspaceReadWriteTools(t *testing.T) {
 		t.Fatalf("expected successful write, got %s", writeResult)
 	}
 
-	workspaceFile := filepath.Join(home, ".ash", "state", "counter.txt")
+	workspaceFile := filepath.Join(home, ".config", "ash", "state", "counter.txt")
 	data, err := os.ReadFile(workspaceFile)
 	if err != nil {
 		t.Fatalf("read workspace file: %v", err)
@@ -35,7 +35,7 @@ func TestWorkspaceReadWriteTools(t *testing.T) {
 		t.Fatalf("unexpected workspace content: %q", string(data))
 	}
 
-	inventory, err := os.ReadFile(filepath.Join(home, ".ash", "inventory.md"))
+	inventory, err := os.ReadFile(filepath.Join(home, ".config", "ash", "inventory.md"))
 	if err != nil {
 		t.Fatalf("read inventory file: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestScratchReadWriteAppendAndEditTools(t *testing.T) {
 	shim := localToolShim{}
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv("SESSION_ID", "session_123")
+	t.Setenv("ASH_SESSION_ID", "session_123")
 
 	writeResult := shim.CallTool(context.Background(), "write_scratch_file", map[string]any{
 		"path":    "plan/notes.txt",
@@ -80,7 +80,7 @@ func TestScratchReadWriteAppendAndEditTools(t *testing.T) {
 		t.Fatalf("expected successful scratch edit, got %s", editResult)
 	}
 
-	content, err := os.ReadFile(filepath.Join(home, ".ash", "scratch", "session_123", "plan", "notes.txt"))
+	content, err := os.ReadFile(filepath.Join(home, ".local", "state", "ash", "scratch", "session_123", "plan", "notes.txt"))
 	if err != nil {
 		t.Fatalf("read scratch file: %v", err)
 	}
@@ -98,7 +98,7 @@ func TestScratchTargetedEditRequiresOneExactMatch(t *testing.T) {
 	shim := localToolShim{}
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv("SESSION_ID", "session_123")
+	t.Setenv("ASH_SESSION_ID", "session_123")
 	ctx := context.Background()
 	if result := shim.CallTool(ctx, "write_scratch_file", map[string]any{"path": "notes.txt", "content": "alpha α beta"}); !strings.Contains(result, `"ok":true`) {
 		t.Fatalf("write scratch file: %s", result)
@@ -107,7 +107,7 @@ func TestScratchTargetedEditRequiresOneExactMatch(t *testing.T) {
 	if !strings.Contains(result, `"ok":true`) {
 		t.Fatalf("edit unique text: %s", result)
 	}
-	path := filepath.Join(home, ".ash", "scratch", "session_123", "notes.txt")
+	path := filepath.Join(home, ".local", "state", "ash", "scratch", "session_123", "notes.txt")
 	content, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -139,7 +139,7 @@ func TestListScratchFilesReturnsBoundedSortedSessionEntries(t *testing.T) {
 	shim := localToolShim{}
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv("SESSION_ID", "session_123")
+	t.Setenv("ASH_SESSION_ID", "session_123")
 	for path, content := range map[string]string{
 		"z.txt":        "z",
 		"nested/a.txt": "aa",
@@ -149,7 +149,7 @@ func TestListScratchFilesReturnsBoundedSortedSessionEntries(t *testing.T) {
 			t.Fatalf("write %s: %s", path, result)
 		}
 	}
-	root := filepath.Join(home, ".ash", "scratch", "session_123")
+	root := filepath.Join(home, ".local", "state", "ash", "scratch", "session_123")
 	for _, hidden := range []string{".secret", ".ash_scratch_lock"} {
 		if err := os.WriteFile(filepath.Join(root, hidden), []byte("hidden"), 0o600); err != nil {
 			t.Fatal(err)
@@ -189,7 +189,7 @@ func TestListScratchFilesBoundsSerializedPages(t *testing.T) {
 	shim := localToolShim{}
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv("SESSION_ID", "session_123")
+	t.Setenv("ASH_SESSION_ID", "session_123")
 	t.Setenv("ASH_TOOL_OUTPUT_MAX", "512")
 	for i := 0; i < 8; i++ {
 		result := shim.CallTool(context.Background(), "write_scratch_file", map[string]any{
@@ -223,7 +223,7 @@ func TestListScratchFilesBoundsSerializedPages(t *testing.T) {
 func TestCleanupStaleScratchDirs(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	base := filepath.Join(home, ".ash", "scratch")
+	base := filepath.Join(home, ".local", "state", "ash", "scratch")
 	if err := os.MkdirAll(base, 0o700); err != nil {
 		t.Fatalf("mkdir scratch root: %v", err)
 	}
@@ -281,8 +281,8 @@ func TestCleanupWorkspaceRetentionSweepsHistoryAndRuntime(t *testing.T) {
 	osUserHomeDir = func() (string, error) { return home, nil }
 	t.Cleanup(func() { osUserHomeDir = originalHome })
 
-	historyDir := filepath.Join(home, ashWorkspaceDirName, historyDirName)
-	runtimeDir := filepath.Join(home, ashWorkspaceDirName, runtimeDirName)
+	historyDir := filepath.Join(home, ".local", "state", "ash", historyDirName)
+	runtimeDir := filepath.Join(home, ".local", "state", "ash", runtimeDirName)
 	for _, dir := range []string{historyDir, runtimeDir} {
 		if err := os.MkdirAll(dir, 0o700); err != nil {
 			t.Fatalf("mkdir %s: %v", dir, err)
@@ -355,7 +355,7 @@ func TestWorkspaceWriteRejectsPathTraversal(t *testing.T) {
 		"content": "bad",
 		"purpose": "invalid",
 	})
-	if !strings.Contains(result, "inside ~/.ash") {
+	if !strings.Contains(result, "inside the configured Ash workspace") {
 		t.Fatalf("expected containment error, got %s", result)
 	}
 }

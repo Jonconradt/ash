@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"ash/internal/localize"
-	"ash/internal/uistyle"
+	"github.com/Jonconradt/ash/internal/localize"
+	"github.com/Jonconradt/ash/internal/uistyle"
 )
 
 // probeTimeout bounds local service discovery so a closed/filtered port cannot stall install.

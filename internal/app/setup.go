@@ -1,25 +1,17 @@
 package app
 
 import (
-	"fmt"
+	"errors"
 	"os"
 	"strings"
+
+	"github.com/Jonconradt/ash/internal/localize"
 )
 
 func missingAIEnvSetupError() error {
 	rcFile := rcFileForShellEnv(os.Getenv("SHELL"))
 
-	return fmt.Errorf(
-		"AI environment setup is incomplete.\n"+
-			"Please add these lines to your ~/%s file:\n\n"+
-			"export AI_ENDPOINT='https://your-api-endpoint.example.com'\n"+
-			"export AI_MODEL='your-model-name'\n"+
-			"export AI_AUTH_TOKEN='your-token'\n\n"+
-			"Then run: source ~/%s\n"+
-			"After that, run your ash command again",
-		rcFile,
-		rcFile,
-	)
+	return errors.New(localize.Format("setup.ai_env_incomplete", []any{rcFile, rcFile}))
 }
 
 func rcFileForShellEnv(shellEnv string) string {

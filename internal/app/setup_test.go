@@ -35,9 +35,9 @@ func TestMissingAIEnvSetupError(t *testing.T) {
 	message := err.Error()
 	for _, want := range []string{
 		"~/.zshrc",
-		"export AI_ENDPOINT='https://your-api-endpoint.example.com'",
-		"export AI_MODEL='your-model-name'",
-		"export AI_AUTH_TOKEN='your-token'",
+		"export ASH_AI_ENDPOINT='https://your-api-endpoint.example.com'",
+		"export ASH_AI_MODEL='your-model-name'",
+		"export ASH_AI_AUTH_TOKEN='your-token'",
 		"source ~/.zshrc",
 	} {
 		if !strings.Contains(message, want) {

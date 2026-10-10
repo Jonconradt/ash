@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"ash/internal/localize"
-	"ash/internal/model"
+	"github.com/Jonconradt/ash/internal/localize"
+	"github.com/Jonconradt/ash/internal/model"
 )
 
 type metricsStage string

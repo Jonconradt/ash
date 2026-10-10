@@ -35,13 +35,17 @@ para forzar la salida de texto.
 .PP
 El subcomando
 .B install
-añade un bloque de integración administrado a los archivos de inicio del shell.
+instala los recursos administrados. Solo modifica los archivos de inicio del
+shell cuando se indica
+.B --shell-integration .
 Durante la instalación, el idioma se selecciona según
 .B ASH_LANG
 (si está definida) o, de lo contrario,
 .B LANG
 y los paquetes disponibles se guardan en
-.IR ~/.ash/languages/ .
+.IR $XDG_DATA_HOME/ash/languages/
+(predeterminado
+.IR ~/.local/share/ash/languages/ ).
 .SH ÓRDENES
 .TP
 .B ash [texto...]
@@ -68,6 +72,12 @@ Adjunta una imagen o un documento a la solicitud. Se puede repetir.
 .BI --shell " shell"
 Selecciona explícitamente el shell que se instalará.
 .TP
+.B --shell-integration
+Activa o actualiza el bloque administrado en el archivo de inicio del shell.
+.TP
+.B --disable-shell-integration
+Elimina únicamente el bloque administrado del archivo de inicio.
+.TP
 .B --dry-run
 Previsualiza los cambios sin escribir archivos.
 .TP
@@ -93,7 +103,7 @@ Selecciona el idioma de la interfaz si
 .B ASH_LANG
 no está definida. Se admiten en_US, zh_CN, zh_TW, es_ES, ar_AE e id_ID. Si no existe una variante regional, se usa el catálogo disponible para ese idioma.
 .TP
-.B AI_ENDPOINT, AI_MODEL, AI_AUTH_TOKEN
+.B ASH_AI_ENDPOINT, ASH_AI_MODEL, ASH_AI_AUTH_TOKEN
 Configuran el endpoint, el modelo y las credenciales de IA.
 .TP
 .B ASH_SAY_TEXT
@@ -102,10 +112,10 @@ Con el valor
 desactiva la salida de voz.
 .SH ARCHIVOS
 .TP
-.I ~/.ash/languages/
+.I $XDG_DATA_HOME/ash/languages/
 Catálogos de idioma instalados por el usuario.
 .TP
-.I ~/.ash/.ash_env
+.I $XDG_CONFIG_HOME/ash/.ash_env
 Configuración administrada del entorno de IA.
 .SH ESTADO DE SALIDA
 .TP

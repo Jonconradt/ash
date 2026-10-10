@@ -30,7 +30,7 @@ func schedulerEnvAllowlist() map[string]string {
 		scheduledTaskEnvName,
 		"HOME",
 		"PATH",
-		"AI_TIMEOUT",
+		"ASH_AI_TIMEOUT",
 		"ASH_HISTORY_MAX",
 		"ASH_VERBOSE",
 		"ASH_LOG_FILE",
@@ -142,45 +142,38 @@ func schedulerLogFilePath(isScheduledTask bool) (string, error) {
 
 // schedulerLogFilePathForSession returns the log file path for the supplied session ID and task type.
 func schedulerLogFilePathForSession(sessionID string, isScheduledTask bool) (string, error) {
-	home, err := osUserHomeDir()
+	stateDir, err := ashStateDir()
 	if err != nil {
 		return "", err
 	}
-	sanitized := sessionIDSanitizer.ReplaceAllString(strings.TrimSpace(sessionID), "")
-	if sanitized == "" {
-		return "", errors.New("SESSION_ID must be set for log file naming")
+	sessionID = strings.TrimSpace(sessionID)
+	if !validSessionID(sessionID) {
+		return "", errors.New("ASH_SESSION_ID must be a valid session identifier")
 	}
 	if isScheduledTask {
-		sanitized = "task_" + sanitized
+		sessionID = "task_" + sessionID
 	}
-	return filepath.Join(home, ashWorkspaceDirName, schedulerLogDirName, sanitized+".log"), nil
+	return filepath.Join(stateDir, schedulerLogDirName, sessionID+".log"), nil
 }
 
 // sanitizedSessionIDForLogFile returns the sanitized session ID used for history and log file naming.
 func sanitizedSessionIDForLogFile() (string, error) {
 	raw := strings.TrimSpace(os.Getenv(sessionIDEnvName))
 	if raw == "" {
-		return "", errors.New("SESSION_ID is required for log file naming")
+		return "", errors.New("ASH_SESSION_ID is required for log file naming")
 	}
-	if sessionIDPattern.MatchString(raw) {
-		if !validSessionID(raw) {
-			return "", errors.New("SESSION_ID is too long")
-		}
-		return raw, nil
+	if !validSessionID(raw) {
+		return "", errors.New("ASH_SESSION_ID must be a valid session identifier")
 	}
-	sanitized := sessionIDSanitizer.ReplaceAllString(raw, "")
-	if sanitized == "" {
-		return "", errors.New("SESSION_ID must contain at least one ASCII letter or digit")
-	}
-	if len(sanitized) > maxSessionIDLength {
-		return "", errors.New("SESSION_ID is too long")
-	}
-	return sanitized, nil
+	return raw, nil
 }
 
 // ensureSessionID ensures a session ID exists in the environment and returns it.
 func ensureSessionID() (string, error) {
-	if existing, err := sanitizedSessionIDForLogFile(); err == nil {
+	if existing := strings.TrimSpace(os.Getenv(sessionIDEnvName)); existing != "" {
+		if !validSessionID(existing) {
+			return "", errors.New("ASH_SESSION_ID must be a valid session identifier")
+		}
 		return existing, nil
 	}
 

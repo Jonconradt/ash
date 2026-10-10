@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"ash/internal/localize"
+	"github.com/Jonconradt/ash/internal/localize"
 )
 
 func TestInstallPreferredLanguageFallsBackFromRegionalPack(t *testing.T) {
@@ -65,7 +65,7 @@ func TestInstallPreferredLanguageFallsBackFromRegionalPack(t *testing.T) {
 	if err := installPreferredLanguage(&output); err != nil {
 		t.Fatal(err)
 	}
-	languageDir := filepath.Join(home, ".ash", "languages")
+	languageDir := filepath.Join(home, ".config", "ash", "languages")
 	if err := localize.ValidateLocale("es_ES", languageDir); err != nil {
 		t.Fatalf("installed fallback catalog is invalid: %v", err)
 	}

@@ -283,13 +283,13 @@ func TestPromptInstallEnvValuesAutoUsesDetectedCloudProvider(t *testing.T) {
 		t.Fatalf("expected auto-detected values, got nil")
 	}
 	if values[aiEnvEndpoint] != server.URL {
-		t.Fatalf("AI_ENDPOINT = %q, want %q", values[aiEnvEndpoint], server.URL)
+		t.Fatalf("ASH_AI_ENDPOINT = %q, want %q", values[aiEnvEndpoint], server.URL)
 	}
 	if values[aiEnvAuthToken] != "openai-secret" {
-		t.Fatalf("AI_AUTH_TOKEN = %q, want openai-secret", values[aiEnvAuthToken])
+		t.Fatalf("ASH_AI_AUTH_TOKEN = %q, want openai-secret", values[aiEnvAuthToken])
 	}
 	if values[aiEnvModel] != "test-model" {
-		t.Fatalf("AI_MODEL = %q, want test-model", values[aiEnvModel])
+		t.Fatalf("ASH_AI_MODEL = %q, want test-model", values[aiEnvModel])
 	}
 }
 

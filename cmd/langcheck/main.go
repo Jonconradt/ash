@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"ash/internal/localize"
+	"github.com/Jonconradt/ash/internal/localize"
 )
 
 func main() {

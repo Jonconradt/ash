@@ -112,7 +112,7 @@ func TestRunSubAgentCommand(t *testing.T) {
 	origExecutable := osExecutable
 	osExecutable = func() (string, error) { return "/bin/echo", nil }
 	t.Cleanup(func() { osExecutable = origExecutable })
-	t.Setenv("SESSION_ID", "parent")
+	t.Setenv("ASH_SESSION_ID", "parent")
 	t.Setenv(childAgentEnvName, "")
 
 	result := runSubAgentCommand(context.Background(), "child result", "parent.abc123")
@@ -135,7 +135,7 @@ func TestRunSubAgentCommandTimeoutKillsProcessGroup(t *testing.T) {
 	osExecutable = func() (string, error) { return scriptPath, nil }
 	t.Cleanup(func() { osExecutable = origExecutable })
 	t.Setenv("PID_PATH", pidPath)
-	t.Setenv("AI_TIMEOUT", "1s")
+	t.Setenv("ASH_AI_TIMEOUT", "1s")
 	t.Setenv(childAgentEnvName, "")
 
 	result := runSubAgentCommand(context.Background(), "ignored", "parent.abc123")

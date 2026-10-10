@@ -14,8 +14,8 @@ import (
 	"strings"
 	"testing"
 
-	"ash/internal/brokerproto"
-	mcpclient "ash/internal/mcp"
+	"github.com/Jonconradt/ash/internal/brokerproto"
+	mcpclient "github.com/Jonconradt/ash/internal/mcp"
 )
 
 func TestParseMCPAddArgs(t *testing.T) {

@@ -1,9 +1,10 @@
 # ash_bootstrap
 
 Assets embedded into the `ash` binary via `//go:embed` in
-[bootstrap_assets.go](../bootstrap_assets.go) and installed into `~/.ash/` (and
-the user's shell rc file) by `ash install`. Edit files here directly — do not
-edit the copies under `~/.ash/`, which are overwritten on install/update.
+[bootstrap_assets.go](../bootstrap_assets.go) and installed into the XDG
+configuration/data directories (and optionally the user's shell rc file) by
+`ash install`. Edit files here directly; installed copies may be overwritten
+on install/update.
 
 ## Shell wrapper templates
 
@@ -13,7 +14,7 @@ edit the copies under `~/.ash/`, which are overwritten on install/update.
 
 ## Runtime config templates
 
-- `.ash_env` — managed `AI_ENDPOINT`/`AI_MODEL`/`AI_AUTH_TOKEN`/PATH exports, written by `ash install`'s interactive/auto-detect flow.
+- `.ash_env` — managed `ASH_AI_*` and `ASH_SESSION_ID` exports, written by `ash install`'s interactive/auto-detect flow.
 - The shell wrappers consume `ASH_MCP_CREDENTIAL_KEY` at broker launch, pass it only in the broker process environment, then unset their temporary shell copy.
 - `.ash_system` — default system prompt, supports `$IF_PYTHON_AVAILABLE`, `$TOOLS_DIR_LIST`, `$PLUGINS_DIR_LIST`, `$ASH_RESPONSE_LANGUAGE`, and `$VARIABLE` expansion.
 - `.ash_allow` — default command, tool, and plugin allowlist; HTTP(S) URL lines register remote MCP servers.
@@ -25,5 +26,5 @@ edit the copies under `~/.ash/`, which are overwritten on install/update.
 
 ## Bundled tools and native plugins
 
-- `tools/` — Python scripts installed into `~/.ash/tools/` and made available to the model as callable tools (`headlines.py`, `wikipedia.py`, `yfinance.py`), plus `requirements.txt` and `test_tool_docs.py` (verifies each tool documents its own usage).
-- `plugins_src/` — Native plugins in Go, Rust, and TypeScript with dedicated Makefiles and source trees (`what_time_is_it`, `flip_a_coin`, `calculator`). Built into `~/.ash/plugins/`.
+- `tools/` — Python scripts installed into `$XDG_DATA_HOME/ash/tools/` (default `~/.local/share/ash/tools/`) and made available to the model as callable tools (`headlines.py`, `wikipedia.py`, `yfinance.py`), plus `requirements.txt` and `test_tool_docs.py` (verifies each tool documents its own usage).
+- `plugins_src/` — Native plugins in Go, Rust, and TypeScript with dedicated Makefiles and source trees (`what_time_is_it`, `flip_a_coin`, `calculator`). Built into `$XDG_DATA_HOME/ash/plugins/` (default `~/.local/share/ash/plugins/`).

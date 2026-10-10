@@ -6,6 +6,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -13,46 +14,51 @@ import (
 
 func TestParseInstallArgs(t *testing.T) {
 	t.Run("empty args", func(t *testing.T) {
-		shellName, dryRun, overwrite, err := parseInstallArgs(nil)
+		shellName, dryRun, overwrite, shellIntegration, disableShellIntegration, err := parseInstallArgs(nil)
 		if err != nil {
 			t.Fatalf("parseInstallArgs returned error: %v", err)
 		}
-		if shellName != "" || dryRun || overwrite {
-			t.Fatalf("unexpected parse result: shell=%q dryRun=%v overwrite=%v", shellName, dryRun, overwrite)
+		if shellName != "" || dryRun || overwrite || shellIntegration || disableShellIntegration {
+			t.Fatalf("unexpected parse result: shell=%q dryRun=%v overwrite=%v shellIntegration=%v disableShellIntegration=%v", shellName, dryRun, overwrite, shellIntegration, disableShellIntegration)
 		}
 	})
 
 	t.Run("shell and dry run", func(t *testing.T) {
-		shellName, dryRun, overwrite, err := parseInstallArgs([]string{"--shell", "zsh", "--dry-run", "--overwrite"})
+		shellName, dryRun, overwrite, shellIntegration, disableShellIntegration, err := parseInstallArgs([]string{"--shell", "zsh", "--dry-run", "--overwrite", "--shell-integration"})
 		if err != nil {
 			t.Fatalf("parseInstallArgs returned error: %v", err)
 		}
-		if shellName != "zsh" || !dryRun || !overwrite {
-			t.Fatalf("unexpected parse result: shell=%q dryRun=%v overwrite=%v", shellName, dryRun, overwrite)
+		if shellName != "zsh" || !dryRun || !overwrite || !shellIntegration || disableShellIntegration {
+			t.Fatalf("unexpected parse result: shell=%q dryRun=%v overwrite=%v shellIntegration=%v disableShellIntegration=%v", shellName, dryRun, overwrite, shellIntegration, disableShellIntegration)
 		}
 	})
 
 	t.Run("missing shell value", func(t *testing.T) {
-		_, _, _, err := parseInstallArgs([]string{"--shell"})
+		_, _, _, _, _, err := parseInstallArgs([]string{"--shell"})
 		if err == nil || !strings.Contains(err.Error(), "--shell requires a value") {
 			t.Fatalf("expected missing value error, got %v", err)
 		}
 	})
 
 	t.Run("unknown arg", func(t *testing.T) {
-		_, _, _, err := parseInstallArgs([]string{"--wat"})
+		_, _, _, _, _, err := parseInstallArgs([]string{"--wat"})
 		if err == nil || !strings.Contains(err.Error(), "unknown install argument") {
 			t.Fatalf("expected unknown argument error, got %v", err)
+		}
+	})
+
+	t.Run("enable and disable are mutually exclusive", func(t *testing.T) {
+		_, _, _, _, _, err := parseInstallArgs([]string{"--shell-integration", "--disable-shell-integration"})
+		if err == nil {
+			t.Fatal("expected conflicting shell integration flags to fail")
 		}
 	})
 }
 
 func TestBuildFishEnvironmentFile(t *testing.T) {
 	content := strings.Join([]string{
-		"export SESSION_ID=`head -c 100 /dev/urandom`",
-		`export PATH="$HOME/.ash/tools:$PATH"`,
-		"export AI_ENDPOINT='https://example.test'",
-		"export ASH_MAX_TOOL_ITERS=16",
+		"export ASH_SESSION_ID=ignored",
+		"export ASH_AI_ENDPOINT='https://example.test'",
 		"export UNRELATED=value",
 		"",
 	}, "\n")
@@ -60,16 +66,14 @@ func TestBuildFishEnvironmentFile(t *testing.T) {
 	got := string(buildFishEnvironmentFile(content))
 	for _, want := range []string{
 		"# managed by ash install",
-		"if not set -q SESSION_ID",
-		`set -gx PATH "$HOME/.ash/tools" "$HOME/.local/bin" $PATH`,
-		"set -gx AI_ENDPOINT 'https://example.test'",
-		"set -gx ASH_MAX_TOOL_ITERS '16'",
+		"if not set -q ASH_SESSION_ID",
+		"set -gx ASH_AI_ENDPOINT 'https://example.test'",
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected Fish environment file to contain %q, got %q", want, got)
 		}
 	}
-	if strings.Contains(got, "UNRELATED") {
+	if strings.Contains(got, "UNRELATED") || strings.Contains(got, "PATH") {
 		t.Fatalf("Fish environment file must not contain unrelated variables: %q", got)
 	}
 }
@@ -144,7 +148,7 @@ func TestInstallRecommendation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("installRecommendation returned error: %v", err)
 	}
-	if !strings.Contains(reco, "ash install --shell bash") {
+	if !strings.Contains(reco, "ash install --shell bash --shell-integration") {
 		t.Fatalf("expected recommendation for bash install, got %q", reco)
 	}
 
@@ -171,7 +175,7 @@ func TestInstallRecommendation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("installRecommendation returned error: %v", err)
 	}
-	if !strings.Contains(reco, "outdated") || !strings.Contains(reco, "ash install --shell bash") {
+	if !strings.Contains(reco, "outdated") || !strings.Contains(reco, "ash install --shell bash --shell-integration") {
 		t.Fatalf("expected outdated recommendation, got %q", reco)
 	}
 
@@ -188,7 +192,8 @@ func TestInstallRecommendation(t *testing.T) {
 	}
 
 	profilePath := filepath.Join(home, ".bash_profile")
-	if err := os.WriteFile(profilePath, []byte(`[ -f "$HOME/.ash/.ash_bashrc" ] && . "$HOME/.ash/.ash_bashrc"`+"\n"), 0o600); err != nil {
+	profileSource := `[ -f "` + wrapperPath + `" ] && . "` + wrapperPath + `"` + "\n"
+	if err := os.WriteFile(profilePath, []byte(profileSource), 0o600); err != nil {
 		t.Fatalf("write bash profile: %v", err)
 	}
 
@@ -208,7 +213,7 @@ func TestInstallRecommendation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("installRecommendation returned error: %v", err)
 	}
-	if !strings.Contains(reco, "ash install --shell bash") {
+	if !strings.Contains(reco, "ash install --shell bash --shell-integration") {
 		t.Fatalf("expected recommendation when bash wrapper file is missing, got %q", reco)
 	}
 }
@@ -240,7 +245,7 @@ func TestInstallUsesEmbeddedBootstrapAssets(t *testing.T) {
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	code := run([]string{"install", "--shell", "bash"}, &stdout, &stderr)
+	code := run([]string{"install", "--shell", "bash", "--shell-integration"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
 	}
@@ -263,11 +268,11 @@ func TestInstallUsesEmbeddedBootstrapAssets(t *testing.T) {
 		t.Fatalf("expected workspace env file to be created: %v", err)
 	}
 
-	workspaceToolsPath := filepath.Join(home, ashWorkspaceDirName, "tools", "wikipedia.py")
+	workspaceToolsPath := filepath.Join(home, ".local", "share", "ash", "tools", "wikipedia.py")
 	if _, err := os.Stat(workspaceToolsPath); err != nil {
 		t.Fatalf("expected tool script to be installed: %v", err)
 	}
-	workspacePluginsPath := filepath.Join(home, ashWorkspaceDirName, "plugins")
+	workspacePluginsPath := filepath.Join(home, ".local", "share", "ash", "plugins")
 	pluginsInfo, err := os.Stat(workspacePluginsPath)
 	if err != nil {
 		t.Fatalf("expected plugins directory to be created: %v", err)
@@ -287,7 +292,7 @@ func TestRunInstallFish(t *testing.T) {
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	code := run([]string{"install", "--shell", "fish"}, &stdout, &stderr)
+	code := run([]string{"install", "--shell", "fish", "--shell-integration"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("expected Fish install to succeed, got %d stderr=%q", code, stderr.String())
 	}
@@ -301,7 +306,7 @@ func TestRunInstallFish(t *testing.T) {
 		t.Fatalf("expected Fish config to source wrapper, got %q", rcContent)
 	}
 
-	workspace := filepath.Join(home, ashWorkspaceDirName)
+	workspace := filepath.Join(configHome, "ash")
 	for _, path := range []string{
 		filepath.Join(workspace, ".ash_fish.fish"),
 		filepath.Join(workspace, ".ash_fish_env.fish"),
@@ -317,7 +322,7 @@ func TestRunInstallFish(t *testing.T) {
 
 	stdout.Reset()
 	stderr.Reset()
-	code = run([]string{"install", "--shell", "fish"}, &stdout, &stderr)
+	code = run([]string{"install", "--shell", "fish", "--shell-integration"}, &stdout, &stderr)
 	if code != 0 || !strings.Contains(stdout.String(), "already present") {
 		t.Fatalf("expected idempotent Fish install, code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
@@ -337,12 +342,12 @@ func TestInstallOverwriteMode(t *testing.T) {
 	existingEnv := strings.Join([]string{
 		"# managed by ash install",
 		"export ASH_OLD=1",
-		"export AI_ENDPOINT='https://api.openai.com/v1'",
-		"export AI_MODEL='gpt-4.1-mini'",
-		"export AI_AUTH_TYPE='bearer'",
-		"export AI_AUTH_TOKEN='secret-token'",
-		"export AI_PROVIDER='openai'",
-		"export AI_CACHE='off'",
+		"export ASH_AI_ENDPOINT='https://api.openai.com/v1'",
+		"export ASH_AI_MODEL='gpt-4.1-mini'",
+		"export ASH_AI_AUTH_TYPE='bearer'",
+		"export ASH_AI_AUTH_TOKEN='secret-token'",
+		"export ASH_AI_PROVIDER='openai'",
+		"export ASH_AI_CACHE='off'",
 		"",
 	}, "\n")
 	if err := os.WriteFile(workspaceEnvPath, []byte(existingEnv), 0o600); err != nil {
@@ -364,35 +369,34 @@ func TestInstallOverwriteMode(t *testing.T) {
 		t.Fatalf("expected overwrite mode to replace existing env file, got %q", string(content))
 	}
 	for _, want := range []string{
-		managedPathExportLine,
-		"export AI_ENDPOINT='https://api.openai.com/v1'",
-		"export AI_MODEL='gpt-4.1-mini'",
-		"export AI_AUTH_TYPE='bearer'",
-		"export AI_AUTH_TOKEN='secret-token'",
-		"export AI_PROVIDER='openai'",
-		"export AI_CACHE='off'",
+		"export ASH_AI_ENDPOINT='https://api.openai.com/v1'",
+		"export ASH_AI_MODEL='gpt-4.1-mini'",
+		"export ASH_AI_AUTH_TYPE='bearer'",
+		"export ASH_AI_AUTH_TOKEN='secret-token'",
+		"export ASH_AI_PROVIDER='openai'",
+		"export ASH_AI_CACHE='off'",
 	} {
 		if !strings.Contains(string(content), want) {
 			t.Fatalf("expected overwrite mode to preserve %q, got %q", want, string(content))
 		}
 	}
-	if !strings.Contains(string(content), "export SESSION_ID=") {
-		t.Fatalf("expected overwritten env file to keep SESSION_ID, got %q", string(content))
+	if !strings.Contains(string(content), "export ASH_SESSION_ID=") {
+		t.Fatalf("expected overwritten env file to preserve ASH_SESSION_ID behavior, got %q", string(content))
 	}
 }
 
-func TestInstallRemovesLegacyToolScripts(t *testing.T) {
+func TestInstallDoesNotMigrateLegacyToolScripts(t *testing.T) {
 	forceNonInteractiveInstallEnv(t)
 	home := t.TempDir()
 	t.Setenv("HOME", home)
 	t.Setenv("SHELL", "/bin/bash")
 
-	toolsDir := filepath.Join(home, ashWorkspaceDirName, "tools")
-	if err := os.MkdirAll(toolsDir, 0o700); err != nil {
+	legacyToolsDir := filepath.Join(home, ashWorkspaceDirName, "tools")
+	if err := os.MkdirAll(legacyToolsDir, 0o700); err != nil {
 		t.Fatalf("mkdir tools dir: %v", err)
 	}
 
-	legacyPath := filepath.Join(toolsDir, "yfinance")
+	legacyPath := filepath.Join(legacyToolsDir, "yfinance")
 	if err := os.WriteFile(legacyPath, []byte("#!/usr/bin/env python3\n"), 0o600); err != nil {
 		t.Fatalf("write legacy tool script: %v", err)
 	}
@@ -404,11 +408,11 @@ func TestInstallRemovesLegacyToolScripts(t *testing.T) {
 		t.Fatalf("expected overwrite install to succeed, got %d stderr=%q", code, stderr.String())
 	}
 
-	if _, err := os.Stat(legacyPath); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("expected legacy tool script to be removed, got err=%v", err)
+	if _, err := os.Stat(legacyPath); err != nil {
+		t.Fatalf("fresh-install policy must not modify legacy files: %v", err)
 	}
 
-	modernPath := filepath.Join(toolsDir, "yfinance.py")
+	modernPath := filepath.Join(home, ".local", "share", "ash", "tools", "yfinance.py")
 	if _, err := os.Stat(modernPath); err != nil {
 		t.Fatalf("expected modern tool script to exist, err=%v", err)
 	}
@@ -444,7 +448,7 @@ func TestRunInstall(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := run([]string{"install", "--shell", "bash"}, &stdout, &stderr)
+	code := run([]string{"install", "--shell", "bash", "--shell-integration"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("expected exit code 0, got %d stderr=%q", code, stderr.String())
 	}
@@ -471,7 +475,7 @@ func TestRunInstall(t *testing.T) {
 
 	stdout.Reset()
 	stderr.Reset()
-	code = run([]string{"install", "--shell", "bash"}, &stdout, &stderr)
+	code = run([]string{"install", "--shell", "bash", "--shell-integration"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("expected second install to succeed, got %d stderr=%q", code, stderr.String())
 	}
@@ -501,8 +505,8 @@ func TestRunInstall(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read canonical system file: %v", err)
 	}
-	if string(canonicalSystemContent) != "canonical system" {
-		t.Fatalf("canonical system mismatch: got %q", string(canonicalSystemContent))
+	if string(canonicalSystemContent) == "canonical system" {
+		t.Fatal("install must not import the current-directory system prompt")
 	}
 
 	canonicalAllowPath := filepath.Join(home, ashWorkspaceDirName, allowFileName)
@@ -510,8 +514,8 @@ func TestRunInstall(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read canonical allow file: %v", err)
 	}
-	if !strings.Contains(string(canonicalAllowContent), "say") {
-		t.Fatalf("expected canonical allow content to include say, got %q", string(canonicalAllowContent))
+	if strings.TrimSpace(string(canonicalAllowContent)) == "say" {
+		t.Fatal("install must not import the current-directory tool policy")
 	}
 
 	staleBlock := installSourceBlockForShell("bash")
@@ -522,7 +526,7 @@ func TestRunInstall(t *testing.T) {
 
 	stdout.Reset()
 	stderr.Reset()
-	code = run([]string{"install", "--shell", "bash"}, &stdout, &stderr)
+	code = run([]string{"install", "--shell", "bash", "--shell-integration"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("expected update install to succeed, got %d stderr=%q", code, stderr.String())
 	}
@@ -534,8 +538,8 @@ func TestRunInstall(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read rc file after update: %v", err)
 	}
-	if !strings.Contains(string(rcContentUpdated), ".ash/.ash_bashrc") {
-		t.Fatalf("expected refreshed install block to source .ash/.ash_bashrc")
+	if !strings.Contains(string(rcContentUpdated), `$_ash_config_base/ash/.ash_bashrc`) {
+		t.Fatalf("expected refreshed install block to source the XDG config wrapper")
 	}
 
 	wrapperPath := filepath.Join(home, ashWorkspaceDirName, ".ash_bashrc")
@@ -543,15 +547,15 @@ func TestRunInstall(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read bash wrapper file: %v", err)
 	}
-	if !strings.Contains(string(wrapperContent), `[ -f "$HOME/.ash/.ash_env" ] && . "$HOME/.ash/.ash_env"`) {
-		t.Fatalf("expected wrapper file to source .ash/.ash_env")
+	if !strings.Contains(string(wrapperContent), `[[ -f "$_ash_config_dir/.ash_env" ]]`) {
+		t.Fatalf("expected wrapper file to source the XDG config environment")
 	}
 	if !strings.Contains(string(wrapperContent), "command_not_found_handle") {
 		t.Fatalf("expected wrapper file to include command_not_found_handle")
 	}
 }
 
-func TestRunInstallMigratesLegacyBashProfileSourcing(t *testing.T) {
+func TestRunInstallPreservesLegacyBashProfileSourcing(t *testing.T) {
 	forceNonInteractiveInstallEnv(t)
 	home := t.TempDir()
 	cwd := t.TempDir()
@@ -570,13 +574,13 @@ func TestRunInstallMigratesLegacyBashProfileSourcing(t *testing.T) {
 	}
 
 	profilePath := filepath.Join(home, ".bash_profile")
-	if err := os.WriteFile(profilePath, []byte(`[ -f "$HOME/.ash/.ash_bashrc" ] && . "$HOME/.ash/.ash_bashrc"`+"\n"), 0o600); err != nil {
+	if err := os.WriteFile(profilePath, []byte(`[ -f "$HOME/.config/ash/.ash_bashrc" ] && . "$HOME/.config/ash/.ash_bashrc"`+"\n"), 0o600); err != nil {
 		t.Fatalf("write legacy bash_profile: %v", err)
 	}
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	code := run([]string{"install", "--shell", "bash"}, &stdout, &stderr)
+	code := run([]string{"install", "--shell", "bash", "--shell-integration"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("expected install to succeed, got %d stderr=%q", code, stderr.String())
 	}
@@ -585,15 +589,15 @@ func TestRunInstallMigratesLegacyBashProfileSourcing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read bash_profile: %v", err)
 	}
-	if strings.Contains(string(profileContent), ".ash/.ash_bashrc") {
-		t.Fatalf("expected legacy bash_profile source to be removed, got %q", string(profileContent))
+	if !strings.Contains(string(profileContent), ".config/ash/.ash_bashrc") {
+		t.Fatalf("expected legacy bash_profile source to be preserved, got %q", string(profileContent))
 	}
 	if !strings.Contains(string(profileContent), ".bashrc") {
 		t.Fatalf("expected bash_profile to source .bashrc, got %q", string(profileContent))
 	}
 }
 
-func TestRunInstallCleansLegacyAshSourcingWhenBashRCAlreadyPresent(t *testing.T) {
+func TestRunInstallPreservesLegacyAshSourcingWhenBashRCAlreadyPresent(t *testing.T) {
 	forceNonInteractiveInstallEnv(t)
 	home := t.TempDir()
 	cwd := t.TempDir()
@@ -625,7 +629,7 @@ func TestRunInstallCleansLegacyAshSourcingWhenBashRCAlreadyPresent(t *testing.T)
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	code := run([]string{"install", "--shell", "bash"}, &stdout, &stderr)
+	code := run([]string{"install", "--shell", "bash", "--shell-integration"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("expected install to succeed, got %d stderr=%q", code, stderr.String())
 	}
@@ -635,37 +639,170 @@ func TestRunInstallCleansLegacyAshSourcingWhenBashRCAlreadyPresent(t *testing.T)
 		t.Fatalf("read bash_profile: %v", err)
 	}
 	updated := string(updatedProfileContent)
-	if strings.Contains(updated, ".ash/.ash_env") || strings.Contains(updated, ".ash/.ash_bashrc") {
-		t.Fatalf("expected direct ash sourcing to be removed from bash_profile, got %q", updated)
+	if !strings.Contains(updated, ".ash/.ash_env") || !strings.Contains(updated, ".ash/.ash_bashrc") {
+		t.Fatalf("expected legacy ash sourcing to be preserved in bash_profile, got %q", updated)
 	}
-	if strings.Count(updated, `[ -f "$HOME/.bashrc" ] && . "$HOME/.bashrc"`) != 1 {
-		t.Fatalf("expected a single bashrc source line in bash_profile, got %q", updated)
+	if updated != profileContent {
+		t.Fatalf("expected legacy profile content to remain unchanged, got %q", updated)
 	}
 }
 
 func TestRunInstallDryRun(t *testing.T) {
+	for _, shell := range []string{"bash", "zsh", "fish"} {
+		for _, existing := range []bool{false, true} {
+			name := shell + "/fresh"
+			if existing {
+				name = shell + "/existing"
+			}
+			t.Run(name, func(t *testing.T) {
+				home := t.TempDir()
+				configHome := filepath.Join(home, ".config")
+				dataHome := filepath.Join(home, ".local", "share")
+				stateHome := filepath.Join(home, ".local", "state")
+				cacheHome := filepath.Join(home, ".cache")
+				t.Setenv("HOME", home)
+				t.Setenv("SHELL", "/bin/"+shell)
+				t.Setenv("XDG_CONFIG_HOME", configHome)
+				t.Setenv("XDG_DATA_HOME", dataHome)
+				t.Setenv("XDG_STATE_HOME", stateHome)
+				t.Setenv("XDG_CACHE_HOME", cacheHome)
+				t.Setenv("XDG_RUNTIME_DIR", filepath.Join(home, "runtime"))
+
+				if existing {
+					rcPath, err := rcPathForShell(shell)
+					if err != nil {
+						t.Fatal(err)
+					}
+					for path, content := range map[string]string{
+						rcPath: "user shell config\n",
+						filepath.Join(configHome, "ash", ".ash_system"):      "custom prompt\n",
+						filepath.Join(dataHome, "ash", "tools", "custom.py"): "print('user tool')\n",
+					} {
+						if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+							t.Fatal(err)
+						}
+						if err := os.WriteFile(path, []byte(content), 0o640); err != nil {
+							t.Fatal(err)
+						}
+					}
+				}
+
+				before, err := snapshotInstallFilesystem(home)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var stdout, stderr bytes.Buffer
+				code := run([]string{"install", "--shell", shell, "--shell-integration", "--dry-run"}, &stdout, &stderr)
+				if code != 0 {
+					t.Fatalf("dry-run exit code = %d, stderr=%q", code, stderr.String())
+				}
+				if !strings.Contains(stdout.String(), "[dry-run]") {
+					t.Fatalf("expected dry-run output, got %q", stdout.String())
+				}
+				if strings.Contains(stdout.String(), "[EID=") {
+					t.Fatalf("expected dry-run output without EIDs, got %q", stdout.String())
+				}
+				after, err := snapshotInstallFilesystem(home)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if !reflect.DeepEqual(after, before) {
+					t.Fatalf("dry-run changed filesystem\nbefore: %#v\nafter: %#v", before, after)
+				}
+			})
+		}
+	}
+}
+
+func snapshotInstallFilesystem(root string) (map[string]string, error) {
+	snapshot := make(map[string]string)
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		relative, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		value := strconv.FormatUint(uint64(info.Mode()), 8)
+		switch {
+		case info.Mode().IsRegular():
+			content, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			value += "\x00" + string(content)
+		case info.Mode()&os.ModeSymlink != 0:
+			target, err := os.Readlink(path)
+			if err != nil {
+				return err
+			}
+			value += "\x00" + target
+		}
+		snapshot[relative] = value
+		return nil
+	})
+	return snapshot, err
+}
+
+func TestDisableShellIntegrationPreservesSurroundingRCContent(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)
-	t.Setenv("SHELL", "/bin/zsh")
-
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-
-	code := run([]string{"install", "--shell", "zsh", "--dry-run"}, &stdout, &stderr)
-	if code != 0 {
-		t.Fatalf("expected dry-run exit code 0, got %d stderr=%q", code, stderr.String())
+	t.Setenv("SHELL", "/bin/bash")
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, ".config"))
+	rcPath := filepath.Join(home, ".bashrc")
+	before := "# user prelude\n\n" + installStartMarker + "\nsource ash\n" + installEndMarker + "\n\n# user epilogue\n"
+	if err := os.WriteFile(rcPath, []byte(before), 0o640); err != nil {
+		t.Fatal(err)
 	}
 
-	if !strings.Contains(stdout.String(), "[dry-run]") {
-		t.Fatalf("expected dry-run output, got %q", stdout.String())
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"install", "--shell", "bash", "--disable-shell-integration"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("disable shell integration exit = %d, stderr = %q", code, stderr.String())
 	}
-	if strings.Contains(stdout.String(), "[EID=") {
-		t.Fatalf("expected dry-run output without EIDs, got %q", stdout.String())
+	got, err := os.ReadFile(rcPath)
+	if err != nil {
+		t.Fatal(err)
 	}
+	want := "# user prelude\n\n# user epilogue\n"
+	if string(got) != want {
+		t.Fatalf("rc after disable = %q, want %q", got, want)
+	}
+	info, err := os.Stat(rcPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if info.Mode().Perm() != 0o640 {
+		t.Fatalf("rc mode after disable = %o, want 640", info.Mode().Perm())
+	}
+	if _, err := os.Stat(filepath.Join(home, ".config", "ash", ".ash_bashrc")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("disable unexpectedly removed installed assets: %v", err)
+	}
+}
 
-	rcPath := filepath.Join(home, ".zshrc")
-	if _, err := os.Stat(rcPath); !errors.Is(err, os.ErrNotExist) {
-		t.Fatalf("expected no rc file write in dry-run, stat err=%v", err)
+func TestDisableShellIntegrationDryRunLeavesRCUnchanged(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SHELL", "/bin/bash")
+	rcPath := filepath.Join(home, ".bashrc")
+	before := "# user\n" + installStartMarker + "\nsource ash\n" + installEndMarker + "\n"
+	if err := os.WriteFile(rcPath, []byte(before), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var stdout, stderr bytes.Buffer
+	if code := run([]string{"install", "--shell", "bash", "--disable-shell-integration", "--dry-run"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("disable dry-run exit = %d, stderr = %q", code, stderr.String())
+	}
+	got, err := os.ReadFile(rcPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != before {
+		t.Fatalf("dry-run changed rc content: %q", got)
 	}
 }
 
@@ -699,7 +836,7 @@ func TestShouldConfigureInstallEnv(t *testing.T) {
 		if err := os.MkdirAll(filepath.Dir(ashPath), 0o700); err != nil {
 			t.Fatalf("mkdir ash dir: %v", err)
 		}
-		if err := os.WriteFile(ashPath, []byte("export AI_ENDPOINT='http://localhost:11434'\n"), 0o600); err != nil {
+		if err := os.WriteFile(ashPath, []byte("export ASH_AI_ENDPOINT='http://localhost:11434'\n"), 0o600); err != nil {
 			t.Fatalf("write ash env file: %v", err)
 		}
 
@@ -847,7 +984,7 @@ func TestRunInstallHardensWorkspacePermissions(t *testing.T) {
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	code := run([]string{"install", "--shell", "bash"}, &stdout, &stderr)
+	code := run([]string{"install", "--shell", "bash", "--shell-integration"}, &stdout, &stderr)
 	if code != 0 {
 		t.Fatalf("expected install success, got %d stderr=%q", code, stderr.String())
 	}

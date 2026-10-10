@@ -2,7 +2,7 @@
 
 **[Visit the ash website](https://jonconradt.github.io/ash/)** for a quick introduction and installation links.
 
-Ever wanted to ask an AI a question in the middle of working in a terminal? Don't want to launch another app just to ask one question? ASH extends the bash and zsh shells to support in-line AI prompting. When the shell does not understand your command it passes it to the AI as a prompt.
+Ever wanted to ask an AI a question in the middle of working in a terminal? Don't want to launch another app just to ask one question? ash integrates with Bash, zsh, and Fish for in-line AI prompting. When the shell does not understand your command it can pass it to the AI as a prompt.
 
 ```ash
 $:~ jon$ whoami
@@ -16,9 +16,13 @@ $:~ jon$ When is the next full moon?
 
 What if you want the AI to investigate a problem? The .ash_allow file is an allow list of unix commands, managed tools, and native plugins the AI can use (and pipe together) to accomplish investigations. You can also explicitly deny specific commands or tools using .ash_deny.
 
-What if you have a more complex question, something that needs to be computed? If you allow ash to expose Python the AI can write temporary scripts, or use scripts in the ~/.ash/tools directory to run complex processes. You can also add compiled native plugins in Go, Rust, or TypeScript under ~/.ash/plugins/.
+What if you have a more complex question, something that needs to be computed? If you allow ash to expose Python the AI can write temporary scripts, or use scripts in `$XDG_DATA_HOME/ash/tools/` (default `~/.local/share/ash/tools/`) to run complex processes. You can also add compiled native plugins in Go, Rust, or TypeScript under `$XDG_DATA_HOME/ash/plugins/`.
 
-What if the AI needs temporary notes, plans, script fragments, or small working files? Ash includes a managed scratch workspace under `~/.ash/scratch/<session-id>/` that is automatically scoped to the current session. The AI never needs to remember or pass the session ID; ash resolves it automatically. Active Ash invocations and their shell broker hold a private session lock so cleanup cannot remove files in use. On Ash exit, unlocked directories older than 48 hours and not accessed in the last 24 hours are removed; crashed sessions release their OS lock automatically and their leftover lock file does not block later cleanup.
+Native plugins use a language-independent executable interface with versioned
+`--ai-docs` discovery metadata. Ash does not offer a public Go plugin SDK; see
+the [native plugin contract](docs/PLUGIN_CONTRACT.md) before publishing plugins.
+
+What if the AI needs temporary notes, plans, script fragments, or small working files? Ash includes a managed scratch workspace under `$XDG_STATE_HOME/ash/scratch/<session-id>/` (default `~/.local/state/ash/scratch/<session-id>/`) that is automatically scoped to the current session. The AI never needs to remember or pass the session ID; ash resolves it automatically. Active Ash invocations and their shell broker hold a private session lock so cleanup cannot remove files in use. On Ash exit, unlocked directories older than 48 hours and not accessed in the last 24 hours are removed; crashed sessions release their OS lock automatically and their leftover lock file does not block later cleanup.
 
 What if you want something to happen on a schedule or in the future? Ash can create systems jobs that run once or recur.
 
@@ -42,19 +46,19 @@ What if I want to run a unix command that looks like a prompt, e.g. which ash? Y
 
 What if I am on MacOS and I want the results in my clipboard? Add pbcopy to .ash_allow. If you forget, ask the AI because it knows what to do.
 
-Where is the system prompt? Put your system prompt in ~/.ash/.ash_system. It supports replacement of environment variables.
+Where is the system prompt? Put your system prompt in `$XDG_CONFIG_HOME/ash/.ash_system` (default `~/.config/ash/.ash_system`). It supports replacement of environment variables.
 
-Does this support Ollama, OpenAI, Google, Anthropic? Yes, plus Azure OpenAI, Mistral, Cohere, Groq, xAI, DeepSeek, Together AI, OpenRouter, HuggingFace, and AWS Bedrock. During install, ash auto-detects an already-configured provider key or a local server; otherwise it shows a numbered menu so you can pick a provider (or enter a custom URL) and supply your app key. The app key will be added to ~/.ash/.ash_env
+Does this support Ollama, OpenAI, Google, Anthropic? Yes, plus Azure OpenAI, Mistral, Cohere, Groq, xAI, DeepSeek, Together AI, OpenRouter, HuggingFace, and AWS Bedrock. During install, ash auto-detects an already-configured provider key or a local server; otherwise it shows a numbered menu so you can pick a provider (or enter a custom URL) and supply your app key. Ash-owned settings are stored in `$XDG_CONFIG_HOME/ash/.ash_env` (default `~/.config/ash/.ash_env`); third-party provider credential variables retain their standard names.
 
 Is this thing secure and safe? It really depends on how bold you are. It runs as your user so it can read your files, but it is limited in the commands it can execute, but it can execute python (if you allow it). If you allow curl or wget and are running a naive model you could end up executing more than you wanted.
 
 ## Features
 
-- Uses `AI_ENDPOINT` and `AI_MODEL` to target local or cloud provider endpoints
-- Uses bearer authentication automatically when `AI_AUTH_TOKEN` is set
+- Uses `ASH_AI_ENDPOINT` and `ASH_AI_MODEL` to target local or cloud provider endpoints
+- Uses bearer authentication automatically when `ASH_AI_AUTH_TOKEN` is set
 - Auto-detects provider adapters (`ollama`, `openai`, `google`, `anthropic`, `cohere`, `bedrock`) from endpoint
 - `ash install` auto-configures from an already-set cloud provider API key or a running local inference server, and offers a numbered model picker
-- Supports optional `AI_PROVIDER` override for advanced routing control
+- Supports optional `ASH_AI_PROVIDER` override for advanced routing control
 - Uses provider-native tool calling through per-provider adapters
 - Can attach files (images or documents) to a request with `--attach <path>` (repeatable); currently encoded on the wire for OpenAI-compatible providers
 - Optional streaming responses via `ASH_STREAM` for providers whose adapter supports it (currently OpenAI only)
@@ -62,21 +66,32 @@ Is this thing secure and safe? It really depends on how bold you are. It runs as
 - Shows an ANSI-friendly thinking indicator while waiting for the AI response
 - Supports `Ctrl-C` to abort an in-flight request
 - Keeps chat history across calls
-- Uses `~/.ash/.ash_system` as the canonical system prompt file when present
+- Uses `$XDG_CONFIG_HOME/ash/.ash_system` (default `~/.config/ash/.ash_system`) as the canonical system prompt file when present
 - Always prepends current local date/time to the system prompt sent to the model
 - Supports emoji input/output (UTF-8)
 - Renders markdown output to terminal styling with ANSI fallback safety
 - Can execute allowlisted Unix commands and `python3` as AI tools
 - Can schedule one-off and recurring prompt invocations via `at` and `crontab`
 - Maintains recurring-job inventory and management through AI tools
-- Provides persistent AI workspace file access under `~/.ash`
-- Provides a session-scoped scratch workspace under `~/.ash/scratch/<session-id>/` for temporary notes, plans, and helper files
+- Provides persistent AI workspace file access under `$XDG_CONFIG_HOME/ash` (default `~/.config/ash`)
+- Provides a session-scoped scratch workspace under `$XDG_STATE_HOME/ash/scratch/<session-id>/` (default `~/.local/state/ash/scratch/<session-id>/`) for temporary notes, plans, and helper files
 - Automatically cleans stale scratch directories older than 48 hours with no access in the last 24 hours
 
 ## Build
 
+Requires Go 1.27.2 or newer. To install the two Go commands from the canonical
+module:
+
 ```bash
-go build -ldflags "-X main.ashVersion=v0.17.1 -X main.ashCommit=$(git rev-parse HEAD) -X main.ashDevelopmentBuild=true" -o ash .
+go install github.com/Jonconradt/ash/cmd/ash@latest
+go install github.com/Jonconradt/ash/cmd/ash-broker@latest
+```
+
+This installs the commands only; use `make install` from a checkout to also
+build and install the bundled plugins.
+
+```bash
+go build -ldflags "-X github.com/Jonconradt/ash/internal/app.ashVersion=dev -X github.com/Jonconradt/ash/internal/app.ashCommit=$(git rev-parse HEAD) -X github.com/Jonconradt/ash/internal/app.ashDevelopmentBuild=true" -o ash ./cmd/ash
 ```
 
 Build metadata is injected through linker flags. `make build` uses the latest
@@ -100,7 +115,7 @@ make release RELEASE_VERSION=v1.2.3
 - `make lint` runs `golangci-lint` checks across the module
 - `make security` runs `gosec` and `govulncheck` for security scanning
 - `make test` runs `go test ./...`
-- `make install` runs `go install ./...`
+- `make install` builds `ash`, `ash-broker`, and bundled plugins into user-local directories.
 - `make verify` runs strict checks (tests, race, coverage gate, vet, staticcheck, gosec, govulncheck)
 - `make sync-route-words` regenerates the ambiguous-word block in the shell assets from
   `internal/app/ash_bootstrap/route_words.txt`, the canonical list. Edit only that file; a test fails if
@@ -112,7 +127,7 @@ make release RELEASE_VERSION=v1.2.3
   notes, and pushes it to `origin`
 - Release publishing also creates `SHA256SUMS` and a Sigstore bundle. The
   updater requires both the signed manifest and the matching SHA-256 digest.
-- Release-note generation requires `AI_ENDPOINT` and `AI_MODEL`. Make supplies
+- Release-note generation requires `ASH_AI_ENDPOINT` and `ASH_AI_MODEL`. Make supplies
   the Git history to `ash`; `ash` does not invoke Git. The tagged notes are
   published as the GitHub Release body.
 - If `RELEASE_VERSION` is omitted, the latest stable tag is used as the source
@@ -122,15 +137,15 @@ Contributor note: run `make lint test` before submitting changes.
 
 ## Install on Linux, macOS, or FreeBSD
 
-Install the latest release with the verified one-liner:
+Install Sigstore `cosign` first, then install the latest release:
 
 ```bash
 curl -fsSL https://jonconradt.github.io/ash/install.sh | sh
 ```
 
 The installer supports Linux and macOS on `amd64` and `arm64`, and FreeBSD on
-`amd64`. It verifies the
-download against the release `SHA256SUMS` manifest and installs `ash` to
+`amd64`. It verifies the signed release `SHA256SUMS` manifest with `cosign`,
+then verifies the archive digest and installs `ash` to
 `~/.local/bin` without requiring `sudo`. Set `ASH_INSTALL_DIR` to choose a
 different destination when needed.
 
@@ -140,11 +155,29 @@ different destination when needed.
 | Linux | ✅ | ✅ |
 | FreeBSD | ✅ | ❌ |
 
-The installer runs `ash install` for the detected shell. Bash, zsh, and Fish are
-detected; unknown shells default to bash. Fish uses its standard
+The installer detects Bash, zsh, or Fish. Shell startup-file integration is
+opt-in; the installer asks before adding its managed block. You can enable it
+later with `ash install --shell <bash|zsh|fish> --shell-integration`. Fish uses its standard
 `$XDG_CONFIG_HOME/fish/config.fish` path (defaulting to `~/.config/fish/config.fish`).
-`ash install` adds `~/.local/bin` to `PATH` from the managed `~/.ash/.ash_env`
-file, so restart the shell or source its rc file afterward.
+Ash settings and files follow the XDG base directories: configuration in
+`$XDG_CONFIG_HOME/ash` (default `~/.config/ash`), durable data in
+`$XDG_DATA_HOME/ash` (default `~/.local/share/ash`), state in
+`$XDG_STATE_HOME/ash` (default `~/.local/state/ash`), cache in
+`$XDG_CACHE_HOME/ash` (default `~/.cache/ash`), and broker sockets in
+`$XDG_RUNTIME_DIR/ash` (falling back to `$XDG_STATE_HOME/ash/runtime`).
+Explicit XDG paths must be absolute. The v1 clean break does not migrate files
+from the former `~/.ash` layout or read Ash settings from generic `AI_*` or
+`SESSION_ID` variables; use `ASH_AI_*` and `ASH_SESSION_ID`.
+
+To remove a user-local install, first remove its shell integration with
+`ash install --shell <bash|zsh|fish> --disable-shell-integration`, then remove
+the installed `ash` and `ash-broker` binaries (under `~/.local/bin` by
+default). Package-managed installs should be removed with their package
+manager. To erase local settings and history too, separately remove the Ash
+directories under your XDG config, data, state, and cache roots; the state
+directory contains conversation history and scratch data.
+
+Open a new shell or source its startup file after enabling integration.
 
 ### Language support
 
@@ -155,7 +188,8 @@ include the `en_US` fallback catalog and publish downloadable UTF-8 JSON
 language catalogs for `zh_CN`, `zh_TW`, `es_ES`, `ar_AE`, and `id_ID`.
 Ash also tells the AI to respond in the resolved language.
 `ash install` automatically downloads the catalog matching a supported
-non-English language into `~/.ash/languages/`; if the release asset is
+non-English language into `$XDG_DATA_HOME/ash/languages/` (default
+`~/.local/share/ash/languages/`); if the release asset is
 unavailable, installation continues in English with a notice. Locale variants
 such as `es_MX.UTF-8` use the available Spanish catalog unless an exact
 regional override is installed. Unsupported languages use `en_US`.
@@ -164,20 +198,25 @@ The native man-page hierarchy is localized too. Use the usual `LANG` setting
 when running `man ash`; pages are installed under locale-specific paths such
 as `/usr/share/man/es_ES/man1/ash.1`.
 
-Bundled Python tools use an isolated virtualenv at `~/.ash/venv`; `ash install`
-waits for its dependencies, including `yfinance`, to be installed. Debian and
-Ubuntu packages declare `python3` and `python3-venv` as dependencies. When
-installing from the tarball on another platform, install Python 3 with venv
-support before running `ash install`.
+Bundled Python tools use an isolated virtualenv at
+`$XDG_DATA_HOME/ash/venv` (default `~/.local/share/ash/venv`). `ash install`
+attempts to provision their dependencies, including `yfinance`, but continues
+if Python, venv support, or network access is unavailable. Python is not a
+required dependency of the native packages; install Python 3 with venv support
+to use the bundled Python tools.
 
 Native packages remain available from the [latest GitHub release](https://github.com/Jonconradt/ash/releases/latest): macOS `.pkg`, and Linux `.deb`
-or `.rpm` packages. FreeBSD ships as a `.tar.gz` only; install `bash` with
-`pkg install bash` first. Configure `AI_ENDPOINT` and `AI_MODEL` after installation
+or `.rpm` packages. Each package contains `ash`, `ash-broker`, bundled native
+plugins, the `ash` man pages, and the MIT license. Linux packages install
+binaries under `/usr/bin` and plugins under `/usr/lib/ash/plugins`; macOS
+packages install under `/usr/local`. These package-manager-owned installs are
+not updated by `ash update`. FreeBSD ships as a `.tar.gz` only; install `bash` with
+`pkg install bash` first. Configure `ASH_AI_ENDPOINT` and `ASH_AI_MODEL` after installation
 as described below.
 
 ### Fish support
 
-Run `ash install --shell fish` to install Fish integration. It uses Fish's native
+Run `ash install --shell fish --shell-integration` to opt in to Fish integration. It uses Fish's native
 `fish_command_not_found` hook, shares the connection broker and snooze behavior
 with bash/zsh, and installs compatible natural-language collision wrappers.
 
@@ -232,7 +271,8 @@ Requirements for local packaging:
 - Linux packaging requires `fpm` (for `.deb`/`.rpm`) plus `dpkg-deb`/`rpm` for validation
 - Go toolchain installed
 
-The package is currently unsigned and not notarized by design.
+The macOS package is not signed or notarized. Release archives are distributed
+with a signed checksum manifest; package payloads are covered by that manifest.
 
 ## Configure
 
@@ -242,13 +282,13 @@ Running `ash install` automatically configures the AI endpoint, model, and auth 
 2. Otherwise, ash probes for a local inference server (Ollama, LM Studio, llama.cpp/MLX/LocalAI, vLLM, text-generation-webui, Jan, or GPT4All) on its default port.
 3. If neither is found, you're shown a numbered menu of cloud providers (plus the option to enter a custom URL) and prompted for an API key.
 
-In every case, once an endpoint and key are known, ash queries the endpoint's model-listing API and lets you pick the model from a numbered menu (falling back to free-text entry if listing isn't supported). The result is written to `~/.ash/.ash_env`, which the managed install block sources from your `.bashrc`/`.zshrc`.
+In every case, once an endpoint and key are known, ash queries the endpoint's model-listing API and lets you pick the model from a numbered menu (falling back to free-text entry if listing isn't supported). The result is written to `$XDG_CONFIG_HOME/ash/.ash_env` (default `~/.config/ash/.ash_env`), which the optional managed shell integration sources.
 
 To configure manually instead, set a local Ollama target:
 
 ```bash
-export AI_ENDPOINT="http://localhost:11434"
-export AI_MODEL="llama3.1:latest"
+export ASH_AI_ENDPOINT="http://localhost:11434"
+export ASH_AI_MODEL="llama3.1:latest"
 ```
 
 For Ollama, keep the model loaded after `ash` exits to avoid the next invocation paying the model-load cost:
@@ -262,16 +302,16 @@ Restart Ollama after changing this setting. Keeping a model resident uses its me
 Cloud example (authenticated):
 
 ```bash
-export AI_ENDPOINT="https://ollama.example.com"
-export AI_MODEL="llama3.1:latest"
-export AI_AUTH_TOKEN="<token>"
+export ASH_AI_ENDPOINT="https://ollama.example.com"
+export ASH_AI_MODEL="llama3.1:latest"
+export ASH_AI_AUTH_TOKEN="<token>"
 ```
 
 Optional advanced overrides:
 
 ```bash
-export AI_PROVIDER="openai"   # optional: ollama|openai|google|anthropic|gemini
-export AI_CACHE="off"         # optional: on by default when provider supports native caching
+export ASH_AI_PROVIDER="openai"   # optional: ollama|openai|google|anthropic|gemini
+export ASH_AI_CACHE="off"         # optional: on by default when provider supports native caching
 export ASH_STREAM="off"       # optional: on by default; stream responses when the provider adapter supports it (currently OpenAI only)
 ```
 
@@ -282,7 +322,7 @@ echo "summarize the current directory" | ash
 cat prompt.txt | ash
 ```
 
-Common `AI_ENDPOINT` values:
+Common `ASH_AI_ENDPOINT` values:
 
 - Ollama: `http://localhost:11434`
 - OpenAI: `https://api.openai.com/v1`
@@ -298,32 +338,30 @@ Common `AI_ENDPOINT` values:
 - OpenRouter (OpenAI-compatible): `https://openrouter.ai/api/v1`
 - HuggingFace Router (OpenAI-compatible): `https://router.huggingface.co/v1`
 - Cohere (native SDK): `https://api.cohere.com`
-- AWS Bedrock (native SDK, Converse API): `https://bedrock-runtime.<region>.amazonaws.com` — uses the AWS credential chain (env vars, `~/.aws/credentials`, SSO, instance role) for SigV4 signing; `AI_AUTH_TOKEN` is still required by ash's generic cloud-endpoint validation but is unused by Bedrock itself, so set any placeholder value.
+- AWS Bedrock (native SDK, Converse API): `https://bedrock-runtime.<region>.amazonaws.com` — uses the AWS credential chain (env vars, `~/.aws/credentials`, SSO, instance role) for SigV4 signing; no Ash bearer token is required.
 
 Notes:
 
-- Cloud endpoints are inferred when the host is not `localhost`, `127.0.0.1`, a private/LAN address (RFC1918 IPv4, IPv6 ULA), or a `.local` mDNS hostname. Set `ASH_STRICT=1` to treat only `localhost`/loopback as non-cloud (private/LAN hosts then require `https` and `AI_AUTH_TOKEN` like any other cloud endpoint).
-- Cloud endpoints must use `https` and require `AI_AUTH_TOKEN`; tokens are sent as bearer auth.
-- Provider detection is automatic by endpoint host/path; use `AI_PROVIDER` only when you need to override.
-- `AI_CACHE` defaults to enabled. Use `AI_CACHE=off` to disable provider-native caching.
-- Legacy `AI=ollama://...` configuration is no longer supported.
+- Cloud endpoints are inferred when the host is not `localhost`, `127.0.0.1`, a private/LAN address (RFC1918 IPv4, IPv6 ULA), or a `.local` mDNS hostname. Set `ASH_STRICT=1` to treat only `localhost`/loopback as non-cloud (private/LAN hosts then require `https` and `ASH_AI_AUTH_TOKEN` like any other cloud endpoint).
+- Cloud endpoints must use `https`; all except AWS Bedrock require `ASH_AI_AUTH_TOKEN`, which is sent as bearer auth.
+- Provider detection is automatic by endpoint host/path; use `ASH_AI_PROVIDER` only when you need to override.
+- `ASH_AI_CACHE` defaults to enabled. Use `ASH_AI_CACHE=off` to disable provider-native caching.
 
 ### Complete environment variable reference
 
-- `AI_ENDPOINT` (required): Base URL for the chat API endpoint.
+- `ASH_AI_ENDPOINT` (required): Base URL for the chat API endpoint.
 - `LANG` (optional): Selects the interface locale. Supported catalogs: `en_US`,
   `zh_CN`, `zh_TW`, `es_ES`, `ar_AE`, and `id_ID`; missing regional variants
   fall back to the available catalog for the language.
-- `AI_MODEL` (required): Model name sent to the endpoint.
-- `AI_AUTH_TOKEN` (optional): When set, sent as a bearer token. Required for cloud endpoints.
-- `AI_PROVIDER` (optional): Override auto-detected provider (`ollama`, `openai`, `google`, `gemini`, `anthropic`).
+- `ASH_AI_MODEL` (required): Model name sent to the endpoint.
+- `ASH_AI_AUTH_TOKEN` (optional): When set, sent as a bearer token. Required for cloud endpoints other than AWS Bedrock.
+- `ASH_AI_PROVIDER` (optional): Override auto-detected provider (`ollama`, `openai`, `google`, `gemini`, `anthropic`).
   Also accepts `cohere` and `bedrock` for the native SDK-based adapters (auto-detected from `api.cohere.com`/`bedrock-runtime.*.amazonaws.com` when not set explicitly).
-- `AI_CACHE` (optional): Enable or disable provider-native caching (`true/false`). Default `true`.
+- `ASH_AI_CACHE` (optional): Enable or disable provider-native caching (`true/false`). Default `true`.
 - `ASH_ALWAYS_OPENAI_API` (optional): When true-like, routes the `ollama` provider through the OpenAI-compatible SDK adapter instead of its hand-rolled implementation. Default on; set to a falsy value (e.g. `0`/`off`) to use the hand-rolled ollama adapter.
 - `ASH_STREAM` (optional): When true-like, streams the response from providers whose adapter supports it (currently OpenAI only). Default on; set to a falsy value (e.g. `0`/`off`) to disable. Has no visible effect on output today (see [docs/ash.1](docs/ash.1)).
 - `ASH_ATTACHMENT_MAX_BYTES` (optional): Max size in bytes for a file passed via `--attach`. Default 10485760 (10 MiB).
-- `AI` (legacy, unsupported): Deprecated and rejected; use `AI_ENDPOINT` and `AI_MODEL`.
-- `AI_TIMEOUT` (optional): AI request timeout. Default `3m`.
+- `ASH_AI_TIMEOUT` (optional): AI request timeout. Default `3m`.
 - `ASH_BROKER_AI_WARMUP` (optional): Send one credential-free `HEAD` request to the AI endpoint's origin at broker startup to warm its reusable HTTP connection. Enabled by default; set to `0` to disable. Set to `1` to enable explicitly. The probe does not validate API health or warm a local model.
 - `ASH_HISTORY_MAX` (optional): Max retained history messages per key. Default `40`.
 - `ASH_ALLOW` (optional): Comma-separated allowlisted executables for `run_unix_command`; it overrides `.ash_allow` and does not expand Ash internal tokens.
@@ -344,11 +382,11 @@ Notes:
 - `ASH_LOG_FORMAT` (scheduler/internal): Log format set to `json` for scheduled invocations.
 - `ASH_BROKER_SOCKET`, `ASH_BROKER_TOKEN`, and `ASH_BROKER_LEASE` (internal): Ephemeral per-shell broker settings. They are created by the installed Bash/zsh/Fish wrappers and should not be persisted or copied into scheduled jobs.
 - `ASH_MCP_CREDENTIAL_KEY` (optional): High-entropy 32-byte hex/base64 key for encrypted MCP OAuth credential fallback when the OS credential store is unavailable. The shell wrapper passes it only to `ash-broker` at launch and unsets its shell copy; do not put it in command arguments or logs.
-- `SESSION_ID`: Session identifier used for history and scheduled log naming (generated when missing in interactive runs).
+- `ASH_SESSION_ID`: Ash session identifier used for history, scratch, and scheduled log naming. A valid explicit value is preserved; invalid explicit values are rejected. The unrelated generic `SESSION_ID` variable is ignored.
 - `ASH_SCHEDULED_TASK` (internal): Set by scheduled invocations to mark task execution context.
 - `ASH_CHILD_AGENT` (internal): Marks a one-level child agent; child agents cannot create or schedule ash agents.
-- `SHELL`: Used by `ash install` and install recommendations to detect bash/zsh.
-- `HOME`: Determines ash workspace root under `$HOME/.ash`.
+- `SHELL`: Used by `ash install` and install recommendations to detect Bash, zsh, or Fish.
+- `HOME`: Supplies the fallback base for the XDG directories when their corresponding environment variables are unset.
 - `PATH`: Used to locate executables for tool commands and helper utilities.
 
 ### Connection reuse
@@ -367,7 +405,7 @@ The broker sends one bounded, unauthenticated `HEAD` request to the AI endpoint'
 
 ### Remote MCP servers
 
-Register remote Streamable HTTP MCP servers by adding one URL per line to `$HOME/.ash/.ash_allow`:
+Register remote Streamable HTTP MCP servers by adding one URL per line to `$XDG_CONFIG_HOME/ash/.ash_allow` (default `~/.config/ash/.ash_allow`):
 
 ```text
 https://mcpplaygroundonline.com/mcp-complex-server
@@ -375,7 +413,7 @@ https://mcpplaygroundonline.com/mcp-complex-server
 
 Alternatively, run `ash mcp add <url>` from an interactive Ash shell to connect and register a server. OAuth authorization opens in the desktop browser when a GUI is available; if the browser cannot be opened, Ash prints a copyable authorization URL and waits in the terminal. Use `ash mcp add <url> --no-browser` to always use the terminal flow. The server URL is added to the effective `.ash_allow` only after the connection succeeds.
 
-Ash derives each server's local name from the first 8 lowercase hexadecimal characters of SHA-256 over the exact URL text after trimming whitespace. The URL scheme is recognized case-insensitively; use the exact URL spelling consistently because it determines that name. Lines beginning with HTTP(S) register MCP servers and are ignored as shell-command allowlist entries. `ASH_STRICT=1` does not disable these explicitly registered servers. Existing `$HOME/.ash/mcp.json` files are no longer read; move their URLs into `.ash_allow` manually.
+Ash derives each server's local name from the first 8 lowercase hexadecimal characters of SHA-256 over the exact URL text after trimming whitespace. The URL scheme is recognized case-insensitively; use the exact URL spelling consistently because it determines that name. Lines beginning with HTTP(S) register MCP servers and are ignored as shell-command allowlist entries. `ASH_STRICT=1` does not disable these explicitly registered servers. Old `mcp.json` files are not read; add trusted server URLs explicitly with `ash mcp add`.
 
 The broker connects to each registered server, retains its MCP session, and exposes its tools to the model. OAuth-protected servers use the browser authorization-code flow with PKCE; Ash opens the authorization page when a GUI is available, or prints the URL for manual opening in a same-host browser. The broker handles the local callback, token exchange, and refresh. This terminal fallback still requires a browser; it is not a browserless OAuth flow. Configure only servers you trust, since their tools can perform actions on your behalf. HTTPS is required except for localhost development endpoints; URLs containing userinfo, query parameters, or fragments are rejected.
 
@@ -383,13 +421,15 @@ For direct OAuth connections, Ash permits non-public IP addresses only for the e
 
 If MCP initialization fails, `ash` continues the request with its local tools and without any remote MCP tools. Interactive runs warn on stderr; non-interactive runs intentionally suppress this expected failure. Scheduled jobs do not inherit the per-shell broker, so they run without MCP tools even when servers are listed in `.ash_allow`. Do not schedule prompts that depend on MCP results; they may complete without performing the requested MCP work.
 
-OAuth credentials are stored in the OS credential manager when available. If it is unavailable, Ash requires `ASH_MCP_CREDENTIAL_KEY` containing a randomly generated 32-byte key encoded as hex or base64 and stores only authenticated-encrypted credentials in `$HOME/.ash/mcp/mcp-credentials.enc` with private permissions. The key itself is not stored by Ash. Short-lived access tokens are refreshed with the stored refresh token; the authorization server controls how long refresh credentials remain valid. Refreshes are coordinated across independent shell brokers, so concurrent terminals do not race with stale rotating refresh tokens. The public MCP playground above does not require OAuth and is only useful for remote transport/tool-discovery smoke testing; it does not test OAuth behavior.
+OAuth credentials are stored in the OS credential manager when available. If it is unavailable, Ash requires `ASH_MCP_CREDENTIAL_KEY` containing a randomly generated 32-byte key encoded as hex or base64 and stores only authenticated-encrypted credentials in `$XDG_DATA_HOME/ash/mcp/mcp-credentials.enc` (default `~/.local/share/ash/mcp/mcp-credentials.enc`) with private permissions. The key itself is not stored by Ash. Short-lived access tokens are refreshed with the stored refresh token; the authorization server controls how long refresh credentials remain valid. Refreshes are coordinated across independent shell brokers, so concurrent terminals do not race with stale rotating refresh tokens. The public MCP playground above does not require OAuth and is only useful for remote transport/tool-discovery smoke testing; it does not test OAuth behavior.
 
 Optional canonical system prompt file:
 
 ```text
-$HOME/.ash/.ash_system
+$XDG_CONFIG_HOME/ash/.ash_system
 ```
+
+When `XDG_CONFIG_HOME` is unset, the default is `~/.config/ash`.
 
 Example `.ash_system` content:
 
@@ -397,21 +437,23 @@ Example `.ash_system` content:
 You are a concise shell assistant. Keep answers short and practical. 🙂
 ```
 
-`$TOOLS_DIR_LIST`, `$PLUGINS_DIR_LIST`, and `$IF_PYTHON_AVAILABLE` are reserved internal Ash substitutions, not environment variables. Ash computes them before expanding ordinary environment variables. `$TOOLS_DIR_LIST` lists only allowed regular files in `~/.ash/tools/` with read and execute bits. `$PLUGINS_DIR_LIST` lists allowed native plugins in `~/.ash/plugins/`.
+`$TOOLS_DIR_LIST`, `$PLUGINS_DIR_LIST`, and `$IF_PYTHON_AVAILABLE` are reserved internal Ash substitutions, not environment variables. Ash computes them before expanding ordinary environment variables. `$TOOLS_DIR_LIST` lists only allowed regular files in `$XDG_DATA_HOME/ash/tools/` with read and execute bits. `$PLUGINS_DIR_LIST` lists allowed native plugins in `$XDG_DATA_HOME/ash/plugins/` and the platform package plugin directory.
 
 History is stored in:
 
 ```text
-$HOME/.ash/history/$SESSION_ID.json
+$XDG_STATE_HOME/ash/history/$ASH_SESSION_ID.json
 ```
+
+When `XDG_STATE_HOME` is unset, the default is `~/.local/state/ash`.
 
 Scheduled invocations write task-specific history files:
 
 ```text
-$HOME/.ash/history/task_$SESSION_ID.json
+$XDG_STATE_HOME/ash/history/task_$ASH_SESSION_ID.json
 ```
 
-Legacy `$HOME/.ash_history.json` is ignored.
+Generic `SESSION_ID` is ignored; set `ASH_SESSION_ID` to choose an explicit session identity.
 
 Optional max history messages (default: `40`):
 
@@ -422,8 +464,8 @@ export ASH_HISTORY_MAX=80
 Optional AI request timeout (default: `3m`):
 
 ```bash
-export AI_TIMEOUT=90s
-export AI_TIMEOUT=3m
+export ASH_AI_TIMEOUT=90s
+export ASH_AI_TIMEOUT=3m
 ```
 
 Verbose debug logging (off by default):
@@ -432,24 +474,25 @@ Verbose debug logging (off by default):
 export ASH_VERBOSE=1
 ```
 
-Install shell integration (wrappers plus command-not-found hook):
+Install shell integration (opt-in; wrappers plus command-not-found hook):
 
 ```bash
-ash install --shell bash
-ash install --shell zsh
+ash install --shell bash --shell-integration
+ash install --shell zsh --shell-integration
+ash install --shell fish --shell-integration
 ```
 
 Preview without writing files:
 
 ```bash
-ash install --shell bash --dry-run
+ash install --shell bash --shell-integration --dry-run
 ```
 
-`ash install` is idempotent and appends a single managed block to your rc file.
-For bash it targets `~/.bashrc`; for zsh it targets `~/.zshrc`.
-During install, if `./.ash_system`, `./.ash_allow`, or `./.ash_deny` exist in your current
-directory, they are copied into `~/.ash/` and become the canonical files used
-by `ash`.
+`ash install` is idempotent. It installs managed assets without modifying a
+shell startup file unless `--shell-integration` is supplied. For Bash it
+targets `~/.bashrc`; for zsh it targets `~/.zshrc`; for Fish it targets
+`$XDG_CONFIG_HOME/fish/config.fish` (default `~/.config/fish/config.fish`).
+Installation never imports policy files from the current directory.
 
 Pause automatic shell prompt processing when you need a quiet period:
 
@@ -475,13 +518,10 @@ and installs to
 Sigstore keyless signature for `SHA256SUMS`
 against the `Jonconradt/ash` release workflow, then verifies the selected
 archive's SHA-256 digest. The digest must always match. If signature verification
-fails, an interactive confirmation is required to continue; do not approve unless
-you independently trust the release source. Missing verification data and
-mismatched archive digests abort the update. Unsupported archive entries are
-listed for approval; their payloads are skipped, and trailing-slash paths are
-created as directories. These confirmations are refused in non-interactive runs.
+fails, or if required verification data is missing, the update aborts.
+Mismatched archive digests and unsupported archive entries are rejected.
 
-Customized files under `~/.ash` are skipped by default. Use `--yes` to replace
+Customized configuration files under `$XDG_CONFIG_HOME/ash` are skipped by default. Use `--yes` to replace
 them, or `--skip-customized` to make the default explicit. The updater never
 overwrites system-managed installations and reports when `~/.local/bin` must be
 placed earlier on `PATH`.
@@ -490,7 +530,7 @@ placed earlier on `PATH`.
 Go duration syntax, such as `30s`, `10m`, or `1h`. The snooze is shared by the
 installed shell integrations and affects automatic routing only; explicit
 `ash ...` commands continue to work. The expiry is stored in
-`~/.ash/.ash_snooze_until`.
+`$XDG_STATE_HOME/ash/.ash_snooze_until` (default `~/.local/state/ash/.ash_snooze_until`).
 After updating an existing installation, reload the shell startup file once
 (`source ~/.bashrc` or `source ~/.zshrc`) so the current shell loads the
 snooze-aware integration.
@@ -516,8 +556,8 @@ When enabled, `ash` logs structured diagnostics with Go's standard-library `log/
 - `schedule_future_prompt`: schedules one prompt run via a user `launchd` LaunchAgent
 - `schedule_recurring_prompt`: schedules recurring prompt runs via `crontab`
 - `manage_recurring_jobs`: lists, cancels, modifies, and explains ash-managed recurring jobs
-- `ash_read_workspace_file`: reads a file from `~/.ash`
-- `ash_write_workspace_file`: writes a file in `~/.ash` and auto-updates `~/.ash/inventory.md`
+- `ash_read_workspace_file`: reads a file from `$XDG_CONFIG_HOME/ash` (default `~/.config/ash`)
+- `ash_write_workspace_file`: writes a file in `$XDG_CONFIG_HOME/ash` (default `~/.config/ash`) and auto-updates its `inventory.md`
 - `read_scratch_file`, `write_scratch_file`, `append_scratch_file`, and `replace_scratch_file`: read, create/overwrite, append to, or fully replace files in the current session's temporary scratch workspace
 - `edit_scratch_file`: replace one uniquely matching literal text fragment in an existing scratch file; missing or ambiguous matches leave it unchanged
 - `list_scratch_files`: list sorted, paginated files in the current session's scratch workspace without exposing hidden files or symlinks
@@ -542,7 +582,7 @@ Set allowlisted Unix executables with one of these methods:
 export ASH_ALLOW="ls,ps,man,osascript"
 ```
 
-1. Canonical config file `$HOME/.ash/.ash_allow`:
+1. Canonical config file `$XDG_CONFIG_HOME/ash/.ash_allow` (default `~/.config/ash/.ash_allow`):
 
 ```text
 # one per line or comma-separated
@@ -559,7 +599,7 @@ instead of a shell command. These URL lines are ignored by the command allowlist
 
 The standalone `$TOOLS_DIR_LIST` and `$PLUGINS_DIR_LIST` lines in `.ash_allow` are internal Ash directives that allow eligible managed tool scripts and native plugins. Replace those lines with literal bare names for a fixed restrictive policy.
 
-1. Canonical denylist file `$HOME/.ash/.ash_deny`:
+1. Canonical denylist file `$XDG_CONFIG_HOME/ash/.ash_deny` (default `~/.config/ash/.ash_deny`):
 
 ```text
 # Block specific commands, tools, or plugins
@@ -581,21 +621,21 @@ The Unix tool rejects risky shell-control argument patterns and always executes 
 
 ### Scheduling behavior
 
-- One-off scheduling uses a user `launchd` LaunchAgent under `~/.ash/launchagents/` with a per-invocation `com.user.gonetwork.<id>.plist` filename and loads it with `launchctl`.
+- One-off scheduling uses a user `launchd` LaunchAgent under `$XDG_STATE_HOME/ash/launchagents/` (default `~/.local/state/ash/launchagents/`) with a per-invocation plist filename and loads it with `launchctl`.
 - Recurring scheduling uses user `crontab` entries with ash metadata markers.
 - Recurring-job management (`list`, `cancel`, `modify`, `explain`) operates only on ash-owned crontab entries.
-- Scheduled runs capture prompt + working directory and replay a minimal environment allowlist (`AI_ENDPOINT`, `AI_MODEL`, auth/session variables, `HOME`, `PATH`, and selected ash config vars).
+- Scheduled runs capture prompt + working directory and replay a minimal environment allowlist (`ASH_AI_ENDPOINT`, `ASH_AI_MODEL`, auth/session variables, `HOME`, `PATH`, and selected Ash config vars).
 - Scheduled runs do not inherit an interactive shell's broker and therefore cannot use remote MCP tools. Ash continues without MCP tools; the failure is intentionally silent in non-interactive runs. Do not schedule prompts that require MCP actions or data.
-- One-off scheduled runs also enable verbose logging and write JSON debug logs to `~/.ash/logs/task_$SESSION_ID.log`, rotating the file at 1 MB.
-- SESSION_ID is required for default log naming and is sanitized to alphanumeric characters for filename safety.
+- One-off scheduled runs also enable verbose logging and write JSON debug logs to `$XDG_STATE_HOME/ash/logs/task_$ASH_SESSION_ID.log` (default `~/.local/state/ash/logs/task_$ASH_SESSION_ID.log`), rotating the file at 1 MB.
+- `ASH_SESSION_ID` is required for default log naming and invalid explicit values are rejected.
 
 ### Persistent workspace files
 
-Ash reserves `~/.ash` for cross-invocation state files created by AI tools.
+Ash reserves `$XDG_CONFIG_HOME/ash` (default `~/.config/ash`) for persistent workspace files created by AI tools.
 
-- `~/.ash/inventory.md` tracks file name and purpose entries in `name | purpose` format.
+- `~/.config/ash/inventory.md` tracks file name and purpose entries in `name | purpose` format by default.
 - Inventory examples (such as counters) are descriptive metadata, not built-in special behavior.
-- Workspace tools enforce path containment and reject paths outside `~/.ash`.
+- Workspace tools enforce path containment and reject paths outside the configured Ash workspace.
 
 ### Example: osascript tool call target
 
@@ -628,7 +668,7 @@ On startup, `ash` checks whether its managed install block exists for your
 current shell. If not, it prints a recommendation such as:
 
 ```text
-ash is not installed for bash. Run: ash install --shell bash
+ash is not installed for bash. Run: ash install --shell bash --shell-integration
 ```
 
 ## Zero-prefix command collision handling
@@ -761,7 +801,7 @@ Zsh does not use wrapper functions. Wrappers would shadow real builtins such as
 lookup, so a prompt ending in `?` fails with `no matches found` before any
 wrapper can run.
 
-Instead, `ash install --shell zsh` registers a ZLE `accept-line` widget. ZLE
+Instead, `ash install --shell zsh --shell-integration` registers a ZLE `accept-line` widget. ZLE
 exists only in interactive shells, so scripts and `zsh -c` keep stock zsh
 behavior. On Enter the widget applies fork-free guards to the raw input buffer
 and passes anything that looks like a real command straight through:

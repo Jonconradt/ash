@@ -13,9 +13,9 @@
   package could depend on them without importing `internal/app`. `internal/app` currently
   re-exposes these as lowercase type aliases (`type message = model.Message`) so none of its
   existing call sites needed to change.
-- [internal/workspace](internal/workspace): pure `Root(home string) string` path-join helper
-  for the `~/.ash` workspace directory layout; `internal/app`'s `ashWorkspaceDir()` still
-  resolves `$HOME` itself (via its existing test-stub var) and delegates only the path join.
+- [internal/workspace](internal/workspace): pure path helpers for the XDG configuration,
+  data, state, cache, and runtime directory layout; `internal/app` resolves `$HOME` itself
+  (via its existing test-stub var) and delegates the base-directory joins.
 - [internal/uistyle](internal/uistyle): lipgloss-based styled print helpers for interactive
   install prompts (`PrintMenuTitle`, `PrintSuccess`, etc.) — the one fully standalone piece of
   the install UI, with no dependency on anything else in `internal/app`.
@@ -115,7 +115,8 @@ adding to the global-stub-var pattern; prefer constructor/parameter-injected dep
 ## Operational notes
 
 - History is stored under the user workspace directory and is retained with a bounded cleanup policy.
-- Shell integrations check `~/.ash/.ash_snooze_until` before automatic wrapper and command-not-found routing. Direct `ash` invocations bypass this check.
+- Shell integrations check `$XDG_STATE_HOME/ash/.ash_snooze_until` (default `~/.local/state/ash/.ash_snooze_until`) before automatic wrapper and command-not-found routing. Direct `ash` invocations bypass this check.
 - User-visible messages are plain text by default. ASH_VERBOSE enables structured JSON debug logging, which can optionally be written to a rotating log file.
 - Tool execution is restricted by allowlist and path containment rules. Ash resolves the allowlist once per request, uses it for enforcement and tool schemas, and renders eligible managed scripts through the internal `$TOOLS_DIR_LIST` prompt substitution.
-- `ash install` auto-configures `AI_ENDPOINT`/`AI_MODEL`/`AI_AUTH_TOKEN`: it checks for an already-set cloud provider API key (12 providers, see [ai_autoconfig.go](internal/app/ai_autoconfig.go)), then a running local inference server, then falls back to an interactive numbered menu; AWS Bedrock is intentionally excluded (see [issue #4](https://github.com/Jonconradt/ash/issues/4)).
+- `ash install` auto-configures `ASH_AI_ENDPOINT`/`ASH_AI_MODEL`/`ASH_AI_AUTH_TOKEN`: it checks for an already-set cloud provider API key (12 providers, see [ai_autoconfig.go](internal/app/ai_autoconfig.go)), then a running local inference server, then falls back to an interactive numbered menu. AWS Bedrock uses the AWS credential chain and does not require a placeholder Ash bearer token.
+- Native plugins use the versioned executable discovery contract in [PLUGIN_CONTRACT.md](docs/PLUGIN_CONTRACT.md); Go packages under `internal/` are not a public plugin SDK.

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"ash/internal/plugin"
+	"github.com/Jonconradt/ash/internal/plugin"
 )
 
 type timePlugin struct{}
@@ -26,6 +26,37 @@ func (t *timePlugin) Version() string {
 
 func (t *timePlugin) AIDocs() string {
 	docs := map[string]any{
+		"schema_version": 1,
+		"name":           t.Name(),
+		"version":        t.Version(),
+		"input_schema": map[string]any{
+			"$schema": "https://json-schema.org/draft/2020-12/schema",
+			"type":    "object",
+			"properties": map[string]any{
+				"--format":   map[string]any{"type": "string", "enum": []string{"json", "human", "rfc3339", "unix", "utc"}},
+				"--timezone": map[string]any{"type": "string"},
+			},
+			"additionalProperties": false,
+		},
+		"output_schema": map[string]any{
+			"$schema":  "https://json-schema.org/draft/2020-12/schema",
+			"type":     "object",
+			"required": []string{"status"},
+			"properties": map[string]any{
+				"status":         map[string]any{"type": "string", "enum": []string{"success", "error"}},
+				"local_time":     map[string]any{"type": "string"},
+				"local_time_24h": map[string]any{"type": "string"},
+				"local_date":     map[string]any{"type": "string"},
+				"local_datetime": map[string]any{"type": "string"},
+				"timezone":       map[string]any{"type": "string"},
+				"iso8601":        map[string]any{"type": "string"},
+				"utc_iso8601":    map[string]any{"type": "string"},
+				"unix_timestamp": map[string]any{"type": "integer"},
+				"human_readable": map[string]any{"type": "string"},
+				"error_message":  map[string]any{"type": "string"},
+			},
+			"additionalProperties": false,
+		},
 		"Capabilities": []string{
 			"Retrieve the current date, time, timezone, and epoch timestamp.",
 			"Support formatted output in RFC3339/ISO8601, Unix epoch seconds, UTC, or human-readable format.",

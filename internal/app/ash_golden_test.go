@@ -96,8 +96,8 @@ func TestRunGoldenFailurePromptDirectoryAndExecutables(t *testing.T) {
 	}
 
 	t.Setenv("AI", "")
-	t.Setenv("AI_ENDPOINT", srv.URL)
-	t.Setenv("AI_MODEL", "llama3.1")
+	t.Setenv("ASH_AI_ENDPOINT", srv.URL)
+	t.Setenv("ASH_AI_MODEL", "llama3.1")
 	t.Setenv("ASH_ALLOW", "pwd,find")
 
 	var stdout bytes.Buffer

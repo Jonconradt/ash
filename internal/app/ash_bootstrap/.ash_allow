@@ -23,11 +23,11 @@
 # Managed tools and native plugins
 # -----------------------------------------------------------------------------
 # $TOOLS_DIR_LIST is an internal Ash directive that expands to eligible Python
-# scripts in ~/.ash/tools/.
+# scripts in the XDG data directory.
 $TOOLS_DIR_LIST
 
 # $PLUGINS_DIR_LIST is an internal Ash directive that expands to eligible native
-# binary plugins in ~/.ash/plugins/.
+# binary plugins in the XDG data directory.
 $PLUGINS_DIR_LIST
 
 # -----------------------------------------------------------------------------
@@ -36,7 +36,7 @@ $PLUGINS_DIR_LIST
 #       MCP servers may trigger one-time OAuth authentication. Ash opens the
 #       browser when a GUI is available and prints a URL for terminal fallback.
 # -----------------------------------------------------------------------------
-https://mcpplaygroundonline.com/mcp-complex-server
+# https://mcpplaygroundonline.com/mcp-complex-server
 
 # -----------------------------------------------------------------------------
 # Core shell information

@@ -33,14 +33,6 @@ jobs:
           GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build ./...
           GOOS=freebsd GOARCH=arm64 CGO_ENABLED=0 go build ./...
           GOOS=freebsd GOARCH=amd64 go vet ./...
-      - name: Ensure dist directory exists
-        run: mkdir -p dist
-      - name: Generate SBOM
-        uses: anchore/sbom-action@v0.24.0
-        with:
-          path: .
-          format: spdx-json
-          output-file: dist/sbom.spdx.json
   package-macos:
     runs-on: macos-14
     needs: quality
@@ -65,6 +57,20 @@ jobs:
       - name: Build and package macOS artifacts
         run: |
           make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES=${{ matrix.arch }} RELEASE_VERSION="${GITHUB_REF_NAME}"
+      - name: Smoke test native macOS arm64 tarball
+        if: matrix.arch == 'arm64'
+        run: |
+          set -euo pipefail
+          archive="dist/release/ash-${GITHUB_REF_NAME}-darwin-arm64.tar.gz"
+          mkdir -p smoke
+          tar -xzf "$archive" -C smoke
+          binary="smoke/ash-${GITHUB_REF_NAME}-darwin-arm64"
+          "$binary" --help
+          "$binary" version
+          smoke_home="$(mktemp -d)"
+          env -i HOME="$smoke_home" PATH="$PATH" "$PWD/$binary" install --shell bash --shell-integration </dev/null
+          test -f "$smoke_home/.config/ash/.ash_bashrc"
+          bash -n "$smoke_home/.config/ash/.ash_bashrc"
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@v6
         with:
@@ -99,6 +105,20 @@ jobs:
       - name: Build and package Linux artifacts
         run: |
           make release-artifacts RELEASE_TARGET_OSES=linux RELEASE_TARGET_ARCHES=${{ matrix.arch }} RELEASE_VERSION="${GITHUB_REF_NAME}"
+      - name: Smoke test native Linux amd64 tarball
+        if: matrix.arch == 'amd64'
+        run: |
+          set -euo pipefail
+          archive="dist/release/ash-${GITHUB_REF_NAME}-linux-amd64.tar.gz"
+          mkdir -p smoke
+          tar -xzf "$archive" -C smoke
+          binary="smoke/ash-${GITHUB_REF_NAME}-linux-amd64"
+          "$binary" --help
+          "$binary" version
+          smoke_home="$(mktemp -d)"
+          env -i HOME="$smoke_home" PATH="$PATH" "$PWD/$binary" install --shell bash --shell-integration </dev/null
+          test -f "$smoke_home/.config/ash/.ash_bashrc"
+          bash -n "$smoke_home/.config/ash/.ash_bashrc"
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@v6
         with:
@@ -133,10 +153,8 @@ jobs:
           name: release-freebsd-${{ matrix.arch }}
           path: dist/release/*freebsd-${{ matrix.arch }}*
   smoke-freebsd:
-    # Advisory only: the VM boot is slow and flaky, so this never blocks publish.
     runs-on: ubuntu-latest
     needs: package-freebsd
-    continue-on-error: true
     steps:
       - name: Download FreeBSD amd64 artifact
         uses: actions/download-artifact@v6
@@ -159,11 +177,12 @@ jobs:
             tar -xzf "$archive" -C artifacts
             binary="${archive%.tar.gz}"
             chmod 0755 "$binary"
-            "$binary" install --shell bash --dry-run </dev/null
-            "$binary" install --shell bash </dev/null
-            test -f "$HOME/.ash/.ash_bashrc"
-            bash -n "$HOME/.ash/.ash_bashrc"
-            grep -q '\.ash/\.ash_bashrc' "$HOME/.bashrc"
+            "$binary" --help
+            "$binary" install --shell bash --shell-integration --dry-run </dev/null
+            "$binary" install --shell bash --shell-integration </dev/null
+            test -f "$HOME/.config/ash/.ash_bashrc"
+            bash -n "$HOME/.config/ash/.ash_bashrc"
+            grep -q 'ash/\.ash_bashrc' "$HOME/.bashrc"
             grep -q '\$HOME/\.bashrc' "$HOME/.bash_profile"
             bash -lc 'true'
   publish:
@@ -195,6 +214,12 @@ jobs:
             locale="$(basename "$catalog" .json)"
             cp "$catalog" "dist/release/ash-language-${locale}.json"
           done
+      - name: Generate release SBOM
+        uses: anchore/sbom-action@v0.24.0
+        with:
+          path: dist/release
+          format: spdx-json
+          output-file: dist/release/sbom.spdx.json
       - name: Install cosign
         uses: sigstore/cosign-installer@v3.8.1
       - name: Generate and sign checksum manifest
@@ -202,7 +227,7 @@ jobs:
           set -euo pipefail
           cd dist/release
           : > SHA256SUMS
-          for artifact in ash-*.pkg ash-*.deb ash-*.rpm ash-*.tar.gz ash-*.msi ash-language-*.json; do
+          for artifact in ash-*.pkg ash-*.deb ash-*.rpm ash-*.tar.gz ash-*.msi ash-language-*.json sbom.spdx.json; do
             if [[ -f "$artifact" ]]; then
               sha256sum "$artifact" >> SHA256SUMS
             fi
