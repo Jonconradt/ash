@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ash Pertanyaan Umum</title>
+  <meta name="description" content="Jawaban tentang instalasi ash, penyedia, keamanan, alat, riwayat, dan integrasi shell.">
+  <link rel="canonical" href="https://jonconradt.github.io/ash/id/faq.html">
+  <link rel="alternate" hreflang="en" href="https://jonconradt.github.io/ash/faq.html">
+  <link rel="alternate" hreflang="ar" href="https://jonconradt.github.io/ash/ar/faq.html">
+  <link rel="alternate" hreflang="de" href="https://jonconradt.github.io/ash/de/faq.html">
+  <link rel="alternate" hreflang="es" href="https://jonconradt.github.io/ash/es/faq.html">
+  <link rel="alternate" hreflang="fr" href="https://jonconradt.github.io/ash/fr/faq.html">
+  <link rel="alternate" hreflang="id" href="https://jonconradt.github.io/ash/id/faq.html">
+  <link rel="alternate" hreflang="it" href="https://jonconradt.github.io/ash/it/faq.html">
+  <link rel="alternate" hreflang="lb" href="https://jonconradt.github.io/ash/lb/faq.html">
+  <link rel="alternate" hreflang="pt-BR" href="https://jonconradt.github.io/ash/pt-BR/faq.html">
+  <link rel="alternate" hreflang="zh-CN" href="https://jonconradt.github.io/ash/zh-CN/faq.html">
+  <link rel="alternate" hreflang="zh-TW" href="https://jonconradt.github.io/ash/zh-TW/faq.html">
+  <link rel="alternate" hreflang="x-default" href="https://jonconradt.github.io/ash/faq.html">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="ash pulang"><span class="brand-mark">>_</span> ash</a>
+    <nav aria-label="Navigasi utama">
+      <a href="index.html#how-it-works">Cara kerjanya</a>
+      <a href="index.html#install">Instal</a>
+      <a href="docs.html">Dokumen</a>
+      <a href="faq.html" aria-current="page">FAQ</a>
+      <a href="https://github.com/Jonconradt/ash">GitHub</a>
+      <label class="sr-only" for="site-lingual">Bahasa</label>
+      <select id="site-language" class="language-select" aria-label="Pilih bahasa">
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+        <option value="de">Deutsch</option>
+        <option value="es">Español</option>
+        <option value="fr">Français</option>
+        <option value="id" selected>Bahasa Indonesia</option>
+        <option value="it">Italiano</option>
+        <option value="lb">Lëtzebuergesch</option>
+        <option value="pt-BR">Português (Brasil)</option>
+        <option value="zh-CN">简体中文</option>
+        <option value="zh-TW">繁體中文</option>
+        </select>
+    </nav>
+  </header>
+
+  <main class="page-width docs-page">
+    <header class="docs-header">
+      <p class="eyebrow">Jawaban</p>
+      <h1>Pertanyaan<br><em>yang sering diajukan.</em></h1>
+      <p>Jawaban yang jelas tentang instalasi, penyedia, server MCP, batasan keamanan, alat, dan file yang dikelola ash di mesin Anda.</p>
+    </header>
+
+    <div class="docs-layout">
+      <nav class="docs-contents" aria-label="Isi pertanyaan umum">
+        <strong>Topik</strong>
+        <a href="#getting-started">Memulai</a>
+        <a href="#installing">Memasang dan memperbarui</a>
+        <a href="#ai">AI dan koneksi</a>
+        <a href="#safety">Keamanan dan kontrol</a>
+        <a href="#workflow">Alat dan alur kerja</a>
+        <a href="#storage">Sesi dan penyimpanan</a>
+        <a href="#support">Dukungan dan komunitas</a>
+      </nav>
+      <article class="docs-content">
+        <section id="getting-started">
+          <h2>Memulai</h2>
+          <h3>Apa yang saya perlukan sebelum saya dapat menggunakan ash?</h3>
+          <p>Anda memerlukan <code>ash</code> yang dapat dieksekusi, titik akhir AI, dan nama model. Menjalankan <code>ash install</code> akan mengonfigurasikan ini secara otomatis: ia menggunakan kunci API penyedia cloud yang telah ditetapkan atau server inferensi lokal yang sedang berjalan ketika ditemukan, jika tidak maka akan menampilkan menu penyedia bernomor dan meminta kunci API, lalu memungkinkan Anda memilih model dari daftar model titik akhir. Anda juga dapat mengatur <code>AI_ENDPOINT</code> dan <code>AI_MODEL</code> secara manual. Titik akhir lokal seperti Ollama dapat menggunakan <code>http://localhost:11434</code>, dan host LAN seperti <code>http://brain.local:11434</code> atau IP pribadi juga diperlakukan sebagai lokal (kecuali <code>ASH_STRICT=1</code>); titik akhir cloud harus menggunakan HTTPS dan juga memerlukan <code>AI_AUTH_TOKEN</code>. Integrasi shell bersifat opsional: Anda selalu dapat menjalankan <code>ash "your question"</code> secara langsung.</p>
+
+          <h3>Di mana ash diinstal, dan bagaimana cara memeriksa apakah shell saya dapat menemukannya?</h3>
+          <p>Penginstal terverifikasi menempatkan ash di <code>~/.local/bin/ash</code>, dan <code>ash install</code> menambahkan direktori tersebut ke direktori Anda <code>PATH</code> melalui file <code>~/.ash/.ash_env</code> yang dikelola. Buka terminal baru, lalu jalankan <code>command -v ash</code> untuk konfirmasi. Pembaru mandiri menginstal biner penggantinya ke lokasi <code>~/.local/bin/ash</code> yang sama.</p>
+
+          <h3>Bagaimana cara menggunakan ash tanpa mengubah shell saya?</h3>
+          <p>Lewati perintah yang dikutip secara langsung: <code>ash "how do I find large files?"</code>. Tanpa argumen, ash juga menerima perintah input standar non-interaktif, seperti <code>git diff | ash</code>. Penggunaan langsung adalah opsi yang paling tidak mengejutkan saat Anda mempelajari ash atau menulis skrip.</p>
+
+          <h3>Mengapa ash mengatakan konfigurasi AI saya tidak lengkap?</h3>
+          <p>Periksa apakah <code>AI_ENDPOINT</code> dan <code>AI_MODEL</code> tidak kosong di lingkungan tempat ash dijalankan. Untuk nama host cloud, atur juga <code>AI_AUTH_TOKEN</code>. Jalankan <code>printf '%s\n' "$AI_ENDPOINT" "$AI_MODEL"</code> untuk mengonfirmasi bahwa dua nilai pertama ada, tetapi jangan mencetak token autentikasi ke dalam rekaman terminal atau log bersama.</p>
+        </section>
+
+        <section id="installing">
+          <h2>Menginstal dan Memperbarui</h2>
+          <h3>Apakah ash berfungsi di Windows 11?</h3>
+          <p>Tidak secara bawaan. ash mendukung bash, zsh, dan Fish di macOS, Linux, dan FreeBSD; tidak ada target pemasangan PowerShell. Gunakan WSL untuk pengalaman Linux yang didukung.</p>
+
+          <h3>Bagaimana cara menginstal ash di Subsistem Windows untuk Linux (WSL)?</h3>
+          <p>Menginstalnya di dalam distribusi WSL Anda sebagai Linux: <code>curl -fsSL https://jonconradt.github.io/ash/install.sh | sh</code>. Kemudian konfigurasikan <code>AI_ENDPOINT</code> dan <code>AI_MODEL</code>, dan jalankan <code>ash install</code> untuk shell yang berjalan di dalam WSL.</p>
+
+          <h3>Bagaimana cara memperbarui ash ke versi rilis terbaru?</h3>
+          <p>Jalankan <code>ash update</code> di macOS, Linux, atau FreeBSD. Ia mengunduh arsip pencocokan stabil terbaru, memverifikasi manifes rilis dengan bundel Sigstore dan intisari SHA-256, lalu menginstal ke <code>~/.local/bin/ash</code>. Jika verifikasi tanda tangan gagal atau arsip berisi entri yang tidak didukung, diperlukan konfirmasi interaktif; jangan menyetujui tanda tangan yang gagal kecuali Anda memercayai sumber rilis secara independen. Payload yang tidak didukung akan dilewati, dan proses non-interaktif menolak pengecualian ini. Gunakan <code>ash update --version vX.Y.Z</code> untuk versi tertentu; gunakan <code>--yes</code> hanya jika Anda ingin file terkelola khusus diganti.</p>
+
+          <h3>Saya menjalankan <code>ash install</code>. Mengapa tidak ada perubahan di terminal ini?</h3>
+          <p>Instalasi memperbarui file startup; itu tidak menulis ulang proses shell yang sudah berjalan. Buka terminal baru, atau muat ulang file untuk shell Anda: <code>source ~/.bashrc</code> untuk Bash, <code>source ~/.zshrc</code> untuk zsh, atau <code>source ~/.config/fish/config.fish</code> untuk Fish kecuali Anda menggunakan <code>XDG_CONFIG_HOME</code> khusus.</p>
+
+          <h3>Perintah yang tidak dikenal masih mengatakan “tidak ditemukan.” Bagaimana cara memecahkan masalah integrasi shell?</h3>
+          <p>Pertama jalankan <code>command -v ash</code>; pembungkusnya tidak dapat memanggil biner yang tidak dapat ditemukan oleh shell Anda. Kemudian muat ulang atau mulai ulang shell dan periksa apakah file startupnya berisi blok terkelola <code>&gt;&gt;&gt; ash install &gt;&gt;&gt;</code>. Terakhir, jalankan <code>ash snooze off</code>, karena penundaan dengan sengaja meninggalkan perintah yang tidak diketahui sebagai kegagalan normal “tidak ditemukan”.</p>
+
+          <h3>File apa yang diubah <code>ash install</code>, dan dapatkah saya mempratinjaunya?</h3>
+          <p>File ini menambah atau memperbarui blok bertanda ash di file startup shell yang dipilih dan mengelola file di bawah <code>~/.ash</code>, termasuk konfigurasi, pembungkus, dan alat yang dibundel. Jalankan <code>ash install --shell bash --dry-run</code> untuk melihat pratinjau perubahan file startup tanpa menulisnya. Menginstal ulang instalasi adalah idempoten; gunakan <code>--overwrite</code> hanya jika Anda ingin file bootstrap terkelola disegarkan.</p>
+
+          <h3>Apakah ash mendukung Fish?</h3>
+          <p>Ya. Jalankan <code>ash install --shell fish</code>. ash menambahkan blok terkelola ke <code>$XDG_CONFIG_HOME/fish/config.fish</code>, atau <code>~/.config/fish/config.fish</code> ketika XDG_CONFIG_HOME tidak disetel. Fish menggunakan <code>fish_command_not_found</code>, sehingga perintah yang belum terselesaikan mencapai ash dengan argumen aslinya.</p>
+
+          <h3>Mengapa tidak menggunakan huruf kecil <code>test</code> dan <code>type</code> di Fish?</h3>
+          <p>Fish menyimpan nama huruf kecil tersebut sebagai bawaan penting dan tidak mengizinkan fungsi untuk menggantikannya. Gunakan <code>Test ...</code> atau <code>Type ...</code> untuk menyatakan maksud ash, atau panggil <code>ash "..."</code> secara langsung. Wrapper tabrakan lain yang kompatibel tetap tersedia.</p>
+
+          <h3>Bagaimana dengan ksh93?</h3>
+          <p>ksh93 tidak didukung untuk integrasi shell. Perilaku <code>FPATH</code>-nya hanya dapat memuat file yang diberi nama berdasarkan perintah yang tidak diketahui; ia tidak memiliki callback command-not-found umum yang dapat dengan aman mengimplementasikan perutean cepat atau siklus hidup broker ash.</p>
+        </section>
+
+        <section id="ai">
+          <h2>AI dan Koneksi</h2>
+          <h3>Apakah ash termasuk AI?</h3>
+          <p>Tidak. ash adalah klien untuk titik akhir AI yang Anda konfigurasi. Tetapkan <code>AI_ENDPOINT</code> dan <code>AI_MODEL</code>; ash mendukung Ollama lokal dan server lokal lain yang kompatibel dengan OpenAI (LM Studio, llama.cpp, MLX, LocalAI, vLLM, text-generasi-webui, Jan, GPT4All), dan mendeteksi adaptor penyedia cloud yang didukung dari titik akhir, dengan opsi override <code>AI_PROVIDER</code>.</p>
+
+          <h3>Apa itu server MCP, dan bagaimana cara menambahkannya satu?</h3>
+          <p>Server MCP (Model Context Protocol) mengekspos alat yang dapat dipanggil oleh model AI, seperti penelusuran, analisis, atau tindakan khusus layanan. Untuk menambahkan server HTTP MCP Streamable jarak jauh, masukkan URL-nya pada barisnya sendiri di <code>~/.ash/.ash_allow</code>, lalu jalankan ash lagi. Misalnya: <code>https://mcpplaygroundonline.com/mcp-complex-server</code>. Ash terhubung melalui brokernya dan menawarkan alat server ke model. Gunakan hanya server yang Anda percayai: alat mereka mungkin melakukan tindakan atas nama Anda. HTTPS diperlukan kecuali untuk server pengembangan localhost. File <code>~/.ash/mcp.json</code> yang ada tidak lagi dibaca; pindahkan URL mereka ke <code>.ash_allow</code>. Jika inisialisasi MCP gagal, ash dilanjutkan tanpa alat MCP jarak jauh: alat ini memperingatkan dalam sesi interaktif dan tetap diam dalam sesi non-interaktif.</p>
+
+          <h3>Dapatkah pekerjaan terjadwal menggunakan server MCP?</h3>
+          <p>Tidak. Pekerjaan terjadwal dan pekerjaan non-interaktif lainnya tidak mewarisi broker shell interaktif, sehingga alat MCP jarak jauh tidak tersedia. Ash masih menjalankan prompt tanpa alat MCP dan menekan kegagalan inisialisasi yang diharapkan. Oleh karena itu, perintah yang bergantung pada MCP mungkin selesai tanpa data atau tindakan yang diminta. Jangan jadwalkan perintah yang memerlukan MCP.</p>
+
+          <h3>Apakah MCP berfungsi saat <code>ASH_STRICT=1</code>?</h3>
+          <p>Ya. Baris URL HTTP(S) secara eksplisit mendaftarkan server MCP dan tidak diperlakukan sebagai shell yang dapat dieksekusi. Mode ketat tidak menonaktifkan server MCP yang dikonfigurasi. Ini masih menerapkan perlindungan keluaran tidak tepercaya Ash pada konten alat yang dikembalikan.</p>
+
+          <h3>Bagaimana cara kerja MCP OAuth, dan di mana kredensial disimpan?</h3>
+          <p>Untuk server yang dilindungi OAuth, Ash membuka halaman otorisasi di browser desktop ketika GUI tersedia; jika tidak dapat membuka browser, ia akan mencetak URL untuk diotorisasi secara manual di browser pada host yang sama. Gunakan <code>ash mcp add &lt;url&gt; --no-browser</code> untuk selalu menggunakan aliran terminal. Untuk koneksi OAuth langsung, penemuan mengizinkan alamat IP non-publik hanya untuk otoritas MCP yang terdaftar; host OAuth lainnya tetap tunduk pada pemblokiran alamat non-publik. Proksi jalan keluar yang dikonfigurasi bertanggung jawab untuk memfilter alamat tujuannya. Broker menangani panggilan balik, pertukaran token, penyegaran, dan sesi MCP yang persisten. Kredensial disimpan di manajer kredensial sistem operasi bila tersedia. Jika tidak tersedia, konfigurasikan fallback file terenkripsi menggunakan <code>ASH_MCP_CREDENTIAL_KEY</code> 32-byte acak; Ash tidak pernah menyimpan kunci itu sendiri.</p>
+
+          <h3>Di mana saya dapat menemukan AUTH_KEY untuk penyedia cloud AI paling populer?</h3>
+          <p>ash menyebut nilai ini <code>AI_AUTH_TOKEN</code>; itu tidak membuat atau mendistribusikan kunci penyedia. Buat kunci di akun penyedia Anda, seperti <a href="https://platform.openai.com/api-keys">OpenAI</a>, <a href="https://console.anthropic.com/settings/keys">Anthropic</a>, <a href="https://aistudio.google.com/app/apikey">Google AI Studio</a>, <a href="https://portal.azure.com/">Azure OpenAI</a>, <a href="https://console.mistral.ai/api-keys/">Mistral</a>, <a href="https://dashboard.cohere.com/api-keys">Cohere</a>, <a href="https://console.groq.com/keys">Groq</a>, <a href="https://console.x.ai/">xAI</a>, <a href="https://platform.deepseek.com/api_keys">DeepSeek</a>, <a href="https://api.together.ai/settings/api-keys">Bersama AI</a>, <a href="https://openrouter.ai/settings/keys">OpenRouter</a>, <a href="https://huggingface.co/settings/tokens">HuggingFace</a>, atau <a href="https://ollama.com/settings/keys">Ollama</a>, lalu ekspor sebagai variabel lingkungan penyedia (atau <code>AI_AUTH_TOKEN</code> secara langsung). <code>ash install</code> mendeteksi secara otomatis sebagian besar variabel lingkungan khusus penyedia ini. Titik akhir cloud harus menggunakan HTTPS dan memerlukan token; alamat pribadi/LAN dan nama host <code>.local</code> tidak diperlakukan sebagai titik akhir cloud kecuali <code>ASH_STRICT=1</code> disetel.</p>
+
+          <h3>Apakah ash membuka koneksi baru setiap kali?</h3>
+          <p>Tidak untuk penggunaan shell Unix interaktif normal. Bash, zsh, dan Fish memulai satu broker per sesi shell, berkomunikasi dengannya melalui soket Unix pribadi, dan menggunakan kembali kumpulan koneksi HTTP yang dibatasi. Broker keluar setelah tidak aktif; pekerjaan terjadwal menggunakan permintaan langsung, bukan broker shell persisten.</p>
+
+          <h3>Apakah Fish menggunakan broker tersebut?</h3>
+          <p>Ya. Fish wrapper memulai dan menggunakan kembali broker per sesi yang sama seperti bash dan zsh, menyegarkan sewanya segera sebelum permintaan ash, dan membuat pengaturan broker tetap tenang.</p>
+
+          <h3>Apa yang terjadi jika permintaan lambat, tidak tersedia, atau saya berubah pikiran?</h3>
+          <p>Tekan <code>Ctrl-C</code> untuk membatalkan permintaan dalam penerbangan. Batas waktu permintaan AI default adalah tiga menit; atur <code>AI_TIMEOUT</code>, misalnya <code>AI_TIMEOUT=90s</code>, untuk mengubahnya. ash mencoba ulang kegagalan AI yang dapat dicoba hingga tiga kali secara default dengan batas waktu yang singkat; sesuaikan perilaku tersebut dengan <code>ASH_RETRY_MAX_ATTEMPTS</code>, <code>ASH_RETRY_BASE_DELAY</code>, dan <code>ASH_RETRY_MAX_DELAY</code>.</p>
+        </section>
+
+        <section id="safety">
+          <h2>Keamanan dan Kontrol</h2>
+          <h3>Bagaimana cara mengunci ash agar lebih aman, dan apa implikasinya?</h3>
+          <p>Jaga agar daftar eksekusi yang diizinkan tetap sempit, pilih alat hanya-baca, dan jangan tambahkan perintah istimewa atau destruktif. Setel <code>ASH_STRICT=1</code> untuk memblokir pola injeksi cepat yang dikenali dari alat, file, skrip, saluran pipa, dan keluaran agen anak yang tidak tepercaya. Ini juga dapat menyembunyikan teks sah yang menyerupai upaya penyuntikan. Daftar yang diizinkan adalah batas eksekusi, bukan kotak pasir: ash dan alat yang diizinkan masih berjalan sesuai keinginan Anda.</p>
+
+          <h3>Dapatkah ash menjalankan perintah destruktif seperti <code>rm</code>?</h3>
+          <p>Tidak dengan daftar izin default yang terpasang. Ini secara eksplisit menyarankan agar <code>rm</code>, <code>mv</code>, <code>dd</code>, <code>chmod</code>, <code>chown</code>, <code>kill</code>, dan <code>sudo</code>. Jika Anda menambahkan salah satunya, ash dapat memintanya dengan izin Anda; tinjau keputusan itu dengan hati-hati.</p>
+
+          <h3>Bagaimana cara mengubah perintah ash yang boleh dijalankan?</h3>
+          <p>Edit <code>~/.ash/.ash_allow</code> dan daftarkan nama-nama yang dapat dieksekusi, satu per baris atau dipisahkan koma. Perintah <code>$TOOLS_DIR_LIST</code> dan <code>$PLUGINS_DIR_LIST</code> yang berdiri sendiri mengizinkan skrip terkelola dan plugin asli yang memenuhi syarat; gantilah dengan nama literal untuk kebijakan yang membatasi. Skrip dan plugin yang memenuhi syarat adalah file biasa dalam <code>~/.ash/tools/</code> atau <code>~/.ash/plugins/</code> dengan bit baca dan eksekusi. Anda juga dapat menolak perintah secara eksplisit dengan menambahkannya ke <code>~/.ash/.ash_deny</code>. Atau atur <code>ASH_ALLOW</code> atau <code>ASH_DENY</code> ke daftar yang dipisahkan koma. Perubahan dibaca pada permintaan ash berikutnya.</p>
+
+          <h3>Pengguna apa yang menjalankan ash?</h3>
+          <p>ash dan setiap alat yang diizinkan dijalankan sebagai pengguna yang memulai ash. Itu tidak meningkatkan hak istimewa. Ruang kerja <code>~/.ash</code> yang dikelola telah diperketat izinnya, namun kontennya tetap dapat diakses oleh pengguna Anda dan proses apa pun yang Anda izinkan secara eksplisit.</p>
+
+          <h3>Apakah teks kepercayaan ash yang diterima melalui pipa sama dengan teks pengguna? Perlindungan apa saja yang tersedia untuk data berbahaya?</h3>
+          <p>Ya. Ketika ash tidak menerima argumen baris perintah dan masukan standar disalurkan, masukan tersebut akan diperlakukan sebagai perintah pengguna. Jangan menyalurkan halaman web, log, atau teks yang tidak tepercaya secara langsung ke ash kecuali Anda ingin mengotorisasinya sebagai perintah. Hal ini berbeda dengan keluaran alat, file, skrip, pipeline, dan agen turunan yang dikelola ash: ash memberi label pada hasil tersebut sebagai bukti yang tidak tepercaya dan menginstruksikan model untuk tidak pernah mengikuti instruksi dari bukti tersebut. Setel <code>ASH_STRICT=1</code> untuk menggantikan frasa injeksi cepat yang dikenali dalam bukti yang tidak tepercaya. Aturan eksekusi daftar yang diizinkan dan direct-argv masih berlaku untuk eksekusi alat.</p>
+
+          <h3>Apakah file ash saya bersifat pribadi dari pengguna lain di komputer ini?</h3>
+          <p>Selama instalasi, ash mengeraskan direktori <code>~/.ash</code> menjadi izin hanya pemilik dan file terkelola menjadi izin yang dapat dibaca dan ditulis oleh pemilik. Ini melindungi terhadap akun lokal lain dengan izin Unix normal, namun tidak terhadap akun Anda sendiri, administrator, cadangan, atau perangkat lunak yang Anda pilih untuk dijalankan dengan akses ke direktori beranda Anda.</p>
+        </section>
+
+        <section id="workflow">
+          <h2>Alat dan Alur Kerja</h2>
+          <h3>Apakah ash mendukung pipa dan tradisi Unix lainnya?</h3>
+          <p>Ya. Anda dapat menyalurkan teks ke ash sebagai perintah, misalnya <code>git diff | ash</code>. Untuk pipeline alat yang diminta AI, ash mendukung dua hingga enam belas executable yang diizinkan dan terhubung langsung tanpa shell, seperti <code>ls | grep pattern | pbcopy</code>. Pola kontrol shell dalam argumen alat diblokir, dan setiap eksekusi dalam pipeline yang dikelola ash harus diizinkan.</p>
+
+          <h3>Akankah ash menafsirkan ulang perintah di dalam skrip shell, perintah SSH, atau tugas cron saya?</h3>
+          <p>Tidak. Pembungkus integrasi Bash dan zsh segera kembali dalam shell non-interaktif, sehingga skrip, tugas CI, satu baris SSH, dan perintah cron mempertahankan perilaku normal command-not-found. Gunakan pemanggilan eksplisit seperti <code>ash "summarize this log"</code> atau <code>some-command | ash</code> ketika automasi memanggil ash.</p>
+
+          <h3>Bagaimana cara menghentikan ash menafsirkan perintah saya selama beberapa menit?</h3>
+          <p>Jalankan <code>ash snooze</code> selama lima menit default, atau tentukan durasi seperti <code>ash snooze 30s</code> atau <code>ash snooze 1h</code>. Jalankan <code>ash snooze off</code> untuk segera melanjutkan. Tunda menjeda perutean perintah-tidak-ditemukan dan pembungkus otomatis; perintah eksplisit <code>ash ...</code> masih berfungsi.</p>
+
+          <h3>Bagaimana cara men-debug ash dan melihat informasi selengkapnya tentang apa yang dilakukannya?</h3>
+          <p>Setel <code>ASH_VERBOSE=1</code> sebelum menjalankan ash untuk mengaktifkan keluaran debug terstruktur dan dasbor eksekusi terminal. Setel <code>ASH_LOG_FILE</code> untuk menulis debug JSON ke file; <code>ASH_LOG_MAX_BYTES</code> mengontrol rotasi dan default ke 1 MiB saat file log dikonfigurasi.</p>
+
+          <h3>Batasan apa yang berlaku saat ash menjalankan alat?</h3>
+          <p>Secara default, setiap panggilan alat memiliki batas waktu 15 detik dan menangkap output hingga 8192 byte. Permintaan AI dapat menghasilkan hingga 16 iterasi perulangan alat, dan pipeline yang dikelola ash memiliki dua hingga enam belas tahap. Sesuaikan batas waktu habis alat dan batas keluaran dengan <code>ASH_TOOL_TIMEOUT</code> dan <code>ASH_TOOL_OUTPUT_MAX</code>; menjaga keluaran tetap fokus dengan perintah seperti <code>head</code>, <code>tail</code>, atau <code>grep</code>.</p>
+
+          <h3>Di mana perintah sistem default?</h3>
+          <p>File prompt kanonik adalah <code>~/.ash/.ash_system</code>, diinstal dari paket default saat Anda menjalankan <code>ash install</code>. ash membaca file itu terlebih dahulu. Jika tidak ada, ash kembali ke <code>.ash_system</code> di direktori kerja saat ini dan kemudian <code>~/.ash_system</code>. Nilai <code>$VARIABLE</code> biasa diperluas dari lingkungan, tetapi <code>$TOOLS_DIR_LIST</code>, <code>$PLUGINS_DIR_LIST</code>, dan <code>$IF_PYTHON_AVAILABLE</code> dicadangkan sebagai pengganti Ash internal dan tidak pernah berasal dari lingkungan.</p>
+
+          <h3>Di mana saya dapat meletakkan skrip dan plugin asli saya sendiri ash untuk dipanggil sebagai alat?</h3>
+          <p>Masukkan skrip Python di <code>~/.ash/tools/</code> dan kompilasi plugin biner asli di <code>~/.ash/plugins/</code>. Pastikan mereka dapat dieksekusi, dan tambahkan nama kosong yang dapat dieksekusi ke <code>~/.ash/.ash_allow</code> (atau andalkan <code>$TOOLS_DIR_LIST</code> / <code>$PLUGINS_DIR_LIST</code>). ash tidak memanggil shell untuk perintah dan plugin Unix yang diizinkan.</p>
+
+          <h3>Apa praktik terbaik untuk alat atau plugin sehingga AI memahami tujuan dan penggunaannya?</h3>
+          <p>Ikuti pola alat/plugin standar: tampilkan opsi yang dapat diprediksi dengan argumen CLI; dan menerapkan opsi <code>--ai-docs</code> yang menjelaskan kemampuan, setiap argumen dan default, skema keluaran, status kegagalan, dan kapan AI harus menggunakan alat tersebut. Memancarkan JSON terstruktur ringkas dengan bidang <code>status</code> dan detail kesalahan yang dapat ditindaklanjuti, bukan prosa yang dicampur dengan data. Pertahankan batas keluaran, validasi masukan, tetapkan batas waktu jaringan, tangani kegagalan yang diperkirakan, dan jadikan alat aman untuk dipanggil berulang kali. Tambahkan nama file aslinya ke <code>~/.ash/.ash_allow</code>; ash dapat menjalankannya hanya jika diizinkan dan tidak tercantum dalam <code>~/.ash/.ash_deny</code>.</p>
+
+          <h3>Apa saja skrip alat dan plugin asli yang disediakan?</h3>
+          <p>Skrip bootstrap Python yang diinstal adalah <code>headlines.py</code>, <code>wikipedia.py</code>, dan <code>yfinance.py</code> di <code>~/.ash/tools/</code>. Plugin asli yang disediakan adalah <code>what_time_is_it</code> (Go), <code>flip_a_coin</code> (Rust), dan <code>calculator</code> (TypeScript) di <code>~/.ash/plugins/</code>.</p>
+
+          <h3>Dapatkah ash menghubungi sub-agen?</h3>
+          <p>Ya. Agen orang tua dapat menggunakan <code>run_sub_agent</code> untuk satu tugas yang terfokus dan independen. Seorang anak mewarisi direktori kerja, konfigurasi, alat, dan izin OS, mengembalikan hasil yang dibatasi, dan tidak dapat membuat anak lain. Maksimum default adalah enam sub-agen per proses induk dan dapat diubah dengan <code>ASH_MAX_AGENTS</code>.</p>
+
+          <h3>Dapatkah ash menghasilkan file memori untuk melacak tugas-tugas kompleks dan apa yang telah dipelajari dalam sesi ini?</h3>
+          <p>Ya. Itu dapat menulis file ruang kerja persisten di bawah <code>~/.ash</code>, yang dilacak di <code>~/.ash/inventory.md</code>, dan file awal cakupan sesi di bawah <code>~/.ash/scratch/&lt;session-id&gt;/</code>. Gunakan file ruang kerja persisten untuk informasi yang ingin Anda simpan; menggunakan file awal untuk rencana sementara, catatan, dan artefak pembantu.</p>
+
+          <h3>Dapatkah ash menjadwalkan pekerjaan untuk nanti?</h3>
+          <p>Ya, melalui alat AI-nya. Di macOS, penjadwalan satu kali menggunakan <code>launchd</code> LaunchAgent per pengguna dan memerlukan <code>launchctl</code>. Di Linux, jadwal berulang didukung melalui pengguna Anda <code>crontab</code>; ash hanya mengelola entri yang ditandainya sendiri. Penjadwal <code>launchd</code> satu kali tidak tersedia di Linux, jadi gunakan entri cron atau penjadwal Linux lainnya untuk pekerjaan Linux satu kali. Proses terjadwal menerima lingkungan terbatas dan menggunakan HTTPS langsung, bukan broker shell interaktif, jadi pastikan konfigurasi AI yang diperlukan tersedia untuk pekerjaan terjadwal. Mereka tidak dapat menggunakan alat MCP jarak jauh; Ash berjalan tanpa mereka dan tidak memperingatkan dalam sesi non-interaktif. Jangan jadwalkan perintah yang memerlukan MCP.</p>
+        </section>
+
+        <section id="storage">
+          <h2>Sesi dan Penyimpanan</h2>
+          <h3>Di mana riwayat atau file log untuk ash?</h3>
+          <p>Riwayat percakapan disimpan sebagai JSON di <code>~/.ash/history/&lt;SESSION_ID&gt;.json</code>; proses terjadwal gunakan <code>task_&lt;SESSION_ID&gt;.json</code>. Jika pencatatan debug terjadwal diaktifkan, lokasi log defaultnya adalah <code>~/.ash/logs/task_&lt;SESSION_ID&gt;.log</code>. Anda dapat memilih jalur log debug lainnya dengan <code>ASH_LOG_FILE</code>.</p>
+
+          <h3>Berapa lama file riwayat disimpan?</h3>
+          <p>ash menghapus file JSON riwayat yang lebih lama dari 14 hari selama pembersihan aplikasi normal, dengan anggaran pembersihan 300 ms sehingga keluar tidak tertunda. Jendela pesan terbaru terpisah: jendela ini menyimpan hingga 40 pesan per percakapan secara default dan dapat diubah dengan <code>ASH_HISTORY_MAX</code>.</p>
+
+          <h3>Bagaimana cara menghapus percakapan atau memulai percakapan baru?</h3>
+          <p>Riwayat dipisahkan oleh ID sesi dan titik akhir/kunci model AI. Mulai sesi terminal baru untuk ID sesi baru, atau hapus file JSON yang relevan di bawah <code>~/.ash/history/</code> ketika Anda dengan sengaja ingin membuang riwayat percakapan lokal tersebut. Menghapus file riwayat tidak mencabut kunci penyedia atau menghapus data sisi penyedia; kelola secara terpisah dengan penyedia.</p>
+
+          <h3>Apa itu <code>SESSION_ID</code> dan di mana pembuatannya?</h3>
+          <p>Ini adalah pengidentifikasi per sesi yang digunakan untuk memisahkan riwayat, ruang awal, soket broker, dan nama log terjadwal. Lingkungan shell yang dikelola menghasilkan nilai alfanumerik 16 karakter acak dari <code>/dev/urandom</code> saat shell dimulai; ash juga membuatnya ketika pemanggilan interaktif tidak memiliki nilai.</p>
+
+          <h3>Dapatkah saya mengganti implementasi generator <code>SESSION_ID</code>?</h3>
+          <p>Anda dapat menyediakan <code>SESSION_ID</code> Anda sendiri sebelum memulai ash atau menyesuaikan file lingkungan terkelola lokal Anda, tetapi ash memvalidasinya. ID yang valid terdiri dari maksimal 128 karakter dan menggunakan huruf, angka, garis bawah, tanda hubung, dengan satu akhiran titik sesi anak opsional. Jangan gunakan nilai yang tidak dipercaya atau dibagikan: tabrakan menggabungkan riwayat sesi dan status waktu proses.</p>
+        </section>
+
+        <section id="support">
+          <h2>Dukungan dan Komunitas</h2>
+          <h3>Bagaimana cara melaporkan bug?</h3>
+          <p>Buka masalah di <a href="https://github.com/Jonconradt/ash/issues">github.com/Jonconradt/ash/issues</a> dengan versi atau komit ash, sistem operasi dan shell Anda, konfigurasi yang relevan dengan masalah rahasia dihapus, langkah-langkah yang dapat direproduksi, dan hasil yang diamati. Untuk kerentanan keamanan, jangan membuka isu publik; laporkan secara pribadi melalui email atau penasihat keamanan GitHub.</p>
+
+          <h3>Apakah ada papan diskusi di proyek ash?</h3>
+          <p>Ya. Gunakan <a href="https://github.com/Jonconradt/ash/discussions">Diskusi GitHub</a> untuk pertanyaan dan ide, dan <a href="https://github.com/Jonconradt/ash/issues">Masalah GitHub</a> untuk bug yang dapat direproduksi dan pekerjaan yang dilacak.</p>
+        </section>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer page-width">
+    <a class="brand" href="./"><span class="brand-mark">>_</span> ash</a>
+    <span>AI praktis untuk terminal.</span>
+    <a href="https://github.com/Jonconradt/ash">GitHub <span aria-hidden="true">↗</span></a>
+  </footer>
+  <script src="../site.js" data-site-script defer></script>
+</body>
+</html>

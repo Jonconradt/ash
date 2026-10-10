@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ash FAQ</title>
+  <meta name="description" content="Äntwerten iwwer ash Installatioun, Ubidder, Sécherheet, Tools, Geschicht a Shell Integratioun.">
+  <link rel="canonical" href="https://jonconradt.github.io/ash/lb/faq.html">
+  <link rel="alternate" hreflang="en" href="https://jonconradt.github.io/ash/faq.html">
+  <link rel="alternate" hreflang="ar" href="https://jonconradt.github.io/ash/ar/faq.html">
+  <link rel="alternate" hreflang="de" href="https://jonconradt.github.io/ash/de/faq.html">
+  <link rel="alternate" hreflang="es" href="https://jonconradt.github.io/ash/es/faq.html">
+  <link rel="alternate" hreflang="fr" href="https://jonconradt.github.io/ash/fr/faq.html">
+  <link rel="alternate" hreflang="id" href="https://jonconradt.github.io/ash/id/faq.html">
+  <link rel="alternate" hreflang="it" href="https://jonconradt.github.io/ash/it/faq.html">
+  <link rel="alternate" hreflang="lb" href="https://jonconradt.github.io/ash/lb/faq.html">
+  <link rel="alternate" hreflang="pt-BR" href="https://jonconradt.github.io/ash/pt-BR/faq.html">
+  <link rel="alternate" hreflang="zh-CN" href="https://jonconradt.github.io/ash/zh-CN/faq.html">
+  <link rel="alternate" hreflang="zh-TW" href="https://jonconradt.github.io/ash/zh-TW/faq.html">
+  <link rel="alternate" hreflang="x-default" href="https://jonconradt.github.io/ash/faq.html">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="ash doheem"><span class="brand-mark">&gt;_</span>ash</a>
+    <nav aria-label="Primär Navigatioun">
+      <a href="index.html#how-it-works">Wéi et funktionnéiert</a>
+      <a href="index.html#install">Installéieren</a>
+      <a href="docs.html">Docs</a>
+      <a href="faq.html" aria-current="page">FAQ</a>
+      <a href="https://github.com/Jonconradt/ash">GitHub</a>
+      <label class="sr-only" for="site-language">Sprooch</label>
+      <select id="site-language" class="language-select" aria-label="Wielt Sprooch">
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+        <option value="de">Deutsch</option>
+        <option value="es">Español</option>
+        <option value="fr">Français</option>
+        <option value="id">Bahasa Indonesia</option>
+        <option value="it">Italiano</option>
+        <option value="lb" selected>Lëtzebuergesch</option>
+        <option value="pt-BR">Português (Brasil)</option>
+        <option value="zh-CN">简体中文</option>
+        <option value="zh-TW">繁體中文</option>
+        </select>
+    </nav>
+  </header>
+
+  <main class="page-width docs-page">
+    <header class="docs-header">
+      <p class="eyebrow">Äntwerten</p>
+      <h1>Heefeg gestallte<br><em>Froen.</em></h1>
+      <p>Kloer Äntwerten iwwer Installatioun, Ubidder, MCP-Server, Sécherheetsgrenzen, Tools, an d'Dateien déi ash op Ärer Maschinn geréiert.</p>
+    </header>
+
+    <div class="docs-layout">
+      <nav class="docs-contents" aria-label="FAQ Inhalter">
+        <strong>Themen</strong>
+        <a href="#getting-started">Ugefaangen</a>
+        <a href="#installing">Installatioun an Aktualiséierung</a>
+        <a href="#ai">AI a Verbindungen</a>
+        <a href="#safety">Sécherheet a Kontroll</a>
+        <a href="#workflow">Tools a Workflow</a>
+        <a href="#storage">Sessiounen a Lagerung</a>
+        <a href="#support">Ënnerstëtzung a Gemeinschaft</a>
+      </nav>
+      <article class="docs-content">
+        <section id="getting-started">
+          <h2>Ugefaangen</h2>
+          <h3>Wat brauch ech ier ech ash benotzen kann?</h3>
+          <p>Dir braucht de<code>ash</code>ausführbar, en AI Endpunkt an e Modellnumm. Lafen<code>ash install</code>automatesch konfiguréiert dës: et benotzt e scho gesate Cloud Provider API Schlëssel oder e lafende lokalen Inferenzserver wann se fonnt ginn, soss weist et e nummeréiert Providermenü a freet no engem API Schlëssel, da léisst Dir e Modell aus der Modelllëscht vum Endpunkt wielen. Dir kënnt och setzen<code>AI_ENDPOINT</code>an<code>AI_MODEL</code>manuell. E lokalen Endpunkt wéi Ollama ka benotzen<code>http://localhost:11434</code>, an e LAN Host wéi<code>http://brain.local:11434</code>oder eng privat IP gëtt och als lokal behandelt (ausser<code>ASH_STRICT=1</code>); Cloud Endpunkte mussen HTTPS benotzen an och erfuerderen<code>AI_AUTH_TOKEN</code>. Shell integration is optional: you can always run<code>ash "your question"</code>direkt.</p>
+
+          <h3>Wou installéiert ash, a wéi kontrolléieren ech datt meng Shell et fanne kann?</h3>
+          <p>De verifizéierte Installateur setzt ash an<code>~/.local/bin/ash</code>,an an<code>ash install</code>füügt dee Verzeichnis op Är<code>PATH</code>duerch d'geréiert<code>~/.ash/.ash_env</code>Fichier. Öffnen en neien Terminal, da lafen<code>command -v ash</code>ze bestätegen. De Self-Updater installéiert seng Ersatzbinär op d'selwecht<code>~/.local/bin/ash</code>Standuert.</p>
+
+          <h3>Wéi benotzen ech ash ouni meng Shell z'änneren?</h3>
+          <p>Gitt eng zitéiert Ufro direkt:<code>ash "how do I find large files?"</code>. Ouni Argumenter akzeptéiert ash och eng net-interaktiv Standard-Input-Prompt, wéi z.<code>git diff | ash</code>. Direkt Notzung ass déi mannst iwwerraschend Optioun wann Dir ash léiert oder e Skript schreift.</p>
+
+          <h3>Firwat seet ash meng AI Konfiguratioun ass onkomplett?</h3>
+          <p>Check dat<code>AI_ENDPOINT</code>an<code>AI_MODEL</code>sinn net eidel an der Ëmwelt wou ash leeft. Fir e Cloud Hostnumm, och gesat<code>AI_AUTH_TOKEN</code>. Lafen<code>printf '%s\n' "$AI_ENDPOINT" "$AI_MODEL"</code>fir ze bestätegen datt déi éischt zwee Wäerter präsent sinn, awer dréckt net en Authentifikatiounstoken an eng Terminalopnam oder e gemeinsame Logbuch.</p>
+        </section>
+
+        <section id="installing">
+          <h2>Installatioun an Aktualiséierung</h2>
+          <h3>Wierkt ash op Windows 11?</h3>
+          <p>Net gebierteg. ash ënnerstëtzt bash, zsh, a Fish op macOS, Linux a FreeBSD; et gëtt keen PowerShell Installatiounsziel. Benotzt WSL fir déi ënnerstëtzt Linux Erfahrung.</p>
+
+          <h3>Wéi installéieren ech ash am Windows Subsystem fir Linux (WSL)?</h3>
+          <p>Installéiert et an Ärer WSL Verdeelung als Linux:<code>curl -fsSL https://jonconradt.github.io/ash/install.sh | sh</code>. Dann konfiguréieren<code>AI_ENDPOINT</code>an<code>AI_MODEL</code>, a lafen<code>ash install</code>fir de Réibau Lafen bannent WSL.</p>
+
+          <h3>Wéi aktualiséieren ech ash op déi lescht Verëffentlechungsversioun?</h3>
+          <p>Lafen<code>ash update</code>op macOS, Linux oder FreeBSD. Et luet dat lescht stabilt passende Archiv erof, verifizéiert de Verëffentlechungsmanifest mat sengem Sigstore Bündel a SHA-256 Verdauung, installéiert dann op<code>~/.local/bin/ash</code>. Wann d'Ënnerschrëft Verifizéierung feelt oder d'Archiv net ënnerstëtzt Entréen enthält, ass eng interaktiv Bestätegung erfuerderlech; net eng gescheitert Ënnerschrëft stëmmen ausser Dir onofhängeg der Verëffentlechung Quell vertraut. Net-ënnerstëtzt Notzlaascht ginn iwwersprangen, an net-interaktiv Lafen refuséieren dës Ausnahmen. Benotzt<code>ash update --version vX.Y.Z</code>fir eng spezifesch Versioun; benotzen<code>--yes</code>nëmmen wann Dir personaliséiert verwaltete Dateien ersat wëllt.</p>
+
+          <h3>Ech sinn gelaf<code>ash install</code>. Firwat ännert sech näischt an dësem Terminal?</h3>
+          <p>Installatioun aktualiséiert eng Startupdatei; et iwwerschreift net de Shellprozess dee scho leeft. Öffnen en neien Terminal, oder lued d'Datei fir Är Shell nei:<code>source ~/.bashrc</code>fir Bash,<code>source ~/.zshrc</code>fir zsh,o<code>source ~/.config/fish/config.fish</code>fir Fësch ausser Dir e Benotzerdefinéiert benotzt<code>XDG_CONFIG_HOME</code>.</p>
+
+          <h3>Onbekannt Kommandoen soen ëmmer nach "net fonnt." Wéi léisen ech Shell Integratioun?</h3>
+          <p>Éischt lafen<code>command -v ash</code>; de Wrapper kann net eng Binär opruffen, déi Är Shell net fënnt. Da lued oder nei d'Shell nei a kontrolléiert datt seng Startupdatei enthält<code>&gt;&gt;&gt; ash install &gt;&gt;&gt;</code>geréiert Block. Endlech lafen<code>ash snooze off</code>, well e Snooze bewosst onbekannt Kommandoen als normal "net fonnt" Feeler léisst.</p>
+
+          <h3>Wat Dateien mécht<code>ash install</code>änneren, a kann ech et Virschau?</h3>
+          <p>Et füügt oder aktualiséiert ee markéierte ash Block an der gewielter Shell Startupdatei a geréiert Dateien ënner<code>~/.ash</code>, dorënner Konfiguratioun, Wrapper, a gebündelt Tools. Lafen<code>ash install --shell bash --dry-run</code>fir d'Ännerung vun der Startupdatei ze kucken ouni et ze schreiwen. Installatioun nei lafen ass idempotent; benotzen<code>--overwrite</code>nëmmen wann Dir verwaltete Bootstrap Dateien erfrëscht wëllt.</p>
+
+          <h3>Ënnerstëtzt ash Fësch?</h3>
+          <p>Jo. Lafen<code>ash install --shell fish</code>. ash füügt e verwaltete Block un<code>$XDG_CONFIG_HOME/fish/config.fish</code>, oder<code>~/.config/fish/config.fish</code>wann XDG_CONFIG_HOME unset ass. Fësch benotzt<code>fish_command_not_found</code>, sou datt en ongeléiste Kommando erreecht ash mat hiren originelle Argumenter.</p>
+
+          <h3>Firwat net kleng Buschtawen<code>test</code>an<code>type</code>am Fësch?</h3>
+          <p>Fësch reservéiert déi kleng Buschtawen Nimm als wesentlech Buildins an erlaabt net eng Funktioun fir se ze ersetzen. Benotzt<code>Test ...</code>oder<code>Type ...</code>fir ash Absicht auszedrécken, oder opruffen<code>ash "..."</code>direkt. Aner kompatibel Kollisiounsverpackungen bleiwen verfügbar.</p>
+
+          <h3>Wat iwwer ksh93?</h3>
+          <p>ksh93 gëtt net fir Shell Integratioun ënnerstëtzt. Seng<code>FPATH</code>Verhalen kann nëmmen eng Datei no engem onbekannte Kommando lueden; et huet keng generesch Kommando-net-fonnt Callback déi sécher ëmsetzen kann ash prompt Routing oder Broker Liewenszyklus.</p>
+        </section>
+
+        <section id="ai">
+          <h2>AI a Verbindungen</h2>
+          <h3>Enthält ash den AI?</h3>
+          <p>Nee ash ass e Client fir en AI Endpunkt deen Dir konfiguréiert. Setzt<code>AI_ENDPOINT</code>an<code>AI_MODEL</code>; ash ënnerstëtzt lokal Ollama an aner lokal OpenAI-kompatibel Serveren (LM Studio, llama.cpp, MLX, LocalAI, vLLM, Text-generation-webui, Jan, GPT4All), an entdeckt ënnerstëtzt Cloud-Provider Adapter vum Endpunkt, mat engem fakultativen<code>AI_PROVIDER</code>iwwerschreiden.</p>
+
+          <h3>Wat sinn MCP Serveren, a wéi addéieren ech een?</h3>
+          <p>MCP (Model Context Protocol) Serveren weisen Tools aus, déi en AI Modell kann nennen, sou wéi Sich, Analyse oder Servicespezifesch Aktiounen. Fir e Fern Streamable HTTP MCP Server derbäi ze setzen, setzt seng URL op seng eege Linn an<code>~/.ash/.ash_allow</code>, da lafen ash erëm. Zum Beispill:<code>https://mcpplaygroundonline.com/mcp-complex-server</code>. Ash verbënnt duerch säi Broker a bitt de Server Tools un de Modell. Benotzt nëmmen Serveren déi Dir vertraut: hir Tools kënnen Handlungen aus Ärem Numm maachen. HTTPS ass erfuerderlech ausser fir localhost Entwécklungsserver. Bestehend<code>~/.ash/mcp.json</code>Dateien ginn net méi gelies; réckelen hir URLen an<code>.ash_allow</code>. Wann d'MCP Initialiséierung feelt, geet ash weider ouni Remote MCP Tools: et warnt an interaktiven Sessiounen a bleift roueg an net-interaktiven Sessiounen.</p>
+
+          <h3>Kann geplangten Aarbechtsplaze MCP Server benotzen?</h3>
+          <p>Nee Geplangte an aner net-interaktiv Aarbechtsplazen ierwen keen interaktiven Shell Broker, sou datt Remote MCP Tools net verfügbar sinn. Ash leeft nach ëmmer d'Prompt ouni MCP Tools an ënnerdréckt dësen erwaarten Initialiséierungsfehler. Eng Ufro, déi op MCP hänkt, kann also fäerdeg sinn ouni déi ugefrote Donnéeën oder Handlungen. Zäitplang keng Ufroen déi MCP erfuerderen.</p>
+
+          <h3>Wierker MCP wann<code>ASH_STRICT=1</code>?</h3>
+          <p>Jo. Eng HTTP(S) URL Linn registréiert explizit en MCP Server a gëtt net als Shell ausführbar behandelt. Strikt Modus deaktivéiert net konfiguréiert MCP Server. Et gëlt nach ëmmer Ash's net zouverléissege Ausgangsschutz op zréckginn Toolinhalt.</p>
+
+          <h3>Wéi funktionnéiert MCP OAuth, a wou ginn Umeldungsinformatiounen gespäichert?</h3>
+          <p>Fir en OAuth-geschützte Server mécht Ash d'Autorisatiounssäit am Desktop-Browser op wann e GUI verfügbar ass; wann et e Browser net kann opmaachen, dréckt et eng URL fir manuell an engem Browser op deemselwechte Host ze autoriséieren. Benotzt<code>ash mcp add &lt;url&gt; --no-browser</code>fir ëmmer den Terminalflow ze benotzen. Fir direkt OAuth Verbindungen erlaabt Entdeckung Net-ëffentlech IP Adressen nëmme fir déi exakt registréiert MCP Autoritéit; aner OAuth-Host bleiwen ënner net-ëffentlech-Adress-Blockéierung. E konfiguréierten Egress Proxy ass verantwortlech fir seng Destinatiounsadressen ze filteren. De Broker handhabt den Callback, Tokenaustausch, Erfrëschung a persistent MCP Sessioun. Umeldungsinformatiounen ginn am Betribssystem Umeldungsmanager gespäichert wann verfügbar. Wann et net verfügbar ass, konfiguréiert de verschlësselte Dateifallback mat engem zoufälleg 32-Byte<code>ASH_MCP_CREDENTIAL_KEY</code>; Ash späichert ni de Schlëssel selwer.</p>
+
+          <h3>Wou kann ech den AUTH_KEY fir déi populärste Cloud AI Ubidder fannen?</h3>
+          <p>ash rifft dëse Wäert<code>AI_AUTH_TOKEN</code>; et erstellt oder verdeelt net Provider Schlësselen. Schafen e Schlëssel an Ärem Provider Kont, wéi<a href="https://platform.openai.com/api-keys">OpenAI</a>,<a href="https://console.anthropic.com/settings/keys">Anthropesch</a>,<a href="https://aistudio.google.com/app/apikey">Google AI Studio</a>,<a href="https://portal.azure.com/">Azure OpenAI</a>,<a href="https://console.mistral.ai/api-keys/">Mistral</a>,<a href="https://dashboard.cohere.com/api-keys">Zesummenhang</a>,<a href="https://console.groq.com/keys">Groq</a>,<a href="https://console.x.ai/">xAI</a>,<a href="https://platform.deepseek.com/api_keys">DeepSeek</a>,<a href="https://api.together.ai/settings/api-keys">Zesummen AI</a>,<a href="https://openrouter.ai/settings/keys">Open Router</a>,<a href="https://huggingface.co/settings/tokens">HuggingFace</a>, oder<a href="https://ollama.com/settings/keys">Ollama</a>, exportéiert se dann als Ëmfeldvariabel vum Provider (oder<code>AI_AUTH_TOKEN</code>direkt).<code>ash install</code>automatesch erkennt déi meescht vun dëse Provider-spezifesche Ëmweltvariablen. Cloud Endpunkte mussen HTTPS benotzen an en Token erfuerderen; privat / LAN Adressen an<code>.local</code>Hostnumm ginn net als Cloud Endpunkte behandelt ausser<code>ASH_STRICT=1</code>gesat ass.</p>
+
+          <h3>Maacht ash all Kéier eng nei Verbindung op?</h3>
+          <p>Net fir normal interaktiv Unix Shell Benotzung. Bash, zsh, a Fish starten ee Broker pro Shell Sessioun, kommunizéieren mat him duerch e privaten Unix Socket, a weiderbenotzen säi begrenzten HTTP Verbindungspool. De Broker geet no Inaktivitéit eraus; geplangte Aarbechtsplaze benotzen direkt Ufroen anstatt e persistent Shellbroker.</p>
+
+          <h3>Benotzt Fësch de Broker?</h3>
+          <p>Jo. De Fish Wrapper fänkt un a benotzt de selwechte Per-Session Broker wéi Bash an zsh, erfrëscht säi Leasing direkt virun enger ash Ufro, an hält de Broker Setup roueg.</p>
+
+          <h3>Wat geschitt wann eng Ufro lues, net verfügbar ass oder ech meng Gedanken änneren?</h3>
+          <p>Press<code>Ctrl-C</code>fir eng Ufro am Fluch ze annuléieren. De Standard AI Ufro Timeout ass dräi Minutten; setzen<code>AI_TIMEOUT</code>, zum Beispill<code>AI_TIMEOUT=90s</code>, fir et z'änneren. ash reprobéiert widderhuelend AI Feeler bis zu dräimol par défaut mat engem kuerze begrenzten Réckzuch; tune dat Verhalen mat<code>ASH_RETRY_MAX_ATTEMPTS</code>,<code>ASH_RETRY_BASE_DELAY</code>,an an<code>ASH_RETRY_MAX_DELAY</code>.</p>
+        </section>
+
+        <section id="safety">
+          <h2>Sécherheet a Kontroll</h2>
+          <h3>Wéi spären ech ash fir méi sécher ze sinn, a wat sinn d'Implikatiounen?</h3>
+          <p>Halt déi ausführbar Erlaabneslëscht schmuel, favoriséiert nëmme liest Tools, a füügt keng privilegiéiert oder zerstéierend Kommandoen derbäi. Setzt<code>ASH_STRICT=1</code>fir unerkannt Prompt-Injektiounsmuster vun onvertrauenswürdege Tool, Datei, Skript, Pipeline a Kand-Agent Output ze blockéieren. Dëst kann och legitimen Text verstoppen, deen op eng Injektiounsversuch gläicht. D'Erlaabneslëscht ass eng Ausféierungsgrenz, net eng Sandkëscht: ash an erlaabt Tools lafen nach ëmmer wéi Dir.</p>
+
+          <h3>Kann ash zerstéierende Kommandoen lafen wéi<code>rm</code>?</h3>
+          <p>Net mat der installéierter Standard Erlaabneslëscht. Et beréit explizit géint<code>rm</code>,<code>mv</code>,<code>dd</code>,<code>chmod</code>,<code>chown</code>,<code>kill</code>,an an<code>sudo</code>. Wann Dir ee vun hinnen bäidréit, kann ash et mat Äre Permissiounen ufroen; iwwerpréift dës Entscheedung suergfälteg.</p>
+
+          <h3>Wéi änneren ech d'Befehle ash ass erlaabt auszeféieren?</h3>
+          <p>Edit<code>~/.ash/.ash_allow</code>a lëschten ausführbaren Nimm, eng pro Zeil oder Komma-getrennt. Seng eegestänneg<code>$TOOLS_DIR_LIST</code>an<code>$PLUGINS_DIR_LIST</code>Direktiven erlaben berechtegt verwaltete Scripten an gebierteg Plugins; ersetzen se mat wuertwiertlech Nimm fir eng restriktiv Politik. Usproch Scripten a Plugins si regelméisseg Dateien an<code>~/.ash/tools/</code>oder<code>~/.ash/plugins/</code>mat liesen an ausféieren Bits. Dir kënnt och explizit Kommandoen ofleenen andeems Dir se derbäigesat<code>~/.ash/.ash_deny</code>. Alternativ setzen<code>ASH_ALLOW</code>oder<code>ASH_DENY</code>op eng komma-getrennt Lëscht. Ännerungen ginn op déi nächst ash Ufro gelies.</p>
+
+          <h3>Ënner wéi engem Benotzer leeft ash?</h3>
+          <p>ash an all erlaabt Tool lafen als de Benotzer deen ash ufänkt. Et erhéicht keng Privilegien. Déi geréiert<code>~/.ash</code>Aarbechtsberäich ass Erlaabnis-gehärt, awer säin Inhalt bleift zougänglech fir Äre Benotzer an all Prozess deen Dir explizit erlaabt.</p>
+
+          <h3>Vertrauen ash Text, deen iwwer Päif kritt gëtt, d'selwecht wéi de Benotzertext? Wéi eng Protectiounen existéiere fir béiswëlleg Donnéeën?</h3>
+          <p>Jo. Wann ash keng Kommandozeilargumenter kritt an de Standardinput gëtt gepäift, behandelt et dësen Input als de Benotzerprompt. Gitt net ontrauen Websäiten, Logbicher oder generéierten Text direkt op ash, ausser Dir wëllt et als Ufro autoriséieren. Dëst ënnerscheet sech vum ash-verwalte Tool, Datei, Skript, Pipeline, a Kand-Agent Output: ash markéiert dës Resultater als net zouverléissege Beweiser an instruéiert de Modell ni Instruktioune vun hinnen ze verfollegen. Setzt<code>ASH_STRICT=1</code>fir zousätzlech unerkannt Prompt-Injektiounssätz an ontrauen Beweiser ze ersetzen. D'Erlaabneslëscht an d'direkt-argv Ausféierungsregele gëllen nach ëmmer fir d'Ausféierung vum Tool.</p>
+
+          <h3>Sinn meng ash Dateien privat vun anere Benotzer op dësem Computer?</h3>
+          <p>Während Installatioun, ash härden der<code>~/.ash</code>Verzeechnes fir Besëtzer-nëmmen Permissiounen a geréiert Dateien op Besëtzer liesbar a Besëtzer schreiwen Permissiounen. Dëst schützt géint aner lokal Konten ënner normalen Unix Permissiounen, awer net géint Ären eegene Kont, Administrateuren, Backups oder Software déi Dir gewielt hutt mat Zougang zu Ärem Heemverzeichnis ze lafen.</p>
+        </section>
+
+        <section id="workflow">
+          <h2>Tools a Workflow</h2>
+          <h3>Ënnerstëtzt ash Päifen an aner Unix Traditiounen?</h3>
+          <p>Jo. Dir kënnt zum Beispill Text an ash als Prompt päifen<code>git diff | ash</code>. Fir AI-gefrote Toolpipelines, ënnerstëtzt ash zwee bis siechzéng erlaabt ausführbar ausführbaren direkt verbonne ouni Shell, wéi z.<code>ls | grep pattern | pbcopy</code>. Shell-Kontrollmuster an Tool Argumenter sinn blockéiert, an all ausführbar an enger ash geréiert Pipeline muss erlaabt sinn.</p>
+
+          <h3>Wäert ash Kommandoen a mengem Shell Scripten, SSH Kommandoen oder Cron Jobs nei interpretéieren?</h3>
+          <p>Nee D'Bash an zsh Integratioun Wrappers zréck direkt an net-interaktiven Shells, sou Scripten, CI Aarbechtsplazen, SSH One-Liner, a Cron Kommandoen halen normal Kommando-net-fonnt Verhalen. Benotzt eng explizit Uruff wéi<code>ash "summarize this log"</code>oder<code>some-command | ash</code>wann Automatisatioun soll ash ruffen.</p>
+
+          <h3>Wéi stoppen ech ash meng Kommandoen fir e puer Minutten ze interpretéieren?</h3>
+          <p>Lafen<code>ash snooze</code>fir d'Standard fënnef Minutten, oder spezifizéiert eng Dauer wéi<code>ash snooze 30s</code>oder<code>ash snooze 1h</code>. Lafen<code>ash snooze off</code>fir direkt erëmzefannen. Snooze pauses automatesch Kommando-net-fonnt a wrapper Routing; explizit<code>ash ...</code>Kommandoen funktionnéieren nach ëmmer.</p>
+
+          <h3>Wéi kann ech debuggen ash a gesinn méi Informatiounen iwwert wat et mécht?</h3>
+          <p>Setzt<code>ASH_VERBOSE=1</code>ier Dir ash leeft fir strukturéiert Debug-Output an e Terminal Ausféierung Dashboard z'aktivéieren. Setzt<code>ASH_LOG_FILE</code>fir Debug JSON op eng Datei ze schreiwen;<code>ASH_LOG_MAX_BYTES</code>Kontrollen Rotatioun an Default op 1 MiB wann e Log Fichier konfiguréiert ass.</p>
+
+          <h3>Wéi eng Limite gëllen wann ash Tools leeft?</h3>
+          <p>Par défaut huet all Toolruff e 15 Sekonnen Timeout an erfaasst bis zu 8192 Bytes vum Output. Eng AI Ufro ka bis zu 16 Tool-Loop Iteratiounen maachen, an eng ash geréiert Pipeline huet zwee bis siechzéng Etappen. Ajustéieren der Outil Timeout an Output Limite mat<code>ASH_TOOL_TIMEOUT</code>an<code>ASH_TOOL_OUTPUT_MAX</code>; halen Ausgang fokusséiert mat Kommandoen wéi<code>head</code>,<code>tail</code>, oder<code>grep</code>.</p>
+
+          <h3>Wou ass de Standardsystemprompt?</h3>
+          <p>Déi kanonesch Promptdatei ass<code>~/.ash/.ash_system</code>, aus dem gebündelten Standard installéiert wann Dir leeft<code>ash install</code>. ash liest dës Datei als éischt. Wann et fehlt, fällt ash zréck op<code>.ash_system</code>am aktuellen Aarbechtsverzeichnis an dann<code>~/.ash_system</code>. Gewéinlech<code>$VARIABLE</code>Wäerter sinn aus der Ëmwelt erweidert, mä<code>$TOOLS_DIR_LIST</code>,<code>$PLUGINS_DIR_LIST</code>,an an<code>$IF_PYTHON_AVAILABLE</code>sinn reservéiert intern Ash Auswiesselungen an ni Ëmwelt-ofgeleet.</p>
+
+          <h3>Wou setzen ech meng eegen Scripten an native Plugins fir ash als Tools ze ruffen?</h3>
+          <p>Setzt Python Scripten an<code>~/.ash/tools/</code>a kompiléiert gebierteg binär Plugins an<code>~/.ash/plugins/</code>. Vergewëssert Iech datt se ausführbar sinn, a füügt de blot ausführbaren Numm un<code>~/.ash/.ash_allow</code>(oder vertrauen op<code>$TOOLS_DIR_LIST</code>/<code>$PLUGINS_DIR_LIST</code>). ash rifft keng Shell op fir erlaabt Unix Kommandoen a Plugins.</p>
+
+          <h3>Wat sinn bescht Praktiken fir en Tool oder Plugin sou datt d'AI säin Zweck a seng Notzung versteet?</h3>
+          <p>Follegt d'Standard Tool / Plugin Muster: exponéiert prévisibel Optiounen mat CLI Argumenter; an ëmsetzen an<code>--ai-docs</code>Optioun, déi d'Fäegkeeten erkläert, all Argument an Default, Ausgangsschema, Ausfallzoustand, a wéini d'AI den Tool sollt benotzen. Emittéiert kompakt strukturéiert JSON mat engem<code>status</code>Feld an actionable Feeler Detailer amplaz Prosa mat Daten gemëscht. Halt d'Output begrenzt, validéiert Inputen, setzt Netzwierk Timeouts, handhabt erwaart Feeler, a maacht d'Tool sécher fir ëmmer erëm ze ruffen. Füügt säin bloe Dateinumm un<code>~/.ash/.ash_allow</code>; ash kann et nëmmen ausféieren wann et erlaabt ass an net opgelëscht ass<code>~/.ash/.ash_deny</code>.</p>
+
+          <h3>Wat sinn déi geliwwert Tool Scripten an native Plugins?</h3>
+          <p>Déi installéiert Bootstrap Python Scripte sinn<code>headlines.py</code>,<code>wikipedia.py</code>,an an<code>yfinance.py</code>an<code>~/.ash/tools/</code>. Déi geliwwert gebierteg Plugins sinn<code>what_time_is_it</code>(Gitt),<code>flip_a_coin</code>(Rust), an<code>calculator</code>(TypeScript) an<code>~/.ash/plugins/</code>.</p>
+
+          <h3>Kann ash Ënneragenten uruffen?</h3>
+          <p>Jo. En Elterendeel Agent kann benotzen<code>run_sub_agent</code>fir eng konzentréiert, onofhängeg Aufgab. E Kand ierft den Aarbechtsverzeechnes, d'Konfiguratioun, d'Tools an d'OS Permissiounen, gëtt e begrenzt Resultat zréck a kann net en anert Kand erstellen. De Standard Maximum ass sechs Ënner-Agenten pro Elterendeel lafen a ka geännert ginn mat<code>ASH_MAX_AGENTS</code>.</p>
+
+          <h3>Kann ash Erënnerungsdateien generéieren fir komplex Aufgaben ze verfolgen a wat et an der Sessioun geléiert huet?</h3>
+          <p>Jo. Et kann persistent Aarbechtsberäich Dateien ënner schreiwen<code>~/.ash</code>, déi verfollegt ginn<code>~/.ash/inventory.md</code>, a Sessiouns-scoped Scratch Dateien ënner<code>~/.ash/scratch/&lt;session-id&gt;/</code>. Benotzen persistent Aarbechtsberäich Fichieren fir Informatiounen Dir wëlles ze halen; benotzt Scratchdateien fir temporär Pläng, Notizen an Helper Artefakte.</p>
+
+          <h3>Kann ash Zäitplang Aarbecht fir spéider?</h3>
+          <p>Jo, duerch seng AI Tools. Op macOS benotzt een eemolege Fuerplang e pro Benotzer<code>launchd</code>LaunchAgent a verlaangt<code>launchctl</code>. Op Linux ginn widderhuelend Zäitplang duerch Äre Benotzer ënnerstëtzt<code>crontab</code>; ash geréiert nëmmen seng eege markéiert Entréen. Déi eemoleg<code>launchd</code>Scheduler ass net op Linux verfügbar, also benotzt e Cron-Entrée oder en anere Linux Scheduler fir eng eemoleg Linux Aarbecht. Geplangte Runen kréien e limitéierten Ëmfeld a benotzen direkt HTTPS anstatt en interaktiven Shell Broker, also suergt dofir datt déi erfuerderlech AI Konfiguratioun fir déi geplangten Aarbecht verfügbar ass. Si kënnen net Remote MCP Tools benotzen; Ash leeft ouni si a warnt net an net-interaktiven Sessiounen. Zäitplang keng Ufroen déi MCP erfuerderen.</p>
+        </section>
+
+        <section id="storage">
+          <h2>Sessiounen a Späicheren</h2>
+          <h3>Wou sinn d'Geschicht oder Logdateien fir ash?</h3>
+          <p>Gespréichsgeschicht gëtt als JSON an<code>~/.ash/history/&lt;SESSION_ID&gt;.json</code>; geplangte leeft benotzen<code>task_&lt;SESSION_ID&gt;.json</code>. Wann de geplangte Debug Logbuch aktivéiert ass, ass seng StandardLogplaz<code>~/.ash/logs/task_&lt;SESSION_ID&gt;.log</code>. Dir kënnt en aneren Debug-Log Wee wielen mat<code>ASH_LOG_FILE</code>.</p>
+
+          <h3>Wéi laang ginn d'Geschichtsdateien gespäichert?</h3>
+          <p>ash läscht Geschicht JSON Dateien méi al wéi 14 Deeg wärend der normaler Applikatiounsreinigung, mat engem 300 ms Botzbudget sou datt d'Ausfahrt net verspéit ass. Déi rezent Message Fënster ass separat: et hält bis zu 40 Messagen pro Gespréich als Standard a kann geännert ginn mat<code>ASH_HISTORY_MAX</code>.</p>
+
+          <h3>Wéi läschen ech e Gespréich oder ufänken frësch?</h3>
+          <p>Geschicht gëtt duerch Sessioun ID an AI Endpunkt / Modell Schlëssel getrennt. Start eng nei Terminal Sessioun fir eng nei Sessioun ID, oder läscht déi entspriechend JSON Datei ënner<code>~/.ash/history/</code>wann Dir bewosst déi lokal Gespréichsgeschicht ewechgehäit wëllt. D'Ewechhuele vun enger Geschichtsdatei widderhëlt net e Providerschlëssel oder läscht Provider-Säit Daten; verwalten déi getrennt mam Provider.</p>
+
+          <h3>Wat ass den<code>SESSION_ID</code>a wou gëtt et generéiert?</h3>
+          <p>Et ass de Per-Sessiouns-Identifier benotzt fir d'Geschicht ze trennen, Scratch Space, Broker Sockets, a geplangte Log Nimm. D'geréiert Shell Ëmfeld generéiert eng zoufälleg 16-Charakter alphanumeric Wäert vun<code>/dev/urandom</code>wann d'Schuel ufänkt; ash erstellt och eng wann eng interaktiv Uruff kee Wäert huet.</p>
+
+          <h3>Kann ech d'Ëmsetzung vun der ersetzen<code>SESSION_ID</code>Generator?</h3>
+          <p>Dir kënnt Är eege liwweren<code>SESSION_ID</code>ier Dir ash ufänkt oder Är lokal verwalteten Ëmfelddatei personaliséiert, awer ash validéiert et. Gëlteg IDen si maximal 128 Zeechen a benotzen Buschtawen, Zifferen, Ënnersträicher, Bindestrecken, mat engem fakultativen Kand-Sessioun Punkt Suffix. Benotzt net ontrauen oder gedeelt Wäerter: Kollisiounen kombinéieren Sessiounsgeschicht a Runtime Staat.</p>
+        </section>
+
+        <section id="support">
+          <h2>Ënnerstëtzung a Gemeinschaft</h2>
+          <h3>Wéi schreiwen ech e Feeler?</h3>
+          <p>Öffnen en Thema op<a href="https://github.com/Jonconradt/ash/issues">github.com/Jonconradt/ash/issues</a>mat der ash Versioun oder engagéieren, Äre Betribssystem a Shell, d'Konfiguratioun relevant fir de Problem mat Geheimnisser ewechgeholl, reproduzéierbar Schrëtt, an dat observéiert Resultat. Fir eng Sécherheetsschwieregkeet, maach keng ëffentlech Ausgab op; mellt et privat per E-Mail oder GitHub Sécherheetsberodung.</p>
+
+          <h3>Gëtt et en Diskussiounsbord am Projet ash?</h3>
+          <p>Jo. Benotzt<a href="https://github.com/Jonconradt/ash/discussions">GitHub Diskussiounen</a>fir Froen an Iddien, an<a href="https://github.com/Jonconradt/ash/issues">GitHub Problemer</a>fir reproduzéierbar Bugs a verfollegt Aarbecht.</p>
+        </section>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer page-width">
+    <a class="brand" href="./"><span class="brand-mark">&gt;_</span>ash</a>
+    <span>Praktesch AI fir den Terminal.</span>
+    <a href="https://github.com/Jonconradt/ash">GitHub<span aria-hidden="true">&#8599;</span></a>
+  </footer>
+  <script src="../site.js" data-site-script defer></script>
+</body>
+</html>

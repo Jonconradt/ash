@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ash Preguntas frecuentes</title>
+  <meta name="description" content="Respuestas sobre la instalación de ash, proveedores, seguridad, herramientas, historial e integración de shell.">
+  <link rel="canonical" href="https://jonconradt.github.io/ash/es/faq.html">
+  <link rel="alternate" hreflang="en" href="https://jonconradt.github.io/ash/faq.html">
+  <link rel="alternate" hreflang="ar" href="https://jonconradt.github.io/ash/ar/faq.html">
+  <link rel="alternate" hreflang="de" href="https://jonconradt.github.io/ash/de/faq.html">
+  <link rel="alternate" hreflang="es" href="https://jonconradt.github.io/ash/es/faq.html">
+  <link rel="alternate" hreflang="fr" href="https://jonconradt.github.io/ash/fr/faq.html">
+  <link rel="alternate" hreflang="id" href="https://jonconradt.github.io/ash/id/faq.html">
+  <link rel="alternate" hreflang="it" href="https://jonconradt.github.io/ash/it/faq.html">
+  <link rel="alternate" hreflang="lb" href="https://jonconradt.github.io/ash/lb/faq.html">
+  <link rel="alternate" hreflang="pt-BR" href="https://jonconradt.github.io/ash/pt-BR/faq.html">
+  <link rel="alternate" hreflang="zh-CN" href="https://jonconradt.github.io/ash/zh-CN/faq.html">
+  <link rel="alternate" hreflang="zh-TW" href="https://jonconradt.github.io/ash/zh-TW/faq.html">
+  <link rel="alternate" hreflang="x-default" href="https://jonconradt.github.io/ash/faq.html">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="ash casa"><span class="brand-mark">>_</span> ash</a>
+    <nav aria-label="Navegación primaria">
+      <a href="index.html#how-it-works">Cómo funciona</a>
+      <a href="index.html#install">Instalar</a>
+      <a href="docs.html">Documentos</a>
+      <a href="faq.html" aria-current="page">Preguntas frecuentes</a>
+      <a href="https://github.com/Jonconradt/ash">GitHub</a>
+      <label class="sr-only" for="site-language">Idioma</label>
+      <select id="site-language" class="language-select" aria-label="Elige idioma">
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+        <option value="de">Deutsch</option>
+        <option value="es" selected>Español</option>
+        <option value="fr">Français</option>
+        <option value="id">Bahasa Indonesia</option>
+        <option value="it">Italiano</option>
+        <option value="lb">Lëtzebuergesch</option>
+        <option value="pt-BR">Português (Brasil)</option>
+        <option value="zh-CN">简体中文</option>
+        <option value="zh-TW">繁體中文</option>
+        </select>
+    </nav>
+  </header>
+
+  <main class="page-width docs-page">
+    <header class="docs-header">
+      <p class="eyebrow">Respuestas</p>
+      <h1>Preguntas<br><em>frecuentes.</em></h1>
+      <p>Respuestas claras sobre la instalación, los proveedores, los servidores MCP, los límites de seguridad, las herramientas y los archivos que ash administra en su máquina.</p>
+    </header>
+
+    <div class="docs-layout">
+      <nav class="docs-contents" aria-label="Contenido de las preguntas frecuentes">
+        <strong>Temas</strong>
+        <a href="#getting-started">Primeros pasos</a>
+        <a href="#installing">Instalación y actualización</a>
+        <a href="#ai">IA y conexiones</a>
+        <a href="#safety">Seguridad y control</a>
+        <a href="#workflow">Herramientas y flujo de trabajo</a>
+        <a href="#storage">Sesiones y almacenamiento</a>
+        <a href="#support">Soporte y comunidad</a>
+      </nav>
+      <article class="docs-content">
+        <section id="getting-started">
+          <h2>Primeros pasos</h2>
+          <h3>¿Qué necesito antes de poder usar ash?</h3>
+          <p>Necesita el ejecutable <code>ash</code>, un punto final de IA y un nombre de modelo. La ejecución de <code>ash install</code> los configura automáticamente: utiliza una clave API de proveedor de nube ya configurada o un servidor de inferencia local en ejecución cuando se encuentra; de lo contrario, muestra un menú de proveedor numerado y solicita una clave API, luego le permite elegir un modelo de la lista de modelos del punto final. También puede configurar <code>AI_ENDPOINT</code> y <code>AI_MODEL</code> manualmente. Un punto final local como Ollama puede usar <code>http://localhost:11434</code>, y un host LAN como <code>http://brain.local:11434</code> o una IP privada también se trata como local (a menos que <code>ASH_STRICT=1</code>); los puntos finales en la nube deben usar HTTPS y también requieren <code>AI_AUTH_TOKEN</code>. La integración de Shell es opcional: siempre puede ejecutar <code>ash "your question"</code> directamente.</p>
+
+          <h3>¿Dónde se instala ash y cómo compruebo que mi shell pueda encontrarlo?</h3>
+          <p>El instalador verificado coloca ash en <code>~/.local/bin/ash</code> y <code>ash install</code> agrega ese directorio a su <code>PATH</code> a través del archivo <code>~/.ash/.ash_env</code> administrado. Abra una nueva terminal, luego ejecute <code>command -v ash</code> para confirmar. El actualizador automático instala su binario de reemplazo en la misma ubicación <code>~/.local/bin/ash</code>.</p>
+
+          <h3>¿Cómo uso ash sin cambiar mi shell?</h3>
+          <p>Pase un mensaje entre comillas directamente: <code>ash "how do I find large files?"</code>. Sin argumentos, ash también acepta un mensaje de entrada estándar no interactivo, como <code>git diff | ash</code>. El uso directo es la opción menos sorprendente cuando estás aprendiendo ash o escribiendo un script.</p>
+
+          <h3>¿Por qué ash dice que mi configuración de IA está incompleta?</h3>
+          <p>Comprueba que <code>AI_ENDPOINT</code> y <code>AI_MODEL</code> no estén vacíos en el entorno donde se ejecuta ash. Para un nombre de host en la nube, configure también <code>AI_AUTH_TOKEN</code>. Ejecute <code>printf '%s\n' "$AI_ENDPOINT" "$AI_MODEL"</code> para confirmar que los dos primeros valores están presentes, pero no imprima un token de autenticación en una grabación de terminal o registro compartido.</p>
+        </section>
+
+        <section id="installing">
+          <h2>Instalación y actualización</h2>
+          <h3>¿Funciona ash en Windows 11?</h3>
+          <p>No de forma nativa. ash admite bash, zsh y Fish en macOS, Linux y FreeBSD; no hay ningún destino de instalación de PowerShell. Utilice WSL para disfrutar de la experiencia Linux compatible.</p>
+
+          <h3>¿Cómo instalo ash en el subsistema de Windows para Linux (WSL)?</h3>
+          <p>Instálelo dentro de su distribución WSL como Linux: <code>curl -fsSL https://jonconradt.github.io/ash/install.sh | sh</code>. Luego configure <code>AI_ENDPOINT</code> y <code>AI_MODEL</code>, y ejecute <code>ash install</code> para el shell que se ejecuta dentro de WSL.</p>
+
+          <h3>¿Cómo actualizo ash a la última versión?</h3>
+          <p>Ejecute <code>ash update</code> en macOS, Linux o FreeBSD. Descarga el archivo de coincidencia estable más reciente, verifica el manifiesto de lanzamiento con su paquete Sigstore y el resumen SHA-256, luego lo instala en <code>~/.local/bin/ash</code>. Si la verificación de la firma falla o el archivo contiene entradas no compatibles, se requiere una confirmación interactiva; no apruebe una firma fallida a menos que confíe de forma independiente en la fuente de publicación. Las cargas útiles no admitidas se omiten y las ejecuciones no interactivas rechazan estas excepciones. Utilice <code>ash update --version vX.Y.Z</code> para una versión específica; use <code>--yes</code> solo cuando desee reemplazar archivos administrados personalizados.</p>
+
+          <h3>Ejecuté <code>ash install</code>. ¿Por qué no cambia nada en este terminal?</h3>
+          <p>La instalación actualiza un archivo de inicio; no reescribe el proceso de shell que ya se está ejecutando. Abra una nueva terminal o vuelva a cargar el archivo de su shell: <code>source ~/.bashrc</code> para Bash, <code>source ~/.zshrc</code> para zsh o <code>source ~/.config/fish/config.fish</code> para Fish, a menos que use un <code>XDG_CONFIG_HOME</code> personalizado.</p>
+
+          <h3>Los comandos desconocidos todavía dicen "no encontrado". ¿Cómo soluciono problemas de integración de shell?</h3>
+          <p>Primero ejecute <code>command -v ash</code>; el contenedor no puede invocar un binario que su shell no puede encontrar. Luego vuelva a cargar o reinicie el shell y verifique que su archivo de inicio contenga el bloque administrado <code>&gt;&gt;&gt; ash install &gt;&gt;&gt;</code>. Finalmente ejecute <code>ash snooze off</code>, porque una repetición deja intencionalmente comandos desconocidos como fallas normales "no encontradas".</p>
+
+          <h3>¿Qué archivos cambia <code>ash install</code>? ¿Puedo obtener una vista previa?</h3>
+          <p>Agrega o actualiza un bloque marcado ash en el archivo de inicio de shell seleccionado y administra archivos en <code>~/.ash</code>, incluidos configuración, contenedores y herramientas incluidas. Ejecute <code>ash install --shell bash --dry-run</code> para obtener una vista previa del cambio del archivo de inicio sin escribirlo. Volver a ejecutar la instalación es idempotente; use <code>--overwrite</code> solo cuando desee actualizar los archivos de arranque administrados.</p>
+
+          <h3>¿ash es compatible con Fish?</h3>
+          <p>Sí. Ejecute <code>ash install --shell fish</code>. ash agrega un bloque administrado a <code>$XDG_CONFIG_HOME/fish/config.fish</code>, o <code>~/.config/fish/config.fish</code> cuando XDG_CONFIG_HOME no está configurado. Fish usa <code>fish_command_not_found</code>, por lo que un comando no resuelto llega a ash con sus argumentos originales.</p>
+
+          <h3>¿Por qué no <code>test</code> y <code>type</code> en minúsculas en Fish?</h3>
+          <p>Fish reserva esos nombres en minúsculas como elementos integrados esenciales y no permite que una función los reemplace. Utilice <code>Test ...</code> o <code>Type ...</code> para expresar la intención de ash o invocar <code>ash "..."</code> directamente. Otros contenedores de colisión compatibles siguen estando disponibles.</p>
+
+          <h3>¿Qué pasa con ksh93?</h3>
+          <p>ksh93 no es compatible con la integración de shell. Su comportamiento <code>FPATH</code> sólo puede cargar un archivo con el nombre de un comando desconocido; no tiene una devolución de llamada genérica de comando no encontrado que pueda implementar de forma segura ash enrutamiento rápido o ciclo de vida del corredor.</p>
+        </section>
+
+        <section id="ai">
+          <h2>IA y conexiones</h2>
+          <h3>¿ash incluye la IA?</h3>
+          <p>No. ash es un cliente para un punto final de IA que usted configura. Establezca <code>AI_ENDPOINT</code> y <code>AI_MODEL</code>; ash admite Ollama local y otros servidores locales compatibles con OpenAI (LM Studio, llama.cpp, MLX, LocalAI, vLLM, text-spawn-webui, Jan, GPT4All) y detecta adaptadores de proveedores de nube compatibles desde el punto final, con una anulación <code>AI_PROVIDER</code> opcional.</p>
+
+          <h3>¿Qué son los servidores MCP y cómo los agrego? ¿uno?</h3>
+          <p>Los servidores MCP (Protocolo de contexto de modelo) exponen herramientas a las que un modelo de IA puede llamar, como búsqueda, análisis o acciones específicas de servicio. Para agregar un servidor MCP HTTP Streamable remoto, coloque su URL en su propia línea en <code>~/.ash/.ash_allow</code>, luego ejecute ash nuevamente. Por ejemplo: <code>https://mcpplaygroundonline.com/mcp-complex-server</code>. Ash se conecta a través de su broker y ofrece las herramientas del servidor al modelo. Utilice únicamente servidores en los que confíe: sus herramientas pueden realizar acciones en su nombre. Se requiere HTTPS excepto para los servidores de desarrollo localhost. Los archivos <code>~/.ash/mcp.json</code> existentes ya no se leen; mueva sus URL a <code>.ash_allow</code>. Si la inicialización de MCP falla, ash continúa sin herramientas MCP remotas: advierte en sesiones interactivas y permanece en silencio en sesiones no interactivas.</p>
+
+          <h3>¿Pueden los trabajos programados usar servidores MCP?</h3>
+          <p>No. Los trabajos programados y otros trabajos no interactivos no heredan el intermediario de un shell interactivo, por lo que las herramientas MCP remotas no están disponibles. Ash aún ejecuta el mensaje sin herramientas MCP y suprime este error de inicialización esperado. Por lo tanto, un mensaje que se basa en MCP puede finalizar sin los datos o la acción solicitada. No programe mensajes que requieran MCP.</p>
+
+          <h3>¿Funciona MCP cuando <code>ASH_STRICT=1</code>?</h3>
+          <p>Sí. Una línea URL HTTP(S) registra explícitamente un servidor MCP y no se trata como un ejecutable de shell. El modo estricto no deshabilita los servidores MCP configurados. Todavía aplica las protecciones de salida no confiable de Ash al contenido de la herramienta devuelta.</p>
+
+          <h3>¿Cómo funciona MCP OAuth y dónde se almacenan las credenciales?</h3>
+          <p>Para un servidor protegido con OAuth, Ash abre la página de autorización en el navegador de escritorio cuando hay una GUI disponible; si no puede abrir un navegador, imprime una URL para autorizar manualmente en un navegador en el mismo host. Utilice <code>ash mcp add &lt;url&gt; --no-browser</code> para utilizar siempre el flujo terminal. Para conexiones OAuth directas, el descubrimiento permite direcciones IP no públicas solo para la autoridad MCP registrada exacta; otros hosts de OAuth siguen sujetos al bloqueo de direcciones no públicas. Un proxy de salida configurado es responsable de filtrar sus direcciones de destino. El corredor maneja la devolución de llamada, el intercambio de tokens, la actualización y la sesión MCP persistente. Las credenciales se almacenan en el administrador de credenciales del sistema operativo cuando están disponibles. Si no está disponible, configure el respaldo del archivo cifrado usando un <code>ASH_MCP_CREDENTIAL_KEY</code> aleatorio de 32 bytes; Ash nunca almacena la clave en sí.</p>
+
+          <h3>¿Dónde puedo encontrar AUTH_KEY para los proveedores de IA en la nube más populares?</h3>
+          <p>ash llama a este valor <code>AI_AUTH_TOKEN</code>; no crea ni distribuye claves de proveedor. Cree una clave en su cuenta de proveedor, como <a href="https://platform.openai.com/api-keys">OpenAI</a>, <a href="https://console.anthropic.com/settings/keys">Anthropic</a>, <a href="https://aistudio.google.com/app/apikey">Google AI Studio</a>, <a href="https://portal.azure.com/">Azure OpenAI</a>, <a href="https://console.mistral.ai/api-keys/">Mistral</a>, <a href="https://dashboard.cohere.com/api-keys">Cohere</a>, <a href="https://console.groq.com/keys">Groq</a>, <a href="https://console.x.ai/">xAI</a>, <a href="https://platform.deepseek.com/api_keys">DeepSeek</a>, <a href="https://api.together.ai/settings/api-keys">Together AI</a>, <a href="https://openrouter.ai/settings/keys">OpenRouter</a>, <a href="https://huggingface.co/settings/tokens">HuggingFace</a> o <a href="https://ollama.com/settings/keys">Ollama</a>, luego expórtelo como la variable de entorno del proveedor (o <code>AI_AUTH_TOKEN</code> directamente). <code>ash install</code> detecta automáticamente la mayoría de estas variables de entorno específicas del proveedor. Los puntos finales de la nube deben usar HTTPS y requerir un token; Las direcciones privadas/LAN y los nombres de host <code>.local</code> no se tratan como puntos finales de la nube a menos que se configure <code>ASH_STRICT=1</code>.</p>
+
+          <h3>¿ash abre una nueva conexión cada vez?</h3>
+          <p>No es para el uso normal interactivo del shell Unix. Bash, zsh y Fish inician un intermediario por sesión de shell, se comunican con él a través de un socket Unix privado y reutilizan su grupo de conexiones HTTP limitado. El corredor sale después de la inactividad; los trabajos programados utilizan solicitudes directas en lugar de un intermediario de shell persistente.</p>
+
+          <h3>¿Fish utiliza el intermediario?</h3>
+          <p>Sí. El contenedor Fish inicia y reutiliza el mismo agente por sesión que bash y zsh, actualiza su concesión inmediatamente antes de una solicitud ash y mantiene la configuración del agente en silencio.</p>
+
+          <h3>¿Qué sucede si una solicitud es lenta, no está disponible o cambio de opinión?</h3>
+          <p>Presione <code>Ctrl-C</code> para cancelar una solicitud en curso. El tiempo de espera predeterminado para la solicitud de IA es de tres minutos; establezca <code>AI_TIMEOUT</code>, por ejemplo <code>AI_TIMEOUT=90s</code>, para cambiarlo. ash reintenta fallos de IA reintentables hasta tres veces de forma predeterminada con un breve retroceso limitado; ajuste ese comportamiento con <code>ASH_RETRY_MAX_ATTEMPTS</code>, <code>ASH_RETRY_BASE_DELAY</code> y <code>ASH_RETRY_MAX_DELAY</code>.</p>
+        </section>
+
+        <section id="safety">
+          <h2>Seguridad y control</h2>
+          <h3>¿Cómo bloqueo ash para estar más seguro y cuáles son las implicaciones?</h3>
+          <p>Mantenga la lista de ejecutables permitidos limitada, favorezca las herramientas de solo lectura y no agregue comandos privilegiados o destructivos. Configure <code>ASH_STRICT=1</code> para bloquear patrones de inyección rápida reconocidos de salidas de herramientas, archivos, secuencias de comandos, canalizaciones y agentes secundarios que no sean de confianza. Esto también puede ocultar texto legítimo que se parezca a un intento de inyección. La lista de permitidos es un límite de ejecución, no un entorno de pruebas: ash y las herramientas permitidas aún se ejecutan como usted.</p>
+
+          <h3>¿Puede ash ejecutar comandos destructivos como <code>rm</code>?</h3>
+          <p>No con la lista de permitidos predeterminada instalada. Desaconseja explícitamente <code>rm</code>, <code>mv</code>, <code>dd</code>, <code>chmod</code>, <code>chown</code>, <code>kill</code> y <code>sudo</code>. Si agrega uno de ellos, ash puede solicitarlo con sus permisos; revise esa decisión cuidadosamente.</p>
+
+          <h3>¿Cómo cambio los comandos que ash puede ejecutar?</h3>
+          <p>Edite <code>~/.ash/.ash_allow</code> y enumere los nombres de los ejecutables básicos, uno por línea o separados por comas. Sus directivas independientes <code>$TOOLS_DIR_LIST</code> y <code>$PLUGINS_DIR_LIST</code> permiten scripts administrados y complementos nativos elegibles; reemplácelos con nombres literales para una política restrictiva. Los scripts y complementos elegibles son archivos normales en <code>~/.ash/tools/</code> o <code>~/.ash/plugins/</code> con bits de lectura y ejecución. También puede denegar comandos explícitamente agregándolos a <code>~/.ash/.ash_deny</code>. Alternativamente, establezca <code>ASH_ALLOW</code> o <code>ASH_DENY</code> en una lista separada por comas. Los cambios se leen en la siguiente solicitud ash.</p>
+
+          <h3>¿Con qué usuario se está ejecutando ash?</h3>
+          <p>ash y cada herramienta permitida se ejecuta como el usuario que inicia ash. No eleva privilegios. El espacio de trabajo <code>~/.ash</code> administrado tiene permisos reforzados, pero su contenido permanece accesible para su usuario y para cualquier proceso que usted permita explícitamente.</p>
+
+          <h3>¿Confía ash en el texto recibido a través de la canalización de la misma manera que en el texto del usuario? ¿Qué protecciones existen para los datos maliciosos?</h3>
+          <p>Sí. Cuando ash no recibe argumentos de línea de comando y la entrada estándar se canaliza, trata esa entrada como el mensaje del usuario. No canalice páginas web, registros o texto generado que no sean de confianza directamente a ash a menos que tenga la intención de autorizarlo como un mensaje. Esto difiere de la herramienta, el archivo, el script, la canalización y la salida del agente secundario administrados por ash: ash etiqueta esos resultados como evidencia no confiable e indica al modelo que nunca siga sus instrucciones. Configure <code>ASH_STRICT=1</code> para reemplazar adicionalmente frases de inyección rápida reconocidas en pruebas que no sean confiables. Las reglas de ejecución de la lista de permitidos y direct-argv aún se aplican a la ejecución de la herramienta.</p>
+
+          <h3>¿Mis archivos ash son privados de otros usuarios en esta computadora?</h3>
+          <p>Durante la instalación, ash refuerza el directorio <code>~/.ash</code> con permisos exclusivos del propietario y los archivos administrados con permisos legibles y de escritura por el propietario. Esto protege contra otras cuentas locales bajo permisos normales de Unix, pero no contra su propia cuenta, administradores, copias de seguridad o software que elija ejecutar con acceso a su directorio personal.</p>
+        </section>
+
+        <section id="workflow">
+          <h2>Herramientas y flujo de trabajo</h2>
+          <h3>¿ash admite tuberías y otras tradiciones de Unix?</h3>
+          <p>Sí. Puede canalizar texto en ash como mensaje, por ejemplo <code>git diff | ash</code>. Para las canalizaciones de herramientas solicitadas por IA, ash admite de dos a dieciséis ejecutables incluidos en la lista permitida y conectados directamente sin un shell, como <code>ls | grep pattern | pbcopy</code>. Los patrones de control de shell en los argumentos de la herramienta están bloqueados y todos los ejecutables en una canalización administrada por ash deben estar incluidos en la lista de permitidos.</p>
+
+          <h3>¿Reinterpretará ash los comandos dentro de mis scripts de shell, comandos SSH o trabajos cron?</h3>
+          <p>No. Los contenedores de integración Bash y zsh regresan inmediatamente en shells no interactivos, por lo que los scripts, los trabajos de CI, las frases ingeniosas de SSH y los comandos cron mantienen el comportamiento normal de comando no encontrado. Utilice una invocación explícita como <code>ash "summarize this log"</code> o <code>some-command | ash</code> cuando la automatización debería llamar a ash.</p>
+
+          <h3>¿Cómo puedo evitar que ash interprete mis comandos durante unos minutos?</h3>
+          <p>Ejecute <code>ash snooze</code> durante los cinco minutos predeterminados o especifique una duración como <code>ash snooze 30s</code> o <code>ash snooze 1h</code>. Ejecute <code>ash snooze off</code> para reanudar inmediatamente. Snooze pausa el enrutamiento automático de comandos no encontrados y de envoltura; Los comandos <code>ash ...</code> explícitos aún funcionan.</p>
+
+          <h3>¿Cómo puedo depurar ash y ver más información sobre lo que está haciendo?</h3>
+          <p>Configure <code>ASH_VERBOSE=1</code> antes de ejecutar ash para habilitar la salida de depuración estructurada y un panel de ejecución de terminal. Configure <code>ASH_LOG_FILE</code> para escribir JSON de depuración en un archivo; <code>ASH_LOG_MAX_BYTES</code> controla la rotación y el valor predeterminado es 1 MiB cuando se configura un archivo de registro.</p>
+
+          <h3>¿Qué límites se aplican cuando ash ejecuta herramientas?</h3>
+          <p>De forma predeterminada, cada llamada de herramienta tiene un tiempo de espera de 15 segundos y captura hasta 8192 bytes de salida. Una solicitud de IA puede realizar hasta 16 iteraciones de bucle de herramientas, y una canalización administrada por ash tiene de dos a dieciséis etapas. Ajuste el tiempo de espera de la herramienta y el límite de salida con <code>ASH_TOOL_TIMEOUT</code> y <code>ASH_TOOL_OUTPUT_MAX</code>; mantenga la salida enfocada con comandos como <code>head</code>, <code>tail</code> o <code>grep</code>.</p>
+
+          <h3>¿Dónde está el indicador predeterminado del sistema?</h3>
+          <p>El archivo de solicitud canónico es <code>~/.ash/.ash_system</code>, y se instala desde el paquete predeterminado cuando ejecuta <code>ash install</code>. ash lee ese archivo primero. Si está ausente, ash vuelve a <code>.ash_system</code> en el directorio de trabajo actual y luego a <code>~/.ash_system</code>. Los valores <code>$VARIABLE</code> ordinarios se expanden desde el entorno, pero <code>$TOOLS_DIR_LIST</code>, <code>$PLUGINS_DIR_LIST</code> y <code>$IF_PYTHON_AVAILABLE</code> son sustituciones internas reservadas de Ash y nunca se derivan del entorno.</p>
+
+          <h3>¿Dónde coloco mis propios scripts y complementos nativos? ash para llamar como herramientas?</h3>
+          <p>Coloque scripts de Python en <code>~/.ash/tools/</code> y complementos binarios nativos compilados en <code>~/.ash/plugins/</code>. Asegúrese de que sean ejecutables y agregue el nombre del ejecutable simple a <code>~/.ash/.ash_allow</code> (o confíe en <code>$TOOLS_DIR_LIST</code> / <code>$PLUGINS_DIR_LIST</code>). ash no invoca un shell para los comandos y complementos permitidos de Unix.</p>
+
+          <h3>¿Cuáles son las mejores prácticas para una herramienta o complemento para que la IA comprenda su propósito y uso?</h3>
+          <p>Siga el patrón estándar de herramienta/complemento: exponga opciones predecibles con argumentos CLI; e implementar una opción <code>--ai-docs</code> que explique las capacidades, cada argumento y valor predeterminado, el esquema de salida, los estados de falla y cuándo la IA debe usar la herramienta. Emita JSON estructurado compacto con un campo <code>status</code> y detalles de error procesables en lugar de prosa mezclada con datos. Mantenga la salida limitada, valide las entradas, establezca tiempos de espera de red, maneje las fallas esperadas y haga que la herramienta sea segura para llamar repetidamente. Agregue su nombre de archivo simple a <code>~/.ash/.ash_allow</code>; ash puede ejecutarlo solo cuando está en la lista permitida y no en <code>~/.ash/.ash_deny</code>.</p>
+
+          <h3>¿Cuáles son los scripts de herramientas y complementos nativos proporcionados?</h3>
+          <p>Los scripts de arranque de Python instalados son <code>headlines.py</code>, <code>wikipedia.py</code> y <code>yfinance.py</code> en <code>~/.ash/tools/</code>. Los complementos nativos proporcionados son <code>what_time_is_it</code> (Go), <code>flip_a_coin</code> (Rust) y <code>calculator</code> (TypeScript) en <code>~/.ash/plugins/</code>.</p>
+
+          <h3>¿Puede ash llamar a subagentes?</h3>
+          <p>Sí. Un agente principal puede utilizar <code>run_sub_agent</code> para una tarea independiente y centrada. Un hijo hereda el directorio de trabajo, la configuración, las herramientas y los permisos del sistema operativo, devuelve un resultado limitado y no puede crear otro hijo. El máximo predeterminado es seis subagentes por ejecución principal y se puede cambiar con <code>ASH_MAX_AGENTS</code>.</p>
+
+          <h3>¿Puede ash generar archivos de memoria para realizar un seguimiento de tareas complejas y lo que ha aprendido en la sesión?</h3>
+          <p>Sí. Puede escribir archivos de espacio de trabajo persistentes en <code>~/.ash</code>, de los que se realiza un seguimiento en <code>~/.ash/inventory.md</code>, y archivos temporales con ámbito de sesión en <code>~/.ash/scratch/&lt;session-id&gt;/</code>. Utilice archivos de espacio de trabajo persistentes para la información que desea conservar; utilice archivos borrador para planes temporales, notas y artefactos auxiliares.</p>
+
+          <h3>¿Puede ash programar el trabajo para más tarde?</h3>
+          <p>Sí, a través de sus herramientas de inteligencia artificial. En macOS, la programación única utiliza un <code>launchd</code> LaunchAgent por usuario y requiere <code>launchctl</code>. En Linux, las programaciones recurrentes se admiten a través de su usuario <code>crontab</code>; ash gestiona sólo sus propias entradas marcadas. El programador único <code>launchd</code> no está disponible en Linux, así que use una entrada cron u otro programador de Linux para un trabajo de Linux único. Las ejecuciones programadas reciben un entorno limitado y utilizan HTTPS directo en lugar de un intermediario de shell interactivo, así que asegúrese de que la configuración de IA requerida esté disponible para el trabajo programado. No pueden utilizar herramientas MCP remotas; Ash se ejecuta sin ellos y no advierte en sesiones no interactivas. No programe mensajes que requieran MCP.</p>
+        </section>
+
+        <section id="storage">
+          <h2>Sesiones y almacenamiento</h2>
+          <h3>¿Dónde están el historial o los archivos de registro de ash?</h3>
+          <p>El historial de conversaciones se almacena como JSON en <code>~/.ash/history/&lt;SESSION_ID&gt;.json</code>; las ejecuciones programadas utilizan <code>task_&lt;SESSION_ID&gt;.json</code>. Cuando el registro de depuración programado está habilitado, su ubicación de registro predeterminada es <code>~/.ash/logs/task_&lt;SESSION_ID&gt;.log</code>. Puede elegir otra ruta de registro de depuración con <code>ASH_LOG_FILE</code>.</p>
+
+          <h3>¿Durante cuánto tiempo se retienen los archivos históricos?</h3>
+          <p>ash elimina los archivos JSON del historial con más de 14 días durante la limpieza normal de la aplicación, con un presupuesto de limpieza de 300 ms para que la salida no se retrase. La ventana de mensajes recientes está separada: mantiene hasta 40 mensajes por conversación de forma predeterminada y se puede cambiar con <code>ASH_HISTORY_MAX</code>.</p>
+
+          <h3>¿Cómo borro una conversación o empiezo de nuevo?</h3>
+          <p>El historial está separado por ID de sesión y clave de modelo/punto final de IA. Inicie una nueva sesión de terminal para una nueva ID de sesión o elimine el archivo JSON relevante en <code>~/.ash/history/</code> cuando desee descartar intencionalmente ese historial de conversaciones local. Eliminar un archivo de historial no revoca una clave de proveedor ni elimina datos del lado del proveedor; adminístrelos por separado con el proveedor.</p>
+
+          <h3>¿Qué es <code>SESSION_ID</code> y dónde se genera?</h3>
+          <p>Es el identificador por sesión que se utiliza para separar el historial, el espacio temporal, los sockets de intermediario y los nombres de registros programados. El entorno del shell administrado genera un valor alfanumérico aleatorio de 16 caracteres a partir de <code>/dev/urandom</code> cuando se inicia el shell; ash también crea uno cuando una invocación interactiva no tiene valor.</p>
+
+          <h3>¿Puedo reemplazar la implementación del generador <code>SESSION_ID</code>?</h3>
+          <p>Puede proporcionar su propio <code>SESSION_ID</code> antes de iniciar ash o personalizar su archivo de entorno administrado local, pero ash lo valida. Los ID válidos tienen como máximo 128 caracteres y utilizan letras, dígitos, guiones bajos y guiones, con un sufijo de punto opcional para la sesión secundaria. No utilice valores compartidos o que no sean de confianza: las colisiones combinan el historial de sesiones y el estado de ejecución.</p>
+        </section>
+
+        <section id="support">
+          <h2>Soporte y comunidad</h2>
+          <h3>¿Cómo presento un error?</h3>
+          <p>Abra un problema en <a href="https://github.com/Jonconradt/ash/issues">github.com/Jonconradt/ash/issues</a> con la versión o confirmación ash, su sistema operativo y shell, la configuración relevante para el problema con secretos eliminados, pasos reproducibles y el resultado observado. Para una vulnerabilidad de seguridad, no abra una edición pública; infórmalo de forma privada por correo electrónico o aviso de seguridad de GitHub.</p>
+
+          <h3>¿Hay un foro de discusión en el proyecto ash?</h3>
+          <p>Sí. Utilice <a href="https://github.com/Jonconradt/ash/discussions">GitHub Discussions</a> para preguntas e ideas, y <a href="https://github.com/Jonconradt/ash/issues">GitHub Issues</a> para errores reproducibles y seguimiento del trabajo.</p>
+        </section>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer page-width">
+    <a class="brand" href="./"><span class="brand-mark">>_</span> ash</a>
+    <span>IA práctica para el terminal.</span>
+    <a href="https://github.com/Jonconradt/ash">GitHub <span aria-hidden="true">↗</span></a>
+  </footer>
+  <script src="../site.js" data-site-script defer></script>
+</body>
+</html>

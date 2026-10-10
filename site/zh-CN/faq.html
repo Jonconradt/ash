@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ash常见问题解答</title>
+  <meta name="description" content="有关 ash 安装、提供程序、安全性、工具、历史记录和 shell 集成的答案。">
+  <link rel="canonical" href="https://jonconradt.github.io/ash/zh-CN/faq.html">
+  <link rel="alternate" hreflang="en" href="https://jonconradt.github.io/ash/faq.html">
+  <link rel="alternate" hreflang="ar" href="https://jonconradt.github.io/ash/ar/faq.html">
+  <link rel="alternate" hreflang="de" href="https://jonconradt.github.io/ash/de/faq.html">
+  <link rel="alternate" hreflang="es" href="https://jonconradt.github.io/ash/es/faq.html">
+  <link rel="alternate" hreflang="fr" href="https://jonconradt.github.io/ash/fr/faq.html">
+  <link rel="alternate" hreflang="id" href="https://jonconradt.github.io/ash/id/faq.html">
+  <link rel="alternate" hreflang="it" href="https://jonconradt.github.io/ash/it/faq.html">
+  <link rel="alternate" hreflang="lb" href="https://jonconradt.github.io/ash/lb/faq.html">
+  <link rel="alternate" hreflang="pt-BR" href="https://jonconradt.github.io/ash/pt-BR/faq.html">
+  <link rel="alternate" hreflang="zh-CN" href="https://jonconradt.github.io/ash/zh-CN/faq.html">
+  <link rel="alternate" hreflang="zh-TW" href="https://jonconradt.github.io/ash/zh-TW/faq.html">
+  <link rel="alternate" hreflang="x-default" href="https://jonconradt.github.io/ash/faq.html">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="ash 首页"><span class="brand-mark">&gt;_</span>ash</a>
+    <nav aria-label="主要导航">
+      <a href="index.html#how-it-works">它是如何运作的</a>
+      <a href="index.html#install">安装</a>
+      <a href="docs.html">文档</a>
+      <a href="faq.html" aria-current="page">常问问题</a>
+      <a href="https://github.com/Jonconradt/ash">GitHub</a>
+      <label class="sr-only" for="site-language">语言</label>
+      <select id="site-language" class="language-select" aria-label="选择语言">
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+        <option value="de">Deutsch</option>
+        <option value="es">Español</option>
+        <option value="fr">Français</option>
+        <option value="id">Bahasa Indonesia</option>
+        <option value="it">Italiano</option>
+        <option value="lb">Lëtzebuergesch</option>
+        <option value="pt-BR">Português (Brasil)</option>
+        <option value="zh-CN" selected>简体中文</option>
+        <option value="zh-TW">繁體中文</option>
+        </select>
+    </nav>
+  </header>
+
+  <main class="page-width docs-page">
+    <header class="docs-header">
+      <p class="eyebrow">答案</p>
+      <h1>常见问题<br><em>问题。</em></h1>
+      <p>有关安装、提供程序、MCP 服务器、安全边界、工具以及 ash 在您的计算机上管理的文件的明确答案。</p>
+    </header>
+
+    <div class="docs-layout">
+      <nav class="docs-contents" aria-label="常见问题解答内容">
+        <strong>主题</strong>
+        <a href="#getting-started">入门</a>
+        <a href="#installing">安装和更新</a>
+        <a href="#ai">人工智能和连接</a>
+        <a href="#safety">安全与控制</a>
+        <a href="#workflow">工具和工作流程</a>
+        <a href="#storage">会话和存储</a>
+        <a href="#support">支持和社区</a>
+      </nav>
+      <article class="docs-content">
+        <section id="getting-started">
+          <h2>入门</h2>
+          <h3>使用 ash 之前我需要什么？</h3>
+          <p>你需要<code>ash</code>可执行文件、AI 端点和模型名称。跑步<code>ash install</code>自动配置这些：它使用已设置的云提供商 API 密钥或找到时正在运行的本地推理服务器，否则它会显示编号的提供商菜单并提示输入 API 密钥，然后让您从端点的模型列表中选择模型。您还可以设置<code>AI_ENDPOINT</code>和<code>AI_MODEL</code>手动。本地端点（例如 Ollama）可以使用<code>http://localhost:11434</code>，以及 LAN 主机，例如<code>http://brain.local:11434</code>或者私有 IP 也被视为本地 IP（除非<code>ASH_STRICT=1</code>）；云端点必须使用 HTTPS，并且还要求<code>AI_AUTH_TOKEN</code>。 Shell 集成是可选的：您可以随时运行<code>ash "your question"</code>直接地。</p>
+
+          <h3>ash 安装在哪里，如何检查我的 shell 是否可以找到它？</h3>
+          <p>经过验证的安装程序将 ash 放入<code>~/.local/bin/ash</code>， 和<code>ash install</code>将该目录添加到您的<code>PATH</code>通过托管的<code>~/.ash/.ash_env</code>文件。打开一个新终端，然后运行<code>command -v ash</code>确认。自更新程序将其替换二进制文件安装到相同的<code>~/.local/bin/ash</code>地点。</p>
+
+          <h3>如何在不更改 shell 的情况下使用 ash？</h3>
+          <p>直接传递引用的提示：<code>ash "how do I find large files?"</code>。如果没有参数，ash 也接受非交互式标准输入提示，例如<code>git diff | ash</code>。当您学习 ash 或编写脚本时，直接使用是最不令人惊讶的选择。</p>
+
+          <h3>为什么ash说我的AI配置不完整？</h3>
+          <p>检查一下<code>AI_ENDPOINT</code>和<code>AI_MODEL</code>在 ash 运行的环境中非空。对于云主机名，还设置<code>AI_AUTH_TOKEN</code>。跑步<code>printf '%s\n' "$AI_ENDPOINT" "$AI_MODEL"</code>确认前两个值存在，但不将身份验证令牌打印到终端记录或共享日志中。</p>
+        </section>
+
+        <section id="installing">
+          <h2>安装和更新</h2>
+          <h3>ash 在 Windows 11 上运行吗？</h3>
+          <p>不是原生的。 ash 支持 macOS、Linux 和 FreeBSD 上的 bash、zsh 和 Fish；没有 PowerShell 安装目标。使用 WSL 获得受支持的 Linux 体验。</p>
+
+          <h3>如何在适用于 Linux 的 Windows 子系统 (WSL) 中安装 ash？</h3>
+          <p>将其作为 Linux 安装在 WSL 发行版中：<code>curl -fsSL https://jonconradt.github.io/ash/install.sh | sh</code>。然后配置<code>AI_ENDPOINT</code>和<code>AI_MODEL</code>，然后运行<code>ash install</code>对于在 WSL 内运行的 shell。</p>
+
+          <h3>如何将 ash 更新到最新发布版本？</h3>
+          <p>跑步<code>ash update</code>在 macOS、Linux 或 FreeBSD 上。它下载最新的稳定匹配存档，使用其 Sigstore 捆绑包和 SHA-256 摘要验证发布清单，然后安装到<code>~/.local/bin/ash</code>。如果签名验证失败或者存档包含不支持的条目，则需要交互式确认；除非您独立信任发布源，否则不要批准失败的签名。跳过不支持的有效负载，非交互式运行拒绝这些异常。使用<code>ash update --version vX.Y.Z</code>对于特定版本；使用<code>--yes</code>仅当您想要替换自定义托管文件时。</p>
+
+          <h3>我跑了<code>ash install</code>。为什么这个终端没有任何变化？</h3>
+          <p>安装更新启动文件；它不会重写已经运行的 shell 进程。打开一个新终端，或为您的 shell 重新加载文件：<code>source ~/.bashrc</code>对于巴什来说，<code>source ~/.zshrc</code>对于 zsh，或者<code>source ~/.config/fish/config.fish</code>对于鱼，除非您使用自定义<code>XDG_CONFIG_HOME</code>。</p>
+
+          <h3>未知命令仍然显示“未找到”。如何解决 shell 集成问题？</h3>
+          <p>第一次运行<code>command -v ash</code>;包装器无法调用 shell 找不到的二进制文件。然后重新加载或重新启动 shell 并检查其启动文件是否包含<code>&gt;&gt;&gt; ash install &gt;&gt;&gt;</code>管理块。终于跑了<code>ash snooze off</code>，因为暂停会故意将未知命令留下为正常的“未找到”失败。</p>
+
+          <h3>文件有什么作用<code>ash install</code>更改，我可以预览吗？</h3>
+          <p>它在选定的 shell 启动文件中添加或更新一个标记为 ash 的块，并管理下面的文件<code>~/.ash</code>，包括配置、包装器和捆绑工具。跑步<code>ash install --shell bash --dry-run</code>预览启动文件更改而不写入它。重新运行安装是幂等的；使用<code>--overwrite</code>仅当您想要刷新托管引导程序文件时。</p>
+
+          <h3>ash支持鱼吗？</h3>
+          <p>是的。跑步<code>ash install --shell fish</code>。 ash 添加一个托管块到<code>$XDG_CONFIG_HOME/fish/config.fish</code>， 或者<code>~/.config/fish/config.fish</code>当 XDG_CONFIG_HOME 未设置时。鱼类用途<code>fish_command_not_found</code>，因此未解析的命令及其原始参数到达 ash。</p>
+
+          <h3>为什么不小写<code>test</code>和<code>type</code>在鱼？</h3>
+          <p>Fish 将这些小写名称保留为基本内置函数，并且不允许函数替换它们。使用<code>Test ...</code>或者<code>Type ...</code>表达 ash 意图，或调用<code>ash "..."</code>直接地。其他兼容的碰撞包装器仍然可用。</p>
+
+          <h3>ksh93呢？</h3>
+          <p>shell 集成不支持 ksh93。它是<code>FPATH</code>行为只能加载以未知命令命名的文件；它没有可以安全地实现 ash 提示路由或代理生命周期的通用命令未找到回调。</p>
+        </section>
+
+        <section id="ai">
+          <h2>人工智能与连接</h2>
+          <h3>ash 包含 AI 吗？</h3>
+          <p>否。ash 是您配置的 AI 端点的客户端。放<code>AI_ENDPOINT</code>和<code>AI_MODEL</code>; ash 支持本地 Ollama 和其他本地 OpenAI 兼容服务器（LM Studio、llama.cpp、MLX、LocalAI、vLLM、text- Generation-webui、Jan、GPT4All），并从端点检测支持的云提供商适配器，并带有可选的<code>AI_PROVIDER</code>覆盖。</p>
+
+          <h3>什么是 MCP 服务器？如何添加？</h3>
+          <p>MCP（模型上下文协议）服务器公开 AI 模型可以调用的工具，例如搜索、分析或特定于服务的操作。要添加远程 Streamable HTTP MCP 服务器，请将其 URL 放在单独的行中<code>~/.ash/.ash_allow</code>，然后再次运行ash。例如：<code>https://mcpplaygroundonline.com/mcp-complex-server</code>。 Ash 通过其代理进行连接并向模型提供服务器工具。仅使用您信任的服务器：他们的工具可能代表您执行操作。除本地主机开发服务器外，都需要 HTTPS。现存的<code>~/.ash/mcp.json</code>文件不再被读取；将他们的 URL 移至<code>.ash_allow</code>。如果 MCP 初始化失败，ash 会在没有远程 MCP 工具的情况下继续：它在交互式会话中发出警告，并在非交互式会话中保持静默。</p>
+
+          <h3>计划作业可以使用 MCP 服务器吗？</h3>
+          <p>不可以。计划作业和其他非交互式作业不会继承交互式 shell 的代理，因此远程 MCP 工具不可用。 Ash 仍然在没有 MCP 工具的情况下运行提示并抑制这种预期的初始化失败。因此，依赖 MCP 的提示可能会在没有请求的数据或操作的情况下完成。不要安排需要 MCP 的提示。</p>
+
+          <h3>MCP 何时工作<code>ASH_STRICT=1</code>？</h3>
+          <p>是的。 HTTP(S) URL 行显式注册 MCP 服务器，并且不被视为 shell 可执行文件。严格模式不会禁用已配置的 MCP 服务器。它仍然将 Ash 的不受信任输出保护应用于返回的工具内容。</p>
+
+          <h3>MCP OAuth 如何工作以及凭据存储在哪里？</h3>
+          <p>对于受 OAuth 保护的服务器，当 GUI 可用时，Ash 在桌面浏览器中打开授权页面；如果无法打开浏览器，则会打印 URL 以在同一主机上的浏览器中手动授权。使用<code>ash mcp add &lt;url&gt; --no-browser</code>始终使用终端流。对于直接 OAuth 连接，发现仅允许确切注册的 MCP 机构使用非公共 IP 地址；其他 OAuth 主机仍然受到非公共地址阻止。配置的出口代理负责过滤其目标地址。代理处理回调、令牌交换、刷新和持久 MCP 会话。凭据可用时存储在操作系统凭据管理器中。如果不可用，请使用随机 32 字节配置加密文件后备<code>ASH_MCP_CREDENTIAL_KEY</code>; Ash 从不存储密钥本身。</p>
+
+          <h3>在哪里可以找到最流行的云 AI 提供商的 AUTH_KEY？</h3>
+          <p>ash调用该值<code>AI_AUTH_TOKEN</code>;它不创建或分发提供商密钥。在您的提供商帐户中创建密钥，例如<a href="https://platform.openai.com/api-keys">开放人工智能</a>,<a href="https://console.anthropic.com/settings/keys">人择</a>,<a href="https://aistudio.google.com/app/apikey">谷歌人工智能工作室</a>,<a href="https://portal.azure.com/">Azure 开放人工智能</a>,<a href="https://console.mistral.ai/api-keys/">米斯特拉尔</a>,<a href="https://dashboard.cohere.com/api-keys">连贯</a>,<a href="https://console.groq.com/keys">格罗克</a>,<a href="https://console.x.ai/">人工智能</a>,<a href="https://platform.deepseek.com/api_keys">深度搜索</a>,<a href="https://api.together.ai/settings/api-keys">一起人工智能</a>,<a href="https://openrouter.ai/settings/keys">开放路由器</a>,<a href="https://huggingface.co/settings/tokens">抱脸</a>， 或者<a href="https://ollama.com/settings/keys">奥拉马</a>，然后将其导出为提供者的环境变量（或<code>AI_AUTH_TOKEN</code>直接地）。<code>ash install</code>自动检测大多数特定于提供程序的环境变量。云端点必须使用 HTTPS 并需要令牌；私有/LAN 地址和<code>.local</code>主机名不被视为云端点，除非<code>ASH_STRICT=1</code>已设置。</p>
+
+          <h3>ash每次都会打开一个新连接吗？</h3>
+          <p>不适用于正常的交互式 Unix shell 使用。 Bash、zsh 和 Fish 为每个 shell 会话启动一个代理，通过私有 Unix 套接字与其通信，并重用其有限的 HTTP 连接池。经纪商在不活动后退出；计划作业使用直接请求而不是持久的 shell 代理。</p>
+
+          <h3>Fish 使用经纪人吗？</h3>
+          <p>是的。 Fish 包装器启动并重用与 bash 和 zsh 相同的每会话代理，在 ash 请求之前刷新其租约，并保持代理设置安静。</p>
+
+          <h3>如果请求速度缓慢、不可用或者我改变了主意，会发生什么情况？</h3>
+          <p>按<code>Ctrl-C</code>取消飞行中的请求。默认AI请求超时时间为三分钟；放<code>AI_TIMEOUT</code>， 例如<code>AI_TIMEOUT=90s</code>，更改它。 ash 默认情况下重试可重试的 AI 故障最多 3 次，并具有短的有界退避；调整该行为<code>ASH_RETRY_MAX_ATTEMPTS</code>,<code>ASH_RETRY_BASE_DELAY</code>， 和<code>ASH_RETRY_MAX_DELAY</code>。</p>
+        </section>
+
+        <section id="safety">
+          <h2>安全与控制</h2>
+          <h3>如何锁定 ash 才能更安全，这会产生什么影响？</h3>
+          <p>缩小可执行白名单的范围，支持只读工具，并且不要添加特权或破坏性命令。放<code>ASH_STRICT=1</code>阻止来自不受信任的工具、文件、脚本、管道和子代理输出的已识别提示注入模式。这还可以隐藏类似于注入尝试的合法文本。允许名单是一个执行边界，而不是沙箱：ash，允许的工具仍然可以像您一样运行。</p>
+
+          <h3>ash 可以运行破坏性命令，例如<code>rm</code>？</h3>
+          <p>不适用于已安装的默认白名单。它明确建议反对<code>rm</code>,<code>mv</code>,<code>dd</code>,<code>chmod</code>,<code>chown</code>,<code>kill</code>， 和<code>sudo</code>。如果您添加其中之一，ash可以在您的权限下请求；仔细审查该决定。</p>
+
+          <h3>如何更改允许执行的命令ash？</h3>
+          <p>编辑<code>~/.ash/.ash_allow</code>并列出裸露的可执行文件名称，每行一个或以逗号分隔。它是独立的<code>$TOOLS_DIR_LIST</code>和<code>$PLUGINS_DIR_LIST</code>指令允许合格的托管脚本和本机插件；将它们替换为限制性策略的字面名称。合格的脚本和插件是常规文件<code>~/.ash/tools/</code>或者<code>~/.ash/plugins/</code>具有读取和执行位。您还可以通过将命令添加到显式拒绝命令<code>~/.ash/.ash_deny</code>。或者设置<code>ASH_ALLOW</code>或者<code>ASH_DENY</code>到以逗号分隔的列表。更改将在下一个 ash 请求时读取。</p>
+
+          <h3>ash 在什么用户下运行？</h3>
+          <p>ash 以及每个允许的工具以启动 ash 的用户身份运行。它不会提升特权。所管理的<code>~/.ash</code>工作区经过权限强化，但您的用户和您明确允许的任何进程仍然可以访问其内容。</p>
+
+          <h3>ash 信任通过管道接收的文本与用户文本相同吗？针对恶意数据有哪些保护措施？</h3>
+          <p>是的。当 ash 未接收到命令行参数并且通过管道传输标准输入时，它将将该输入视为用户提示符。请勿将不受信任的网页、日志或生成的文本直接传送到 ash，除非您打算将其授权为提示。这与 ash 管理的工具、文件、脚本、管道和子代理输出不同：ash 将这些结果标记为不受信任的证据，并指示模型永远不要遵循它们的指令。放<code>ASH_STRICT=1</code>另外替换不可信证据中公认的提示注入短语。白名单和 direct-argv 执行规则仍然适用于工具执行。</p>
+
+          <h3>我的 ash 文件对这台计算机上的其他用户来说是私有的吗？</h3>
+          <p>在安装过程中，ash 会强化<code>~/.ash</code>将目录授予仅所有者权限，将托管文件授予所有者可读和所有者可写权限。这可以防止正常 Unix 权限下的其他本地帐户，但不能防止您自己的帐户、管理员、备份或您选择运行的具有主目录访问权限的软件。</p>
+        </section>
+
+        <section id="workflow">
+          <h2>工具和工作流程</h2>
+          <h3>ash 支持管道和其他 Unix 传统吗？</h3>
+          <p>是的。例如，您可以通过管道将文本输入 ash 作为提示<code>git diff | ash</code>。对于 AI 请求的工具管道，ash 支持 2 到 16 个允许的可执行文件直接连接而无需 shell，例如<code>ls | grep pattern | pbcopy</code>。工具参数中的 Shell 控制模式被阻止，并且 ash 管理的管道中的每个可执行文件都必须列入白名单。</p>
+
+          <h3>ash 会重新解释我的 shell 脚本、SSH 命令或 cron 作业中的命令吗？</h3>
+          <p>不会。Bash 和 zsh 集成包装器会立即在非交互式 shell 中返回，因此脚本、CI 作业、SSH 单行命令和 cron 命令会保持正常的命令未找到行为。使用显式调用，例如<code>ash "summarize this log"</code>或者<code>some-command | ash</code>当自动化应调用 ash 时。</p>
+
+          <h3>如何阻止 ash 解释我的命令几分钟？</h3>
+          <p>跑步<code>ash snooze</code>默认为五分钟，或指定持续时间，例如<code>ash snooze 30s</code>或者<code>ash snooze 1h</code>。跑步<code>ash snooze off</code>立即恢复。 Snooze 暂停自动未找到命令和包装器路由；明确的<code>ash ...</code>命令仍然有效。</p>
+
+          <h3>如何调试 ash 并查看有关其正在执行的操作的更多信息？</h3>
+          <p>放<code>ASH_VERBOSE=1</code>在运行 ash 以启用结构化调试输出和终端执行仪表板之前。放<code>ASH_LOG_FILE</code>将调试 JSON 写入文件；<code>ASH_LOG_MAX_BYTES</code>控制旋转，配置日志文件时默认为 1 MiB。</p>
+
+          <h3>ash 运行工具时有哪些限制？</h3>
+          <p>默认情况下，每个工具调用都有 15 秒的超时时间，并捕获最多 8192 字节的输出。一个 AI 请求最多可以进行 16 次工具循环迭代，并且 ash 管理的管道有 2 到 16 个阶段。调整工具超时和输出限制<code>ASH_TOOL_TIMEOUT</code>和<code>ASH_TOOL_OUTPUT_MAX</code>;使用以下命令保持输出集中<code>head</code>,<code>tail</code>， 或者<code>grep</code>。</p>
+
+          <h3>默认的系统提示符在哪里？</h3>
+          <p>规范的提示文件是<code>~/.ash/.ash_system</code>，运行时从捆绑的默认安装<code>ash install</code>。 ash 首先读取该文件。如果不存在，ash 会回退到<code>.ash_system</code>在当前工作目录中，然后<code>~/.ash_system</code>。普通的<code>$VARIABLE</code>价值观是从环境中扩展出来的，但是<code>$TOOLS_DIR_LIST</code>,<code>$PLUGINS_DIR_LIST</code>， 和<code>$IF_PYTHON_AVAILABLE</code>是保留的内部 Ash 替换，并且绝不是环境派生的。</p>
+
+          <h3>我应该在哪里放置我自己的脚本和本机插件以供 ash 作为工具调用？</h3>
+          <p>将Python脚本放入<code>~/.ash/tools/</code>并编译了本机二进制插件<code>~/.ash/plugins/</code>。确保它们是可执行的，并将裸可执行名称添加到<code>~/.ash/.ash_allow</code>（或依赖<code>$TOOLS_DIR_LIST</code>/<code>$PLUGINS_DIR_LIST</code>）。 ash 不会为允许的 Unix 命令和插件调用 shell。</p>
+
+          <h3>工具或插件的最佳实践是什么，以便人工智能了解其目的和用途？</h3>
+          <p>遵循标准工具/插件模式：使用 CLI 参数公开可预测的选项；并实施<code>--ai-docs</code>解释功能、每个参数和默认值、输出模式、故障状态以及人工智能何时应使用该工具的选项。发出紧凑的结构化 JSON<code>status</code>字段和可操作的错误详细信息，而不是与数据混合的散文。保持输出有限，验证输入，设置网络超时，处理预期故障，并使工具可以安全地重复调用。将其裸文件名添加到<code>~/.ash/.ash_allow</code>; ash只有在白名单中且不在列表中时才能执行<code>~/.ash/.ash_deny</code>。</p>
+
+          <h3>提供的工具脚本和原生插件有哪些？</h3>
+          <p>安装的引导Python脚本是<code>headlines.py</code>,<code>wikipedia.py</code>， 和<code>yfinance.py</code>在<code>~/.ash/tools/</code>。提供的本机插件是<code>what_time_is_it</code>（去），<code>flip_a_coin</code>（铁锈），以及<code>calculator</code>（打字稿）在<code>~/.ash/plugins/</code>。</p>
+
+          <h3>ash可以呼叫子代理吗？</h3>
+          <p>是的。父代理可以使用<code>run_sub_agent</code>完成一项专注的、独立的任务。子级继承工作目录、配置、工具和操作系统权限，返回有界结果，并且无法创建另一个子级。默认最大值是每个父运行六个子代理，可以使用以下命令进行更改<code>ASH_MAX_AGENTS</code>。</p>
+
+          <h3>ash 能否生成内存文件来跟踪复杂的任务以及它在会话中学到的内容？</h3>
+          <p>是的。它可以在下面写入持久工作区文件<code>~/.ash</code>，其中被跟踪<code>~/.ash/inventory.md</code>，以及会话范围的临时文件<code>~/.ash/scratch/&lt;session-id&gt;/</code>。使用持久工作区文件来保存您想要保留的信息；将临时文件用于临时计划、注释和辅助工件。</p>
+
+          <h3>ash可以安排稍后工作吗？</h3>
+          <p>是的，通过其人工智能工具。在 macOS 上，一次性调度使用每用户<code>launchd</code>启动代理并需要<code>launchctl</code>。在 Linux 上，您的用户支持循环计划<code>crontab</code>; ash 仅管理其自己的标记条目。一次性的<code>launchd</code>调度程序在 Linux 上不可用，因此请使用 cron 条目或其他 Linux 调度程序来执行一次性 Linux 作业。计划运行接收有限的环境并使用直接 HTTPS 而不是交互式 shell 代理，因此请确保所需的 AI 配置可用于计划作业。他们无法使用远程 MCP 工具； Ash 在没有它们的情况下运行，并且不会在非交互式会话中发出警告。不要安排需要 MCP 的提示。</p>
+        </section>
+
+        <section id="storage">
+          <h2>会话和存储</h2>
+          <h3>ash 的历史记录或日志文件在哪里？</h3>
+          <p>对话历史记录以 JSON 形式存储在<code>~/.ash/history/&lt;SESSION_ID&gt;.json</code>;计划运行使用<code>task_&lt;SESSION_ID&gt;.json</code>。启用计划调试日志记录后，其默认日志位置是<code>~/.ash/logs/task_&lt;SESSION_ID&gt;.log</code>。您可以选择另一个调试日志路径<code>ASH_LOG_FILE</code>。</p>
+
+          <h3>历史文件保留多长时间？</h3>
+          <p>ash 在正常应用程序清理期间删除超过 14 天的历史 JSON 文件，清理预算为 300 毫秒，因此退出不会延迟。最近消息窗口是独立的：默认情况下每个对话最多保留 40 条消息，并且可以使用以下命令进行更改<code>ASH_HISTORY_MAX</code>。</p>
+
+          <h3>如何清理对话或重新开始？</h3>
+          <p>历史记录由会话 ID 和 AI 端点/模型密钥分隔。为新的会话 ID 启动新的终端会话，或删除下面的相关 JSON 文件<code>~/.ash/history/</code>当您故意想要丢弃本地对话历史记录时。删除历史文件不会撤销提供商密钥或删除提供商端数据；与提供商单独管理这些内容。</p>
+
+          <h3>什么是<code>SESSION_ID</code>它是在哪里生成的？</h3>
+          <p>它是每个会话的标识符，用于分隔历史记录、暂存空间、代理套接字和计划日志名称。托管 shell 环境生成一个随机的 16 个字符的字母数字值<code>/dev/urandom</code>当外壳启动时；当交互式调用没有值时，ash 也会创建一个。</p>
+
+          <h3>我可以替换的实施吗<code>SESSION_ID</code>发电机？</h3>
+          <p>您可以自己提供<code>SESSION_ID</code>在启动 ash 或自定义本地托管环境文件之前，但 ash 会对其进行验证。有效 ID 最多 128 个字符，并使用字母、数字、下划线、连字符以及一个可选的子会话点后缀。不要使用不受信任或共享的值：冲突结合了会话历史记录和运行时状态。</p>
+        </section>
+
+        <section id="support">
+          <h2>支持和社区</h2>
+          <h3>如何提交错误？</h3>
+          <p>在以下位置打开问题<a href="https://github.com/Jonconradt/ash/issues">github.com/Jonconradt/ash/issues</a>包含 ash 版本或提交、您的操作系统和 shell、与删除机密的问题相关的配置、可重现的步骤以及观察到的结果。对于安全漏洞，请勿公开发布问题；通过电子邮件或 GitHub 安全公告私下报告。</p>
+
+          <h3>ash项目中有讨论区吗？</h3>
+          <p>是的。使用<a href="https://github.com/Jonconradt/ash/discussions">GitHub 讨论</a>提出问题和想法，以及<a href="https://github.com/Jonconradt/ash/issues">GitHub 问题</a>用于可重现的错误和跟踪的工作。</p>
+        </section>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer page-width">
+    <a class="brand" href="./"><span class="brand-mark">&gt;_</span>ash</a>
+    <span>终端的实用人工智能。</span>
+    <a href="https://github.com/Jonconradt/ash">GitHub<span aria-hidden="true">&#8599;</span></a>
+  </footer>
+  <script src="../site.js" data-site-script defer></script>
+</body>
+</html>
