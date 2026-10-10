@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Jonathan L. Conradt
+// SPDX-License-Identifier: MIT
+
 // Command ash is the ash CLI entry point; see internal/app for implementation.
 package main
 

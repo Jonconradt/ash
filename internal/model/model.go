@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Jonathan L. Conradt
+// SPDX-License-Identifier: MIT
+
 // Package model holds the wire-level chat/tool data types shared by the ash CLI
 // (internal/app) and its provider adapters, kept dependency-free so either side
 // can import it without creating an import cycle.

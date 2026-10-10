@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Jonathan L. Conradt
+// SPDX-License-Identifier: MIT
+
 //go:build darwin || freebsd || linux
 
 package scratchlife

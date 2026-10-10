@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Copyright (c) 2026 Jonathan L. Conradt
+# SPDX-License-Identifier: MIT
+
 # run-quiet.sh — run a command, echoing its output only when it fails.
 #
 # Used by the Makefile "quiet" verify path so a green run prints one line per

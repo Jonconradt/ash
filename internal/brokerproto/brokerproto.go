@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Jonathan L. Conradt
+// SPDX-License-Identifier: MIT
+
 // Package brokerproto defines the wire protocol shared by the ash client
 // (broker.go) and the ash-broker server (cmd/ash-broker) so neither binary
 // needs to import the other.

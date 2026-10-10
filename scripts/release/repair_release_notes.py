@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# Copyright (c) 2026 Jonathan L. Conradt
+# SPDX-License-Identifier: MIT
+
 """Regenerate and repair GitHub Release bodies that contain one-line notes."""
 
 import argparse

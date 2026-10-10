@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Copyright (c) 2026 Jonathan L. Conradt
+# SPDX-License-Identifier: MIT
+
 
 set -Eeuo pipefail
 umask 077

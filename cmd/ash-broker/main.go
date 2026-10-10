@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Jonathan L. Conradt
+// SPDX-License-Identifier: MIT
+
 // Command ash-broker is a long-running, minimal-dependency HTTPS connection
 // broker used by the ash CLI to share keep-alive connections across
 // short-lived invocations. It deliberately avoids importing any AI provider

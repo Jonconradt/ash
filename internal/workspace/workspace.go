@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Jonathan L. Conradt
+// SPDX-License-Identifier: MIT
+
 // Package workspace resolves the canonical ash workspace directory layout under a
 // user's home directory, kept dependency-free for reuse by other internal packages.
 package workspace

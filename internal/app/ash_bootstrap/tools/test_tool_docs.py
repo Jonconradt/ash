@@ -1,3 +1,6 @@
+# Copyright (c) 2026 Jonathan L. Conradt
+# SPDX-License-Identifier: MIT
+
 import os
 import subprocess
 import sys

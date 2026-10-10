@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Copyright (c) 2026 Jonathan L. Conradt
+# SPDX-License-Identifier: MIT
+
 # Emails the ash-secupdate failure journal. Deployed host-only to
 # /home/jon/bin/ash-secupdate-failure-mail and wired to ash-secupdate.service via
 # OnFailure=ash-secupdate-failure.service. This repo copy is the source of truth;

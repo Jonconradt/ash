@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Copyright (c) 2026 Jonathan L. Conradt
+# SPDX-License-Identifier: MIT
+
 # Installs the developer toolchain required by `make lint test security release`.
 # Supports macOS (Homebrew) and Debian/Ubuntu-based Linux (apt).
 

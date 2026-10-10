@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Jonathan L. Conradt
+// SPDX-License-Identifier: MIT
+
 // Package uistyle renders lipgloss-styled output for interactive install prompts.
 // lipgloss auto-detects the terminal's color profile and safely degrades to plain
 // text on non-TTY output (e.g. piped or CI runs).

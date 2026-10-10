@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# Copyright (c) 2026 Jonathan L. Conradt
+# SPDX-License-Identifier: MIT
+
 # Install and configure the ash security-update service for a developer machine.
 #
 # Linux (systemd): installs ash-secupdate.service + .timer, the OnFailure mail

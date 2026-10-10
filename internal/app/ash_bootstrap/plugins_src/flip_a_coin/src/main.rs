@@ -1,3 +1,6 @@
+// Copyright (c) 2026 Jonathan L. Conradt
+// SPDX-License-Identifier: MIT
+
 use std::env;
 use std::fs::{File, OpenOptions};
 use std::io::{Read, Write};

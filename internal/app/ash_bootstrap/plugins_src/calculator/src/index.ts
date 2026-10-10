@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+// Copyright (c) 2026 Jonathan L. Conradt
+// SPDX-License-Identifier: MIT
+
 
 import * as fs from "node:fs";
 import * as path from "node:path";
