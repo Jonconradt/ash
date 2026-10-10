@@ -849,28 +849,7 @@ func writeUpgradeAsset(destination string, content []byte, executable bool) erro
 }
 
 func writeUpgradeAssetMode(destination string, content []byte, mode os.FileMode) error {
-	temporary, err := os.CreateTemp(filepath.Dir(destination), ".ash-asset-*")
-	if err != nil {
-		return err
-	}
-	temporaryPath := temporary.Name()
-	defer func() { _ = os.Remove(temporaryPath) }() // #nosec G703 -- temporaryPath is the unique file created above.
-	if err := temporary.Chmod(mode.Perm()); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if _, err := temporary.Write(content); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Sync(); err != nil {
-		_ = temporary.Close()
-		return err
-	}
-	if err := temporary.Close(); err != nil {
-		return err
-	}
-	return os.Rename(temporaryPath, destination) // #nosec G703 -- destination is an updater-owned target; the temporary file is created beside it.
+	return writeFileAtomically(destination, content, mode)
 }
 
 func snapshotUpgradeFiles(paths []string) ([]upgradeFileSnapshot, error) {

@@ -445,9 +445,9 @@ func TestRun(t *testing.T) {
 		t.Setenv("ASH_AI_ENDPOINT", srv.URL)
 		t.Setenv("ASH_AI_MODEL", "llama3.1")
 
-		originalWrite := osWriteFile
-		t.Cleanup(func() { osWriteFile = originalWrite })
-		osWriteFile = func(string, []byte, os.FileMode) error { return errors.New("disk full") }
+		originalWrite := atomicWriteFile
+		t.Cleanup(func() { atomicWriteFile = originalWrite })
+		atomicWriteFile = func(string, []byte, os.FileMode) error { return errors.New("disk full") }
 
 		var stdout bytes.Buffer
 		var stderr bytes.Buffer

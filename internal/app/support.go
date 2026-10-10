@@ -17,6 +17,7 @@ import (
 )
 
 type historyData struct {
+	SchemaVersion int                  `json:"schema_version"`
 	Version       string               `json:"version"`
 	Conversations map[string][]message `json:"conversations"`
 }
@@ -34,13 +35,14 @@ type toolCommandResult struct {
 }
 
 type recurringJobMetadata struct {
-	ID        string            `json:"id"`
-	Cron      string            `json:"cron"`
-	Prompt    string            `json:"prompt"`
-	Cwd       string            `json:"cwd"`
-	Env       map[string]string `json:"env"`
-	Purpose   string            `json:"purpose,omitempty"`
-	CreatedAt string            `json:"created_at"`
+	SchemaVersion int               `json:"schema_version"`
+	ID            string            `json:"id"`
+	Cron          string            `json:"cron"`
+	Prompt        string            `json:"prompt"`
+	Cwd           string            `json:"cwd"`
+	Env           map[string]string `json:"env"`
+	Purpose       string            `json:"purpose,omitempty"`
+	CreatedAt     string            `json:"created_at"`
 }
 
 type recurringJobRecord struct {
@@ -55,6 +57,7 @@ var (
 	osUserHomeDir       = os.UserHomeDir
 	osReadFile          = os.ReadFile
 	osWriteFile         = os.WriteFile
+	atomicWriteFile     = writeFileAtomically
 	stdinIsInteractive  = isInteractiveStdin
 	readPromptFromStdin = readAllPromptFromStdin
 	execLookPath        = exec.LookPath

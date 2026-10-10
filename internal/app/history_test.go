@@ -3,9 +3,11 @@ package app
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -116,6 +118,9 @@ func TestLoadHistoryNotFound(t *testing.T) {
 	if data.Version != executionDashboardVersion() {
 		t.Fatalf("expected current version %q, got %q", executionDashboardVersion(), data.Version)
 	}
+	if data.SchemaVersion != historySchemaVersion {
+		t.Fatalf("expected schema version %d, got %d", historySchemaVersion, data.SchemaVersion)
+	}
 }
 
 func TestLoadHistoryReadError(t *testing.T) {
@@ -144,7 +149,9 @@ func TestLoadHistoryInitializesNilMap(t *testing.T) {
 	origReadFile := osReadFile
 	t.Cleanup(func() { osReadFile = origReadFile })
 
-	osReadFile = func(string) ([]byte, error) { return []byte(`{"conversations":null}`), nil }
+	osReadFile = func(string) ([]byte, error) {
+		return []byte(`{"schema_version":1,"conversations":null}`), nil
+	}
 	data, err := loadHistory("ignored")
 	if err != nil {
 		t.Fatalf("loadHistory returned error: %v", err)
@@ -156,15 +163,12 @@ func TestLoadHistoryInitializesNilMap(t *testing.T) {
 
 func TestSaveAndLoadHistoryRoundTrip(t *testing.T) {
 	origReadFile := osReadFile
-	origWriteFile := osWriteFile
-	t.Cleanup(func() {
-		osReadFile = origReadFile
-		osWriteFile = origWriteFile
-	})
+	t.Cleanup(func() { osReadFile = origReadFile })
 
 	path := filepath.Join(t.TempDir(), "history.json")
 	input := historyData{
-		Version: executionDashboardVersion(),
+		SchemaVersion: historySchemaVersion,
+		Version:       executionDashboardVersion(),
 		Conversations: map[string][]message{
 			"k": {
 				{Role: "user", Content: "u"},
@@ -190,13 +194,54 @@ func TestSaveAndLoadHistoryRoundTrip(t *testing.T) {
 }
 
 func TestSaveHistoryWriteError(t *testing.T) {
-	origWriteFile := osWriteFile
-	t.Cleanup(func() { osWriteFile = origWriteFile })
+	path := filepath.Join(t.TempDir(), "missing", "history.json")
+	err := saveHistory(path, historyData{Conversations: map[string][]message{}})
+	if err == nil {
+		t.Fatal("expected an error when the history directory does not exist")
+	}
+}
 
-	osWriteFile = func(string, []byte, os.FileMode) error { return errors.New("write failed") }
-	err := saveHistory("ignored", historyData{Conversations: map[string][]message{}})
-	if err == nil || !strings.Contains(err.Error(), "write failed") {
-		t.Fatalf("expected write failed error, got %v", err)
+func TestLoadHistoryRejectsUnsupportedSchema(t *testing.T) {
+	for _, schemaVersion := range []int{0, historySchemaVersion + 1} {
+		t.Run(strconv.Itoa(schemaVersion), func(t *testing.T) {
+			path := filepath.Join(t.TempDir(), "history.json")
+			content := []byte(fmt.Sprintf(`{"schema_version":%d,"conversations":{}}`, schemaVersion))
+			if err := os.WriteFile(path, content, 0o600); err != nil {
+				t.Fatalf("write history fixture: %v", err)
+			}
+			_, err := loadHistory(path)
+			if err == nil || !strings.Contains(err.Error(), "unsupported history schema version") {
+				t.Fatalf("expected unsupported schema error, got %v", err)
+			}
+		})
+	}
+}
+
+func TestSaveHistoryWritesAtomicallyWithPrivatePermissions(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "history.json")
+	if err := os.WriteFile(path, []byte("old"), 0o600); err != nil {
+		t.Fatalf("write initial history: %v", err)
+	}
+	if err := saveHistory(path, historyData{Conversations: map[string][]message{}}); err != nil {
+		t.Fatalf("saveHistory returned error: %v", err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read saved history: %v", err)
+	}
+	var got historyData
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("history file is not valid JSON: %v", err)
+	}
+	if got.SchemaVersion != historySchemaVersion {
+		t.Fatalf("schema version = %d, want %d", got.SchemaVersion, historySchemaVersion)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat saved history: %v", err)
+	}
+	if info.Mode().Perm() != 0o600 {
+		t.Fatalf("history permissions = %o, want 600", info.Mode().Perm())
 	}
 }
 

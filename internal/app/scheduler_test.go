@@ -3,6 +3,7 @@ package app
 import (
 	"encoding/base64"
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -182,7 +183,7 @@ func TestSchedulingHelpers(t *testing.T) {
 		t.Fatalf("unexpected recurring job line: %q", line)
 	}
 
-	payload, err := json.Marshal(recurringJobMetadata{ID: "job-1", Cron: "@daily", Prompt: "echo hi", Cwd: "/tmp", Env: map[string]string{"PATH": "/usr/bin"}, Purpose: "test", CreatedAt: time.Now().Format(time.RFC3339)})
+	payload, err := json.Marshal(recurringJobMetadata{SchemaVersion: schedulerSchemaVersion, ID: "job-1", Cron: "@daily", Prompt: "echo hi", Cwd: "/tmp", Env: map[string]string{"PATH": "/usr/bin"}, Purpose: "test", CreatedAt: time.Now().Format(time.RFC3339)})
 	if err != nil {
 		t.Fatalf("marshal metadata: %v", err)
 	}
@@ -193,5 +194,21 @@ func TestSchedulingHelpers(t *testing.T) {
 	}
 	if len(records) != 1 || records[0].Meta.ID != "job-1" {
 		t.Fatalf("expected one recurring job record, got %#v", records)
+	}
+}
+
+func TestParseRecurringJobsRejectsUnsupportedSchema(t *testing.T) {
+	for _, schemaVersion := range []int{0, schedulerSchemaVersion + 1} {
+		t.Run(strconv.Itoa(schemaVersion), func(t *testing.T) {
+			payload, err := json.Marshal(recurringJobMetadata{SchemaVersion: schemaVersion, ID: "job-1"})
+			if err != nil {
+				t.Fatalf("marshal metadata: %v", err)
+			}
+			encoded := base64.RawStdEncoding.EncodeToString(payload)
+			_, err = parseRecurringJobs("@daily /bin/sh # ash:job job-1 " + encoded)
+			if err == nil || !strings.Contains(err.Error(), "unsupported scheduled-job metadata schema version") {
+				t.Fatalf("expected unsupported schema error, got %v", err)
+			}
+		})
 	}
 }

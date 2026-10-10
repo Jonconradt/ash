@@ -17,6 +17,8 @@ import (
 	"time"
 )
 
+const schedulerSchemaVersion = 1
+
 // schedulerEnvAllowlist returns the subset of environment variables that should be inherited by scheduled ash invocations.
 func schedulerEnvAllowlist() map[string]string {
 	keys := []string{
@@ -408,13 +410,14 @@ func buildRecurringJobLine(prompt, cronExpr, cwd, purpose, id string) (recurring
 		id = fmt.Sprintf("job-%d", timeNow().UnixNano())
 	}
 	meta := recurringJobMetadata{
-		ID:        strings.TrimSpace(id),
-		Cron:      strings.TrimSpace(cronExpr),
-		Prompt:    strings.TrimSpace(prompt),
-		Cwd:       strings.TrimSpace(cwd),
-		Env:       env,
-		Purpose:   strings.TrimSpace(purpose),
-		CreatedAt: timeNow().Format(time.RFC3339),
+		SchemaVersion: schedulerSchemaVersion,
+		ID:            strings.TrimSpace(id),
+		Cron:          strings.TrimSpace(cronExpr),
+		Prompt:        strings.TrimSpace(prompt),
+		Cwd:           strings.TrimSpace(cwd),
+		Env:           env,
+		Purpose:       strings.TrimSpace(purpose),
+		CreatedAt:     timeNow().Format(time.RFC3339),
 	}
 	script, err := buildScheduledInvocationScriptWithEnv(meta.Prompt, meta.Cwd, meta.Env)
 	if err != nil {
@@ -469,6 +472,9 @@ func parseRecurringJobs(content string) ([]recurringJobRecord, error) {
 		var meta recurringJobMetadata
 		if err := json.Unmarshal(decoded, &meta); err != nil {
 			return nil, err
+		}
+		if meta.SchemaVersion != schedulerSchemaVersion {
+			return nil, fmt.Errorf("unsupported scheduled-job metadata schema version %d for job %q (supported: %d); preserve the schedule and use a compatible Ash version", meta.SchemaVersion, id, schedulerSchemaVersion)
 		}
 		if meta.ID == "" {
 			meta.ID = id

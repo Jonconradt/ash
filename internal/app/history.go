@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net"
 	"os"
 	"path/filepath"
@@ -11,6 +12,8 @@ import (
 	"strings"
 	"time"
 )
+
+const historySchemaVersion = 1
 
 // sortedAllowlist returns the allowlisted tool names in sorted order.
 func sortedAllowlist(allowlist map[string]struct{}) []string {
@@ -165,7 +168,11 @@ func brokerSocketAlive(path string) bool {
 func loadHistory(path string) (historyData, error) {
 	content, err := osReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
-		return historyData{Version: executionDashboardVersion(), Conversations: map[string][]message{}}, nil
+		return historyData{
+			SchemaVersion: historySchemaVersion,
+			Version:       executionDashboardVersion(),
+			Conversations: map[string][]message{},
+		}, nil
 	}
 	if err != nil {
 		return historyData{}, err
@@ -174,6 +181,9 @@ func loadHistory(path string) (historyData, error) {
 	var data historyData
 	if err := json.Unmarshal(content, &data); err != nil {
 		return historyData{}, err
+	}
+	if data.SchemaVersion != historySchemaVersion {
+		return historyData{}, fmt.Errorf("unsupported history schema version %d in %q (supported: %d); preserve the file and use a compatible Ash version", data.SchemaVersion, path, historySchemaVersion)
 	}
 	if data.Conversations == nil {
 		data.Conversations = map[string][]message{}
@@ -184,11 +194,12 @@ func loadHistory(path string) (historyData, error) {
 
 // saveHistory writes chat history to the provided JSON file path.
 func saveHistory(path string, data historyData) error {
+	data.SchemaVersion = historySchemaVersion
 	data.Version = executionDashboardVersion()
 	content, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return err
 	}
 
-	return osWriteFile(path, content, 0o600)
+	return atomicWriteFile(path, content, 0o600)
 }
