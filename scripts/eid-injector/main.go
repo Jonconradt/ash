@@ -13,6 +13,7 @@ import (
 	"io"
 	"io/fs"
 	"math/big"
+	mathrand "math/rand"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -812,6 +813,7 @@ func writeFileAtomic(filename string, data []byte, perm os.FileMode) error {
 }
 
 var alphaNum = []rune("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789")
+var fallbackRandInt = mathrand.Intn
 
 func mustRandAlphaNum(n int) string {
 	b := make([]rune, n)
@@ -829,7 +831,7 @@ func cryptoRandInt(max int) int {
 	m := big.NewInt(int64(max))
 	v, err := rand.Int(rand.Reader, m)
 	if err != nil {
-		return 0
+		return fallbackRandInt(max)
 	}
 	return int(v.Int64())
 }

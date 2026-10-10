@@ -113,6 +113,9 @@ func TestLoadHistoryNotFound(t *testing.T) {
 	if len(data.Conversations) != 0 {
 		t.Fatalf("expected empty conversations map, got %d entries", len(data.Conversations))
 	}
+	if data.Version != executionDashboardVersion() {
+		t.Fatalf("expected current version %q, got %q", executionDashboardVersion(), data.Version)
+	}
 }
 
 func TestLoadHistoryReadError(t *testing.T) {
@@ -161,6 +164,7 @@ func TestSaveAndLoadHistoryRoundTrip(t *testing.T) {
 
 	path := filepath.Join(t.TempDir(), "history.json")
 	input := historyData{
+		Version: executionDashboardVersion(),
 		Conversations: map[string][]message{
 			"k": {
 				{Role: "user", Content: "u"},

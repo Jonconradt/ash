@@ -1,6 +1,7 @@
 package main
 
 import (
+	cryptorand "crypto/rand"
 	"errors"
 	"os"
 	"path/filepath"
@@ -47,6 +48,30 @@ func TestBuildPlanAllModeMarksChangedWhenPrecleanRewritesInvalidPersistenceEID(t
 	}
 	if strings.Contains(string(out), "\\xff") {
 		t.Fatalf("expected invalid escaped bytes to be replaced")
+	}
+}
+
+func TestCryptoRandIntAlwaysReturnsAnAlphaNumericIndex(t *testing.T) {
+	for i := 0; i < 100; i++ {
+		got := cryptoRandInt(len(alphaNum))
+		if got < 0 || got >= len(alphaNum) {
+			t.Fatalf("cryptoRandInt returned out-of-range index %d", got)
+		}
+	}
+}
+
+func TestCryptoRandIntFallsBackWhenSecureRandomnessFails(t *testing.T) {
+	originalReader := cryptorand.Reader
+	originalFallback := fallbackRandInt
+	t.Cleanup(func() {
+		cryptorand.Reader = originalReader
+		fallbackRandInt = originalFallback
+	})
+	cryptorand.Reader = strings.NewReader("")
+	fallbackRandInt = func(max int) int { return max - 1 }
+
+	if got, want := cryptoRandInt(len(alphaNum)), len(alphaNum)-1; got != want {
+		t.Fatalf("cryptoRandInt fallback = %d, want %d", got, want)
 	}
 }
 

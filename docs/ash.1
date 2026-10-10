@@ -26,6 +26,9 @@ ash \- practical shell assistant for command-not-found workflows
 .B update
 .RI [ --version vX.Y.Z ]
 .RI [ --yes | --skip-customized ]
+.br
+.B ash
+.B version
 .SH DESCRIPTION
 .B ash
 sends prompt text to the configured AI endpoint and prints the assistant response.
@@ -71,6 +74,9 @@ For Fish, the target is
 (defaulting to
 .IR ~/.config/fish/config.fish ).
 .SH COMMANDS
+.TP
+.B ash version
+Print the version of the running ash binary.
 .TP
 .B ash [text ...]
 Run a single assistant request.

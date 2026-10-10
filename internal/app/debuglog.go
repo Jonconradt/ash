@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -176,6 +177,13 @@ func (w *rotatingSchedulerLogWriter) openCurrent() error {
 	}
 	w.file = file
 	w.size = info.Size()
+	if w.size == 0 {
+		if err := w.writeVersionHeader(); err != nil {
+			_ = file.Close()
+			w.file = nil
+			return err
+		}
+	}
 	if w.maxBytes > 0 && w.size >= w.maxBytes {
 		return w.rotateCurrent()
 	}
@@ -201,5 +209,33 @@ func (w *rotatingSchedulerLogWriter) rotateCurrent() error {
 	}
 	w.file = file
 	w.size = 0
+	return w.writeVersionHeader()
+}
+
+func (w *rotatingSchedulerLogWriter) writeVersionHeader() error {
+	version := executionDashboardVersion()
+	header, err := json.Marshal(struct {
+		Time    string `json:"time"`
+		Level   string `json:"level"`
+		Message string `json:"message"`
+		Version string `json:"version"`
+	}{
+		Time:    timeNow().Format("2006-01-02T15:04:05.999999999Z07:00"),
+		Level:   "info",
+		Message: "ash version: " + version,
+		Version: version,
+	})
+	if err != nil {
+		return err
+	}
+	header = append(header, '\n')
+	n, err := w.file.Write(header)
+	w.size += int64(n)
+	if err != nil {
+		return err
+	}
+	if n != len(header) {
+		return io.ErrShortWrite
+	}
 	return nil
 }

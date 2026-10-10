@@ -80,6 +80,10 @@ func Run(args []string, stdout, stderr io.Writer) int {
 
 // run runs the requested operation.
 func run(args []string, stdout, stderr io.Writer) int {
+	if len(args) == 1 && (args[0] == "version" || args[0] == "--version") {
+		_, _ = fmt.Fprintln(stdout, executionDashboardVersion())
+		return 0
+	}
 	if !initLanguage(stderr) {
 		return 1
 	}

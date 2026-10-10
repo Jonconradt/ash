@@ -166,7 +166,7 @@ func brokerSocketAlive(path string) bool {
 func loadHistory(path string) (historyData, error) {
 	content, err := osReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
-		return historyData{Conversations: map[string][]message{}}, nil
+		return historyData{Version: executionDashboardVersion(), Conversations: map[string][]message{}}, nil
 	}
 	if err != nil {
 		return historyData{}, err
@@ -185,6 +185,7 @@ func loadHistory(path string) (historyData, error) {
 
 // saveHistory writes chat history to the provided JSON file path.
 func saveHistory(path string, data historyData) error {
+	data.Version = executionDashboardVersion()
 	content, err := json.MarshalIndent(data, "", "  ")
 	if err != nil {
 		return err

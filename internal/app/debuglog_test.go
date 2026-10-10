@@ -45,6 +45,10 @@ func TestSchedulerDebugLoggingRotatesJSON(t *testing.T) {
 	if !strings.Contains(string(currentData), "second ") {
 		t.Fatalf("expected current log file to contain second entry, got %q", string(currentData))
 	}
+	currentHeader := strings.SplitN(string(currentData), "\n", 2)[0]
+	if !strings.Contains(currentHeader, `"message":"ash version: `) {
+		t.Fatalf("expected current log file to start with version information, got %q", currentHeader)
+	}
 
 	rotatedData, err := os.ReadFile(rotatedPath)
 	if err != nil {
@@ -52,6 +56,39 @@ func TestSchedulerDebugLoggingRotatesJSON(t *testing.T) {
 	}
 	if !strings.Contains(string(rotatedData), "first ") {
 		t.Fatalf("expected rotated log file to contain first entry, got %q", string(rotatedData))
+	}
+	rotatedHeader := strings.SplitN(string(rotatedData), "\n", 2)[0]
+	if !strings.Contains(rotatedHeader, `"message":"ash version: `) {
+		t.Fatalf("expected rotated log file to start with version information, got %q", rotatedHeader)
+	}
+}
+
+func TestRunPrintsVersionWithoutRuntimeConfiguration(t *testing.T) {
+	origVersion := ashVersion
+	origCommit := ashCommit
+	origDevelopment := ashDevelopmentBuild
+	t.Cleanup(func() {
+		ashVersion = origVersion
+		ashCommit = origCommit
+		ashDevelopmentBuild = origDevelopment
+	})
+	ashVersion = "1.2.3"
+	ashCommit = "abcdef1234567890"
+	ashDevelopmentBuild = "true"
+
+	for _, command := range []string{"version", "--version"} {
+		t.Run(command, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			if code := run([]string{command}, &stdout, &stderr); code != 0 {
+				t.Fatalf("run returned %d, stderr=%q", code, stderr.String())
+			}
+			if got, want := strings.TrimSpace(stdout.String()), "v1.2.3 (dev:7890)"; got != want {
+				t.Fatalf("version output = %q, want %q", got, want)
+			}
+			if stderr.Len() != 0 {
+				t.Fatalf("expected no stderr output, got %q", stderr.String())
+			}
+		})
 	}
 }
 

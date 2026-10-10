@@ -17,6 +17,7 @@ import (
 )
 
 type historyData struct {
+	Version       string               `json:"version"`
 	Conversations map[string][]message `json:"conversations"`
 }
 
