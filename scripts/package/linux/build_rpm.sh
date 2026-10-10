@@ -136,7 +136,7 @@ if [[ ! -f "$man_page_path" ]]; then
 fi
 
 if ! command -v fpm >/dev/null 2>&1; then
-  echo "fpm command not found. Install with: gem install --no-document fpm" >&2
+  echo "fpm command not found. Install with: gem install --no-document --version 1.18.0 fpm" >&2
   exit 1
 fi
 

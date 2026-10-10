@@ -16,8 +16,9 @@ fail() {
 GOLANGCI_LINT_VERSION="${GOLANGCI_LINT_VERSION:-v2.14.0}"
 GOSEC_VERSION="${GOSEC_VERSION:-v2.29.1-0.20261009120814-7b1b5cebe007}"
 GOVULNCHECK_VERSION="${GOVULNCHECK_VERSION:-v1.8.0}"
-STATICCHECK_VERSION="${STATICCHECK_VERSION:-latest}"
-YAMLFMT_VERSION="${YAMLFMT_VERSION:-latest}"
+STATICCHECK_VERSION="${STATICCHECK_VERSION:-2026.2.1}"
+YAMLFMT_VERSION="${YAMLFMT_VERSION:-v0.21.0}"
+FPM_VERSION="${FPM_VERSION:-1.18.0}"
 RUFF_VERSION="${RUFF_VERSION:-0.12.10}"
 MARKDOWNLINT_CLI2_VERSION="${MARKDOWNLINT_CLI2_VERSION:-0.23.2}"
 
@@ -60,9 +61,9 @@ install_linux_packages() {
 		apt_install "$pkg"
 	done
 
-	if command -v gem >/dev/null 2>&1 && ! gem list -i fpm >/dev/null 2>&1; then
-		log "gem: installing fpm (required for .deb/.rpm packaging in 'make release')"
-		sudo gem install --no-document fpm
+	if command -v gem >/dev/null 2>&1 && ! gem list -i -v "$FPM_VERSION" fpm >/dev/null 2>&1; then
+		log "gem: installing fpm $FPM_VERSION (required for .deb/.rpm packaging in 'make release')"
+		sudo gem install --no-document --version "$FPM_VERSION" fpm
 	fi
 
 	if command -v uv >/dev/null 2>&1; then

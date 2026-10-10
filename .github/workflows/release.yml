@@ -11,23 +11,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v5
       - name: Set up Rust 1.99.0
         run: rustup toolchain install 1.99.0 --profile minimal
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           go-version-file: go.mod
       - name: Setup uv
-        uses: astral-sh/setup-uv@v10.0.1
+        uses: astral-sh/setup-uv@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v10.0.1
         with:
           version: "0.12.5"
       - name: Setup Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
-          node-version: 22
+          node-version: 22.23.3
       - name: Run quality checks
-        run: make lint test
+        run: make verify
       - name: Verify FreeBSD cross-compilation
         run: |
           GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build ./...
@@ -42,11 +42,11 @@ jobs:
         arch: [amd64, arm64]
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v5
       - name: Set up Rust 1.99.0
         run: rustup toolchain install 1.99.0 --profile minimal
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           go-version-file: go.mod
       - name: Install Rust cross target
@@ -72,7 +72,7 @@ jobs:
           test -f "$smoke_home/.config/ash/.ash_bashrc"
           bash -n "$smoke_home/.config/ash/.ash_bashrc"
       - name: Upload macOS artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v6
         with:
           name: release-macos-${{ matrix.arch }}
           path: dist/release/*darwin-${{ matrix.arch }}*
@@ -85,18 +85,18 @@ jobs:
         arch: [amd64, arm64]
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v5
       - name: Set up Rust 1.99.0
         run: rustup toolchain install 1.99.0 --profile minimal
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           go-version-file: go.mod
       - name: Install packaging tools
         run: |
           sudo apt-get update
           sudo apt-get install -y ruby ruby-dev build-essential rpm
-          sudo gem install --no-document fpm
+          sudo gem install --no-document --version 1.18.0 fpm
       - name: Install Rust cross toolchain (arm64)
         if: matrix.arch == 'arm64'
         run: |
@@ -120,7 +120,7 @@ jobs:
           test -f "$smoke_home/.config/ash/.ash_bashrc"
           bash -n "$smoke_home/.config/ash/.ash_bashrc"
       - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v6
         with:
           name: release-linux-${{ matrix.arch }}
           path: dist/release/*linux-${{ matrix.arch }}*
@@ -133,22 +133,22 @@ jobs:
         arch: [amd64]
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v5
       - name: Set up Rust 1.99.0
         run: rustup toolchain install 1.99.0 --profile minimal
       - name: Setup Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           go-version-file: go.mod
       - name: Install Rust cross toolchain (FreeBSD)
         # cross-rs builds the Rust plugin inside a Docker image with a real FreeBSD
         # sysroot; a plain rustup target add can't link a FreeBSD binary from Linux.
-        run: cargo install cross --git https://github.com/cross-rs/cross --locked
+        run: cargo install cross --version 0.2.5 --locked
       - name: Build and package FreeBSD artifacts
         run: |
           make release-artifacts RELEASE_TARGET_OSES=freebsd RELEASE_TARGET_ARCHES=${{ matrix.arch }} RELEASE_VERSION="${GITHUB_REF_NAME}"
       - name: Upload FreeBSD artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v6
         with:
           name: release-freebsd-${{ matrix.arch }}
           path: dist/release/*freebsd-${{ matrix.arch }}*
@@ -157,12 +157,12 @@ jobs:
     needs: package-freebsd
     steps:
       - name: Download FreeBSD amd64 artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           name: release-freebsd-amd64
           path: artifacts
       - name: Install ash in a FreeBSD VM
-        uses: vmactions/freebsd-vm@v1
+        uses: vmactions/freebsd-vm@c46abacb49f09938ca4e1702d15d836285d694cc # v1
         with:
           release: "14"
           cache-after-prepare: true
@@ -191,17 +191,19 @@ jobs:
       actions: read
       contents: write
       id-token: write
+      attestations: write
+      artifact-metadata: write
     needs:
       - package-macos
       - package-linux
       - package-freebsd
     steps:
       - name: Checkout release tag
-        uses: actions/checkout@v5
+        uses: actions/checkout@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v5
         with:
           fetch-depth: 0
       - name: Download packaged artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           path: dist/release
       - name: Flatten artifact directories
@@ -215,13 +217,13 @@ jobs:
             cp "$catalog" "dist/release/ash-language-${locale}.json"
           done
       - name: Generate release SBOM
-        uses: anchore/sbom-action@v0.24.0
+        uses: anchore/sbom-action@88f49ff79e777bef6d3564531636ee4d3cc2f8d2 # v0.24.0
         with:
           path: dist/release
           format: spdx-json
           output-file: dist/release/sbom.spdx.json
       - name: Install cosign
-        uses: sigstore/cosign-installer@v3.8.1
+        uses: sigstore/cosign-installer@4d101475d8b20a2381f78447822ac1eab6504dd8 # v3.8.1
       - name: Generate and sign checksum manifest
         run: |
           set -euo pipefail
@@ -237,6 +239,23 @@ jobs:
           make release-checksums RELEASE_PACKAGE_DIR="$PWD/dist/release"
           cd dist/release
           cosign sign-blob --yes --bundle SHA256SUMS.sigstore.json SHA256SUMS
+      - name: Attest release artifacts
+        id: attest
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-path: |
+            dist/release/ash-*.pkg
+            dist/release/ash-*.deb
+            dist/release/ash-*.rpm
+            dist/release/ash-*.tar.gz
+            dist/release/ash-*.msi
+            dist/release/ash-language-*.json
+            dist/release/sbom.spdx.json
+            dist/release/SHA256SUMS
+      - name: Stage provenance bundle for release
+        env:
+          BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
+        run: cp "$BUNDLE_PATH" dist/release/provenance.sigstore.json
       - name: Extract release notes
         run: |
           set -euo pipefail
@@ -255,7 +274,7 @@ jobs:
             exit 1
           fi
       - name: Publish GitHub release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
           body_path: release-notes.md
           files: |

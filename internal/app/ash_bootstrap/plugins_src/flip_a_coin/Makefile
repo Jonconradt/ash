@@ -49,7 +49,7 @@ build:
 	else \
 		command -v cross >/dev/null 2>&1 || { \
 			echo "flip_a_coin: 'cross' is required to build $$target_os/$$target_arch from a $$host_os host"; \
-			echo "install with: cargo install cross --git https://github.com/cross-rs/cross --locked"; \
+			echo "install with: cargo install cross --version 0.2.5 --locked"; \
 			exit 1; \
 		}; \
 		$(RUN_QUIET) "cross-build" cross build --release --target "$$triple"; \
