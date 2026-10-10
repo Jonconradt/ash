@@ -58,12 +58,16 @@ func formatUntrustedEvidenceBlock(kind, source, content string) string {
 
 // buildSystemPrompt creates the system prompt prefix that includes guidance and the user's request.
 func buildSystemPrompt(userPrompt string, now time.Time) string {
-	guidance := subAgentSystemGuidance()
+	guidance := subAgentSystemGuidance() + "\n\n" + scratchWorkspaceSystemGuidance()
 	trimmed := strings.TrimSpace(userPrompt)
 	if trimmed == "" {
 		return guidance
 	}
 	return guidance + "\n\n" + trimmed
+}
+
+func scratchWorkspaceSystemGuidance() string {
+	return "Scratch workspace: use read_scratch_file, write_scratch_file, append_scratch_file, replace_scratch_file, edit_scratch_file, and list_scratch_files directly as tools, not through run_unix_command. Use scratch only when a reusable script, intermediate data, accumulated findings, or revisable artifact adds value; prefer direct commands or inline Python for simple one-off work and do not create files just to plan. Paths are relative to this session; use returned absolute_path values for execution and never construct session paths. Use write for complete initial content, append to add literal text, edit to replace one uniquely matching fragment, replace for a complete rewrite, read to inspect, and list to rediscover earlier session files. Scratch is temporary: active Ash invocations are protected from cleanup; inactive sessions are eligible for cleanup after the retention window. Use workspace tools for information meant to persist."
 }
 
 func subAgentSystemGuidance() string {

@@ -365,8 +365,26 @@ fragments. The session ID is resolved automatically from the active ash session;
 AI callers do not need to remember or provide it. Scratch files are kept within
 the managed Ash workspace and are not written to arbitrary directories such as
 .IR /tmp .
-When ash exits, it checks for stale scratch directories older than 48 hours that
-have not been accessed in the last 24 hours and removes the entire directory.
+Active ash invocations and their shell broker hold a private OS-backed lock in the
+session directory. Cleanup never removes a locked session. When ash exits, it removes
+unlocked scratch directories older than 48 hours that have not been accessed in the
+last 24 hours. A crashed process releases its OS lock automatically; a leftover lock
+file does not block cleanup. Eligible abandoned directories are removed on a later
+ash-exit cleanup sweep, not immediately on broker shutdown.
+.PP
+Scratch tools are optional and session-scoped: use them for useful temporary scripts,
+intermediate data, accumulated findings, or revisable artifacts, not for mandatory
+planning on every request. The tools are
+.BR read_scratch_file ,
+.BR write_scratch_file ,
+.BR append_scratch_file ,
+.BR replace_scratch_file ,
+.BR edit_scratch_file ,
+and
+.BR list_scratch_files .
+The edit tool replaces one uniquely matching literal text fragment and fails without
+changing the file when the match is missing or ambiguous. Replace rewrites the whole
+file and creates it if missing. Use persistent workspace files for information to keep.
 .PP
 On macOS, Linux, and FreeBSD, installed Bash and zsh wrappers lazily start one unprivileged
 broker per interactive shell. The broker keeps a bounded HTTPS connection pool

@@ -369,6 +369,14 @@ func TestBuildSystemPrompt(t *testing.T) {
 		if !strings.Contains(got, "run_sub_agent") || !strings.Contains(got, "untrusted evidence") {
 			t.Fatalf("expected delegation guidance, got %q", got)
 		}
+		for _, name := range []string{"read_scratch_file", "write_scratch_file", "append_scratch_file", "replace_scratch_file", "edit_scratch_file", "list_scratch_files"} {
+			if !strings.Contains(got, name) {
+				t.Errorf("runtime scratch guidance omitted %q", name)
+			}
+		}
+		if strings.Contains(got, "ash_write_scratch_file") || !strings.Contains(got, "do not create files just to plan") {
+			t.Fatalf("runtime guidance contains a retired name or encourages unnecessary files: %q", got)
+		}
 	})
 
 	t.Run("guidance plus prompt body", func(t *testing.T) {
@@ -381,6 +389,9 @@ func TestBuildSystemPrompt(t *testing.T) {
 		}
 		if !strings.Contains(got, "only for an independent, well-scoped task") {
 			t.Fatalf("expected delegation guidance, got %q", got)
+		}
+		if !strings.Contains(got, "list_scratch_files") || !strings.HasSuffix(got, "sys-msg") {
+			t.Fatalf("custom prompt did not retain the runtime scratch guide: %q", got)
 		}
 	})
 }

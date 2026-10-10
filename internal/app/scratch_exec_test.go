@@ -17,7 +17,7 @@ func TestCallToolWriteScratchFileRecordsScratchWriteMetric(t *testing.T) {
 	metrics := newExecutionMetrics(time.Now())
 	ctx := withExecutionMetrics(context.Background(), metrics)
 
-	result := shim.CallTool(ctx, "ash_write_scratch_file", map[string]any{
+	result := shim.CallTool(ctx, "write_scratch_file", map[string]any{
 		"path":    "plan/notes.txt",
 		"content": "alpha",
 	})
@@ -40,8 +40,8 @@ func TestCallToolAppendScratchFileRecordsScratchWriteMetric(t *testing.T) {
 	metrics := newExecutionMetrics(time.Now())
 	ctx := withExecutionMetrics(context.Background(), metrics)
 
-	shim.CallTool(ctx, "ash_write_scratch_file", map[string]any{"path": "plan/notes.txt", "content": "alpha"})
-	result := shim.CallTool(ctx, "ash_append_scratch_file", map[string]any{"path": "plan/notes.txt", "content": " beta"})
+	shim.CallTool(ctx, "write_scratch_file", map[string]any{"path": "plan/notes.txt", "content": "alpha"})
+	result := shim.CallTool(ctx, "append_scratch_file", map[string]any{"path": "plan/notes.txt", "content": " beta"})
 	if !strings.Contains(result, `"ok":true`) {
 		t.Fatalf("expected successful scratch append, got %s", result)
 	}
@@ -61,8 +61,8 @@ func TestCallToolEditScratchFileRecordsScratchWriteMetric(t *testing.T) {
 	metrics := newExecutionMetrics(time.Now())
 	ctx := withExecutionMetrics(context.Background(), metrics)
 
-	shim.CallTool(ctx, "ash_write_scratch_file", map[string]any{"path": "plan/notes.txt", "content": "alpha"})
-	result := shim.CallTool(ctx, "ash_edit_scratch_file", map[string]any{"path": "plan/notes.txt", "content": "gamma"})
+	shim.CallTool(ctx, "write_scratch_file", map[string]any{"path": "plan/notes.txt", "content": "alpha"})
+	result := shim.CallTool(ctx, "replace_scratch_file", map[string]any{"path": "plan/notes.txt", "content": "gamma"})
 	if !strings.Contains(result, `"ok":true`) {
 		t.Fatalf("expected successful scratch edit, got %s", result)
 	}
@@ -183,22 +183,22 @@ func TestScratchFileToolsRejectHiddenDotfilePaths(t *testing.T) {
 	t.Setenv("ASH_STRICT", "")
 	ctx := context.Background()
 
-	writeResult := shim.CallTool(ctx, "ash_write_scratch_file", map[string]any{
+	writeResult := shim.CallTool(ctx, "write_scratch_file", map[string]any{
 		"path":    "notes/.secret.txt",
 		"content": "alpha",
 	})
 	if !strings.Contains(writeResult, "hidden dotfile") {
-		t.Fatalf("expected ash_write_scratch_file to reject dotfile path, got %s", writeResult)
+		t.Fatalf("expected write_scratch_file to reject dotfile path, got %s", writeResult)
 	}
 
-	_ = shim.CallTool(ctx, "ash_write_scratch_file", map[string]any{
+	_ = shim.CallTool(ctx, "write_scratch_file", map[string]any{
 		"path":    "plan/notes.txt",
 		"content": "alpha",
 	})
-	readResult := shim.CallTool(ctx, "ash_read_scratch_file", map[string]any{
+	readResult := shim.CallTool(ctx, "read_scratch_file", map[string]any{
 		"path": ".env",
 	})
 	if !strings.Contains(readResult, "hidden dotfile") {
-		t.Fatalf("expected ash_read_scratch_file to reject dotfile path, got %s", readResult)
+		t.Fatalf("expected read_scratch_file to reject dotfile path, got %s", readResult)
 	}
 }

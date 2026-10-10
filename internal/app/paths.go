@@ -1,6 +1,7 @@
 package app
 
 import (
+	"ash/internal/scratchlife"
 	"ash/internal/workspace"
 	"bufio"
 	"errors"
@@ -86,56 +87,11 @@ func scratchRelativePathIfWithin(root, candidate string) (rel string, ok bool) {
 }
 
 func cleanupStaleScratchDirs(root string, now time.Time) ([]string, error) {
-	if root == "" {
-		return nil, errors.New("scratch root is required")
-	}
-	if err := osMkdirAll(root, 0o700); err != nil {
-		return nil, err
-	}
-
-	currentSessionDir, err := ashScratchSessionRoot()
-	if err != nil {
-		return nil, err
-	}
-
-	entries, err := os.ReadDir(root)
-	if err != nil {
-		return nil, err
-	}
-
-	deleted := make([]string, 0)
-	cutoffAge := now.Add(-scratchCleanupMaxAge)
-	cutoffIdle := now.Add(-scratchCleanupIdleAge)
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		dirPath := filepath.Join(root, entry.Name())
-		if dirPath == currentSessionDir {
-			continue
-		}
-		info, err := os.Stat(dirPath)
-		if err != nil {
-			continue
-		}
-		if info.ModTime().After(cutoffAge) {
-			continue
-		}
-		accessPath := filepath.Join(dirPath, scratchAccessFileName)
-		accessInfo, err := os.Stat(accessPath)
-		if err == nil {
-			if accessInfo.ModTime().After(cutoffIdle) {
-				continue
-			}
-		} else if !errors.Is(err, os.ErrNotExist) {
-			continue
-		}
-		if err := os.RemoveAll(dirPath); err != nil {
-			continue
-		}
-		deleted = append(deleted, dirPath)
-	}
-	return deleted, nil
+	return scratchlife.Cleanup(root, scratchlife.CleanupOptions{
+		MaxAge:  scratchCleanupMaxAge,
+		IdleAge: scratchCleanupIdleAge,
+		Now:     now,
+	})
 }
 
 // resolveWorkspacePath converts a user-supplied workspace path into a canonical absolute path and a relative workspace path.

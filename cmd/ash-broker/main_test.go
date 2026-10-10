@@ -87,7 +87,7 @@ func TestBrokerSocketReadyWhileMCPStartupIsBlocked(t *testing.T) {
 	var stderr strings.Builder
 	go func() {
 		runResult <- runBroker(ctx, []string{
-			"--socket", socket, "--parent-pid", strconv.Itoa(os.Getpid()),
+			"--socket", socket, "--session-id", "startup-test", "--parent-pid", strconv.Itoa(os.Getpid()),
 		}, io.Discard, &stderr)
 	}()
 
@@ -104,6 +104,10 @@ func TestBrokerSocketReadyWhileMCPStartupIsBlocked(t *testing.T) {
 			t.Fatalf("broker exited before socket readiness with code %d: %s", result, stderr.String())
 		case <-time.After(10 * time.Millisecond):
 		}
+	}
+	sessionLock := filepath.Join(home, ".ash", "scratch", "startup-test", ".ash_scratch_lock")
+	if _, err := os.Stat(sessionLock); err != nil {
+		t.Fatalf("broker socket became ready without its scratch lock: %v", err)
 	}
 	select {
 	case <-mcpStarted:
@@ -127,6 +131,9 @@ func TestBrokerSocketReadyWhileMCPStartupIsBlocked(t *testing.T) {
 		}
 	case <-time.After(8 * time.Second):
 		t.Fatal("broker did not stop after cancellation with MCP startup blocked")
+	}
+	if _, err := os.Stat(sessionLock); !os.IsNotExist(err) {
+		t.Fatalf("broker left its last-holder scratch lock behind: %v", err)
 	}
 }
 

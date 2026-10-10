@@ -12,14 +12,14 @@ func TestExecutionMetricsAddToolCallTracksPerNamedCount(t *testing.T) {
 	metrics.addToolCall("run_unix_command", time.Millisecond)
 	metrics.addToolCall("run_unix_command", time.Millisecond)
 	metrics.addToolCall("run_unix_command", time.Millisecond)
-	metrics.addToolCall("ash_write_scratch_file", time.Millisecond)
+	metrics.addToolCall("write_scratch_file", time.Millisecond)
 
 	snap := metrics.snapshot()
 	if got := snap.ToolCallCounts["run_unix_command"]; got != 3 {
 		t.Fatalf("run_unix_command count = %d, want 3", got)
 	}
-	if got := snap.ToolCallCounts["ash_write_scratch_file"]; got != 1 {
-		t.Fatalf("ash_write_scratch_file count = %d, want 1", got)
+	if got := snap.ToolCallCounts["write_scratch_file"]; got != 1 {
+		t.Fatalf("write_scratch_file count = %d, want 1", got)
 	}
 	if len(snap.ToolCallCounts) != 2 {
 		t.Fatalf("expected exactly 2 distinct tool names, got %d (%v)", len(snap.ToolCallCounts), snap.ToolCallCounts)
@@ -139,22 +139,22 @@ func TestRenderExecutionDashboardShowsToolBreakdownWhenPresent(t *testing.T) {
 	metrics := newExecutionMetrics(time.Now())
 	metrics.addToolCall("run_unix_command", time.Millisecond)
 	metrics.addToolCall("run_unix_command", time.Millisecond)
-	metrics.addToolCall("ash_write_scratch_file", time.Millisecond)
+	metrics.addToolCall("write_scratch_file", time.Millisecond)
 
 	output := renderExecutionDashboard(metrics, false)
 	if !strings.Contains(output, "by tool") {
 		t.Fatalf("expected per-tool breakdown section, got:\n%s", output)
 	}
 	byToolIdx := strings.Index(output, "by tool")
-	nameA := strings.Index(output, "ash_write_scratch_file")
+	nameA := strings.Index(output, "write_scratch_file")
 	nameB := strings.Index(output, "run_unix_command")
 	if nameA < byToolIdx || nameB < byToolIdx {
 		t.Fatalf("expected both tool names after the breakdown header, got:\n%s", output)
 	}
-	if nameA > nameB {
-		t.Fatalf("expected alphabetical order (ash_write_scratch_file before run_unix_command), got:\n%s", output)
+	if nameB > nameA {
+		t.Fatalf("expected alphabetical order (run_unix_command before write_scratch_file), got:\n%s", output)
 	}
-	if !strings.Contains(output, "  ash_write_scratch_file\n") {
+	if !strings.Contains(output, "  write_scratch_file\n") {
 		t.Fatalf("expected single-count tool listed without a count, got:\n%s", output)
 	}
 	if !strings.Contains(output, "run_unix_command") || !strings.Contains(output, "2") {

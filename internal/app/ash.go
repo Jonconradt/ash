@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"ash/internal/localize"
+	"ash/internal/scratchlife"
 	"ash/internal/workspace"
 )
 
@@ -166,11 +167,22 @@ func run(args []string, stdout, stderr io.Writer) int {
 
 	configureDebugLogging()
 	defer cleanupWorkspaceRetention(defaultHistoryRetention, defaultHistoryCleanupBudget)
+	scratchRoot, err := ashScratchRoot()
+	if err != nil {
+		slog.Error(localize.Format("log.scratch.lifecycle_failed", []any{err}), "error", err, "EID", "6CK2vCl2")
+		return 1
+	}
+	scratchLock, err := scratchlife.Acquire(scratchRoot, sessionID)
+	if err != nil {
+		slog.Error(localize.Format("log.scratch.lifecycle_failed", []any{err}), "error", err, "EID", "AXhiG6LH")
+		return 1
+	}
 	defer func() {
-		if root, err := ashScratchRoot(); err == nil {
-			if _, err := cleanupStaleScratchDirs(root, timeNow()); err != nil {
-				slog.Debug("scratch cleanup failed", "error", err, "EID", "uRkD7M7F")
-			}
+		if err := scratchLock.Close(); err != nil {
+			slog.Warn(localize.Format("log.scratch.lifecycle_failed", []any{err}), "error", err, "EID", "Pi5Vn73F")
+		}
+		if _, err := cleanupStaleScratchDirs(scratchRoot, timeNow()); err != nil {
+			slog.Debug(localize.Format("log.scratch.lifecycle_failed", []any{err}), "error", err, "EID", "VXWZusLT")
 		}
 	}()
 

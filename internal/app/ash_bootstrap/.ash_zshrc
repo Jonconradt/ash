@@ -6,6 +6,12 @@ zmodload -i zsh/datetime 2>/dev/null
 _ash_ensure_broker() {
 	local mcp_credential_key="${ASH_MCP_CREDENTIAL_KEY:-}"
 	unset ASH_MCP_CREDENTIAL_KEY
+	local session_id="${SESSION_ID:-}"
+	if [[ -z "$session_id" ]]; then
+		session_id="$(head -c 100 /dev/urandom | LC_ALL=C tr -dc 'a-zA-Z0-9' | fold -w 16 | head -n 1)"
+		[[ -n "$session_id" ]] || return 1
+		export SESSION_ID="$session_id"
+	fi
 	[[ -n "${AI_ENDPOINT:-}" && -n "${AI_MODEL:-}" ]] || return 1
 	# Without this probe a missing ash-broker reaches command_not_found_handler, which
 	# would forward the broker's own command line to the AI as a prompt.
@@ -14,8 +20,8 @@ _ash_ensure_broker() {
 		return 0
 	fi
 	local runtime_dir="$HOME/.ash/runtime"
-	local socket_path="$runtime_dir/${SESSION_ID:-shell}.sock"
-	local lease_path="$runtime_dir/${SESSION_ID:-shell}.lease"
+	local socket_path="$runtime_dir/$session_id.sock"
+	local lease_path="$runtime_dir/$session_id.lease"
 	local token
 	if ! mkdir -p -m 700 "$runtime_dir"; then
 		return 1
@@ -29,7 +35,7 @@ _ash_ensure_broker() {
 	fi
 	# &! backgrounds and disowns atomically, so no job-control notice reaches the terminal.
 	local parent_pid="$$"
-	ASH_BROKER_TOKEN="$token" ASH_MCP_CREDENTIAL_KEY="$mcp_credential_key" command ash-broker --socket "$socket_path" --parent-pid "$parent_pid" --lease "$lease_path" </dev/null >/dev/null 2>&1 &!
+	ASH_BROKER_TOKEN="$token" ASH_MCP_CREDENTIAL_KEY="$mcp_credential_key" command ash-broker --socket "$socket_path" --session-id "$session_id" --parent-pid "$parent_pid" --lease "$lease_path" </dev/null >/dev/null 2>&1 &!
 	unset mcp_credential_key
 	local broker_pid=$!
 	local attempt

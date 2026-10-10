@@ -31,9 +31,13 @@ function _ash_ensure_broker
 	end
 
 	set -l runtime_dir "$HOME/.ash/runtime"
-	set -l session_id shell
+	set -l session_id ""
 	if set -q SESSION_ID; and test -n "$SESSION_ID"
 		set session_id "$SESSION_ID"
+	else
+		set session_id (command head -c 100 /dev/urandom | command tr -dc 'a-zA-Z0-9' | command fold -w 16 | command head -n 1)
+		test -n "$session_id"; or return 1
+		set -gx SESSION_ID "$session_id"
 	end
 	set -l socket_path "$runtime_dir/$session_id.sock"
 	set -l lease_path "$runtime_dir/$session_id.lease"
@@ -46,7 +50,7 @@ function _ash_ensure_broker
 	begin
 		set -lx ASH_BROKER_TOKEN "$token"
 		set -lx ASH_MCP_CREDENTIAL_KEY "$mcp_credential_key"
-		command ash-broker --socket "$socket_path" --parent-pid "$parent_pid" --lease "$lease_path" </dev/null >/dev/null 2>&1
+		command ash-broker --socket "$socket_path" --session-id "$session_id" --parent-pid "$parent_pid" --lease "$lease_path" </dev/null >/dev/null 2>&1
 	end &
 	set -l broker_pid $last_pid
 	disown "$broker_pid" 2>/dev/null; or true

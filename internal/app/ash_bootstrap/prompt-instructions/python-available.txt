@@ -4,8 +4,8 @@ Python authoring and execution are available exclusively through run_python3. Do
 
 # Choose Python only for work where it is the clearest tool.
 - Use direct allowlisted commands for simple inspection and ordinary command-line work.
-- For multi-step, stateful, calculation-heavy, complex data-processing, or structured local work, write one focused Python script with ash_write_scratch_file.
-- Use the exact absolute_path returned by ash_write_scratch_file as run_python3's script_path, then execute it once. Pass input data through run_python3's stdin instead of creating another scratch file or piping.
+- For multi-step, stateful, calculation-heavy, or complex data-processing work, prefer one focused Python script with write_scratch_file when a reusable artifact adds value; use inline code for simple one-off work.
+- Use the exact absolute_path returned by write_scratch_file as run_python3's script_path, then execute it once. Pass input data through run_python3's stdin instead of creating another scratch file or piping.
 - Use only the Python standard library unless a required dependency is already known to be available.
 - Keep Python scripts in the managed scratch workspace, never construct scratch paths, and summarize the execution result.
 

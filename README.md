@@ -18,7 +18,7 @@ What if you want the AI to investigate a problem? The .ash_allow file is an allo
 
 What if you have a more complex question, something that needs to be computed? If you allow ash to expose Python the AI can write temporary scripts, or use scripts in the ~/.ash/tools directory to run complex processes. You can also add compiled native plugins in Go, Rust, or TypeScript under ~/.ash/plugins/.
 
-What if the AI needs temporary notes, plans, script fragments, or small working files? Ash includes a managed scratch workspace under `~/.ash/scratch/<session-id>/` that is automatically scoped to the current session. The AI never needs to remember or pass the session ID; ash resolves it automatically. Scratch files are kept inside the managed workspace and are cleaned up on exit when a directory is older than 48 hours and has not been accessed in the last 24 hours.
+What if the AI needs temporary notes, plans, script fragments, or small working files? Ash includes a managed scratch workspace under `~/.ash/scratch/<session-id>/` that is automatically scoped to the current session. The AI never needs to remember or pass the session ID; ash resolves it automatically. Active Ash invocations and their shell broker hold a private session lock so cleanup cannot remove files in use. On Ash exit, unlocked directories older than 48 hours and not accessed in the last 24 hours are removed; crashed sessions release their OS lock automatically and their leftover lock file does not block later cleanup.
 
 What if you want something to happen on a schedule or in the future? Ash can create systems jobs that run once or recur.
 
@@ -518,10 +518,17 @@ When enabled, `ash` logs structured diagnostics with Go's standard-library `log/
 - `manage_recurring_jobs`: lists, cancels, modifies, and explains ash-managed recurring jobs
 - `ash_read_workspace_file`: reads a file from `~/.ash`
 - `ash_write_workspace_file`: writes a file in `~/.ash` and auto-updates `~/.ash/inventory.md`
+- `read_scratch_file`, `write_scratch_file`, `append_scratch_file`, and `replace_scratch_file`: read, create/overwrite, append to, or fully replace files in the current session's temporary scratch workspace
+- `edit_scratch_file`: replace one uniquely matching literal text fragment in an existing scratch file; missing or ambiguous matches leave it unchanged
+- `list_scratch_files`: list sorted, paginated files in the current session's scratch workspace without exposing hidden files or symlinks
+
+Scratch tools are optional: use them when a reusable script, intermediate data, accumulated findings, or a revisable artifact adds value, not merely to create a plan for every request. Use persistent workspace files for information intended to outlive scratch retention. Scratch tool names are unprefixed; the former `ash_*_scratch_file` names are no longer published or accepted.
+
+To evaluate whether model changes improve scratch use, compare repeated synthetic multi-step analysis, accumulating-note, and follow-up/revision tasks under the same provider/model/settings, alongside simple one-off tasks that should not create files. Judge useful artifacts and correct outcomes against unnecessary tool calls and files; raw scratch-call counts alone do not measure adoption. Such live evaluation is provider-dependent and is not part of the automated test suite.
 
 Tool execution is local to your machine. Use a narrow allowlist.
 
-`run_python3` is separate from the Unix executable allowlist. It is published only when ash resolves its selected interpreter (`ASH_PYTHON`, the managed virtualenv, or system `python3`) and strict mode is disabled. To execute a generated script, write it with `ash_write_scratch_file` and pass the returned `absolute_path` as `script_path`; ash accepts only `.py` files inside the current scratch session. `ASH_STRICT=1` removes the tool and blocks ash-managed bundled `.py` tools as defense in depth.
+`run_python3` is separate from the Unix executable allowlist. It is published only when ash resolves its selected interpreter (`ASH_PYTHON`, the managed virtualenv, or system `python3`) and strict mode is disabled. To execute a generated script, write it with `write_scratch_file` and pass the returned `absolute_path` as `script_path`; ash accepts only `.py` files inside the current scratch session. `ASH_STRICT=1` removes the tool and blocks ash-managed bundled `.py` tools as defense in depth.
 
 Sub-agents use the same ash executable, working directory, configuration, tools, and OS permissions. Their session IDs have the form `{parent-session-id}.{six-random-characters}`. Delegation is one level only: child agents cannot publish or invoke `run_sub_agent`, schedule ash, or directly invoke ash through the built-in tools. Control-C cancels the parent and terminates active child work. On Unix, ash places each child in a process group so cancellation and timeout terminate its descendants. Tool, script, file, piped, and child output is untrusted data and must not be treated as instructions or allowed to override the system prompt or user request. Arbitrary Python or shell programs may still launch processes independently; this feature is not a sandbox. Each ash process maintains its own HTTPS connection pool. A child process cannot reuse the parent process's live TLS connection, but retries within one process reuse its HTTP client and transport.
 

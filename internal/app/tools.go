@@ -6,8 +6,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -209,14 +211,14 @@ func (s localToolShim) ListTools() []toolDefinition {
 		{
 			Type: "function",
 			Function: toolFunctionDefinition{
-				Name:        "ash_read_scratch_file",
-				Description: "Read a file in the current session's managed scratch directory under ~/.ash/scratch. The result includes an absolute_path; use that exact absolute path (not a guessed path) if you need to execute the file with run_unix_command.",
+				Name:        "read_scratch_file",
+				Description: "Read a file in the current session's scratch workspace. Use for existing notes or artifacts; paths are relative to the session scratch root. The result includes an exact absolute_path for run_python3 or commands.",
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
 						"path": map[string]any{
 							"type":        "string",
-							"description": "Path relative to the current session scratch root",
+							"description": "Relative path to the file in this session",
 						},
 					},
 					"required": []string{"path"},
@@ -226,22 +228,18 @@ func (s localToolShim) ListTools() []toolDefinition {
 		{
 			Type: "function",
 			Function: toolFunctionDefinition{
-				Name:        "ash_write_scratch_file",
-				Description: "Write a file in the current session's managed scratch directory under ~/.ash/scratch. The result includes an absolute_path; use that exact absolute path (not a guessed path) if you need to execute the file with run_unix_command.",
+				Name:        "write_scratch_file",
+				Description: "Create or overwrite a file with complete contents in this session's scratch workspace. Use for an initial artifact or full rewrite; the result includes its exact absolute_path.",
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
 						"path": map[string]any{
 							"type":        "string",
-							"description": "Path relative to the current session scratch root",
+							"description": "Relative path to the file in this session",
 						},
 						"content": map[string]any{
 							"type":        "string",
 							"description": "File contents to write",
-						},
-						"purpose": map[string]any{
-							"type":        "string",
-							"description": "Optional purpose text for scratch tracking",
 						},
 					},
 					"required": []string{"path", "content"},
@@ -251,14 +249,14 @@ func (s localToolShim) ListTools() []toolDefinition {
 		{
 			Type: "function",
 			Function: toolFunctionDefinition{
-				Name:        "ash_append_scratch_file",
-				Description: "Append content to a file in the current session's managed scratch directory under ~/.ash/scratch. The result includes an absolute_path; use that exact absolute path (not a guessed path) if you need to execute the file with run_unix_command.",
+				Name:        "append_scratch_file",
+				Description: "Append literal content to a file in this session's scratch workspace, creating it if missing. No newline is added automatically; the result includes its exact absolute_path.",
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
 						"path": map[string]any{
 							"type":        "string",
-							"description": "Path relative to the current session scratch root",
+							"description": "Relative path to the file in this session",
 						},
 						"content": map[string]any{
 							"type":        "string",
@@ -272,21 +270,45 @@ func (s localToolShim) ListTools() []toolDefinition {
 		{
 			Type: "function",
 			Function: toolFunctionDefinition{
-				Name:        "ash_edit_scratch_file",
-				Description: "Replace a file in the current session's managed scratch directory under ~/.ash/scratch. The result includes an absolute_path; use that exact absolute path (not a guessed path) if you need to execute the file with run_unix_command.",
+				Name:        "replace_scratch_file",
+				Description: "Replace the complete contents of a file in this session's scratch workspace (creates it if missing). Use edit_scratch_file for one uniquely matching fragment; result includes exact absolute_path.",
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
-						"path": map[string]any{
-							"type":        "string",
-							"description": "Path relative to the current session scratch root",
-						},
-						"content": map[string]any{
-							"type":        "string",
-							"description": "Replacement file contents",
-						},
+						"path":    map[string]any{"type": "string", "description": "Relative path to the file in this session"},
+						"content": map[string]any{"type": "string", "description": "Complete replacement contents"},
 					},
 					"required": []string{"path", "content"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: toolFunctionDefinition{
+				Name:        "edit_scratch_file",
+				Description: "Replace one uniquely matching literal text fragment in an existing session scratch file. Fails without changing the file if the old text is missing or ambiguous; use replace_scratch_file for a complete rewrite.",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"path":     map[string]any{"type": "string", "description": "Relative path to the file in this session"},
+						"old_text": map[string]any{"type": "string", "description": "Non-empty literal text that must occur exactly once"},
+						"new_text": map[string]any{"type": "string", "description": "Replacement text; may be empty to delete the match"},
+					},
+					"required": []string{"path", "old_text", "new_text"},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: toolFunctionDefinition{
+				Name:        "list_scratch_files",
+				Description: "List files in this session's scratch workspace to rediscover existing artifacts. Returns sorted relative and absolute paths, byte sizes, and a continuation offset; excludes hidden files and symlinks.",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"offset": map[string]any{"type": "integer", "minimum": 0, "description": "Zero-based offset; defaults to 0"},
+						"limit":  map[string]any{"type": "integer", "minimum": 1, "maximum": 100, "description": "Page size from 1 to 100; defaults to 100"},
+					},
 				},
 			},
 		},
@@ -296,7 +318,7 @@ func (s localToolShim) ListTools() []toolDefinition {
 			Type: "function",
 			Function: toolFunctionDefinition{
 				Name:        "run_python3",
-				Description: "Execute either non-empty Python code or one .py script in the current session's managed scratch directory. Provide exactly one of code or script_path; script_path must be the absolute_path returned by ash_write_scratch_file. This is the only supported way to run Python; python3 is not directly allowlisted for run_unix_command/run_unix_pipeline.",
+				Description: "Execute either non-empty Python code or one .py script in the current session's managed scratch directory. Provide exactly one of code or script_path; script_path must be the absolute_path returned by write_scratch_file. This is the only supported way to run Python; python3 is not directly allowlisted for run_unix_command/run_unix_pipeline.",
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
@@ -306,7 +328,7 @@ func (s localToolShim) ListTools() []toolDefinition {
 						},
 						"script_path": map[string]any{
 							"type":        "string",
-							"description": "Absolute path returned by ash_write_scratch_file for a .py script",
+							"description": "Absolute path returned by write_scratch_file for a .py script",
 						},
 						"argv": map[string]any{
 							"type": "array",
@@ -372,14 +394,18 @@ func (s localToolShim) CallTool(ctx context.Context, name string, args map[strin
 		result = s.callReadWorkspaceFile(args)
 	case "ash_write_workspace_file":
 		result = s.callWriteWorkspaceFile(args)
-	case "ash_read_scratch_file":
+	case "read_scratch_file":
 		result = s.callReadScratchFile(args)
-	case "ash_write_scratch_file":
+	case "write_scratch_file":
 		result = s.callWriteScratchFile(ctx, args)
-	case "ash_append_scratch_file":
+	case "append_scratch_file":
 		result = s.callAppendScratchFile(ctx, args)
-	case "ash_edit_scratch_file":
+	case "replace_scratch_file":
+		result = s.callReplaceScratchFile(ctx, args)
+	case "edit_scratch_file":
 		result = s.callEditScratchFile(ctx, args)
+	case "list_scratch_files":
+		result = s.callListScratchFiles(args)
 	default:
 		result = toolCommandResult{OK: false, Error: fmt.Sprintf("unknown tool: %s", name), EID: "Ryr9hU7l"}
 	}
@@ -917,19 +943,19 @@ func (s localToolShim) callWriteWorkspaceFile(args map[string]any) toolCommandRe
 func (s localToolShim) callReadScratchFile(args map[string]any) toolCommandResult {
 	rel, ok := toStringArg(args["path"])
 	if !ok || strings.TrimSpace(rel) == "" {
-		return toolCommandResult{OK: false, Command: "ash_read_scratch_file", Error: "path must be a non-empty string", EID: "uVm1k7c0"}
+		return toolCommandResult{OK: false, Command: "read_scratch_file", Error: "path must be a non-empty string", EID: "uVm1k7c0"}
 	}
 	root, err := ashScratchSessionRoot()
 	if err != nil {
-		return toolCommandResult{OK: false, Command: "ash_read_scratch_file", Error: err.Error(), EID: "nZM5YQn7"}
+		return toolCommandResult{OK: false, Command: "read_scratch_file", Error: err.Error(), EID: "nZM5YQn7"}
 	}
 	absolutePath, relPath, err := resolveScratchPath(root, rel)
 	if err != nil {
-		return toolCommandResult{OK: false, Command: "ash_read_scratch_file", Error: err.Error(), EID: "h2XPvVtL"}
+		return toolCommandResult{OK: false, Command: "read_scratch_file", Error: err.Error(), EID: "h2XPvVtL"}
 	}
 	content, err := osReadFile(absolutePath)
 	if err != nil {
-		return toolCommandResult{OK: false, Command: "ash_read_scratch_file", Error: err.Error(), EID: "yh6bZ1NG"}
+		return toolCommandResult{OK: false, Command: "read_scratch_file", Error: err.Error(), EID: "yh6bZ1NG"}
 	}
 	payload := string(content)
 	if strictSecurityModeEnabled() {
@@ -940,107 +966,300 @@ func (s localToolShim) callReadScratchFile(args map[string]any) toolCommandResul
 		payload = formatUntrustedEvidenceBlock("file_content", relPath, sanitized)
 	}
 	if err := updateScratchAccessMarker(root); err != nil {
-		return toolCommandResult{OK: false, Command: "ash_read_scratch_file", Error: err.Error(), EID: "G4rQePRH"}
+		return toolCommandResult{OK: false, Command: "read_scratch_file", Error: err.Error(), EID: "G4rQePRH"}
 	}
-	return toolCommandResult{OK: true, Command: "ash_read_scratch_file", ExitCode: 0, Stdout: fmt.Sprintf("path=%s\nabsolute_path=%s\n%s", relPath, absolutePath, payload)}
+	return toolCommandResult{OK: true, Command: "read_scratch_file", ExitCode: 0, Stdout: fmt.Sprintf("path=%s\nabsolute_path=%s\n%s", relPath, absolutePath, payload)}
 }
 
 func (s localToolShim) callWriteScratchFile(ctx context.Context, args map[string]any) toolCommandResult {
 	rel, ok := toStringArg(args["path"])
 	if !ok || strings.TrimSpace(rel) == "" {
-		return toolCommandResult{OK: false, Command: "ash_write_scratch_file", Error: "path must be a non-empty string", EID: "Sz2W91zM"}
+		return toolCommandResult{OK: false, Command: "write_scratch_file", Error: "path must be a non-empty string", EID: "Sz2W91zM"}
 	}
 	content, ok := toStringArg(args["content"])
 	if !ok {
-		return toolCommandResult{OK: false, Command: "ash_write_scratch_file", Error: "content must be a string", EID: "ke8gAfiS"}
+		return toolCommandResult{OK: false, Command: "write_scratch_file", Error: "content must be a string", EID: "ke8gAfiS"}
 	}
 	root, err := ashScratchSessionRoot()
 	if err != nil {
-		return toolCommandResult{OK: false, Command: "ash_write_scratch_file", Error: err.Error(), EID: "fL3MHcQP"}
+		return toolCommandResult{OK: false, Command: "write_scratch_file", Error: err.Error(), EID: "fL3MHcQP"}
 	}
 	absolutePath, relPath, err := resolveScratchPath(root, rel)
 	if err != nil {
-		return toolCommandResult{OK: false, Command: "ash_write_scratch_file", Error: err.Error(), EID: "Q6k2ud7x"}
+		return toolCommandResult{OK: false, Command: "write_scratch_file", Error: err.Error(), EID: "Q6k2ud7x"}
 	}
 	if err := osMkdirAll(filepath.Dir(absolutePath), 0o700); err != nil {
-		return toolCommandResult{OK: false, Command: "ash_write_scratch_file", Error: err.Error(), EID: "d6pJYDoL"}
+		return toolCommandResult{OK: false, Command: "write_scratch_file", Error: err.Error(), EID: "d6pJYDoL"}
 	}
 	if err := osWriteFile(absolutePath, []byte(content), 0o600); err != nil {
-		return toolCommandResult{OK: false, Command: "ash_write_scratch_file", Error: err.Error(), EID: "T2f1nJqH"}
+		return toolCommandResult{OK: false, Command: "write_scratch_file", Error: err.Error(), EID: "T2f1nJqH"}
 	}
 	if err := updateScratchAccessMarker(root); err != nil {
-		return toolCommandResult{OK: false, Command: "ash_write_scratch_file", Error: err.Error(), EID: "P9U2vU7Q"}
+		return toolCommandResult{OK: false, Command: "write_scratch_file", Error: err.Error(), EID: "P9U2vU7Q"}
 	}
 	if metrics := executionMetricsFromContext(ctx); metrics != nil {
 		metrics.addScratchWrite(relPath)
 	}
-	return toolCommandResult{OK: true, Command: "ash_write_scratch_file", ExitCode: 0, Stdout: fmt.Sprintf("wrote %s\nabsolute_path=%s", relPath, absolutePath)}
+	return toolCommandResult{OK: true, Command: "write_scratch_file", ExitCode: 0, Stdout: fmt.Sprintf("wrote %s\nabsolute_path=%s", relPath, absolutePath)}
 }
 
 func (s localToolShim) callAppendScratchFile(ctx context.Context, args map[string]any) toolCommandResult {
 	rel, ok := toStringArg(args["path"])
 	if !ok || strings.TrimSpace(rel) == "" {
-		return toolCommandResult{OK: false, Command: "ash_append_scratch_file", Error: "path must be a non-empty string", EID: "AvW1nY6Q"}
+		return toolCommandResult{OK: false, Command: "append_scratch_file", Error: "path must be a non-empty string", EID: "AvW1nY6Q"}
 	}
 	content, ok := toStringArg(args["content"])
 	if !ok {
-		return toolCommandResult{OK: false, Command: "ash_append_scratch_file", Error: "content must be a string", EID: "r2Hk1HeP"}
+		return toolCommandResult{OK: false, Command: "append_scratch_file", Error: "content must be a string", EID: "r2Hk1HeP"}
 	}
 	root, err := ashScratchSessionRoot()
 	if err != nil {
-		return toolCommandResult{OK: false, Command: "ash_append_scratch_file", Error: err.Error(), EID: "HnD2J7oW"}
+		return toolCommandResult{OK: false, Command: "append_scratch_file", Error: err.Error(), EID: "HnD2J7oW"}
 	}
 	absolutePath, relPath, err := resolveScratchPath(root, rel)
 	if err != nil {
-		return toolCommandResult{OK: false, Command: "ash_append_scratch_file", Error: err.Error(), EID: "v1sK2d5J"}
+		return toolCommandResult{OK: false, Command: "append_scratch_file", Error: err.Error(), EID: "v1sK2d5J"}
 	}
 	if err := osMkdirAll(filepath.Dir(absolutePath), 0o700); err != nil {
-		return toolCommandResult{OK: false, Command: "ash_append_scratch_file", Error: err.Error(), EID: "kC2tD5cY"}
+		return toolCommandResult{OK: false, Command: "append_scratch_file", Error: err.Error(), EID: "kC2tD5cY"}
 	}
 	current, err := osReadFile(absolutePath)
 	if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return toolCommandResult{OK: false, Command: "ash_append_scratch_file", Error: err.Error(), EID: "bD2M3w4w"}
+		return toolCommandResult{OK: false, Command: "append_scratch_file", Error: err.Error(), EID: "bD2M3w4w"}
 	}
 	if err := osWriteFile(absolutePath, append(current, []byte(content)...), 0o600); err != nil {
-		return toolCommandResult{OK: false, Command: "ash_append_scratch_file", Error: err.Error(), EID: "yM2Se3E9"}
+		return toolCommandResult{OK: false, Command: "append_scratch_file", Error: err.Error(), EID: "yM2Se3E9"}
 	}
 	if err := updateScratchAccessMarker(root); err != nil {
-		return toolCommandResult{OK: false, Command: "ash_append_scratch_file", Error: err.Error(), EID: "sR5qCdHV"}
+		return toolCommandResult{OK: false, Command: "append_scratch_file", Error: err.Error(), EID: "sR5qCdHV"}
 	}
 	if metrics := executionMetricsFromContext(ctx); metrics != nil {
 		metrics.addScratchWrite(relPath)
 	}
-	return toolCommandResult{OK: true, Command: "ash_append_scratch_file", ExitCode: 0, Stdout: fmt.Sprintf("appended %s\nabsolute_path=%s", relPath, absolutePath)}
+	return toolCommandResult{OK: true, Command: "append_scratch_file", ExitCode: 0, Stdout: fmt.Sprintf("appended %s\nabsolute_path=%s", relPath, absolutePath)}
 }
 
-func (s localToolShim) callEditScratchFile(ctx context.Context, args map[string]any) toolCommandResult {
+func (s localToolShim) callReplaceScratchFile(ctx context.Context, args map[string]any) toolCommandResult {
 	rel, ok := toStringArg(args["path"])
 	if !ok || strings.TrimSpace(rel) == "" {
-		return toolCommandResult{OK: false, Command: "ash_edit_scratch_file", Error: "path must be a non-empty string", EID: "jW1Vw7Xb"}
+		return toolCommandResult{OK: false, Command: "replace_scratch_file", Error: "path must be a non-empty string", EID: "jW1Vw7Xb"}
 	}
 	content, ok := toStringArg(args["content"])
 	if !ok {
-		return toolCommandResult{OK: false, Command: "ash_edit_scratch_file", Error: "content must be a string", EID: "eh8Kf1eU"}
+		return toolCommandResult{OK: false, Command: "replace_scratch_file", Error: "content must be a string", EID: "eh8Kf1eU"}
 	}
 	root, err := ashScratchSessionRoot()
 	if err != nil {
-		return toolCommandResult{OK: false, Command: "ash_edit_scratch_file", Error: err.Error(), EID: "R7w7fY5L"}
+		return toolCommandResult{OK: false, Command: "replace_scratch_file", Error: err.Error(), EID: "R7w7fY5L"}
 	}
 	absolutePath, relPath, err := resolveScratchPath(root, rel)
 	if err != nil {
-		return toolCommandResult{OK: false, Command: "ash_edit_scratch_file", Error: err.Error(), EID: "v6Qc7T9b"}
+		return toolCommandResult{OK: false, Command: "replace_scratch_file", Error: err.Error(), EID: "v6Qc7T9b"}
 	}
 	if err := osMkdirAll(filepath.Dir(absolutePath), 0o700); err != nil {
-		return toolCommandResult{OK: false, Command: "ash_edit_scratch_file", Error: err.Error(), EID: "tE7Kf1Vv"}
+		return toolCommandResult{OK: false, Command: "replace_scratch_file", Error: err.Error(), EID: "tE7Kf1Vv"}
 	}
 	if err := osWriteFile(absolutePath, []byte(content), 0o600); err != nil {
-		return toolCommandResult{OK: false, Command: "ash_edit_scratch_file", Error: err.Error(), EID: "Y3M8prKJ"}
+		return toolCommandResult{OK: false, Command: "replace_scratch_file", Error: err.Error(), EID: "Y3M8prKJ"}
 	}
 	if err := updateScratchAccessMarker(root); err != nil {
-		return toolCommandResult{OK: false, Command: "ash_edit_scratch_file", Error: err.Error(), EID: "gN8F6LqP"}
+		return toolCommandResult{OK: false, Command: "replace_scratch_file", Error: err.Error(), EID: "gN8F6LqP"}
 	}
 	if metrics := executionMetricsFromContext(ctx); metrics != nil {
 		metrics.addScratchWrite(relPath)
 	}
-	return toolCommandResult{OK: true, Command: "ash_edit_scratch_file", ExitCode: 0, Stdout: fmt.Sprintf("updated %s\nabsolute_path=%s", relPath, absolutePath)}
+	return toolCommandResult{OK: true, Command: "replace_scratch_file", ExitCode: 0, Stdout: fmt.Sprintf("replaced %s\nabsolute_path=%s", relPath, absolutePath)}
+}
+
+func (s localToolShim) callEditScratchFile(ctx context.Context, args map[string]any) toolCommandResult {
+	const command = "edit_scratch_file"
+	rel, ok := toStringArg(args["path"])
+	if !ok || strings.TrimSpace(rel) == "" {
+		return toolCommandResult{OK: false, Command: command, Error: "path must be a non-empty string", EID: "2KOWg11m"}
+	}
+	oldText, ok := toStringArg(args["old_text"])
+	if !ok || oldText == "" {
+		return toolCommandResult{OK: false, Command: command, Error: "old_text must be a non-empty string", EID: "Jwyv3Xhq"}
+	}
+	newText, ok := toStringArg(args["new_text"])
+	if !ok {
+		return toolCommandResult{OK: false, Command: command, Error: "new_text must be a string", EID: "kWd4OGNA"}
+	}
+	root, err := ashScratchSessionRoot()
+	if err != nil {
+		return toolCommandResult{OK: false, Command: command, Error: err.Error(), EID: "J1WMGV17"}
+	}
+	absolutePath, relPath, err := resolveScratchPath(root, rel)
+	if err != nil {
+		return toolCommandResult{OK: false, Command: command, Error: err.Error(), EID: "ZJRU4hja"}
+	}
+	content, err := osReadFile(absolutePath)
+	if err != nil {
+		return toolCommandResult{OK: false, Command: command, Error: err.Error(), EID: "kceD0smC"}
+	}
+	original := string(content)
+	matches := 0
+	matchAt := -1
+	searchFrom := 0
+	for searchFrom <= len(original)-len(oldText) {
+		index := strings.Index(original[searchFrom:], oldText)
+		if index < 0 {
+			break
+		}
+		matchAt = searchFrom + index
+		matches++
+		searchFrom = matchAt + 1
+	}
+	if matches == 0 {
+		return toolCommandResult{OK: false, Command: command, Error: "old_text was not found; file was not changed", EID: "3MPnufAG"}
+	}
+	if matches != 1 {
+		return toolCommandResult{OK: false, Command: command, Error: "old_text is ambiguous; file was not changed", EID: "BJgePCG4"}
+	}
+	updated := original[:matchAt] + newText + original[matchAt+len(oldText):]
+	if err := osWriteFile(absolutePath, []byte(updated), 0o600); err != nil {
+		return toolCommandResult{OK: false, Command: command, Error: err.Error(), EID: "fVFCoZh3"}
+	}
+	if err := updateScratchAccessMarker(root); err != nil {
+		return toolCommandResult{OK: false, Command: command, Error: err.Error(), EID: "4yix04w3"}
+	}
+	if metrics := executionMetricsFromContext(ctx); metrics != nil {
+		metrics.addScratchWrite(relPath)
+	}
+	return toolCommandResult{OK: true, Command: command, ExitCode: 0, Stdout: fmt.Sprintf("edited %s\nabsolute_path=%s", relPath, absolutePath)}
+}
+
+type scratchFileEntry struct {
+	Path      string `json:"path"`
+	Absolute  string `json:"absolute_path"`
+	SizeBytes int64  `json:"size_bytes"`
+}
+
+type scratchFileListing struct {
+	Files      []scratchFileEntry `json:"files"`
+	Offset     int                `json:"offset"`
+	NextOffset *int               `json:"next_offset"`
+}
+
+func (s localToolShim) callListScratchFiles(args map[string]any) toolCommandResult {
+	const command = "list_scratch_files"
+	offset, err := scratchPaginationArg(args, "offset", 0, int(^uint(0)>>1))
+	if err != nil {
+		return toolCommandResult{OK: false, Command: command, Error: err.Error(), EID: "1fgsU9b1"}
+	}
+	limit, err := scratchPaginationArg(args, "limit", 100, 100)
+	if err != nil || limit < 1 {
+		if err == nil {
+			err = errors.New("limit must be an integer from 1 to 100")
+		}
+		return toolCommandResult{OK: false, Command: command, Error: err.Error(), EID: "GHYcxYcA"}
+	}
+	root, err := ashScratchSessionRoot()
+	if err != nil {
+		return toolCommandResult{OK: false, Command: command, Error: err.Error(), EID: "Kge9OK2Q"}
+	}
+	info, err := os.Stat(root)
+	if errors.Is(err, os.ErrNotExist) {
+		payload, _ := json.Marshal(scratchFileListing{Files: []scratchFileEntry{}, Offset: offset})
+		return toolCommandResult{OK: true, Command: command, ExitCode: 0, Stdout: string(payload)}
+	}
+	if err != nil {
+		return toolCommandResult{OK: false, Command: command, Error: err.Error(), EID: "q7M4vK2p"}
+	}
+	if !info.IsDir() {
+		return toolCommandResult{OK: false, Command: command, Error: "scratch session path is not a directory", EID: "pXAjTAMd"}
+	}
+	if err := updateScratchAccessMarker(root); err != nil {
+		return toolCommandResult{OK: false, Command: command, Error: err.Error(), EID: "lpkmXQQy"}
+	}
+	var all []scratchFileEntry
+	err = filepath.WalkDir(root, func(path string, entry os.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if path == root {
+			return nil
+		}
+		name := entry.Name()
+		if strings.HasPrefix(name, ".") {
+			if entry.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if entry.Type()&os.ModeSymlink != 0 || entry.IsDir() {
+			return nil
+		}
+		fileInfo, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		if !fileInfo.Mode().IsRegular() {
+			return nil
+		}
+		relative, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		all = append(all, scratchFileEntry{Path: filepath.ToSlash(relative), Absolute: path, SizeBytes: fileInfo.Size()})
+		return nil
+	})
+	if err != nil {
+		return toolCommandResult{OK: false, Command: command, Error: err.Error(), EID: "p09jmKSt"}
+	}
+	sort.Slice(all, func(i, j int) bool { return all[i].Path < all[j].Path })
+	start := min(offset, len(all))
+	pageEnd := min(start+limit, len(all))
+	for pageEnd >= start {
+		listing := scratchFileListing{Files: all[start:pageEnd], Offset: offset}
+		if pageEnd < len(all) {
+			next := pageEnd
+			listing.NextOffset = &next
+		}
+		payload, err := json.Marshal(listing)
+		if err != nil {
+			return toolCommandResult{OK: false, Command: command, Error: err.Error(), EID: "2zt6yNks"}
+		}
+		if len(payload) <= toolOutputLimit() {
+			return toolCommandResult{OK: true, Command: command, ExitCode: 0, Stdout: string(payload)}
+		}
+		if pageEnd == start {
+			return toolCommandResult{OK: false, Command: command, Error: "one file entry exceeds the configured tool output limit", EID: "h9wB808Q"}
+		}
+		pageEnd--
+	}
+	return toolCommandResult{OK: false, Command: command, Error: "unable to encode scratch listing page", EID: "To6081re"}
+}
+
+func scratchPaginationArg(args map[string]any, key string, defaultValue, maxValue int) (int, error) {
+	value, present := args[key]
+	if !present || value == nil {
+		return defaultValue, nil
+	}
+	var parsed int64
+	switch number := value.(type) {
+	case int:
+		parsed = int64(number)
+	case int32:
+		parsed = int64(number)
+	case int64:
+		parsed = number
+	case float64:
+		if math.IsNaN(number) || math.IsInf(number, 0) || number < 0 || number >= float64(maxValue)+1 || math.Trunc(number) != number {
+			return 0, fmt.Errorf("%s must be an integer", key)
+		}
+		parsed = int64(number)
+	case json.Number:
+		var err error
+		parsed, err = number.Int64()
+		if err != nil {
+			return 0, fmt.Errorf("%s must be an integer", key)
+		}
+	default:
+		return 0, fmt.Errorf("%s must be an integer", key)
+	}
+	if parsed < 0 || parsed > int64(maxValue) {
+		return 0, fmt.Errorf("%s must be between 0 and %d", key, maxValue)
+	}
+	return int(parsed), nil
 }

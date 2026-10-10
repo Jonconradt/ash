@@ -507,9 +507,25 @@ func TestLocalToolShimIncludesSchedulingAndWorkspaceTools(t *testing.T) {
 		"manage_recurring_jobs",
 		"ash_read_workspace_file",
 		"ash_write_workspace_file",
+		"read_scratch_file",
+		"write_scratch_file",
+		"append_scratch_file",
+		"replace_scratch_file",
+		"edit_scratch_file",
+		"list_scratch_files",
 	} {
 		if _, ok := names[required]; !ok {
 			t.Fatalf("expected tool %q to be published", required)
+		}
+		for _, retired := range []string{
+			"ash_read_scratch_file",
+			"ash_write_scratch_file",
+			"ash_append_scratch_file",
+			"ash_edit_scratch_file",
+		} {
+			if _, ok := names[retired]; ok {
+				t.Fatalf("retired scratch tool %q is still published", retired)
+			}
 		}
 	}
 }

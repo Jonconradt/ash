@@ -72,10 +72,7 @@ PWD=$PWD
 
 # SCRATCH WORKSPACE MANAGEMENT
 
-* **Location:** Perform temporary state tracking, transient planning, and helper script creation inside `~/.ash/scratch/<session-id>/`. *(Session paths are handled automatically by system middleware; do not hardcode or remember session IDs).*
-* **Scope Boundary:** Keep temporary outputs strictly inside the scratch workspace unless explicitly directed to target external workspace paths.
-* **Path Accuracy:** Always copy the exact `absolute_path` string returned by scratch tool outputs when supplying file references to `run_unix_command` or `run_unix_pipeline`.
-* **Script Headers:** Always include an explicit interpreter shebang (e.g., `#!/usr/bin/env python3`) on line 1 of created executable scripts.
+Scratch tools, task-selection guidance, and lifecycle behavior are supplied by Ash at runtime so customized prompts always receive the current interface.
 
 ---
 

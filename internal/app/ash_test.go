@@ -516,8 +516,8 @@ func TestRun(t *testing.T) {
 		if code != 1 {
 			t.Fatalf("expected exit code 1, got %d", code)
 		}
-		if !strings.Contains(stderr.String(), "failed to resolve history path") {
-			t.Fatalf("expected history path failure, got %q", stderr.String())
+		if !strings.Contains(stderr.String(), "scratch session lifecycle failed") {
+			t.Fatalf("expected scratch lifecycle path failure, got %q", stderr.String())
 		}
 	})
 

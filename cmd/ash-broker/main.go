@@ -30,6 +30,7 @@ import (
 	"ash/internal/brokerproto"
 	"ash/internal/localize"
 	"ash/internal/mcp"
+	"ash/internal/scratchlife"
 )
 
 const (
@@ -97,6 +98,7 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 	}
 	logger := newBrokerLogger(stderr)
 	var socket string
+	var sessionID string
 	var parentPID int
 	for index := 0; index < len(args); index++ {
 		switch args[index] {
@@ -119,6 +121,13 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 				return 2
 			}
 			parentPID = parsedPID
+		case "--session-id":
+			index++
+			if index >= len(args) {
+				logger.Error(localize.Text("log.broker.session_id_value_required"))
+				return 2
+			}
+			sessionID = args[index]
 		case "--lease":
 			index++
 			if index >= len(args) {
@@ -131,8 +140,12 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 		}
 	}
 	token := strings.TrimSpace(os.Getenv(brokerTokenEnv))
-	if socket == "" || token == "" || parentPID == 0 {
-		logger.Error("ash-broker requires --socket, --parent-pid, and ASH_BROKER_TOKEN", "EID", "Nc5LpK9x")
+	if socket == "" || sessionID == "" || token == "" || parentPID == 0 {
+		logger.Error(localize.Text("log.broker.arguments_required"), "EID", "Nc5LpK9x")
+		return 2
+	}
+	if err := scratchlife.ValidateSessionID(sessionID); err != nil {
+		logger.Error(localize.Text("log.broker.session_id_invalid"), "error", err)
 		return 2
 	}
 	endpoint := strings.TrimSpace(os.Getenv(aiEndpointEnv))
@@ -150,6 +163,17 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 		logger.Error(localize.Format("log.broker.home_failed", []any{err}), "EID", "Fh4TzP9b")
 		return 1
 	}
+	scratchRoot := filepath.Join(home, ".ash", "scratch")
+	scratchLock, err := scratchlife.Acquire(scratchRoot, sessionID)
+	if err != nil {
+		logger.Error(localize.Format("log.scratch.lifecycle_failed", []any{err}), "error", err)
+		return 1
+	}
+	defer func() {
+		if err := scratchLock.Close(); err != nil {
+			logger.Warn(localize.Format("log.scratch.lifecycle_failed", []any{err}), "error", err)
+		}
+	}()
 	if err := localize.Init(localize.EnvironmentLocale(), filepath.Join(home, ".ash", "languages")); err != nil {
 		_, _ = fmt.Fprintln(stderr, localize.Format("log.broker.language_error", []any{err}))
 		return 1
