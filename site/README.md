@@ -1,9 +1,9 @@
 # site
 
 Static site published to GitHub Pages (deployed by
-[.github/workflows/site.yml](../.github/workflows/site.yml) on push to `main`
-or on release). This is marketing/docs content only — it is not part of the Go
-build.
+[.github/workflows/site.yml](../.github/workflows/site.yml) on pushes to `main`
+that change `site/`, on pushes of release tags (`v*`), or on manually published
+releases). This is marketing/docs content only — it is not part of the Go build.
 
 - `index.html` — landing page.
 - `docs.html` — usage/configuration documentation.
