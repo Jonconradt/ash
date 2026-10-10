@@ -79,6 +79,7 @@
     "ash.broker_moved": "ash broker se ha trasladado a un ejecutable independiente; use 'ash-broker'",
     "ash.attachment_error": "Error en el adjunto: %s",
     "ash.configuration_error": "Error de configuración:\n\n%s\n",
+    "ash.invalid_config_value": "Valor no válido para %s; consulte el formato documentado.",
     "ash.say_failed": "say: error de texto a voz: %v\n",
     "ash.say_unavailable": "say: no se encontró el comando nativo de texto a voz; se mostrará la respuesta",
     "ash.saved_attachment": "Adjunto guardado: %s\n",

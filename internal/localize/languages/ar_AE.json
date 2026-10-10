@@ -79,6 +79,7 @@
     "ash.broker_moved": "انتقل ash broker إلى برنامج منفصل؛ شغّل 'ash-broker' بدلاً منه",
     "ash.attachment_error": "خطأ في المرفق: %s",
     "ash.configuration_error": "خطأ في التهيئة:\n\n%s\n",
+    "ash.invalid_config_value": "قيمة غير صالحة لـ %s؛ راجع التنسيق الموضح في الوثائق.",
     "ash.say_failed": "say: فشل تحويل النص إلى كلام: %v\n",
     "ash.say_unavailable": "say: تعذّر العثور على أمر تحويل النص إلى كلام؛ يتم عرض الرد",
     "ash.saved_attachment": "تم حفظ المرفق: %s\n",

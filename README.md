@@ -357,9 +357,9 @@ Notes:
 - `ASH_AI_AUTH_TOKEN` (optional): When set, sent as a bearer token. Required for cloud endpoints other than AWS Bedrock.
 - `ASH_AI_PROVIDER` (optional): Override auto-detected provider (`ollama`, `openai`, `google`, `gemini`, `anthropic`).
   Also accepts `cohere` and `bedrock` for the native SDK-based adapters (auto-detected from `api.cohere.com`/`bedrock-runtime.*.amazonaws.com` when not set explicitly).
-- `ASH_AI_CACHE` (optional): Enable or disable provider-native caching (`true/false`). Default `true`.
-- `ASH_ALWAYS_OPENAI_API` (optional): When true-like, routes the `ollama` provider through the OpenAI-compatible SDK adapter instead of its hand-rolled implementation. Default on; set to a falsy value (e.g. `0`/`off`) to use the hand-rolled ollama adapter.
-- `ASH_STREAM` (optional): When true-like, streams the response from providers whose adapter supports it (currently OpenAI only). Default on; set to a falsy value (e.g. `0`/`off`) to disable. Has no visible effect on output today (see [docs/ash.1](docs/ash.1)).
+- `ASH_AI_CACHE` (optional): Enable or disable provider-native caching. Accepts `1`, `true`, `yes`, `on`, `enabled`, `0`, `false`, `no`, `off`, or `disabled` (case-insensitive). Default `true`.
+- `ASH_ALWAYS_OPENAI_API` (optional): When true-like, routes the `ollama` provider through the OpenAI-compatible SDK adapter instead of its hand-rolled implementation. Accepts the same boolean values as `ASH_AI_CACHE`; default on.
+- `ASH_STREAM` (optional): When true-like, streams the response from providers whose adapter supports it (currently OpenAI only). Accepts the same boolean values as `ASH_AI_CACHE`; default on. Has no visible effect on output today (see [docs/ash.1](docs/ash.1)).
 - `ASH_ATTACHMENT_MAX_BYTES` (optional): Max size in bytes for a file passed via `--attach`. Default 10485760 (10 MiB).
 - `ASH_AI_TIMEOUT` (optional): AI request timeout. Default `3m`.
 - `ASH_BROKER_AI_WARMUP` (optional): Send one credential-free `HEAD` request to the AI endpoint's origin at broker startup to warm its reusable HTTP connection. Enabled by default; set to `0` to disable. Set to `1` to enable explicitly. The probe does not validate API health or warm a local model.
@@ -383,11 +383,19 @@ Notes:
 - `ASH_BROKER_SOCKET`, `ASH_BROKER_TOKEN`, and `ASH_BROKER_LEASE` (internal): Ephemeral per-shell broker settings. They are created by the installed Bash/zsh/Fish wrappers and should not be persisted or copied into scheduled jobs.
 - `ASH_MCP_CREDENTIAL_KEY` (optional): High-entropy 32-byte hex/base64 key for encrypted MCP OAuth credential fallback when the OS credential store is unavailable. The shell wrapper passes it only to `ash-broker` at launch and unsets its shell copy; do not put it in command arguments or logs.
 - `ASH_SESSION_ID`: Ash session identifier used for history, scratch, and scheduled log naming. A valid explicit value is preserved; invalid explicit values are rejected. The unrelated generic `SESSION_ID` variable is ignored.
+
 - `ASH_SCHEDULED_TASK` (internal): Set by scheduled invocations to mark task execution context.
 - `ASH_CHILD_AGENT` (internal): Marks a one-level child agent; child agents cannot create or schedule ash agents.
 - `SHELL`: Used by `ash install` and install recommendations to detect Bash, zsh, or Fish.
 - `HOME`: Supplies the fallback base for the XDG directories when their corresponding environment variables are unset.
 - `PATH`: Used to locate executables for tool commands and helper utilities.
+
+Explicit boolean settings accept `1`, `true`, `yes`, `on`, `enabled`, `0`,
+`false`, `no`, `off`, or `disabled`, case-insensitively. Integer limits must be
+positive except `ASH_MAX_TOOL_ITERS`, which may be zero. AI/tool timeouts must
+be positive durations; retry delays may be zero but not negative. Durations use
+Go syntax such as `30s`, `5m`, or `1h`. Ash rejects explicitly set malformed
+or out-of-range values instead of silently substituting defaults.
 
 ### Connection reuse
 

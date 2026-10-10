@@ -117,7 +117,7 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 	if raw := strings.TrimSpace(os.Getenv(aiTimeoutEnv)); raw != "" {
 		parsed, err := time.ParseDuration(raw)
 		if err != nil || parsed <= 0 {
-			logger.Error(aiTimeoutEnv + " must be a positive duration")
+			logger.Error(localize.Format("ash.invalid_config_value", []any{aiTimeoutEnv}))
 			return 2
 		}
 	}

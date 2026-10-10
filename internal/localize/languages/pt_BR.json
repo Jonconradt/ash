@@ -79,6 +79,7 @@
     "ash.broker_moved": "o broker do ash foi movido para um binário separado; execute 'ash-broker' em vez disso",
     "ash.attachment_error": "Erro no anexo: %s",
     "ash.configuration_error": "Erro de configuração:\n\n%s\n",
+    "ash.invalid_config_value": "Valor inválido para %s; consulte o formato documentado.",
     "ash.say_failed": "say: falha na conversão de texto em fala: %v\n",
     "ash.say_unavailable": "say: comando nativo de conversão de texto em fala não encontrado; exibindo a resposta",
     "ash.saved_attachment": "Anexo salvo: %s\n",

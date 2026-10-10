@@ -79,6 +79,7 @@
     "ash.broker_moved": "le broker ash a été déplacé dans un binaire séparé ; exécutez plutôt « ash-broker »",
     "ash.attachment_error": "Erreur de pièce jointe : %s",
     "ash.configuration_error": "Erreur de configuration :\n\n%s\n",
+    "ash.invalid_config_value": "Valeur invalide pour %s ; vérifiez le format documenté.",
     "ash.say_failed": "say : échec de la synthèse vocale : %v\n",
     "ash.say_unavailable": "say : commande native de synthèse vocale introuvable ; affichage de la réponse",
     "ash.saved_attachment": "Pièce jointe enregistrée : %s\n",

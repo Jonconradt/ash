@@ -77,6 +77,7 @@
     "ash.attachment_error": "Attachment error: %s",
     "setup.ai_env_incomplete": "Configure AI in your ~/%s by adding:\nexport ASH_AI_ENDPOINT='https://your-api-endpoint.example.com'\nexport ASH_AI_MODEL='your-model-name'\nexport ASH_AI_AUTH_TOKEN='your-token'\nThen activate the settings with: source ~/%s",
     "ash.configuration_error": "Configuration error:\n\n%s\n",
+    "ash.invalid_config_value": "Invalid value for %s; check the documented format.",
     "ash.say_failed": "say: text-to-speech failed: %v\n",
     "ash.say_unavailable": "say: native text-to-speech command not found; displaying response",
     "ash.saved_attachment": "Saved attachment: %s\n",

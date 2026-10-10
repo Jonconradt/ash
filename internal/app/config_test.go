@@ -59,6 +59,77 @@ func TestStreamingEnabled(t *testing.T) {
 	}
 }
 
+func TestValidateRuntimeSettingsRejectsMalformedValues(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+	}{
+		{name: aiEnvCache, value: "maybe"},
+		{name: ashEnvAlwaysOpenAIAPI, value: "maybe"},
+		{name: "ASH_STREAM", value: "maybe"},
+		{name: "ASH_HISTORY_MAX", value: "0"},
+		{name: "ASH_RETRY_MAX_ATTEMPTS", value: "many"},
+		{name: "ASH_RETRY_BASE_DELAY", value: "-1s"},
+		{name: "ASH_RETRY_MAX_DELAY", value: "later"},
+		{name: "ASH_AI_TIMEOUT", value: "0s"},
+		{name: "ASH_TOOL_TIMEOUT", value: "fast"},
+		{name: "ASH_TOOL_OUTPUT_MAX", value: "unlimited"},
+		{name: "ASH_MAX_TOOL_ITERS", value: "-1"},
+		{name: maxAgentsEnvName, value: "0"},
+		{name: "ASH_TASK_MAX", value: "0"},
+		{name: "ASH_RELEVANCE_WINDOW", value: "0"},
+		{name: "ASH_TASK_STALL_ROUNDS", value: "0"},
+		{name: "ASH_TOOL_REPEAT_LIMIT", value: "0"},
+	}
+	settingNames := []string{
+		aiEnvCache, ashEnvAlwaysOpenAIAPI, "ASH_STREAM",
+		"ASH_HISTORY_MAX", "ASH_RETRY_MAX_ATTEMPTS",
+		"ASH_RETRY_BASE_DELAY", "ASH_RETRY_MAX_DELAY", "ASH_AI_TIMEOUT",
+		"ASH_TOOL_TIMEOUT", "ASH_TOOL_OUTPUT_MAX", "ASH_MAX_TOOL_ITERS",
+		maxAgentsEnvName, "ASH_TASK_MAX", "ASH_RELEVANCE_WINDOW",
+		"ASH_TASK_STALL_ROUNDS", "ASH_TOOL_REPEAT_LIMIT",
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			for _, name := range settingNames {
+				t.Setenv(name, "")
+			}
+			t.Setenv(tt.name, tt.value)
+			err := validateRuntimeSettings()
+			if err == nil || !strings.Contains(err.Error(), tt.name) {
+				t.Fatalf("validateRuntimeSettings() error = %v, want error naming %s", err, tt.name)
+			}
+		})
+	}
+}
+
+func TestValidateRuntimeSettingsAcceptsDocumentedValues(t *testing.T) {
+	settings := map[string]string{
+		aiEnvCache:               "disabled",
+		ashEnvAlwaysOpenAIAPI:    "on",
+		"ASH_STREAM":             "0",
+		"ASH_HISTORY_MAX":        "1",
+		"ASH_RETRY_MAX_ATTEMPTS": "1",
+		"ASH_RETRY_BASE_DELAY":   "0s",
+		"ASH_RETRY_MAX_DELAY":    "5m",
+		"ASH_AI_TIMEOUT":         "1ms",
+		"ASH_TOOL_TIMEOUT":       "1s",
+		"ASH_TOOL_OUTPUT_MAX":    "1",
+		"ASH_MAX_TOOL_ITERS":     "0",
+		maxAgentsEnvName:         "1",
+		"ASH_TASK_MAX":           "1",
+		"ASH_RELEVANCE_WINDOW":   "1",
+		"ASH_TASK_STALL_ROUNDS":  "1",
+		"ASH_TOOL_REPEAT_LIMIT":  "1",
+	}
+	for name, value := range settings {
+		t.Setenv(name, value)
+	}
+	if err := validateRuntimeSettings(); err != nil {
+		t.Fatalf("validateRuntimeSettings() rejected documented settings: %v", err)
+	}
+}
+
 func TestLoadAllowlistedCommandsIgnoresLegacyAshTools(t *testing.T) {
 	home := t.TempDir()
 	cwd := t.TempDir()
@@ -346,7 +417,7 @@ func TestParseAIConfigFromEnv(t *testing.T) {
 				"ASH_AI_MODEL":    "llama3.1",
 				"ASH_AI_CACHE":    "sometimes",
 			},
-			wantErr: "ASH_AI_CACHE must be a boolean-like value",
+			wantErr: "ASH_AI_CACHE",
 		},
 	}
 
@@ -500,7 +571,7 @@ func TestParseAICacheEnabled(t *testing.T) {
 	}
 
 	_, err := parseAICacheEnabled("sometimes")
-	if err == nil || !strings.Contains(err.Error(), "boolean-like value") {
+	if err == nil || !strings.Contains(err.Error(), aiEnvCache) {
 		t.Fatalf("expected invalid cache error, got %v", err)
 	}
 }

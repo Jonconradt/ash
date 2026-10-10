@@ -79,6 +79,7 @@
     "ash.broker_moved": "Der ash-Broker befindet sich jetzt in einer separaten Binärdatei; führe stattdessen 'ash-broker' aus",
     "ash.attachment_error": "Anhangsfehler: %s",
     "ash.configuration_error": "Konfigurationsfehler:\n\n%s\n",
+    "ash.invalid_config_value": "Ungültiger Wert für %s; prüfe das dokumentierte Format.",
     "ash.say_failed": "say: Sprachausgabe fehlgeschlagen: %v\n",
     "ash.say_unavailable": "say: nativer Befehl für Sprachausgabe nicht gefunden; Antwort wird angezeigt",
     "ash.saved_attachment": "Anhang gespeichert: %s\n",

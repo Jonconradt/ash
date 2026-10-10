@@ -79,6 +79,7 @@
     "ash.broker_moved": "ash broker telah dipindahkan ke biner terpisah; jalankan 'ash-broker'",
     "ash.attachment_error": "Kesalahan lampiran: %s",
     "ash.configuration_error": "Kesalahan konfigurasi:\n\n%s\n",
+    "ash.invalid_config_value": "Nilai untuk %s tidak valid; periksa format yang didokumentasikan.",
     "ash.say_failed": "say: teks ke suara gagal: %v\n",
     "ash.say_unavailable": "say: perintah teks ke suara asli tidak ditemukan; menampilkan respons",
     "ash.saved_attachment": "Lampiran disimpan: %s\n",

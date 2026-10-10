@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Jonconradt/ash/internal/localize"
 	mcpclient "github.com/Jonconradt/ash/internal/mcp"
 )
 
@@ -48,6 +49,10 @@ type aiConfig struct {
 
 // parseAIConfigFromEnv parses and validates input values.
 func parseAIConfigFromEnv() (aiConfig, error) {
+	if err := validateRuntimeSettings(); err != nil {
+		return aiConfig{}, err
+	}
+
 	rawEndpoint := strings.TrimSpace(os.Getenv(aiEnvEndpoint))
 	model := strings.TrimSpace(os.Getenv(aiEnvModel))
 	authToken := strings.TrimSpace(os.Getenv(aiEnvAuthToken))
@@ -73,13 +78,6 @@ func parseAIConfigFromEnv() (aiConfig, error) {
 	if err != nil {
 		return aiConfig{}, err
 	}
-	if rawTimeout := strings.TrimSpace(os.Getenv("ASH_AI_TIMEOUT")); rawTimeout != "" {
-		timeout, err := time.ParseDuration(rawTimeout)
-		if err != nil || timeout <= 0 {
-			return aiConfig{}, errors.New("ASH_AI_TIMEOUT must be a positive duration")
-		}
-	}
-
 	if isCloudAIHost(host) {
 		if scheme != "https" {
 			return aiConfig{}, errors.New("ASH_AI_ENDPOINT must use https for cloud endpoints")
@@ -116,8 +114,88 @@ func parseAICacheEnabled(raw string) (bool, error) {
 	case "0", "false", "no", "off", "disabled":
 		return false, nil
 	default:
-		return false, fmt.Errorf("%s must be a boolean-like value (true/false)", aiEnvCache)
+		return false, invalidConfigSettingError(aiEnvCache)
 	}
+}
+
+func validateRuntimeSettings() error {
+	booleanSettings := []string{aiEnvCache, ashEnvAlwaysOpenAIAPI, "ASH_STREAM"}
+	for _, name := range booleanSettings {
+		raw := strings.TrimSpace(os.Getenv(name))
+		if raw == "" {
+			continue
+		}
+		if name == aiEnvCache {
+			if _, err := parseAICacheEnabled(raw); err != nil {
+				return err
+			}
+			continue
+		}
+		switch strings.ToLower(raw) {
+		case "1", "true", "yes", "on", "enabled", "0", "false", "no", "off", "disabled":
+		default:
+			return invalidConfigSettingError(name)
+		}
+	}
+
+	positiveIntegers := []string{
+		"ASH_HISTORY_MAX",
+		"ASH_RETRY_MAX_ATTEMPTS",
+		"ASH_TOOL_OUTPUT_MAX",
+		maxAgentsEnvName,
+		"ASH_TASK_MAX",
+		"ASH_RELEVANCE_WINDOW",
+		"ASH_TASK_STALL_ROUNDS",
+		"ASH_TOOL_REPEAT_LIMIT",
+	}
+	for _, name := range positiveIntegers {
+		if err := validateIntegerSetting(name, 1); err != nil {
+			return err
+		}
+	}
+	if err := validateIntegerSetting("ASH_MAX_TOOL_ITERS", 0); err != nil {
+		return err
+	}
+
+	for _, name := range []string{"ASH_AI_TIMEOUT", "ASH_TOOL_TIMEOUT"} {
+		if err := validateDurationSetting(name, false); err != nil {
+			return err
+		}
+	}
+	for _, name := range []string{"ASH_RETRY_BASE_DELAY", "ASH_RETRY_MAX_DELAY"} {
+		if err := validateDurationSetting(name, true); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateIntegerSetting(name string, minimum int) error {
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return nil
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil || value < minimum {
+		return invalidConfigSettingError(name)
+	}
+	return nil
+}
+
+func validateDurationSetting(name string, allowZero bool) error {
+	raw := strings.TrimSpace(os.Getenv(name))
+	if raw == "" {
+		return nil
+	}
+	value, err := time.ParseDuration(raw)
+	if err != nil || value < 0 || (!allowZero && value == 0) {
+		return invalidConfigSettingError(name)
+	}
+	return nil
+}
+
+func invalidConfigSettingError(name string) error {
+	return errors.New(localize.Format("ash.invalid_config_value", []any{name}))
 }
 
 // alwaysUseOpenAIAPIForOllama reports whether ASH_ALWAYS_OPENAI_API is truthy.

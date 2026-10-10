@@ -79,6 +79,7 @@
     "ash.broker_moved": "il broker ash è stato spostato in un binario separato; esegui invece 'ash-broker'",
     "ash.attachment_error": "Errore dell'allegato: %s",
     "ash.configuration_error": "Errore di configurazione:\n\n%s\n",
+    "ash.invalid_config_value": "Valore non valido per %s; controlla il formato documentato.",
     "ash.say_failed": "say: sintesi vocale non riuscita: %v\n",
     "ash.say_unavailable": "say: comando nativo di sintesi vocale non trovato; la risposta verrà visualizzata",
     "ash.saved_attachment": "Allegato salvato: %s\n",

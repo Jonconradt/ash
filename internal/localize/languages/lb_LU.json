@@ -79,6 +79,7 @@
     "ash.broker_moved": "den ash-Broker ass an e separat Binär geplënnert; féiert amplaz 'ash-broker' aus",
     "ash.attachment_error": "Feeler mam Uschloss: %s",
     "ash.configuration_error": "Konfiguratiounsfeeler:\n\n%s\n",
+    "ash.invalid_config_value": "Ongëltege Wäert fir %s; kuckt dat dokumentéiert Format no.",
     "ash.say_failed": "say: Text-zu-Sprooch feelgeschloen: %v\n",
     "ash.say_unavailable": "say: den nativen Text-zu-Sprooch-Befeel gouf net fonnt; d'Äntwert gëtt ugewisen",
     "ash.saved_attachment": "Uschloss gespäichert: %s\n",

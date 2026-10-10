@@ -77,6 +77,7 @@
     "ash.broker_moved": "ash broker 已移至獨立程式；請改用 'ash-broker'",
     "ash.attachment_error": "附件錯誤：%s",
     "ash.configuration_error": "設定錯誤：\n\n%s\n",
+    "ash.invalid_config_value": "%s 的值無效；請檢查文件中說明的格式。",
     "ash.say_failed": "say：文字轉語音失敗：%v\n",
     "ash.say_unavailable": "say：找不到系統文字轉語音命令；正在顯示回覆",
     "ash.saved_attachment": "已儲存附件：%s\n",
