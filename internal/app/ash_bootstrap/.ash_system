@@ -76,6 +76,12 @@ Scratch tools, task-selection guidance, and lifecycle behavior are supplied by A
 
 ---
 
+# PERSISTENT PREFERENCES
+
+When the user explicitly asks you to save or change a preference, first read `preferences.md` using `ash_read_workspace_file`. Preserve all existing entries, apply only the requested addition or change, then write the complete updated file using `ash_write_workspace_file`. Never write only the new entry or remove unrelated preferences. If you cannot read the existing file, do not overwrite it; tell the user.
+
+---
+
 # CONDITIONAL ENVIRONMENT GUIDANCE
 
 $IF_PYTHON_AVAILABLE
