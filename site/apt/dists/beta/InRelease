@@ -1,0 +1,51 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA512
+
+Architectures: amd64 arm64
+Codename: beta
+Components: main
+Date: Sun, 11 Oct 2026 18:21:32 +0000
+Description: Official APT repository for ash
+Label: VersionX APT Repository
+Origin: VersionX
+Suite: beta
+MD5Sum:
+ ca4ecba6fbe996227453b49c14e0bc57              202 Release
+ 94612b45ec9b29751222f59626c48783              471 main/binary-amd64/Packages
+ 1f54501dc5a3f2004aa84c0224410155              359 main/binary-amd64/Packages.gz
+ 003dbfd5ff852c2d5336fb5c6f149da4              471 main/binary-arm64/Packages
+ 2d386181b8589ce137f880a43f5f700e              358 main/binary-arm64/Packages.gz
+SHA1:
+ 7b652f1f399eef8800600fd865c646403a8e3af0              202 Release
+ 3ef404e1cb5e7399ce3278c2ab0b6f4f8a79f11f              471 main/binary-amd64/Packages
+ 9113cc2aff5cc1c22eb4555a96c7e150fc1eb337              359 main/binary-amd64/Packages.gz
+ c2d7457fb375f541229f95b5cd0b74cbea9dac71              471 main/binary-arm64/Packages
+ 83b90135d1e7bb38d2db18b484d70babda9f44cb              358 main/binary-arm64/Packages.gz
+SHA256:
+ b8455bea8df4feefda6f1f9a6155df8b64a72dbb8b5d50f29569ded519669e0f              202 Release
+ 0ee76aac14f856db2039f524a4902f7e09a257c622a304dc260fa5514c5b5135              471 main/binary-amd64/Packages
+ bf14861f1db0e62b5909600f42858061f829eb09f163d4c6c8a9961c99615791              359 main/binary-amd64/Packages.gz
+ c6f5a48a2b9f32881126ee0a0423bcbe05584fbf0f058d2929b06e0c2985096a              471 main/binary-arm64/Packages
+ e98c465402ff6a08c7e5b1ffda27f3e2c52679bd1307c6314cb39c4bb64e4911              358 main/binary-arm64/Packages.gz
+SHA512:
+ c404c31c148d1a61933df32ca0bb62e9e2dc78197d74247a1cc510f24122b0ce26bf230d3677cf2e20619e3f892b204a15b7aea361bf807cacc3a47d4b926309              202 Release
+ eb0580cfde5a900fafee0bf3589cc117584a95173d3e8b00253c43fbe5d55455c7abd158aecf932c44f5b4205a217846e30fad08511438988033f21acb3b8d81              471 main/binary-amd64/Packages
+ 1e8b6b3a4b3644658180b8d0d51a745056ceeed0f90fe529a99265a70168b54076f91ed757b05f07e1ddac3fac9ca8db08a3652b188a3d5c9d11cbc4400e994c              359 main/binary-amd64/Packages.gz
+ 12a940b1215c9eceb4d103c89a30829cfa1a3eada3c92eabe6e11c1931d598b3ddbfc11538d729e31b56e6e3d2a7febb6f040d73e8cdf2e586211749d5103363              471 main/binary-arm64/Packages
+ a1168ef2729f3bdb7fd190a4902c45f3d759365255eaf674e703be3d8b5011696716b054fd29be2e6c3d7055112c3c6fe7ab9a8d3357666b3d3b0c5687d0edb8              358 main/binary-arm64/Packages.gz
+-----BEGIN PGP SIGNATURE-----
+
+iQIzBAEBCgAdFiEEMsbBHS+Gv+Rut3/8Ulf+phNokZ8FAmrL06wACgkQUlf+phNo
+kZ+Ptg/7BGOCIFyOtC3P3j51IAuj3FtYcDaqCDp3ROhDyxzbCDLjNeQPA18nhAyj
+8gA9lhulRupd6GOswYmhAVWxYlYzWq0No9snNt7ReBVvY03aVxE7xCH7Kk0/yhGL
+RoGm0orZym2IVE49Og/47iDgL5G7KT577SO8CdteeczdMY3swL+gvgqv6oeU9kAV
+U6a0Kqf9fE1QpLwqfIwvOiV/j3dUPurUvKvqZsz1tyho7y3v81MZ4PkKdQULdKld
+KGaX6yCOcOBws23o1mxbK0ILX2Rdc3+gmdQnnkMeDJD8w5uKK4ws7yyol0jdT7MS
+FUQc1z51+Ct19+Nm504xUsCmg55dvOMhvHVm77CF2Hp6CBoDyuirINfQUq3yantg
+dn8OStKsecLwXsvGDYaun6KYTFg8UQbYM+vF2Ubr6ojrTBsSNkgtLjPJlTYmUaMy
+e/n8TH7RTKeGCK1b3AfJHWtw2LqTt4ybvBGCiCbWM5MPpGuYGA5lyUP7a1M3uXpY
+PUBc7enyjWOGIDAhUkireqVW2CTNaRXU9ehSFFnkgoxlT75eZ1QxDLWqNGB9u2ep
+hYuCa5AgX2PP5XlARKBvAXr4/12hzj3LRgKNkjPzsZ5gJcm6qOAfBEC5xdXWnIeH
+DBaZAneJ6sVEUnhe3mLUckBpLebCJ7WE+Pznojz/CZnSZZf1PwE=
+=R24d
+-----END PGP SIGNATURE-----

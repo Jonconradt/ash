@@ -1,0 +1,17 @@
+Package: ash
+Version: 0.27.0~beta.2
+Architecture: arm64
+Maintainer: <runner@runnervmy3dvn>
+Installed-Size: 56879
+Filename: pool/beta/main/ash_0.27.0~beta.2_arm64.deb
+Size: 19473810
+MD5sum: 4189780c39df9e9e64e7987ec679ae30
+SHA1: 08b7e3460fc32382014186eb65b55412657b3679
+SHA256: 6ea3b88b03f7ec276da297e18571d5e326c271d02d499b742d994a8b0a34d020
+Section: default
+Priority: optional
+Homepage: https://github.com
+Description: ash shell assistant
+License: unknown
+Vendor: none
+
