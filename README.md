@@ -138,7 +138,9 @@ make release CHANNEL=stable
   published as the GitHub Release body.
 - Beta counters increment for each release of the next minor version. Stable
   releases omit the prerelease suffix; nightly tags use the next minor version
-  and the UTC release date.
+  and the UTC release date. Same-day retries append an increasing counter, for
+  example `v1.2.0-nightly.20261011.1`. Release tags are immutable, including
+  failed attempts, because Go's checksum database may already have indexed them.
 
 Contributor note: run `make lint test` before submitting changes.
 

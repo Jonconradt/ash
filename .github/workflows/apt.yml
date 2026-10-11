@@ -33,7 +33,7 @@ jobs:
                 channel=beta
                 package_version="${BASH_REMATCH[1]}~beta.${BASH_REMATCH[2]}"
                 arch_version="${BASH_REMATCH[1]}.beta.${BASH_REMATCH[2]}"
-              elif [[ "$RELEASE_TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-nightly\.([0-9]{8})$ ]]; then
+              elif [[ "$RELEASE_TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-nightly\.([0-9]{8}(\.[1-9][0-9]*)?)$ ]]; then
                 channel=nightly
                 package_version="${BASH_REMATCH[1]}~nightly.${BASH_REMATCH[2]}"
                 arch_version="${BASH_REMATCH[1]}.nightly.${BASH_REMATCH[2]}"
@@ -207,7 +207,11 @@ jobs:
             "site/apt/dists/${PACKAGE_CHANNEL}/main/binary-arm64" \
             "$rpm_repo/packages" \
             "$pacman_repo"
-          install -m 0644 "$RUNNER_TEMP"/debs/*.deb "site/apt/pool/${PACKAGE_CHANNEL}/main/"
+          for package in "$RUNNER_TEMP"/debs/*.deb; do
+            architecture="$(dpkg-deb --field "$package" Architecture)"
+            install -m 0644 "$package" \
+              "site/apt/pool/${PACKAGE_CHANNEL}/main/ash_${PACKAGE_VERSION}_${architecture}.deb"
+          done
           install -m 0644 "$RUNNER_TEMP"/rpms/*.rpm "$rpm_repo/packages/"
           find "$pacman_repo" -maxdepth 1 -type f -name '*.pkg.tar.zst*' -delete
           rm -f "$pacman_repo"/versionx.db*
@@ -221,6 +225,9 @@ jobs:
             for architecture in amd64 arm64; do
               apt_directory="dists/${PACKAGE_CHANNEL}/main/binary-${architecture}"
               dpkg-scanpackages --arch "$architecture" "pool/${PACKAGE_CHANNEL}/main" /dev/null > "${apt_directory}/Packages"
+              grep -Fx "Package: ash" "${apt_directory}/Packages"
+              grep -Fx "Version: ${PACKAGE_VERSION}" "${apt_directory}/Packages"
+              grep -Fx "Architecture: ${architecture}" "${apt_directory}/Packages"
               gzip -9n -c "${apt_directory}/Packages" > "${apt_directory}/Packages.gz"
             done
 
@@ -249,8 +256,8 @@ jobs:
             --passphrase "$GPG_PASSPHRASE" --armor --detach-sign \
             --output "$rpm_repo/repodata/repomd.xml.asc" "$rpm_repo/repodata/repomd.xml"
           gpg --verify "$rpm_repo/repodata/repomd.xml.asc" "$rpm_repo/repodata/repomd.xml"
-          pacman_package="$(find "$pacman_repo" -maxdepth 1 -type f -name '*.pkg.tar.zst' -print -quit)"
-          if [[ -z "$pacman_package" ]]; then
+          pacman_package="$pacman_repo/ash-${ARCH_VERSION}-1-x86_64.pkg.tar.zst"
+          if [[ ! -s "$pacman_package" ]]; then
             echo "::error::Arch package was not built"
             exit 1
           fi

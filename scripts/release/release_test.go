@@ -144,6 +144,180 @@ MAKE := $(MAKE) -f Makefile -f steps.mk
 	}
 }
 
+func TestNightlyRetriesUseImmutableVersions(t *testing.T) {
+	_, dir := releaseFixture(t)
+	runFixture(t, dir, nil, "git", "tag", "v1.1.7")
+	base := "v1.2.0-nightly." + time.Now().UTC().Format("20060102")
+	runFixture(t, dir, nil, "git", "tag", base)
+	for _, suffix := range []string{".1", ".2", ".10"} {
+		got := strings.TrimSpace(runFixture(t, dir, nil, "bash", "scripts/release/next_version.sh", "nightly"))
+		if got != base+suffix {
+			t.Fatalf("got %s, want %s", got, base+suffix)
+		}
+		runFixture(t, dir, nil, "git", "tag", got)
+		if suffix == ".2" {
+			runFixture(t, dir, nil, "git", "tag", base+".9")
+			runFixture(t, dir, nil, "git", "tag", base+".invalid")
+			runFixture(t, dir, nil, "git", "tag", base+".01")
+		}
+	}
+}
+
+func workflowStep(t *testing.T, root, workflow, step string) string {
+	t.Helper()
+	data, err := os.ReadFile(filepath.Join(root, ".github/workflows", workflow))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, section, found := strings.Cut(string(data), "- name: "+step+"\n")
+	if !found {
+		t.Fatalf("missing workflow step %s", step)
+	}
+	_, script, found := strings.Cut(section, "run: |\n")
+	if !found {
+		t.Fatalf("missing script for %s", step)
+	}
+	script, _, _ = strings.Cut(script, "      - name:")
+	lines := strings.Split(strings.TrimRight(script, "\n"), "\n")
+	for i := range lines {
+		lines[i] = strings.TrimPrefix(lines[i], "          ")
+	}
+	return strings.Join(lines, "\n")
+}
+
+func TestScheduledNightlyUsesPublishedRelease(t *testing.T) {
+	root, dir := releaseFixture(t)
+	tag := "v1.2.0-nightly.20261011"
+	runFixture(t, dir, nil, "git", "tag", tag)
+	writeFixture(t, filepath.Join(dir, "bin/gh"), `#!/bin/bash
+[[ "$*" == *"--paginate --slurp"* ]] || exit 1
+if [[ "$TEST_API_FAIL" == yes ]]; then exit 1; fi
+if [[ -n "$TEST_PUBLISHED_TAG" ]]; then
+  printf '[[{"draft":false,"tag_name":"%s"}]]' "$TEST_PUBLISHED_TAG"
+else
+  printf '[[]]'
+fi
+`, 0o755)
+	script := workflowStep(t, root, "nightly.yml", "Check for changes since the latest nightly")
+	for _, published := range []string{"", tag} {
+		output := filepath.Join(t.TempDir(), "output")
+		env := []string{
+			"PATH=" + filepath.Join(dir, "bin") + ":" + os.Getenv("PATH"),
+			"GITHUB_REPOSITORY=fixture/repo", "GITHUB_OUTPUT=" + output,
+			"TEST_PUBLISHED_TAG=" + published,
+		}
+		runFixture(t, dir, env, "bash", "-c", script)
+		data, err := os.ReadFile(output)
+		if err != nil {
+			t.Fatal(err)
+		}
+		want := "publish=true\n"
+		if published != "" {
+			want = "publish=false\n"
+		}
+		if string(data) != want {
+			t.Fatalf("published=%q: got %q, want %q", published, data, want)
+		}
+	}
+	env := []string{"PATH=" + filepath.Join(dir, "bin") + ":" + os.Getenv("PATH"), "GITHUB_REPOSITORY=fixture/repo", "TEST_API_FAIL=yes"}
+	if err := fixtureCommand(dir, env, "bash", "-c", script).Run(); err == nil {
+		t.Fatal("release API failure was ignored")
+	}
+}
+
+func TestRepositoryNightlyRetryVersionMapping(t *testing.T) {
+	root, dir := releaseFixture(t)
+	script := workflowStep(t, root, "apt.yml", "Resolve release channel package versions")
+	for _, tag := range []string{"v1.2.0-nightly.20261011", "v1.2.0-nightly.20261011.1"} {
+		output := filepath.Join(t.TempDir(), "env")
+		runFixture(t, dir, []string{"RELEASE_TAG=" + tag, "GITHUB_ENV=" + output}, "bash", "-c", script)
+		data, err := os.ReadFile(output)
+		if err != nil {
+			t.Fatal(err)
+		}
+		version := strings.TrimPrefix(tag, "v")
+		want := "PACKAGE_CHANNEL=nightly\nPACKAGE_VERSION=" + strings.Replace(version, "-nightly.", "~nightly.", 1) +
+			"\nARCH_VERSION=" + strings.Replace(version, "-nightly.", ".nightly.", 1) + "\n"
+		if string(data) != want {
+			t.Fatalf("%s: got %q, want %q", tag, data, want)
+		}
+	}
+}
+
+func TestDebianRepositoryUsesArchitectureFilenameSuffix(t *testing.T) {
+	root, dir := releaseFixture(t)
+	script := workflowStep(t, root, "apt.yml", "Import signing key and update repositories")
+	start := `for package in "$RUNNER_TEMP"/debs/*.deb; do`
+	_, staging, found := strings.Cut(script, start)
+	if !found {
+		t.Fatal("missing Debian staging loop")
+	}
+	staging, _, found = strings.Cut(staging, "\ninstall -m 0644")
+	if !found {
+		t.Fatal("missing end of Debian staging loop")
+	}
+	staging = start + staging
+	writeFixture(t, filepath.Join(dir, "bin/dpkg-deb"), `#!/bin/bash
+case "$2" in
+  *-amd64.deb) echo amd64 ;;
+  *-arm64.deb) echo arm64 ;;
+  *) exit 1 ;;
+esac
+`, 0o755)
+	for _, arch := range []string{"amd64", "arm64"} {
+		writeFixture(t, filepath.Join(dir, "runner/debs/ash-v1.2.0-nightly.20261011.1-linux-"+arch+".deb"), arch, 0o644)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "site/apt/pool/nightly/main"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	env := []string{
+		"PATH=" + filepath.Join(dir, "bin") + ":" + os.Getenv("PATH"),
+		"RUNNER_TEMP=" + filepath.Join(dir, "runner"), "PACKAGE_CHANNEL=nightly", "PACKAGE_VERSION=1.2.0~nightly.20261011.1",
+	}
+	runFixture(t, dir, env, "bash", "-euo", "pipefail", "-c", staging)
+	for _, arch := range []string{"amd64", "arm64"} {
+		path := filepath.Join(dir, "site/apt/pool/nightly/main/ash_1.2.0~nightly.20261011.1_"+arch+".deb")
+		data, err := os.ReadFile(path)
+		if err != nil || string(data) != arch {
+			t.Fatalf("invalid Debian repository file %s: %q, %v", path, data, err)
+		}
+	}
+}
+
+func TestArchRepositorySignsMainPackage(t *testing.T) {
+	root, dir := releaseFixture(t)
+	script := workflowStep(t, root, "apt.yml", "Import signing key and update repositories")
+	_, signing, found := strings.Cut(script, "pacman_package=")
+	if !found {
+		t.Fatal("missing Arch package signing")
+	}
+	signing, _, found = strings.Cut(signing, "\ndocker run")
+	if !found {
+		t.Fatal("missing end of Arch package signing")
+	}
+	signing = "pacman_package=" + signing
+	writeFixture(t, filepath.Join(dir, "bin/gpg"), `#!/bin/bash
+while [[ $# -gt 0 ]]; do
+  if [[ "$1" == --output ]]; then output="$2"; shift; fi
+  input="$1"
+  shift
+done
+cp "$input" "$output"
+`, 0o755)
+	archive := "ash-1.2.0.nightly.20261011.1-1-x86_64.pkg.tar.zst"
+	writeFixture(t, filepath.Join(dir, "repo/ash-debug-1.2.0.nightly.20261011.1-1-x86_64.pkg.tar.zst"), "debug", 0o644)
+	writeFixture(t, filepath.Join(dir, "repo", archive), "main", 0o644)
+	env := []string{
+		"PATH=" + filepath.Join(dir, "bin") + ":" + os.Getenv("PATH"),
+		"pacman_repo=repo", "ARCH_VERSION=1.2.0.nightly.20261011.1", "key_id=fixture", "GPG_PASSPHRASE=fixture",
+	}
+	runFixture(t, dir, env, "bash", "-euo", "pipefail", "-c", signing)
+	data, err := os.ReadFile(filepath.Join(dir, "repo", archive+".sig"))
+	if err != nil || string(data) != "main" {
+		t.Fatalf("main Arch package was not signed: %q, %v", data, err)
+	}
+}
+
 func TestReleasePublishingToIsolatedRemote(t *testing.T) {
 	for _, channel := range []string{"beta", "stable", "nightly"} {
 		t.Run(channel, func(t *testing.T) {
@@ -247,9 +421,10 @@ printf 'THIRD_PARTY_NOTICES_INCLUDED\n'
 printf '%s\n' "${args[@]}"
 `, 0o755)
 	versions := map[string]string{
-		"v1.2.0":                  "1.2.0",
-		"v1.2.0-beta.1":           "1.2.0~beta.1",
-		"v1.2.0-nightly.20261011": "1.2.0~nightly.20261011",
+		"v1.2.0":                    "1.2.0",
+		"v1.2.0-beta.1":             "1.2.0~beta.1",
+		"v1.2.0-nightly.20261011":   "1.2.0~nightly.20261011",
+		"v1.2.0-nightly.20261011.1": "1.2.0~nightly.20261011.1",
 	}
 	for version, want := range versions {
 		for _, format := range []string{"deb", "rpm"} {
@@ -325,7 +500,7 @@ func TestTarballIncludesThirdPartyNotices(t *testing.T) {
 func TestArchPrereleaseUsesOriginalReleaseBinaryName(t *testing.T) {
 	root, dir := releaseFixture(t)
 	copyFixture(t, root, dir, "scripts/package/arch/PKGBUILD")
-	for _, channel := range []string{"beta.1", "nightly.20261011"} {
+	for _, channel := range []string{"beta.1", "nightly.20261011", "nightly.20261011.1"} {
 		t.Run(channel, func(t *testing.T) {
 			src := filepath.Join(t.TempDir(), "src")
 			pkg := filepath.Join(t.TempDir(), "pkg")
@@ -364,6 +539,8 @@ func TestDashboardRequiresSuccessfulWorkflow(t *testing.T) {
 	root, dir := releaseFixture(t)
 	copyFixture(t, root, dir, "scripts/release/release_dashboard.sh")
 	tag := "v1.2.0-beta.1"
+	runFixture(t, dir, nil, "git", "tag", tag)
+	commit := strings.TrimSpace(runFixture(t, dir, nil, "git", "rev-parse", tag))
 	var assets []map[string]string
 	for _, target := range []string{"darwin-amd64", "darwin-arm64", "linux-amd64", "linux-arm64", "freebsd-amd64"} {
 		formats := []string{"tar.gz"}
@@ -389,17 +566,20 @@ func TestDashboardRequiresSuccessfulWorkflow(t *testing.T) {
 	writeFixture(t, filepath.Join(dir, "assets.json"), string(data), 0o644)
 	writeFixture(t, filepath.Join(dir, "bin/gh"), `#!/bin/bash
 case "$1 $2" in
-  "run list") echo 123 ;;
-  "run view") printf '{"status":"completed","conclusion":"%s","jobs":[]}' "$TEST_CONCLUSION" ;;
+  "run list") [[ "$*" == *"--commit $TEST_EXPECTED_COMMIT"* ]] || exit 1; echo 123 ;;
+  "run view") printf '{"databaseId":123,"status":"completed","conclusion":"%s","jobs":[]}' "$TEST_CONCLUSION" ;;
   "release view") cat assets.json ;;
   *) exit 1 ;;
 esac
 `, 0o755)
 	for _, conclusion := range []string{"success", "failure"} {
-		env := []string{"PATH=" + filepath.Join(dir, "bin") + ":" + os.Getenv("PATH"), "TEST_CONCLUSION=" + conclusion}
+		env := []string{"PATH=" + filepath.Join(dir, "bin") + ":" + os.Getenv("PATH"), "TEST_CONCLUSION=" + conclusion, "TEST_EXPECTED_COMMIT=" + commit}
 		output, err := fixtureCommand(dir, env, "/bin/bash", "scripts/release/release_dashboard.sh", "--tag", tag, "--repo", "fixture/repo", "--once").CombinedOutput()
 		if (err == nil) != (conclusion == "success") {
 			t.Fatalf("dashboard conclusion=%s: %v\n%s", conclusion, err, output)
+		}
+		if !strings.Contains(string(output), "Run: 123") {
+			t.Fatalf("dashboard did not match the tag commit: %s", output)
 		}
 	}
 }
@@ -420,9 +600,10 @@ printf '200'
 `, 0o755)
 	env := []string{"PATH=" + filepath.Join(dir, "bin") + ":" + os.Getenv("PATH"), "HOMEBREW_TAP_GITHUB_TOKEN=fixture"}
 	versions := map[string]string{
-		"v1.2.0":                  "ash",
-		"v1.2.0-beta.1":           "ash-beta",
-		"v1.2.0-nightly.20261011": "ash-nightly",
+		"v1.2.0":                    "ash",
+		"v1.2.0-beta.1":             "ash-beta",
+		"v1.2.0-nightly.20261011":   "ash-nightly",
+		"v1.2.0-nightly.20261011.1": "ash-nightly",
 	}
 	for tag, formula := range versions {
 		var sums strings.Builder

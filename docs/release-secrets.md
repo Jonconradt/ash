@@ -197,6 +197,13 @@ The scheduled nightly checks the default branch at 04:00 UTC and skips when
 only generated APT/RPM/Pacman repository files have changed since the latest
 nightly. This prevents publishing yesterday's packages from causing another
 otherwise identical nightly.
+The comparison uses the latest published Nightly release, not failed tags, so
+failed builds do not suppress scheduled retries. Same-day retries automatically
+append an increasing counter (for example `v1.2.0-nightly.20261011.1`).
+Fetch all remote tags before releasing from a local checkout. Never move or
+delete release tags, including failed attempts: Go's public checksum database
+can index a tag before a GitHub Release exists. Publish a new version instead;
+do not disable checksum verification.
 
 The pushed annotated tag starts `release.yml`, which verifies and builds all
 platform artifacts, runs smoke tests, signs checksums, and creates the GitHub
@@ -217,6 +224,7 @@ gh run view RUN_ID --repo Jonconradt/ash --log-failed
 ```
 
 Make's release dashboard waits for the tag-triggered release workflow, including
-Homebrew publication; Linux repository publication and Pages deployment are
+Homebrew publication, matching both the local tag name and its commit. Fetch
+the tag before using the dashboard from another checkout. Linux repository publication and Pages deployment are
 separate runs and must also be checked. Token values and scopes, provider/model
 access, and the GPG passphrase cannot be verified through `gh secret list`.

@@ -12,6 +12,7 @@ GOSEC_VERSION ?= v2.29.1-0.20261009120814-7b1b5cebe007
 GOVULNCHECK_VERSION ?= v1.8.0
 STATICCHECK_VERSION ?= latest
 YAMLFMT_VERSION ?= latest
+GITLEAKS_VERSION ?= v8.30.1
 APP_NAME ?= ash
 LOCAL_BIN_DIR ?= $(HOME)/.local/bin
 LOCAL_BINARY_PATH ?= $(LOCAL_BIN_DIR)/$(APP_NAME)
@@ -75,6 +76,7 @@ config:
 	GOSEC_VERSION=$(GOSEC_VERSION) \
 	GOVULNCHECK_VERSION=$(GOVULNCHECK_VERSION) \
 	STATICCHECK_VERSION=$(STATICCHECK_VERSION) \
+	GITLEAKS_VERSION=$(GITLEAKS_VERSION) \
 	YAMLFMT_VERSION=$(YAMLFMT_VERSION) \
 	RUFF_VERSION=$(RUFF_VERSION) \
 	MARKDOWNLINT_CLI2_VERSION=$(MARKDOWNLINT_CLI2_VERSION) \
@@ -91,6 +93,8 @@ verify:
 	@./scripts/dev/run-quiet.sh "vet"         go vet ./...
 	@./scripts/dev/run-quiet.sh "staticcheck" $(MAKE) --no-print-directory staticcheck
 	@./scripts/dev/run-quiet.sh "security"    $(MAKE) --no-print-directory security
+	@./scripts/dev/run-quiet.sh "secrets-history" gitleaks git --redact --verbose --log-opts=--all .
+	@./scripts/dev/run-quiet.sh "secrets-tree"    gitleaks dir --redact --verbose .
 	@./scripts/dev/run-quiet.sh "test-fuzz"   go test -fuzz=Fuzz -fuzztime=$(FUZZ_TIME) ./internal/app
 	@./scripts/dev/run-quiet.sh "benchmark"   go test -bench=. -benchmem ./...
 	@echo "verify: all checks passed"
@@ -270,7 +274,7 @@ release-check: $(if $(filter stable,$(CHANNEL)),verify,lint test gosec govulnche
 		case "$(CHANNEL)" in \
 			stable) [[ "$(RELEASE_VERSION)" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$$ ]] ;; \
 			beta) [[ "$(RELEASE_VERSION)" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-beta\.[1-9][0-9]*$$ ]] ;; \
-			nightly) [[ "$(RELEASE_VERSION)" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-nightly\.[0-9]{8}$$ ]] ;; \
+			nightly) [[ "$(RELEASE_VERSION)" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-nightly\.[0-9]{8}(\.[1-9][0-9]*)?$$ ]] ;; \
 		esac; \
 	}; then \
 		echo "RELEASE_VERSION does not match CHANNEL=$(CHANNEL): $(RELEASE_VERSION)"; \
@@ -485,17 +489,18 @@ release-validate-one:
 			shasum -a 256 "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).rpm" > "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).rpm.sha256"; \
 			;; \
 		tar.gz) \
-			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^$(notdir $(RELEASE_BINARY_PATH))$$"; \
-			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^$(APP_NAME)-broker$$"; \
-			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^LICENSE$$"; \
-			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^THIRD_PARTY_NOTICES\.md$$"; \
-			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^$(TARBALL_MAN_PATH)/$(APP_NAME)\.1$$"; \
+			entries="$$(tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz")"; \
+			grep -Fxq "$(notdir $(RELEASE_BINARY_PATH))" <<< "$$entries"; \
+			grep -Fxq "$(APP_NAME)-broker" <<< "$$entries"; \
+			grep -Fxq "LICENSE" <<< "$$entries"; \
+			grep -Fxq "THIRD_PARTY_NOTICES.md" <<< "$$entries"; \
+			grep -Fxq "$(TARBALL_MAN_PATH)/$(APP_NAME).1" <<< "$$entries"; \
 			for locale in zh_CN zh_TW es_ES ar_AE id_ID; do \
-				tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^usr/share/man/$$locale/man1/$(APP_NAME)\.1$$" || { echo "localized man page missing from tarball: $$locale"; exit 1; }; \
+				grep -Fxq "usr/share/man/$$locale/man1/$(APP_NAME).1" <<< "$$entries" || { echo "localized man page missing from tarball: $$locale"; exit 1; }; \
 			done; \
-			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^plugins/[^/]+$$"; \
+			grep -Eq "^plugins/[^/]+$$" <<< "$$entries"; \
 			while IFS= read -r plugin; do \
-				tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Fxq "plugins/$$(basename "$$plugin")" || { echo "plugin missing from tarball: $$plugin"; exit 1; }; \
+				grep -Fxq "plugins/$$(basename "$$plugin")" <<< "$$entries" || { echo "plugin missing from tarball: $$plugin"; exit 1; }; \
 			done < <(find "$(RELEASE_PLUGINS_BIN_DIR)" -maxdepth 1 -type f -perm -111 -print); \
 			shasum -a 256 "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" > "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz.sha256"; \
 			;; \

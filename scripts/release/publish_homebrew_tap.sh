@@ -13,7 +13,7 @@ if [[ "$release_tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
 elif [[ "$release_tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-beta\.[1-9][0-9]*$ ]]; then
 	formula_name="ash-beta"
 	class_name="AshBeta"
-elif [[ "$release_tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-nightly\.[0-9]{8}$ ]]; then
+elif [[ "$release_tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-nightly\.[0-9]{8}(\.[1-9][0-9]*)?$ ]]; then
 	formula_name="ash-nightly"
 	class_name="AshNightly"
 else

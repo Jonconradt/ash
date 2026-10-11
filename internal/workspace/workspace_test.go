@@ -10,6 +10,7 @@ import (
 )
 
 func TestWorkspaceRoot(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", "")
 	home := "/home/testuser"
 	expected := filepath.Join(home, ".config", DirName)
 	if got := Root(home); got != expected {
@@ -18,6 +19,7 @@ func TestWorkspaceRoot(t *testing.T) {
 }
 
 func TestWorkspaceRootAdversarialInputs(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", "")
 	tests := []string{
 		"",
 		"/",

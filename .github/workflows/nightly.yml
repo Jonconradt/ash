@@ -43,23 +43,18 @@ jobs:
         id: changes
         run: |
           set -euo pipefail
-          latest_tag="$(git tag --list 'v*-nightly.*' --sort=-v:refname | head -n1 || true)"
+          latest_tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate --slurp |
+            jq -r '[.[][] | select(.draft == false and (.tag_name | contains("-nightly.")))][0].tag_name // empty')"
           if [[ -n "$latest_tag" ]] && git diff --quiet "$latest_tag" HEAD -- . \
             ':(exclude)site/apt' ':(exclude)site/rpm' ':(exclude)site/pacman'; then
             echo "publish=false" >> "$GITHUB_OUTPUT"
             echo "No repository changes since $latest_tag"
             exit 0
           fi
-          release_tag="$(./scripts/release/next_version.sh nightly)"
-          if git show-ref --verify --quiet "refs/tags/$release_tag"; then
-            echo "publish=false" >> "$GITHUB_OUTPUT"
-            echo "Nightly $release_tag was already published"
-            exit 0
-          fi
           echo "publish=true" >> "$GITHUB_OUTPUT"
       - name: Set up Rust
         if: steps.changes.outputs.publish == 'true'
-        run: rustup toolchain install 1.99.0 --profile minimal
+        run: rustup toolchain install 1.99.0 --profile minimal --component clippy
       - name: Set up Go
         if: steps.changes.outputs.publish == 'true'
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6

@@ -40,6 +40,9 @@ func TestRunBrokerRequiresParentPID(t *testing.T) {
 }
 
 func TestBrokerSocketReadyWhileMCPStartupIsBlocked(t *testing.T) {
+	for _, name := range []string{"XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME", "XDG_RUNTIME_DIR"} {
+		t.Setenv(name, "")
+	}
 	home := t.TempDir()
 	registrationPath := filepath.Join(home, ".config", "ash", ".ash_allow")
 	if err := os.MkdirAll(filepath.Dir(registrationPath), 0o700); err != nil {

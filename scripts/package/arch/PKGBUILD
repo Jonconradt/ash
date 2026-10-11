@@ -8,6 +8,7 @@ url="https://www.versionx.ai"
 license=('MIT')
 depends=('gcc-libs' 'glibc')
 optdepends=('python: enable Python-based tools')
+options=('!debug')
 source=('ash.tar.gz')
 sha256sums=("${ASH_ARCHIVE_SHA256:?ASH_ARCHIVE_SHA256 must be set}")
 

@@ -64,6 +64,7 @@ if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
   echo "tag must look like vX.Y.Z (optionally with suffix), got: $tag" >&2
   exit 1
 fi
+tag_commit="$(git rev-parse --verify "refs/tags/${tag}^{}")"
 
 if ! command -v gh >/dev/null 2>&1; then
   echo "gh CLI is required" >&2
@@ -146,7 +147,7 @@ enter_tui() {
 }
 
 find_run_id() {
-  gh run list -R "$repo" --workflow release.yml --limit 20 --json databaseId,headBranch --jq ".[] | select(.headBranch == \"$tag\") | .databaseId" | head -n1 || true
+  gh run list -R "$repo" --workflow release.yml --commit "$tag_commit" --limit 20 --json databaseId,headBranch --jq ".[] | select(.headBranch == \"$tag\") | .databaseId" | head -n1 || true
 }
 
 get_run_json() {
