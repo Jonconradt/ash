@@ -56,6 +56,10 @@ run rather than trying to attach `V=1` after the fact.
 - `make release` creates a beta tag; use `make release CHANNEL=stable` for a
   verified stable release branch, or `make release CHANNEL=nightly` for a
   nightly prerelease.
+- Fetch tags before publishing. Never delete or move a release tag, even after
+  a failed build: Go's checksum database may already have indexed it. Nightly
+  retries on the same UTC day append `.1`, `.2`, and so on; beta retries use
+  the next beta counter.
 - Release preparation runs the existing `make site-locales` Google Translate
   generator in an isolated temporary copy and attaches the generated website
   as a release artifact. Keep translation failures visible; do not substitute

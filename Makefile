@@ -270,7 +270,7 @@ release-check: $(if $(filter stable,$(CHANNEL)),verify,lint test gosec govulnche
 		case "$(CHANNEL)" in \
 			stable) [[ "$(RELEASE_VERSION)" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$$ ]] ;; \
 			beta) [[ "$(RELEASE_VERSION)" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-beta\.[1-9][0-9]*$$ ]] ;; \
-			nightly) [[ "$(RELEASE_VERSION)" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-nightly\.[0-9]{8}$$ ]] ;; \
+			nightly) [[ "$(RELEASE_VERSION)" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-nightly\.[0-9]{8}(\.[1-9][0-9]*)?$$ ]] ;; \
 		esac; \
 	}; then \
 		echo "RELEASE_VERSION does not match CHANNEL=$(CHANNEL): $(RELEASE_VERSION)"; \

@@ -197,6 +197,13 @@ The scheduled nightly checks the default branch at 04:00 UTC and skips when
 only generated APT/RPM/Pacman repository files have changed since the latest
 nightly. This prevents publishing yesterday's packages from causing another
 otherwise identical nightly.
+The comparison uses the latest published Nightly release, not failed tags, so
+failed builds do not suppress scheduled retries. Same-day retries automatically
+append an increasing counter (for example `v1.2.0-nightly.20261011.1`).
+Fetch all remote tags before releasing from a local checkout. Never move or
+delete release tags, including failed attempts: Go's public checksum database
+can index a tag before a GitHub Release exists. Publish a new version instead;
+do not disable checksum verification.
 
 The pushed annotated tag starts `release.yml`, which verifies and builds all
 platform artifacts, runs smoke tests, signs checksums, and creates the GitHub

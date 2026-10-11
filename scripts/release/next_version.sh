@@ -38,7 +38,15 @@ case "$channel" in
     echo "v${major}.${next_minor}.0"
     ;;
   nightly)
-    echo "v${major}.${next_minor}.0-nightly.$(date -u +%Y%m%d)"
+    base_version="v${major}.${next_minor}.0-nightly.$(date -u +%Y%m%d)"
+    latest_retry="$(git tag --list "${base_version}.*" | grep -E "^${base_version//./\\.}\\.[1-9][0-9]*$" | sed -E 's/.*\.//' | sort -n | tail -n1 || true)"
+    if [[ -n "$latest_retry" ]]; then
+      echo "${base_version}.$((latest_retry + 1))"
+    elif git show-ref --verify --quiet "refs/tags/$base_version"; then
+      echo "${base_version}.1"
+    else
+      echo "$base_version"
+    fi
     ;;
   *)
     echo "unsupported release channel: $channel (expected beta, stable, or nightly)" >&2
