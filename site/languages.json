@@ -1,0 +1,79 @@
+[
+  {
+    "locale": "en_US",
+    "path": "",
+    "htmlLang": "en",
+    "translationLang": "en",
+    "name": "English"
+  },
+  {
+    "locale": "ar_AE",
+    "path": "ar",
+    "htmlLang": "ar",
+    "translationLang": "ar",
+    "name": "العربية"
+  },
+  {
+    "locale": "de_DE",
+    "path": "de",
+    "htmlLang": "de",
+    "translationLang": "de",
+    "name": "Deutsch"
+  },
+  {
+    "locale": "es_ES",
+    "path": "es",
+    "htmlLang": "es",
+    "translationLang": "es",
+    "name": "Español"
+  },
+  {
+    "locale": "fr_FR",
+    "path": "fr",
+    "htmlLang": "fr",
+    "translationLang": "fr",
+    "name": "Français"
+  },
+  {
+    "locale": "id_ID",
+    "path": "id",
+    "htmlLang": "id",
+    "translationLang": "id",
+    "name": "Bahasa Indonesia"
+  },
+  {
+    "locale": "it_IT",
+    "path": "it",
+    "htmlLang": "it",
+    "translationLang": "it",
+    "name": "Italiano"
+  },
+  {
+    "locale": "lb_LU",
+    "path": "lb",
+    "htmlLang": "lb",
+    "translationLang": "lb",
+    "name": "Lëtzebuergesch"
+  },
+  {
+    "locale": "pt_BR",
+    "path": "pt-BR",
+    "htmlLang": "pt-BR",
+    "translationLang": "pt",
+    "name": "Português (Brasil)"
+  },
+  {
+    "locale": "zh_CN",
+    "path": "zh-CN",
+    "htmlLang": "zh-CN",
+    "translationLang": "zh-CN",
+    "name": "简体中文"
+  },
+  {
+    "locale": "zh_TW",
+    "path": "zh-TW",
+    "htmlLang": "zh-TW",
+    "translationLang": "zh-TW",
+    "name": "繁體中文"
+  }
+]

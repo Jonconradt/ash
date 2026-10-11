@@ -1,6 +1,7 @@
-.PHONY: all verify build config lint language-lint site-lint yaml-lint python-lint markdown-lint sync-route-words test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install version release release-check release-clean release-build release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one release-checksums restart-broker plugins-build plugins-test plugins-lint plugins-clean plugins-install
+.PHONY: all verify build config lint language-lint site-lint site-locales yaml-lint python-lint markdown-lint sync-route-words test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install version release release-check release-clean release-build release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one release-checksums restart-broker plugins-build plugins-test plugins-lint plugins-clean plugins-install
 
 SHELL := /bin/bash
+SITE_LOCALES ?=
 
 COVERAGE_MIN ?= 60
 FUZZ_TIME ?= 10s
@@ -161,6 +162,9 @@ language-lint:
 
 site-lint:
 	@./scripts/dev/run-quiet.sh "site-lint" sh -n site/install.sh
+
+site-locales:
+	@python3 site/generate_locales.py $(foreach locale,$(SITE_LOCALES),--locale $(locale))
 
 yaml-lint:
 	@./scripts/dev/run-quiet.sh "yaml-lint" go run github.com/google/yamlfmt/cmd/yamlfmt@latest -lint .github/workflows/*.yml

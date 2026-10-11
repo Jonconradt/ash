@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ash |询问您的终端</title>
+  <meta name="description" content="ash 是 bash、Fish 和 zsh 的 AI 助手。无需离开 shell，即可提出问题、调查文件并自动执行终端工作。">
+  <meta name="theme-color" content="#f4f0e8">
+  <link rel="canonical" href="https://jonconradt.github.io/ash/zh-CN/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="ash | Ask your terminal">
+  <meta property="og:description" content="一个住在你外壳里的人工智能助手。">
+  <meta property="og:url" content="https://jonconradt.github.io/ash/zh-CN/">
+  <meta property="og:site_name" content="ash">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="ash | Ask your terminal">
+  <meta name="twitter:description" content="一个住在你外壳里的人工智能助手。">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="alternate" hreflang="en" href="https://jonconradt.github.io/ash/">
+  <link rel="alternate" hreflang="ar" href="https://jonconradt.github.io/ash/ar/">
+  <link rel="alternate" hreflang="de" href="https://jonconradt.github.io/ash/de/">
+  <link rel="alternate" hreflang="es" href="https://jonconradt.github.io/ash/es/">
+  <link rel="alternate" hreflang="fr" href="https://jonconradt.github.io/ash/fr/">
+  <link rel="alternate" hreflang="id" href="https://jonconradt.github.io/ash/id/">
+  <link rel="alternate" hreflang="it" href="https://jonconradt.github.io/ash/it/">
+  <link rel="alternate" hreflang="lb" href="https://jonconradt.github.io/ash/lb/">
+  <link rel="alternate" hreflang="pt-BR" href="https://jonconradt.github.io/ash/pt-BR/">
+  <link rel="alternate" hreflang="zh-CN" href="https://jonconradt.github.io/ash/zh-CN/">
+  <link rel="alternate" hreflang="zh-TW" href="https://jonconradt.github.io/ash/zh-TW/">
+  <link rel="alternate" hreflang="x-default" href="https://jonconradt.github.io/ash/">
+  <link rel="stylesheet" href="../styles.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "ash",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "macOS, Linux, FreeBSD",
+    "description": "An AI assistant integrated into bash, Fish, and zsh.",
+    "codeRepository": "https://github.com/Jonconradt/ash",
+    "license": "https://github.com/Jonconradt/ash/blob/main/LICENSE"
+  }
+  </script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="ash 首页"><span class="brand-mark">&gt;_</span>ash</a>
+    <nav aria-label="主要导航">
+      <a href="#how-it-works">它是如何运作的</a>
+      <a href="#install">安装</a>
+      <a href="docs.html">文档</a>
+      <a href="faq.html">常问问题</a>
+      <a href="https://github.com/Jonconradt/ash">GitHub</a>
+      <label class="sr-only" for="site-language">语言</label>
+      <select id="site-language" class="language-select" aria-label="选择语言">
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+        <option value="de">Deutsch</option>
+        <option value="es">Español</option>
+        <option value="fr">Français</option>
+        <option value="id">Bahasa Indonesia</option>
+        <option value="it">Italiano</option>
+        <option value="lb">Lëtzebuergesch</option>
+        <option value="pt-BR">Português (Brasil)</option>
+        <option value="zh-CN" selected>简体中文</option>
+        <option value="zh-TW">繁體中文</option>
+        </select>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero page-width">
+      <div class="hero-copy">
+        <p class="eyebrow">你的 shell，有第二个大脑</p>
+        <h1>询问你的终端。<br><em>保持流程。</em></h1>
+        <p class="hero-lede">ash 将 AI 引入 bash、Fish 和 zsh，因此问题、调查和小型自动化可以在已有工作的地方进行。连接远程 MCP 服务器，将其工具纳入同一工作流程。</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#install">安装ash<span aria-hidden="true">&#8595;</span></a>
+          <a class="text-link" href="https://github.com/Jonconradt/ash#configure">阅读设置指南<span aria-hidden="true">&#8594;</span></a>
+        </div>
+        <p class="compatibility"><span class="status-dot"></span> macOS · Linux · FreeBSD · 开源</p>
+      </div>
+      <div class="terminal-window" role="img" aria-label="示例 ash 终端会话">
+        <div class="terminal-bar"><span></span><span></span><span></span><b>bash &mdash; session 04</b></div>
+        <div class="terminal-body">
+          <p><span class="prompt">$</span> <span class="command">正常运行时间</span></p>
+          <p class="answer">11:17 过去 5 天，3:13，2 个用户，平均负载：1.94 3.05 3.05</p>
+          <p><span class="prompt">$</span> <span class="command">总结一下项目</span></p>
+          <p class="answer">ASH 是一个集成 shell 的 AI 助手。<br>它可以检查文件、运行白名单工具、安排任务、编写和执行 python，并为子代理执行保留会话范围的注释。</p>
+          <p><span class="prompt">$</span> <span class="command">在此处列出最大的文件</span></p>
+          <p class="answer table">1.2M   ./README.md<br>842K   ./ash_test.go<br>312K   ./docs/ash.1</p>
+          <p><span class="cursor">█</span></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="signal-strip" aria-label="产品亮点">
+      <div class="page-width signal-grid">
+        <div><strong>01</strong><span>就地提问</span><p>无需上下文切换。从您已使用的命令行进行提示。</p></div>
+        <div><strong>02</strong><span>一起调查</span><p>为 AI 提供一个可用于探索的故意命令白名单。</p></div>
+        <div><strong>03</strong><span>连接 MCP 工具</span><p>注册远程 MCP 服务器并让 ash 代理持久会话和 OAuth。</p></div>
+        <div><strong>04</strong><span>本地控制</span><p>使用本地托管模型或云提供商，同时保持执行在您的控制之下。</p></div>
+      </div>
+    </section>
+
+    <section id="how-it-works" class="how page-width">
+      <div class="section-heading">
+        <p class="eyebrow">以更平静的方式使用人工智能</p>
+        <h2>终端保持<br><em>重心。</em></h2>
+      </div>
+      <div class="how-grid">
+        <div class="numbered"><span>01</span><h3>安装 shell 集成</h3><p>ash 适用于 bash、Fish 和 zsh。未知命令变成提示，不改变你正常的命令习惯。当您需要从自动提示处理中休息一下时，请小睡一下。</p></div>
+        <div class="numbered"><span>02</span><h3>轻松更新</h3><p><code>ash update</code> 让您的安装保持最新版本。该命令自动处理版本检查、下载和验证。没有背景或意外更新。</p></div>
+        <div class="numbered"><span>03</span><h3>保持控制</h3><p>工具执行受到显式允许和拒绝列表的限制，并以您的用户身份运行。您决定允许触摸什么ash。将您自己的 Python 脚本添加到 ~/.ash/tools 或将本机插件添加到 ~/.ash/plugins。</p></div>
+      </div>
+    </section>
+
+    <section id="install" class="install-band">
+      <div class="page-width install-content">
+        <div><p class="eyebrow">从小事做起</p><h2>给你的外壳<br><em>一些陪伴。</em></h2></div>
+        <div class="install-details">
+          <p>Linux、macOS 和 FreeBSD 用户可以一步安装最新版本。安装程序会验证下载，安装到 <code>~/.local/bin</code>，并配置检测到的 Fish、zsh 或 bash 集成，然后回退到 bash。</p>
+          <p><code>ash install</code> 自动配置您的 AI 提供商：它会检测已设置的云提供商 API 密钥或正在运行的本地推理服务器，否则会显示一个编号菜单以选择提供商和模型。或者自己设置：</p>
+          <pre><code>export AI_AUTH_TOKEN='84…89'
+export AI_ENDPOINT='https://ollama.com'
+export AI_MODEL='gemma4:31b-cloud'
+</code></pre>
+          <p>支持 Local、OpenAI、Anthropic、Google、Azure OpenAI、Mistral、Cohere、Groq、xAI、DeepSeek、Together AI、OpenRouter、HuggingFace、AWS Bedrock 以及具有 OpenAI 兼容 API 的任何其他提供商。</p>
+          <div class="code-block-wrap">
+            <pre class="code-block"><code><span class="code-command">curl -fsSL https://jonconradt.github.io/ash/install.sh | sh</span></code></pre>
+            <button type="button" class="copy-button" data-copy-target=".code-command" aria-label="复制安装命令" data-copied-label="复制了！">复制</button>
+          </div>
+          <div class="install-links"><a class="button button-light" href="https://github.com/Jonconradt/ash/releases/latest">查看套餐<span aria-hidden="true">&#8599;</span></a><a class="text-link light-link" href="https://github.com/Jonconradt/ash#configure">配置齐全<span aria-hidden="true">&#8594;</span></a></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="closing page-width">
+      <p class="eyebrow">按设计开放</p>
+      <h2>当前有用。<br><em>稍后即可理解。</em></h2>
+      <p>阅读源代码，检查架构，或确切查看安装的内容。</p>
+      <div class="closing-links">
+          <a href="docs.html">阅读文档<span aria-hidden="true">&#8594;</span></a>
+          <a href="https://github.com/Jonconradt/ash">GitHub<span aria-hidden="true">&#8599;</span></a>
+          <a href="https://github.com/Jonconradt/ash/issues/new">报告问题<span aria-hidden="true">&#8599;</span></a>
+          <a href="https://github.com/Jonconradt/ash/blob/main/SECURITY.md">安全政策<span aria-hidden="true">&#8599;</span></a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer page-width"><span class="brand"><span class="brand-mark">&gt;_</span>ash</span><span>开源 shell 智能</span><a href="docs.html">文档</a><a href="https://github.com/Jonconradt/ash">github.com/Jonconradt/ash</a></footer>
+
+  <script src="../site.js" data-site-script defer></script>
+</body>
+</html>
