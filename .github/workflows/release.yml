@@ -11,15 +11,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - name: Set up Rust 1.99.0
         run: rustup toolchain install 1.99.0 --profile minimal
       - name: Setup Go
-        uses: actions/setup-go@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
       - name: Setup uv
-        uses: astral-sh/setup-uv@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v10.0.1
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           version: "0.12.5"
       - name: Setup Node.js
@@ -60,11 +60,11 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
-        uses: actions/checkout@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - name: Set up Rust 1.99.0
         run: rustup toolchain install 1.99.0 --profile minimal
       - name: Setup Go
-        uses: actions/setup-go@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
       - name: Build and package macOS artifacts
@@ -91,7 +91,7 @@ jobs:
           /usr/local/bin/ash --help
           /usr/local/bin/ash-broker --version
       - name: Upload macOS artifacts
-        uses: actions/upload-artifact@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: release-macos-${{ matrix.arch }}
           path: dist/release/*darwin-${{ matrix.arch }}*
@@ -108,11 +108,11 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
-        uses: actions/checkout@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - name: Set up Rust 1.99.0
         run: rustup toolchain install 1.99.0 --profile minimal
       - name: Setup Go
-        uses: actions/setup-go@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
       - name: Install packaging tools
@@ -150,7 +150,7 @@ jobs:
           /usr/bin/ash-broker --version
           sudo rpm -e ash
       - name: Upload Linux artifacts
-        uses: actions/upload-artifact@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: release-linux-${{ matrix.arch }}
           path: dist/release/*linux-${{ matrix.arch }}*
@@ -163,11 +163,11 @@ jobs:
         arch: [amd64]
     steps:
       - name: Checkout
-        uses: actions/checkout@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - name: Set up Rust 1.99.0
         run: rustup toolchain install 1.99.0 --profile minimal
       - name: Setup Go
-        uses: actions/setup-go@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
       - name: Install Rust cross toolchain (FreeBSD)
@@ -178,7 +178,7 @@ jobs:
         run: |
           make release-artifacts RELEASE_TARGET_OSES=freebsd RELEASE_TARGET_ARCHES=${{ matrix.arch }} RELEASE_VERSION="${GITHUB_REF_NAME}"
       - name: Upload FreeBSD artifacts
-        uses: actions/upload-artifact@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: release-freebsd-${{ matrix.arch }}
           path: dist/release/*freebsd-${{ matrix.arch }}*
@@ -187,7 +187,7 @@ jobs:
     needs: package-freebsd
     steps:
       - name: Download FreeBSD amd64 artifact
-        uses: actions/download-artifact@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: release-freebsd-amd64
           path: artifacts
@@ -238,18 +238,18 @@ jobs:
           test -n "$RELEASE_GITHUB_TOKEN" || { echo "::error::RELEASE_GITHUB_TOKEN is required"; exit 1; }
           test -n "$HOMEBREW_TAP_GITHUB_TOKEN" || { echo "::error::HOMEBREW_TAP_GITHUB_TOKEN is required"; exit 1; }
       - name: Checkout release tag
-        uses: actions/checkout@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
       - name: Download packaged artifacts
-        uses: actions/download-artifact@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           path: dist/release
       - name: Flatten artifact directories
         run: |
           find dist/release -mindepth 2 -type f -name '*' -exec mv {} dist/release/ \;
       - name: Restore translation cache
-        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f7 # v4.2.4
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
           path: .cache/ash/site-translation-cache.json
           key: site-translation-cache-v2-${{ hashFiles('site/generate_locales.py') }}-${{ github.run_id }}
@@ -264,13 +264,13 @@ jobs:
             cp "$catalog" "dist/release/ash-language-${locale}.json"
           done
       - name: Generate release SBOM
-        uses: anchore/sbom-action@88f49ff79e777bef6d3564531636ee4d3cc2f8d2 # v0.24.0
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
           path: dist/release
           format: spdx-json
           output-file: dist/release/sbom.spdx.json
       - name: Install cosign
-        uses: sigstore/cosign-installer@4d101475d8b20a2381f78447822ac1eab6504dd8 # v3.8.1
+        uses: sigstore/cosign-installer@d7d6bc7722e3daa8354c50bcb52f4837da5e9b6a # v3.8.1
       - name: Generate and sign checksum manifest
         run: |
           set -euo pipefail

@@ -34,7 +34,7 @@ jobs:
             exit 1
           fi
       - name: Checkout default branch and tags
-        uses: actions/checkout@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 0
@@ -62,12 +62,12 @@ jobs:
         run: rustup toolchain install 1.99.0 --profile minimal
       - name: Set up Go
         if: steps.changes.outputs.publish == 'true'
-        uses: actions/setup-go@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version-file: go.mod
       - name: Set up uv
         if: steps.changes.outputs.publish == 'true'
-        uses: astral-sh/setup-uv@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v10.0.1
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           version: "0.12.5"
       - name: Set up Node.js
@@ -77,7 +77,7 @@ jobs:
           node-version: 22.23.3
       - name: Restore translation cache
         if: steps.changes.outputs.publish == 'true'
-        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f7 # v4.2.4
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
           path: .cache/ash/site-translation-cache.json
           key: site-translation-cache-v2-${{ hashFiles('site/generate_locales.py') }}-${{ github.run_id }}
