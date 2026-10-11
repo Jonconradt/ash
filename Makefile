@@ -23,8 +23,9 @@ LOCAL_PLUGINS_DIR ?= $(if $(XDG_DATA_HOME),$(XDG_DATA_HOME),$(HOME)/.local/share
 # RELEASE_GOOS/RELEASE_ARCH so release plugin binaries match the release target.
 PLUGIN_TARGET_GOOS ?=
 PLUGIN_TARGET_GOARCH ?=
-RELEASE_ARCH ?= arm64
+RELEASE_ARCH ?= $(shell uname -m | sed -e 's/^x86_64$$/amd64/' -e 's/^aarch64$$/arm64/')
 RELEASE_OUTPUT_DIR ?= dist/release
+RELEASE_TRANSLATION_CACHE ?= .cache/ash/site-translation-cache.json
 RELEASE_PACKAGE_DIR ?= $(RELEASE_OUTPUT_DIR)
 RELEASE_TARGET_ARCHES ?= amd64 arm64
 RELEASE_TARGET_OSES ?= auto
@@ -46,6 +47,7 @@ ifeq ($(origin AUTO_RELEASE_VERSION),undefined)
 AUTO_RELEASE_VERSION := $(shell ./scripts/release/next_version.sh "$(CHANNEL)")
 endif
 RELEASE_VERSION ?= $(AUTO_RELEASE_VERSION)
+export RELEASE_VERSION RELEASE_COMMIT CHANNEL
 RELEASE_PKG_NAME ?= $(APP_NAME)-$(RELEASE_VERSION)-darwin-$(RELEASE_ARCH).pkg
 RELEASE_PKG_PATH ?= $(RELEASE_PACKAGE_DIR)/$(RELEASE_PKG_NAME)
 RELEASE_INSTALL_PATH ?= /usr/local/bin
@@ -244,6 +246,20 @@ release-check: $(if $(filter stable,$(CHANNEL)),verify,lint test gosec govulnche
 		echo "CHANNEL must be beta, stable, or nightly; got: $(CHANNEL)"; \
 		exit 1; \
 	fi
+	@if [[ "$$(uname -s)" != Darwin ]]; then \
+		echo "make release requires macOS for package creation and release-note execution"; \
+		exit 1; \
+	fi
+	@if [[ "$$(git rev-parse --abbrev-ref HEAD)" == HEAD ]]; then \
+		echo "cannot publish release from detached HEAD"; \
+		exit 1; \
+	fi
+	@git var GIT_AUTHOR_IDENT >/dev/null
+	@git var GIT_COMMITTER_IDENT >/dev/null
+	@if [[ -z "$${ASH_AI_ENDPOINT:-}" || -z "$${ASH_AI_MODEL:-}" ]]; then \
+		echo "set ASH_AI_ENDPOINT and ASH_AI_MODEL before generating release notes"; \
+		exit 1; \
+	fi
 	@echo "Using RELEASE_VERSION=$(RELEASE_VERSION)"
 	@if [[ -z "$(LATEST_RELEASE_TAG)" ]]; then \
 		echo "No stable release tags found; defaulting from baseline v0.1.0"; \
@@ -277,7 +293,8 @@ release-translate:
 		status=$$?; \
 		trap - EXIT; \
 		if [[ -f "$$work_dir/.site-translation-cache.json" ]]; then \
-			cp "$$work_dir/.site-translation-cache.json" .site-translation-cache.json || status=$$?; \
+			mkdir -p "$$(dirname "$(RELEASE_TRANSLATION_CACHE)")" && \
+				cp "$$work_dir/.site-translation-cache.json" "$(RELEASE_TRANSLATION_CACHE)" || status=$$?; \
 		fi; \
 		rm -rf "$$work_dir" || status=$$?; \
 		exit "$$status"; \
@@ -286,14 +303,17 @@ release-translate:
 	mkdir -p "$$work_dir/site" "$$work_dir/internal/localize"; \
 	cp -R site/. "$$work_dir/site/"; \
 	cp -R internal/localize/languages "$$work_dir/internal/localize/"; \
-	if [[ -f .site-translation-cache.json ]]; then \
+	if [[ -f "$(RELEASE_TRANSLATION_CACHE)" ]]; then \
+		cp "$(RELEASE_TRANSLATION_CACHE)" "$$work_dir/.site-translation-cache.json"; \
+	elif [[ -f .site-translation-cache.json ]]; then \
 		cp .site-translation-cache.json "$$work_dir/.site-translation-cache.json"; \
 	fi; \
 	(cd "$$work_dir" && python3 site/generate_locales.py); \
 	mkdir -p "$(RELEASE_OUTPUT_DIR)"; \
 	tar -C "$$work_dir/site" -czf "$(RELEASE_OUTPUT_DIR)/ash-site-$(RELEASE_VERSION).tar.gz" .; \
-	tar -tzf "$(RELEASE_OUTPUT_DIR)/ash-site-$(RELEASE_VERSION).tar.gz" | grep -Fxq "./index.html"; \
-	tar -tzf "$(RELEASE_OUTPUT_DIR)/ash-site-$(RELEASE_VERSION).tar.gz" | grep -Fxq "./fr/index.html"; \
+	tar -tzf "$(RELEASE_OUTPUT_DIR)/ash-site-$(RELEASE_VERSION).tar.gz" > "$$work_dir/archive-entries"; \
+	grep -Fxq "./index.html" "$$work_dir/archive-entries"; \
+	grep -Fxq "./fr/index.html" "$$work_dir/archive-entries"; \
 	echo "translated website release artifact: $(RELEASE_OUTPUT_DIR)/ash-site-$(RELEASE_VERSION).tar.gz"
 
 release-build-one:
@@ -322,7 +342,8 @@ release-pkg:
 # Every release archive includes one ash executable, its broker, plugins, and license.
 release-pkg-one:
 	@mkdir -p "$(RELEASE_PACKAGE_DIR)"
-	@case "$(RELEASE_FORMAT)" in \
+	@set -euo pipefail; \
+	case "$(RELEASE_FORMAT)" in \
 		pkg) \
 			if [[ "$(RELEASE_GOOS)" != "darwin" ]]; then \
 				echo "pkg format requires RELEASE_GOOS=darwin"; \
@@ -423,7 +444,8 @@ release-validate:
 	@shasum -a 256 "$(RELEASE_PKG_PATH)" > "$(RELEASE_PKG_PATH).sha256"
 
 release-validate-one:
-	@case "$(RELEASE_FORMAT)" in \
+	@set -euo pipefail; \
+	case "$(RELEASE_FORMAT)" in \
 		pkg) \
 			./scripts/package/macos/validate_pkg.sh \
 				--pkg "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).pkg" \
@@ -549,7 +571,8 @@ release-notes:
 	exit 1
 
 release-artifacts:
-	@target_oses="$(RELEASE_TARGET_OSES)"; \
+	@set -euo pipefail; \
+	target_oses="$(RELEASE_TARGET_OSES)"; \
 	if [[ "$$target_oses" == "auto" ]]; then \
 		case "$$(uname -s)" in \
 			Darwin) target_oses="darwin" ;; \
@@ -599,7 +622,12 @@ release-artifacts:
 	done
 
 release-publish:
-	@current_branch="$$(git rev-parse --abbrev-ref HEAD)"; \
+	@set -euo pipefail; \
+	if [[ -n "$$(git status --porcelain)" ]]; then \
+		echo "git working tree changed during release preparation; refusing to publish"; \
+		exit 1; \
+	fi; \
+	current_branch="$$(git rev-parse --abbrev-ref HEAD)"; \
 	if [[ "$$current_branch" == "HEAD" ]]; then \
 		echo "cannot publish release from detached HEAD"; \
 		exit 1; \
@@ -608,8 +636,8 @@ release-publish:
 	if [[ "$(CHANNEL)" == "stable" ]]; then \
 		publish_branch="release/$$(printf '%s' "$(RELEASE_VERSION)" | sed -E 's/^(v[0-9]+\.[0-9]+)\..*/\1/')"; \
 		if [[ "$$current_branch" != "$$publish_branch" ]]; then \
-			if git show-ref --verify --quiet "refs/heads/$$publish_branch" || \
-				git ls-remote --exit-code --heads origin "$$publish_branch" >/dev/null 2>&1; then \
+			remote_branch="$$(git ls-remote --heads origin "$$publish_branch")"; \
+			if git show-ref --verify --quiet "refs/heads/$$publish_branch" || [[ -n "$$remote_branch" ]]; then \
 				echo "stable branch already exists: $$publish_branch"; \
 				exit 1; \
 			fi; \
@@ -618,7 +646,8 @@ release-publish:
 	fi; \
 	./scripts/release/push_with_retry.sh "pushing branch $$publish_branch to origin" git push origin "$$publish_branch" && \
 	echo "pushed branch $$publish_branch to origin"
-	@head_sha="$$(git rev-parse HEAD)"; \
+	@set -euo pipefail; \
+	head_sha="$$(git rev-parse HEAD)"; \
 	local_sha="$$(git rev-parse -q --verify "refs/tags/$(RELEASE_VERSION)^{}" 2>/dev/null || true)"; \
 	if [[ -n "$$local_sha" && "$$local_sha" != "$$head_sha" ]]; then \
 		echo "local tag $(RELEASE_VERSION) already exists and points to $$local_sha, not HEAD ($$head_sha)"; \

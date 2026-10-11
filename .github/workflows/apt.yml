@@ -19,6 +19,7 @@ jobs:
         with:
           ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 0
+          token: ${{ secrets.RELEASE_GITHUB_TOKEN }}
       - name: Resolve release channel package versions
         run: |
           set -euo pipefail
@@ -46,9 +47,11 @@ jobs:
               exit 1
               ;;
           esac
-          echo "PACKAGE_CHANNEL=$channel" >> "$GITHUB_ENV"
-          echo "PACKAGE_VERSION=$package_version" >> "$GITHUB_ENV"
-          echo "ARCH_VERSION=$arch_version" >> "$GITHUB_ENV"
+          {
+            echo "PACKAGE_CHANNEL=$channel"
+            echo "PACKAGE_VERSION=$package_version"
+            echo "ARCH_VERSION=$arch_version"
+          } >> "$GITHUB_ENV"
       - name: Install repository tools
         run: |
           sudo apt-get update
@@ -68,6 +71,7 @@ jobs:
           cp "$archive" "$RUNNER_TEMP/arch-build/ash.tar.gz"
           docker run --rm --platform linux/amd64 \
             -e "ASH_VERSION=${ARCH_VERSION}" \
+            -e "ASH_RELEASE_TAG=${RELEASE_TAG}" \
             -e "ASH_ARCHIVE_SHA256=${archive_sha256}" \
             -v "$RUNNER_TEMP/arch-build:/build" \
             archlinux:base-devel \
@@ -77,6 +81,7 @@ jobs:
               chown -R builder:builder /build
               runuser -u builder -- env \
                 "ASH_VERSION=$ASH_VERSION" \
+                "ASH_RELEASE_TAG=$ASH_RELEASE_TAG" \
                 "ASH_ARCHIVE_SHA256=$ASH_ARCHIVE_SHA256" \
                 bash -euo pipefail -c "cd /build && makepkg --noconfirm --clean"
               package="/build/ash-${ASH_VERSION}-1-x86_64.pkg.tar.zst"
@@ -238,7 +243,8 @@ jobs:
             gpg --verify "dists/${PACKAGE_CHANNEL}/InRelease"
             gpg --verify "dists/${PACKAGE_CHANNEL}/Release.gpg" "dists/${PACKAGE_CHANNEL}/Release"
           )
-          createrepo_c --checksum sha256 "$rpm_repo"
+          (cd "$rpm_repo" && find packages -type f -name '*.rpm' -print | sort) > "$RUNNER_TEMP/rpm-package-list"
+          createrepo_c --checksum sha256 --pkglist "$RUNNER_TEMP/rpm-package-list" "$rpm_repo"
           gpg --batch --yes --local-user "$key_id" --pinentry-mode loopback \
             --passphrase "$GPG_PASSPHRASE" --armor --detach-sign \
             --output "$rpm_repo/repodata/repomd.xml.asc" "$rpm_repo/repodata/repomd.xml"
@@ -277,7 +283,8 @@ jobs:
             echo "APT repository is already up to date"
             exit 0
           fi
-          git commit -m "chore(repositories): publish ash ${RELEASE_TAG}"
+          git commit -m "chore(repositories): publish ash ${RELEASE_TAG}" \
+            -m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
           git fetch origin "$DEFAULT_BRANCH"
           git rebase "origin/${DEFAULT_BRANCH}"
           git push origin "HEAD:${DEFAULT_BRANCH}"

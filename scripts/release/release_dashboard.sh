@@ -7,13 +7,14 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  release_dashboard.sh --tag <tag> [--repo <owner/repo>] [--interval <seconds>] [--once]
+  release_dashboard.sh --tag <tag> [--repo <owner/repo>] [--interval <seconds>] [--timeout <seconds>] [--once]
 EOF
 }
 
 tag=""
 repo=""
 interval=10
+timeout=7200
 once=0
 
 while [[ $# -gt 0 ]]; do
@@ -33,6 +34,10 @@ while [[ $# -gt 0 ]]; do
     --once)
       once=1
       shift
+      ;;
+    --timeout)
+      timeout="${2:-}"
+      shift 2
       ;;
     -h|--help)
       usage
@@ -83,6 +88,10 @@ if ! [[ "$interval" =~ ^[0-9]+$ ]] || [[ "$interval" -lt 1 ]]; then
   echo "interval must be a positive integer" >&2
   exit 1
 fi
+if ! [[ "$timeout" =~ ^[0-9]+$ ]] || [[ "$timeout" -lt 1 ]]; then
+  echo "timeout must be a positive integer" >&2
+  exit 1
+fi
 
 spinner_frames="|/-\\"
 spinner_index=0
@@ -116,7 +125,10 @@ for asset in \
   "ash-${tag}-linux-arm64.tar.gz.sha256" \
   "ash-${tag}-freebsd-amd64.tar.gz.sha256" \
   "SHA256SUMS" \
-  "SHA256SUMS.sigstore.json"; do
+  "SHA256SUMS.sigstore.json" \
+  "ash-site-${tag}.tar.gz" \
+  "sbom.spdx.json" \
+  "provenance.sigstore.json"; do
   expected_assets+=("$asset")
 done
 
@@ -249,15 +261,15 @@ if isinstance(run, dict):
 release_complete = assets_total > 0 and assets_completed == assets_total
 workflow_complete = workflow_status == "completed"
 
-if release_complete:
-  print("complete")
-  print("published")
-elif workflow_complete and workflow_conclusion and workflow_conclusion != "success":
+if workflow_complete and workflow_conclusion and workflow_conclusion != "success":
   print("complete")
   print("workflow_failed")
+elif workflow_complete and release_complete:
+  print("complete")
+  print("published")
 elif workflow_complete:
-  print("pending")
-  print("awaiting_assets")
+  print("complete")
+  print("missing_assets")
 else:
   print("pending")
   print("active")
@@ -486,6 +498,7 @@ enter_tui
 
 final_message=""
 final_status=0
+started_at=$SECONDS
 
 while true; do
   run_id="$(find_run_id)"
@@ -506,7 +519,10 @@ while true; do
     render_dashboard plain "$run_json" "$assets_json"
   fi
 
-  mapfile -t release_progress < <(get_release_progress "$run_json" "$assets_json")
+  release_progress=()
+  while IFS= read -r progress; do
+    release_progress+=("$progress")
+  done < <(get_release_progress "$run_json" "$assets_json")
   release_state="${release_progress[0]:-pending}"
 
   if [[ "$release_state" == "complete" ]]; then
@@ -518,12 +534,20 @@ while true; do
         final_message="$(get_failure_summary "$run_json")"
         final_status=1
         ;;
+      missing_assets)
+        final_message="Release $tag workflow succeeded but required artifacts are missing."
+        final_status=1
+        ;;
     esac
     break
   fi
 
   if [[ "$once" == "1" ]]; then
     break
+  fi
+  if (( SECONDS - started_at >= timeout )); then
+    echo "Timed out waiting for release $tag after ${timeout}s; check tag workflow triggers, token permissions, and the Actions run logs." >&2
+    exit 1
   fi
 
   spinner_index=$(((spinner_index + 1) % 4))

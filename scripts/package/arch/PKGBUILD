@@ -1,5 +1,6 @@
 pkgname=ash
 pkgver="${ASH_VERSION:?ASH_VERSION must be set}"
+release_tag="${ASH_RELEASE_TAG:-v${pkgver}}"
 pkgrel=1
 pkgdesc="A shell assistant for command-not-found workflows"
 arch=('x86_64')
@@ -11,7 +12,7 @@ source=('ash.tar.gz')
 sha256sums=("${ASH_ARCHIVE_SHA256:?ASH_ARCHIVE_SHA256 must be set}")
 
 package() {
-  install -Dm0755 "$srcdir/ash-v${pkgver}-linux-amd64" "$pkgdir/usr/bin/ash"
+  install -Dm0755 "$srcdir/ash-${release_tag}-linux-amd64" "$pkgdir/usr/bin/ash"
   install -Dm0755 "$srcdir/ash-broker" "$pkgdir/usr/bin/ash-broker"
   install -Dm0644 "$srcdir/LICENSE" "$pkgdir/usr/share/licenses/ash/LICENSE"
   install -Dm0755 "$srcdir"/plugins/* -t "$pkgdir/usr/lib/ash/plugins"

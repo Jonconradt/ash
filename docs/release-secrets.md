@@ -3,7 +3,8 @@
 This guide is for engineers maintaining release automation in
 `Jonconradt/ash`. Configure repository secrets at
 **GitHub → Jonconradt/ash → Settings → Secrets and variables → Actions**.
-The equivalent CLI commands below use `gh` and require `gh auth login`.
+The equivalent CLI commands below use Bash and `gh` and require `gh auth login`.
+On macOS, run `bash` first if your interactive shell is zsh.
 
 Check which secret names are configured with:
 
@@ -18,15 +19,17 @@ confirms its name exists; it does not verify its value, expiry, or permissions.
 
 | Secret | Required | Value |
 | --- | --- | --- |
-| `RELEASE_GITHUB_TOKEN` | Yes | Fine-grained personal access token for the `Jonconradt/ash` repository. Grant **Contents: Read and write** and **Actions: Read-only**. The nightly workflow uses it to check out the repository and allow Make to push the release branch and tag. The dedicated token is needed so pushing a tag starts the tag-triggered release workflow. |
+| `RELEASE_GITHUB_TOKEN` | Yes | Fine-grained personal access token for the `Jonconradt/ash` repository. Grant **Contents: Read and write** and **Actions: Read-only**. It authenticates nightly tag pushes, GitHub Release creation, and package repository pushes. Unlike `GITHUB_TOKEN`, these events trigger the next workflows in the release chain. |
 | `ASH_AI_ENDPOINT` | Yes | Base URL for an AI API reachable from a GitHub-hosted runner and supported by ash. Use the endpoint format specified by the provider. A local-only address such as `localhost` will not work on GitHub-hosted runners. |
 | `ASH_AI_MODEL` | Yes | Exact model identifier accepted by the configured endpoint. |
-| `ASH_AI_AUTH_TOKEN` | Conditional | Provider API credential, if the endpoint requires bearer-token authentication. Leave unset for an endpoint that does not require it. |
+| `ASH_AI_AUTH_TOKEN` | Conditional | Provider API credential. ash requires it for public/cloud endpoints other than AWS Bedrock, even if the service itself accepts unauthenticated requests. Local/LAN endpoints may omit it; Bedrock uses the AWS credential chain instead. |
 
 The nightly workflow maps `RELEASE_GITHUB_TOKEN` to `GH_TOKEN` and passes the
 AI settings to `make release CHANNEL=nightly`. It fails before the release
 starts if the GitHub token, endpoint, or model is missing. The endpoint and
 model are also used to generate release notes.
+For a public Ollama or OpenAI-compatible endpoint, configure all three AI
+secrets, including `ASH_AI_AUTH_TOKEN`.
 
 ### Create `RELEASE_GITHUB_TOKEN`
 
@@ -65,7 +68,7 @@ printf '%s' 'your-exact-model-id' |
 ```
 
 Replace the example values with the provider's actual endpoint and exact model
-ID. If authentication is required, add its API token without placing it in
+ID. For public/cloud endpoints, add its API token without placing it in
 shell history:
 
 ```bash
@@ -100,6 +103,8 @@ unset secret
 ```
 
 Keep this token scoped to the tap repository; do not reuse the nightly token.
+The repository may initially be empty; the publishing script creates the first
+formula commit on its default branch.
 
 ## Linux package repository signing
 
@@ -159,3 +164,59 @@ Values are intentionally not displayed. When a token expires or is rotated,
 create a replacement with the same repository scope and permissions, update
 the corresponding secret, verify the next workflow run, then revoke the old
 token.
+
+## Release readiness and workflow chain
+
+Before a local release, fetch the current stable and prerelease tags and ensure
+your macOS checkout is clean, attached to a branch, and has a Git identity:
+
+```bash
+git fetch origin --tags
+git status --short
+git var GIT_AUTHOR_IDENT
+git var GIT_COMMITTER_IDENT
+```
+
+Repository secrets are not downloaded into your local shell. Set
+`ASH_AI_ENDPOINT`, `ASH_AI_MODEL`, and any required provider credentials locally
+before running Make. Authenticate Git pushes separately, for example using
+`gh auth setup-git` with an appropriately authorized account.
+
+```bash
+make release CHANNEL=nightly
+make release                 # beta
+make release CHANNEL=stable  # full make verify, then release/vX.Y branch
+```
+
+These commands publish real release tags; do not use them as dry runs. Each
+invocation freezes the version across all Make steps. Release translations
+start from the existing Google Translate cache and store updates in ignored
+`.cache/ash/site-translation-cache.json`, leaving tracked files unchanged.
+
+The scheduled nightly checks the default branch at 04:00 UTC and skips when
+only generated APT/RPM/Pacman repository files have changed since the latest
+nightly. This prevents publishing yesterday's packages from causing another
+otherwise identical nightly.
+
+The pushed annotated tag starts `release.yml`, which verifies and builds all
+platform artifacts, runs smoke tests, signs checksums, and creates the GitHub
+Release using `RELEASE_GITHUB_TOKEN`. The published-release event starts
+`apt.yml`, which signs and commits channel-specific package repositories using
+the same token. That push to the default branch starts `site.yml`; Pages
+deploys from the default branch, not from a prerelease tag. Homebrew updates
+run within `release.yml` using the separate tap token.
+
+Verify workflow outcomes, not just secret names:
+
+```bash
+gh run list --repo Jonconradt/ash --workflow nightly.yml
+gh run list --repo Jonconradt/ash --workflow release.yml
+gh run list --repo Jonconradt/ash --workflow apt.yml
+gh run list --repo Jonconradt/ash --workflow site.yml
+gh run view RUN_ID --repo Jonconradt/ash --log-failed
+```
+
+Make's release dashboard waits for the tag-triggered release workflow, including
+Homebrew publication; Linux repository publication and Pages deployment are
+separate runs and must also be checked. Token values and scopes, provider/model
+access, and the GPG passphrase cannot be verified through `gh secret list`.

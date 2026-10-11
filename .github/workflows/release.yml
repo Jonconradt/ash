@@ -29,6 +29,8 @@ jobs:
       - name: Run quality checks
         run: make verify
       - name: Verify external Go installs from the release tag
+        env:
+          GONOPROXY: github.com/Jonconradt/ash
         run: |
           set -euo pipefail
           install_dir="$(mktemp -d)"
@@ -68,13 +70,13 @@ jobs:
       - name: Build and package macOS artifacts
         run: |
           make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES=${{ matrix.arch }} RELEASE_VERSION="${GITHUB_REF_NAME}"
-      - name: Smoke test native macOS arm64 tarball
+      - name: Smoke test native macOS tarball
         run: |
           set -euo pipefail
-          archive="dist/release/ash-${GITHUB_REF_NAME}-darwin-arm64.tar.gz"
+          archive="dist/release/ash-${GITHUB_REF_NAME}-darwin-${{ matrix.arch }}.tar.gz"
           mkdir -p smoke
           tar -xzf "$archive" -C smoke
-          binary="smoke/ash-${GITHUB_REF_NAME}-darwin-arm64"
+          binary="smoke/ash-${GITHUB_REF_NAME}-darwin-${{ matrix.arch }}"
           "$binary" --help
           "$binary" version
           smoke_home="$(mktemp -d)"
@@ -121,13 +123,13 @@ jobs:
       - name: Build and package Linux artifacts
         run: |
           make release-artifacts RELEASE_TARGET_OSES=linux RELEASE_TARGET_ARCHES=${{ matrix.arch }} RELEASE_VERSION="${GITHUB_REF_NAME}"
-      - name: Smoke test native Linux amd64 tarball
+      - name: Smoke test native Linux tarball
         run: |
           set -euo pipefail
-          archive="dist/release/ash-${GITHUB_REF_NAME}-linux-amd64.tar.gz"
+          archive="dist/release/ash-${GITHUB_REF_NAME}-linux-${{ matrix.arch }}.tar.gz"
           mkdir -p smoke
           tar -xzf "$archive" -C smoke
-          binary="smoke/ash-${GITHUB_REF_NAME}-linux-amd64"
+          binary="smoke/ash-${GITHUB_REF_NAME}-linux-${{ matrix.arch }}"
           "$binary" --help
           "$binary" version
           smoke_home="$(mktemp -d)"
@@ -225,7 +227,16 @@ jobs:
       - package-macos
       - package-linux
       - package-freebsd
+      - smoke-freebsd
     steps:
+      - name: Validate publishing credentials
+        env:
+          RELEASE_GITHUB_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "$RELEASE_GITHUB_TOKEN" || { echo "::error::RELEASE_GITHUB_TOKEN is required"; exit 1; }
+          test -n "$HOMEBREW_TAP_GITHUB_TOKEN" || { echo "::error::HOMEBREW_TAP_GITHUB_TOKEN is required"; exit 1; }
       - name: Checkout release tag
         uses: actions/checkout@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v5
         with:
@@ -240,9 +251,9 @@ jobs:
       - name: Restore translation cache
         uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f7 # v4.2.4
         with:
-          path: .site-translation-cache.json
-          key: site-translation-cache-v1-${{ hashFiles('site/generate_locales.py') }}
-          restore-keys: site-translation-cache-v1-
+          path: .cache/ash/site-translation-cache.json
+          key: site-translation-cache-v2-${{ hashFiles('site/generate_locales.py') }}-${{ github.run_id }}
+          restore-keys: site-translation-cache-v2-${{ hashFiles('site/generate_locales.py') }}-
       - name: Generate translated website release artifact
         run: make release-translate RELEASE_VERSION="${GITHUB_REF_NAME}"
       - name: Add downloadable language catalogs
@@ -312,6 +323,7 @@ jobs:
       - name: Publish GitHub release
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
+          token: ${{ secrets.RELEASE_GITHUB_TOKEN }}
           body_path: release-notes.md
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: |

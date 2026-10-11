@@ -44,7 +44,8 @@ jobs:
         run: |
           set -euo pipefail
           latest_tag="$(git tag --list 'v*-nightly.*' --sort=-v:refname | head -n1 || true)"
-          if [[ -n "$latest_tag" && "$(git rev-parse "${latest_tag}^{}")" == "$GITHUB_SHA" ]]; then
+          if [[ -n "$latest_tag" ]] && git diff --quiet "$latest_tag" HEAD -- . \
+            ':(exclude)site/apt' ':(exclude)site/rpm' ':(exclude)site/pacman'; then
             echo "publish=false" >> "$GITHUB_OUTPUT"
             echo "No repository changes since $latest_tag"
             exit 0
@@ -78,9 +79,14 @@ jobs:
         if: steps.changes.outputs.publish == 'true'
         uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f7 # v4.2.4
         with:
-          path: .site-translation-cache.json
-          key: site-translation-cache-v1-${{ hashFiles('site/generate_locales.py') }}
-          restore-keys: site-translation-cache-v1-
+          path: .cache/ash/site-translation-cache.json
+          key: site-translation-cache-v2-${{ hashFiles('site/generate_locales.py') }}-${{ github.run_id }}
+          restore-keys: site-translation-cache-v2-${{ hashFiles('site/generate_locales.py') }}-
+      - name: Configure release tag identity
+        if: steps.changes.outputs.publish == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
       - name: Publish nightly release
         if: steps.changes.outputs.publish == 'true'
         run: make release CHANNEL=nightly

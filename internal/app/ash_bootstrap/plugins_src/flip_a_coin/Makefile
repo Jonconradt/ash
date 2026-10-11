@@ -20,7 +20,8 @@ RUN_QUIET := ../../../../../scripts/dev/run-quiet.sh
 # which cross-compiles inside a Docker image with the target's own libc/sysroot.
 build:
 	@mkdir -p "$(BUILD_DIR)"
-	@host_os="$$(uname -s | tr '[:upper:]' '[:lower:]')"; \
+	@set -eu; \
+	host_os="$$(uname -s | tr '[:upper:]' '[:lower:]')"; \
 	case "$$(uname -m)" in \
 		x86_64) host_arch=amd64 ;; \
 		arm64|aarch64) host_arch=arm64 ;; \
@@ -40,7 +41,7 @@ build:
 		$(RUN_QUIET) "cargo-build" cargo build --release; \
 		bin_path="target/release/$(PLUGIN_NAME)"; \
 	elif [ "$$target_os" = "$$host_os" ]; then \
-		rustup target add "$$triple" >/dev/null 2>&1 || true; \
+		rustup target add "$$triple"; \
 		if [ "$$target_os" = "linux" ] && [ "$$target_arch" = "arm64" ]; then \
 			export CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc; \
 		fi; \
