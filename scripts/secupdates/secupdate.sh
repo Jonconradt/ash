@@ -145,7 +145,11 @@ main() {
 	log "running security checks"
 	make security
 	log "running lint and tests"
-	make lint test
+	(
+		# Test fixtures assert the permission bits they request; keep the service umask elsewhere.
+		umask 022
+		make lint test
+	)
 	if ! repository_is_clean; then
 		commit_repository_changes
 		push_repository_changes
