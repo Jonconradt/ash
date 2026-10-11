@@ -115,7 +115,7 @@ make release RELEASE_VERSION=v1.2.3
 - `make lint` runs `golangci-lint` checks across the module
 - `make security` runs `gosec` and `govulncheck` for security scanning
 - `make test` runs `go test ./...`
-- `make install` builds `ash`, `ash-broker`, and bundled plugins into user-local directories.
+- `make install` builds `ash`, `ash-broker`, and bundled plugins into user-local directories, then enables Bash shell integration.
 - `make verify` runs strict checks (tests, race, coverage gate, vet, staticcheck, gosec, govulncheck)
 - `make sync-route-words` regenerates the ambiguous-word block in the shell assets from
   `internal/app/ash_bootstrap/route_words.txt`, the canonical list. Edit only that file; a test fails if

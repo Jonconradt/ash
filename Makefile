@@ -214,7 +214,7 @@ install: test lint gosec plugins-build plugins-install
 	@go build -o "$(LOCAL_BINARY_PATH)" -ldflags "-X github.com/Jonconradt/ash/internal/app.ashVersion=$(BUILD_VERSION) -X github.com/Jonconradt/ash/internal/app.ashCommit=$(BUILD_COMMIT) -X github.com/Jonconradt/ash/internal/app.ashDevelopmentBuild=true" ./cmd/ash
 	@go build -o "$(LOCAL_BIN_DIR)/ash-broker" ./cmd/ash-broker
 	@$(MAKE) restart-broker
-	@"$(LOCAL_BINARY_PATH)" install --shell bash --overwrite
+	@"$(LOCAL_BINARY_PATH)" install --shell bash --shell-integration --overwrite
 
 version: release-check release-artifacts
 
