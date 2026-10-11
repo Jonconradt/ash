@@ -4,12 +4,15 @@
 package app
 
 import (
+	"bytes"
 	"context"
+	"errors"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 // extractBashRouteGuards pulls the shipped prefilter out of the real bash asset so these
@@ -136,5 +139,35 @@ func TestBashAssetDelegatesRoutingPolicyToGo(t *testing.T) {
 		if strings.Contains(asset, duplicated) {
 			t.Errorf("bash asset still contains duplicated heuristic marker %q", duplicated)
 		}
+	}
+}
+
+func TestBashCommandNotFoundDoesNotReenterWhenAshIsMissing(t *testing.T) {
+	bashPath, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skipf("bash not available: %v", err)
+	}
+	content, err := readEmbeddedBootstrapAsset("ash_bootstrap/.ash_bashrc")
+	if err != nil {
+		t.Fatalf("read embedded bash asset: %v", err)
+	}
+
+	home := t.TempDir()
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	cmd := exec.CommandContext(ctx, bashPath, "--noprofile", "--norc", "-ic", string(content)+"\nSummarize my bio\n")
+	cmd.Env = []string{"HOME=" + home, "PATH=", "ASH_SESSION_ID=test"}
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	runErr := cmd.Run()
+	if ctx.Err() != nil {
+		t.Fatalf("bash command-not-found hook did not terminate: %v", ctx.Err())
+	}
+	var exitErr *exec.ExitError
+	if !errors.As(runErr, &exitErr) || exitErr.ExitCode() != 127 {
+		t.Fatalf("bash command exit = %v, want status 127; stderr=%q", runErr, stderr.String())
+	}
+	if strings.Contains(stderr.String(), "maximum function nesting level") {
+		t.Fatalf("bash command-not-found hook recursed: %q", stderr.String())
 	}
 }

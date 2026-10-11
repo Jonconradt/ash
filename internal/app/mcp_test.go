@@ -317,3 +317,43 @@ func TestShellWrappersScopeMCPCredentialKeyToBroker(t *testing.T) {
 		}
 	}
 }
+
+func TestShellWrappersAddUserLocalBinToPath(t *testing.T) {
+	tests := []struct {
+		asset string
+		want  string
+	}{
+		{asset: "ash_bootstrap/.ash_bashrc", want: `PATH="$HOME/.local/bin:$PATH"`},
+		{asset: "ash_bootstrap/.ash_zshrc", want: `PATH="$HOME/.local/bin:$PATH"`},
+		{asset: "ash_bootstrap/.ash_fish.fish", want: `set -gx PATH "$HOME/.local/bin" $PATH`},
+	}
+	for _, test := range tests {
+		content, err := readEmbeddedBootstrapAsset(test.asset)
+		if err != nil {
+			t.Fatalf("readEmbeddedBootstrapAsset(%q) error = %v", test.asset, err)
+		}
+		if !strings.Contains(string(content), test.want) {
+			t.Errorf("%s does not add the default local binary directory to PATH", test.asset)
+		}
+	}
+}
+
+func TestShellWrappersGuardMissingAshExecutable(t *testing.T) {
+	tests := []struct {
+		asset string
+		want  string
+	}{
+		{asset: "ash_bootstrap/.ash_bashrc", want: `if ! builtin type -P ash >/dev/null 2>&1; then`},
+		{asset: "ash_bootstrap/.ash_zshrc", want: `if ! whence -p ash >/dev/null 2>&1; then`},
+		{asset: "ash_bootstrap/.ash_fish.fish", want: `if not command -q ash`},
+	}
+	for _, test := range tests {
+		content, err := readEmbeddedBootstrapAsset(test.asset)
+		if err != nil {
+			t.Fatalf("readEmbeddedBootstrapAsset(%q) error = %v", test.asset, err)
+		}
+		if !strings.Contains(string(content), test.want) {
+			t.Errorf("%s does not guard against a missing external ash executable", test.asset)
+		}
+	}
+}

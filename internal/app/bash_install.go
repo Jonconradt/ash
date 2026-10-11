@@ -37,6 +37,11 @@ case "$-" in
 	*i*) ;;
 	*) return ;;
 esac
+if [[ "${_ASH_LOCAL_BIN_ON_PATH:-}" != 1 ]]; then
+	PATH="$HOME/.local/bin:$PATH"
+	export PATH
+	_ASH_LOCAL_BIN_ON_PATH=1
+fi
 _ash_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/ash"
 _ash_state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/ash"
 [[ -f "$_ash_config_dir/.ash_env" ]] && . "$_ash_config_dir/.ash_env"
@@ -64,9 +69,17 @@ _ash_prompt_processing_enabled() {
 
 	command_not_found_handle() {
 	if _ash_prompt_processing_enabled; then
+		if ! builtin type -P ash >/dev/null 2>&1; then
+			if declare -F _ash_original_command_not_found_handle >/dev/null 2>&1; then
+				_ash_original_command_not_found_handle "$@"
+				return $?
+			fi
+			printf '%s: command not found\n' "$1" >&2
+			return 127
+		fi
 		_ash_ensure_broker >/dev/null 2>&1
 		[[ -n "${ASH_BROKER_LEASE:-}" ]] && touch "$ASH_BROKER_LEASE"
-		ash "$@"
+		command ash -- "$@"
 		return $?
 	fi
 	if declare -F _ash_original_command_not_found_handle >/dev/null 2>&1; then
@@ -77,6 +90,10 @@ _ash_prompt_processing_enabled() {
 }
 
 ash() {
+	if ! builtin type -P ash >/dev/null 2>&1; then
+		printf '%s\n' "ash: command not found" >&2
+		return 127
+	fi
 	if [[ "${1:-}" == "mcp" && "${2:-}" == "add" ]]; then
 		_ash_ensure_broker >/dev/null 2>&1
 		[[ -n "${ASH_BROKER_LEASE:-}" ]] && touch "$ASH_BROKER_LEASE"

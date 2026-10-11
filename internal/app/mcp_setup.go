@@ -219,32 +219,18 @@ func resolveMCPAllowlistPath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	cwd, err := osGetwd()
-	if err != nil {
-		return "", err
-	}
-	home, err := osUserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	for _, path := range []string{
-		filepath.Join(root, allowFileName),
-		filepath.Join(cwd, allowFileName),
-		filepath.Join(home, allowFileName),
-	} {
-		info, err := os.Lstat(path)
-		if errors.Is(err, os.ErrNotExist) {
-			continue
-		}
-		if err != nil {
-			return "", err
-		}
-		if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
-			return "", fmt.Errorf("%s is not a regular file", path)
-		}
+	path := filepath.Join(root, allowFileName)
+	info, err := os.Lstat(path)
+	if errors.Is(err, os.ErrNotExist) {
 		return path, nil
 	}
-	return filepath.Join(root, allowFileName), nil
+	if err != nil {
+		return "", err
+	}
+	if info.Mode()&os.ModeSymlink != 0 || !info.Mode().IsRegular() {
+		return "", fmt.Errorf("%s is not a regular file", path)
+	}
+	return path, nil
 }
 
 func checkMCPRegistration(path string, server mcpclient.RemoteServer) error {

@@ -33,7 +33,8 @@ The CLI entry point in [internal/app/ash.go](internal/app/ash.go) initializes co
 3. run the chat/tool loop
 4. render the final assistant reply
 
-Remote MCP servers are registered as URL lines in `$HOME/.ash/.ash_allow`. The `ash` executable
+Remote MCP servers are registered as URL lines in `$XDG_CONFIG_HOME/ash/.ash_allow`
+(default `~/.config/ash/.ash_allow`). The `ash` executable
 derives stable local names from each URL, loads tool definitions through typed broker requests,
 and dispatches model-selected calls back to the broker. URL registrations are excluded from the
 shell-command allowlist and remain active in strict mode. `ash-broker` owns the persistent MCP

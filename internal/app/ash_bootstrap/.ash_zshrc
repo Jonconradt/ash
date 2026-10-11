@@ -1,5 +1,10 @@
 # >>> ash install >>>
 [[ -o interactive ]] || return
+if [[ "${_ASH_LOCAL_BIN_ON_PATH:-}" != 1 ]]; then
+	PATH="$HOME/.local/bin:$PATH"
+	export PATH
+	_ASH_LOCAL_BIN_ON_PATH=1
+fi
 _ash_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/ash"
 _ash_state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/ash"
 if [[ -n "${XDG_RUNTIME_DIR:-}" ]]; then
@@ -78,6 +83,7 @@ _ash_ambiguous_words=(at 1 for 1 in 1 say 1 test 1 time 1 type 1 what 1 where 1 
 # Guards are ordered cheapest-first and stay fork-free so real commands are never slowed down.
 _ash_should_route_buffer() {
 	local buf="$1"
+	whence -p ash >/dev/null 2>&1 || return 1
 	[[ "$buf" == *[$'\n'"|;&<>\`"]* ]] && return 1
 	[[ "$buf" == *'$('* ]] && return 1
 	local first="${buf%%[[:space:]]*}"
@@ -140,8 +146,16 @@ fi
 command_not_found_handler() {
 	[[ -o interactive ]] || return 127
 	if _ash_prompt_processing_enabled; then
+		if ! whence -p ash >/dev/null 2>&1; then
+			if (( $+functions[_ash_original_command_not_found_handler] )); then
+				_ash_original_command_not_found_handler "$@"
+				return $?
+			fi
+			printf '%s: command not found\n' "$1" >&2
+			return 127
+		fi
 		_ash_ensure_broker >/dev/null 2>&1
-		ash -- "$@"
+		command ash -- "$@"
 		return $?
 	fi
 	if (( $+functions[_ash_original_command_not_found_handler] )); then
@@ -152,6 +166,10 @@ command_not_found_handler() {
 }
 
 ash() {
+	if ! whence -p ash >/dev/null 2>&1; then
+		printf '%s\n' "ash: command not found" >&2
+		return 127
+	fi
 	if [[ "${1:-}" == "mcp" && "${2:-}" == "add" ]]; then
 		_ash_ensure_broker >/dev/null 2>&1
 		[[ -n "${ASH_BROKER_LEASE:-}" ]] && touch "$ASH_BROKER_LEASE"

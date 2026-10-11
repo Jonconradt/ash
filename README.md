@@ -157,7 +157,9 @@ different destination when needed.
 
 The installer detects Bash, zsh, or Fish. Shell startup-file integration is
 opt-in; the installer asks before adding its managed block. You can enable it
-later with `ash install --shell <bash|zsh|fish> --shell-integration`. Fish uses its standard
+later with `ash install --shell <bash|zsh|fish> --shell-integration`. Enabled
+shell integration prepends `~/.local/bin` to `PATH`, where the local Makefile
+build and install targets place `ash` and `ash-broker`. Fish uses its standard
 `$XDG_CONFIG_HOME/fish/config.fish` path (defaulting to `~/.config/fish/config.fish`).
 Ash settings and files follow the XDG base directories: configuration in
 `$XDG_CONFIG_HOME/ash` (default `~/.config/ash`), durable data in

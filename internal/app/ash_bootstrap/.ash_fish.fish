@@ -6,6 +6,11 @@ if not status is-interactive
 	return
 end
 
+if not set -q __ash_local_bin_on_path
+	set -gx PATH "$HOME/.local/bin" $PATH
+	set -g __ash_local_bin_on_path 1
+end
+
 set -g __ash_config_base "$HOME/.config"
 set -g __ash_data_base "$HOME/.local/share"
 set -g __ash_state_base "$HOME/.local/state"
@@ -116,6 +121,14 @@ end
 
 function fish_command_not_found
 	if _ash_prompt_processing_enabled
+		if not command -q ash
+			if functions -q __ash_original_command_not_found
+				__ash_original_command_not_found $argv
+				return $status
+			end
+			printf '%s: command not found\n' "$argv[1]" >&2
+			return 127
+		end
 		_ash_prepare_prompt
 		command ash -- $argv
 		return $status
@@ -128,6 +141,10 @@ function fish_command_not_found
 end
 
 function ash
+	if not command -q ash
+		printf '%s\n' "ash: command not found" >&2
+		return 127
+	end
 	if test (count $argv) -ge 2; and test "$argv[1]" = mcp; and test "$argv[2]" = add
 		_ash_prepare_prompt
 	end

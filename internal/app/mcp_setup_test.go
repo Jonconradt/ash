@@ -90,16 +90,12 @@ func TestResolveMCPAllowlistPathMatchesRuntimePriority(t *testing.T) {
 	if err := os.Remove(workspacePath); err != nil {
 		t.Fatal(err)
 	}
-	expectedCWDPath, err := filepath.EvalSymlinks(cwdPath)
-	if err != nil {
-		t.Fatal(err)
-	}
 	got, err = resolveMCPAllowlistPath()
 	if err != nil {
 		t.Fatalf("resolveMCPAllowlistPath() after removing workspace file: %v", err)
 	}
-	if got != expectedCWDPath {
-		t.Fatalf("resolveMCPAllowlistPath() = %q, want cwd file %q", got, expectedCWDPath)
+	if got != workspacePath {
+		t.Fatalf("resolveMCPAllowlistPath() = %q, want canonical workspace path %q", got, workspacePath)
 	}
 }
 
