@@ -12,6 +12,7 @@ GOSEC_VERSION ?= v2.29.1-0.20261009120814-7b1b5cebe007
 GOVULNCHECK_VERSION ?= v1.8.0
 STATICCHECK_VERSION ?= latest
 YAMLFMT_VERSION ?= latest
+GITLEAKS_VERSION ?= v8.30.1
 APP_NAME ?= ash
 LOCAL_BIN_DIR ?= $(HOME)/.local/bin
 LOCAL_BINARY_PATH ?= $(LOCAL_BIN_DIR)/$(APP_NAME)
@@ -75,6 +76,7 @@ config:
 	GOSEC_VERSION=$(GOSEC_VERSION) \
 	GOVULNCHECK_VERSION=$(GOVULNCHECK_VERSION) \
 	STATICCHECK_VERSION=$(STATICCHECK_VERSION) \
+	GITLEAKS_VERSION=$(GITLEAKS_VERSION) \
 	YAMLFMT_VERSION=$(YAMLFMT_VERSION) \
 	RUFF_VERSION=$(RUFF_VERSION) \
 	MARKDOWNLINT_CLI2_VERSION=$(MARKDOWNLINT_CLI2_VERSION) \
@@ -91,6 +93,8 @@ verify:
 	@./scripts/dev/run-quiet.sh "vet"         go vet ./...
 	@./scripts/dev/run-quiet.sh "staticcheck" $(MAKE) --no-print-directory staticcheck
 	@./scripts/dev/run-quiet.sh "security"    $(MAKE) --no-print-directory security
+	@./scripts/dev/run-quiet.sh "secrets-history" gitleaks git --redact --verbose --log-opts=--all .
+	@./scripts/dev/run-quiet.sh "secrets-tree"    gitleaks dir --redact --verbose .
 	@./scripts/dev/run-quiet.sh "test-fuzz"   go test -fuzz=Fuzz -fuzztime=$(FUZZ_TIME) ./internal/app
 	@./scripts/dev/run-quiet.sh "benchmark"   go test -bench=. -benchmem ./...
 	@echo "verify: all checks passed"
