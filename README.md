@@ -305,7 +305,8 @@ to use the bundled Python tools.
 
 Native packages remain available from the [latest GitHub release](https://github.com/Jonconradt/ash/releases/latest): macOS `.pkg`, and Linux `.deb`
 or `.rpm` packages. Each package contains `ash`, `ash-broker`, bundled native
-plugins, the `ash` man pages, and the MIT license. Linux packages install
+plugins, the `ash` man pages, the MIT license, and
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md). Linux packages install
 binaries under `/usr/bin` and plugins under `/usr/lib/ash/plugins`; macOS
 packages install under `/usr/local`. These package-manager-owned installs are
 not updated by `ash update`. FreeBSD ships as a `.tar.gz` only; install `bash` with
@@ -953,4 +954,5 @@ register, and returns 127 in non-interactive shells.
 
 ## License
 
-MIT. See `LICENSE`.
+MIT. See [`LICENSE`](LICENSE) and
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) for third-party components.

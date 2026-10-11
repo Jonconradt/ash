@@ -263,6 +263,7 @@ jobs:
             locale="$(basename "$catalog" .json)"
             cp "$catalog" "dist/release/ash-language-${locale}.json"
           done
+          cp THIRD_PARTY_NOTICES.md dist/release/THIRD_PARTY_NOTICES.md
       - name: Generate release SBOM
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0.24.0
         with:
@@ -276,7 +277,7 @@ jobs:
           set -euo pipefail
           cd dist/release
           : > SHA256SUMS
-          for artifact in ash-*.pkg ash-*.deb ash-*.rpm ash-*.tar.gz ash-*.msi ash-language-*.json sbom.spdx.json; do
+          for artifact in ash-*.pkg ash-*.deb ash-*.rpm ash-*.tar.gz ash-*.msi ash-language-*.json sbom.spdx.json THIRD_PARTY_NOTICES.md; do
             if [[ -f "$artifact" ]]; then
               sha256sum "$artifact" >> SHA256SUMS
             fi
@@ -298,6 +299,7 @@ jobs:
             dist/release/ash-*.msi
             dist/release/ash-language-*.json
             dist/release/sbom.spdx.json
+            dist/release/THIRD_PARTY_NOTICES.md
             dist/release/SHA256SUMS
       - name: Stage provenance bundle for release
         env:

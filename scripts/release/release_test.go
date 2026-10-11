@@ -229,10 +229,23 @@ func TestLinuxPackageVersionMapping(t *testing.T) {
 	for _, name := range []string{"scripts/package/linux/build_deb.sh", "scripts/package/linux/build_rpm.sh"} {
 		copyFixture(t, root, dir, name)
 	}
-	for _, name := range []string{"ash", "ash-broker", "plugins/fixture", "LICENSE", "ash.1"} {
+	for _, name := range []string{"ash", "ash-broker", "plugins/fixture", "LICENSE", "THIRD_PARTY_NOTICES.md", "ash.1"} {
 		writeFixture(t, filepath.Join(dir, "payload", name), "fixture", 0o755)
 	}
-	writeFixture(t, filepath.Join(dir, "bin/fpm"), "#!/bin/bash\nprintf '%s\\n' \"$@\"\n", 0o755)
+	writeFixture(t, filepath.Join(dir, "bin/fpm"), `#!/bin/bash
+args=("$@")
+while [[ $# -gt 0 ]]; do
+  if [[ "$1" == "-C" ]]; then
+    payload="$2"
+    shift 2
+  else
+    shift
+  fi
+done
+test -f "$payload/usr/share/licenses/ash/THIRD_PARTY_NOTICES.md"
+printf 'THIRD_PARTY_NOTICES_INCLUDED\n'
+printf '%s\n' "${args[@]}"
+`, 0o755)
 	versions := map[string]string{
 		"v1.2.0":                  "1.2.0",
 		"v1.2.0-beta.1":           "1.2.0~beta.1",
@@ -245,6 +258,7 @@ func TestLinuxPackageVersionMapping(t *testing.T) {
 				"--app-name", "ash", "--version", version, "--arch", "arm64",
 				"--binary", "payload/ash", "--broker", "payload/ash-broker",
 				"--plugins-dir", "payload/plugins", "--license-file", "payload/LICENSE",
+				"--third-party-notices-file", "payload/THIRD_PARTY_NOTICES.md",
 				"--install-path", "/usr/bin", "--plugin-install-path", "/usr/lib/ash/plugins",
 				"--license-install-path", "/usr/share/licenses/ash/LICENSE",
 				"--man-page", "payload/ash.1", "--man-install-path", "/usr/share/man/man1",
@@ -252,7 +266,59 @@ func TestLinuxPackageVersionMapping(t *testing.T) {
 			if !strings.Contains(output, "-v\n"+want+"\n") {
 				t.Fatalf("%s %s has incorrect package version: %s", format, version, output)
 			}
+			if !strings.Contains(output, "THIRD_PARTY_NOTICES_INCLUDED") {
+				t.Fatalf("%s %s omitted third-party notices", format, version)
+			}
 		}
+	}
+}
+
+func TestMacPackageIncludesThirdPartyNotices(t *testing.T) {
+	root, dir := releaseFixture(t)
+	copyFixture(t, root, dir, "scripts/package/macos/build_pkg.sh")
+	for _, name := range []string{"ash", "ash-broker", "plugins/fixture", "LICENSE", "THIRD_PARTY_NOTICES.md", "ash.1"} {
+		writeFixture(t, filepath.Join(dir, "payload", name), "fixture", 0o755)
+	}
+	writeFixture(t, filepath.Join(dir, "bin/pkgbuild"), `#!/bin/bash
+set -e
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --root) payload="$2"; shift 2 ;;
+    *) output="$1"; shift ;;
+  esac
+done
+test -f "$payload/usr/local/share/licenses/ash/THIRD_PARTY_NOTICES.md"
+touch "$output"
+`, 0o755)
+	env := []string{"PATH=" + filepath.Join(dir, "bin") + ":" + os.Getenv("PATH")}
+	runFixture(t, dir, env, "bash", "scripts/package/macos/build_pkg.sh",
+		"--app-name", "ash", "--version", "v1.2.0", "--binary", "payload/ash",
+		"--broker", "payload/ash-broker", "--plugins-dir", "payload/plugins",
+		"--license-file", "payload/LICENSE", "--third-party-notices-file", "payload/THIRD_PARTY_NOTICES.md",
+		"--install-path", "/usr/local/bin", "--plugin-install-path", "/usr/local/lib/ash/plugins",
+		"--license-install-path", "/usr/local/share/licenses/ash/LICENSE",
+		"--man-page", "payload/ash.1", "--man-install-path", "/usr/local/share/man/man1",
+		"--output", "dist/ash.pkg")
+	if _, err := os.Stat(filepath.Join(dir, "dist/ash.pkg")); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTarballIncludesThirdPartyNotices(t *testing.T) {
+	_, dir := releaseFixture(t)
+	writeFixture(t, filepath.Join(dir, "LICENSE"), "license", 0o644)
+	writeFixture(t, filepath.Join(dir, "THIRD_PARTY_NOTICES.md"), "notices", 0o644)
+	for _, name := range []string{"ash", "ash-broker", "ash-v1.2.0-linux-amd64-broker", "ash.1", "LICENSE", "THIRD_PARTY_NOTICES.md", "plugins/fixture"} {
+		writeFixture(t, filepath.Join(dir, "payload", name), "fixture", 0o755)
+	}
+	runFixture(t, dir, nil, "make", "release-pkg-one",
+		"RELEASE_FORMAT=tar.gz", "RELEASE_VERSION=v1.2.0",
+		"RELEASE_OUTPUT_DIR=payload", "RELEASE_PACKAGE_DIR=dist",
+		"RELEASE_BINARY_PATH=payload/ash", "RELEASE_ARTIFACT_BASE=ash-v1.2.0-linux-amd64",
+		"RELEASE_PLUGINS_BIN_DIR=payload/plugins", "MAN_PAGE_PATH=payload/ash.1")
+	entries := runFixture(t, dir, nil, "tar", "-tzf", "dist/ash-v1.2.0-linux-amd64.tar.gz")
+	if !strings.Contains(entries, "THIRD_PARTY_NOTICES.md") {
+		t.Fatalf("tarball omitted third-party notices: %s", entries)
 	}
 }
 
@@ -264,7 +330,7 @@ func TestArchPrereleaseUsesOriginalReleaseBinaryName(t *testing.T) {
 			src := filepath.Join(t.TempDir(), "src")
 			pkg := filepath.Join(t.TempDir(), "pkg")
 			tag := "v1.2.0-" + channel
-			for _, file := range []string{"ash-" + tag + "-linux-amd64", "ash-broker", "plugins/fixture", "LICENSE", "usr/share/man/man1/ash.1"} {
+			for _, file := range []string{"ash-" + tag + "-linux-amd64", "ash-broker", "plugins/fixture", "LICENSE", "THIRD_PARTY_NOTICES.md", "usr/share/man/man1/ash.1"} {
 				writeFixture(t, filepath.Join(src, file), "fixture", 0o755)
 			}
 			env := []string{"ASH_VERSION=1.2.0." + channel, "ASH_RELEASE_TAG=" + tag, "ASH_ARCHIVE_SHA256=fixture", "srcdir=" + src, "pkgdir=" + pkg}
@@ -285,6 +351,9 @@ source scripts/package/arch/PKGBUILD
 package
 `)
 			if _, err := os.Stat(filepath.Join(pkg, "usr/bin/ash")); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := os.Stat(filepath.Join(pkg, "usr/share/licenses/ash/THIRD_PARTY_NOTICES.md")); err != nil {
 				t.Fatal(err)
 			}
 		})
@@ -310,7 +379,7 @@ func TestDashboardRequiresSuccessfulWorkflow(t *testing.T) {
 			assets = append(assets, map[string]string{"name": name}, map[string]string{"name": name + ".sha256"})
 		}
 	}
-	for _, name := range []string{"SHA256SUMS", "SHA256SUMS.sigstore.json", "ash-site-" + tag + ".tar.gz", "sbom.spdx.json", "provenance.sigstore.json"} {
+	for _, name := range []string{"SHA256SUMS", "SHA256SUMS.sigstore.json", "ash-site-" + tag + ".tar.gz", "sbom.spdx.json", "THIRD_PARTY_NOTICES.md", "provenance.sigstore.json"} {
 		assets = append(assets, map[string]string{"name": name})
 	}
 	data, err := json.Marshal(map[string]any{"assets": assets})
@@ -365,6 +434,9 @@ printf '200'
 		content := runFixture(t, dir, nil, "git", "--git-dir="+remote, "show", "main:Formula/"+formula+".rb")
 		if !strings.Contains(content, `version "`+strings.TrimPrefix(tag, "v")+`"`) {
 			t.Fatalf("unexpected %s formula:\n%s", formula, content)
+		}
+		if !strings.Contains(content, `install "THIRD_PARTY_NOTICES.md"`) {
+			t.Fatalf("%s formula does not install third-party notices:\n%s", formula, content)
 		}
 	}
 }
