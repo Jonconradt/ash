@@ -1,0 +1,17 @@
+Package: ash
+Version: 0.27.0~nightly.20261011.2
+Architecture: amd64
+Maintainer: <runner@runnervmmprz5>
+Installed-Size: 60485
+Filename: pool/nightly/main/ash_0.27.0~nightly.20261011.2_amd64.deb
+Size: 21435096
+MD5sum: 5d54b9520a2e85e72c551f0616eb509f
+SHA1: 0a5485c17aabd43f76d8d9fb3feb7f6291e0798e
+SHA256: 87d5845da79ffa68b4f6b045826b7cd2fa06d8743e24d23ccf22cc078e392fb0
+Section: default
+Priority: optional
+Homepage: https://github.com
+Description: ash shell assistant
+License: unknown
+Vendor: none
+
