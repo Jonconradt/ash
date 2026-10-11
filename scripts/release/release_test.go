@@ -244,6 +244,80 @@ func TestRepositoryNightlyRetryVersionMapping(t *testing.T) {
 	}
 }
 
+func TestDebianRepositoryUsesArchitectureFilenameSuffix(t *testing.T) {
+	root, dir := releaseFixture(t)
+	script := workflowStep(t, root, "apt.yml", "Import signing key and update repositories")
+	start := `for package in "$RUNNER_TEMP"/debs/*.deb; do`
+	_, staging, found := strings.Cut(script, start)
+	if !found {
+		t.Fatal("missing Debian staging loop")
+	}
+	staging, _, found = strings.Cut(staging, "\ninstall -m 0644")
+	if !found {
+		t.Fatal("missing end of Debian staging loop")
+	}
+	staging = start + staging
+	writeFixture(t, filepath.Join(dir, "bin/dpkg-deb"), `#!/bin/bash
+case "$2" in
+  *-amd64.deb) echo amd64 ;;
+  *-arm64.deb) echo arm64 ;;
+  *) exit 1 ;;
+esac
+`, 0o755)
+	for _, arch := range []string{"amd64", "arm64"} {
+		writeFixture(t, filepath.Join(dir, "runner/debs/ash-v1.2.0-nightly.20261011.1-linux-"+arch+".deb"), arch, 0o644)
+	}
+	if err := os.MkdirAll(filepath.Join(dir, "site/apt/pool/nightly/main"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	env := []string{
+		"PATH=" + filepath.Join(dir, "bin") + ":" + os.Getenv("PATH"),
+		"RUNNER_TEMP=" + filepath.Join(dir, "runner"), "PACKAGE_CHANNEL=nightly", "PACKAGE_VERSION=1.2.0~nightly.20261011.1",
+	}
+	runFixture(t, dir, env, "bash", "-euo", "pipefail", "-c", staging)
+	for _, arch := range []string{"amd64", "arm64"} {
+		path := filepath.Join(dir, "site/apt/pool/nightly/main/ash_1.2.0~nightly.20261011.1_"+arch+".deb")
+		data, err := os.ReadFile(path)
+		if err != nil || string(data) != arch {
+			t.Fatalf("invalid Debian repository file %s: %q, %v", path, data, err)
+		}
+	}
+}
+
+func TestArchRepositorySignsMainPackage(t *testing.T) {
+	root, dir := releaseFixture(t)
+	script := workflowStep(t, root, "apt.yml", "Import signing key and update repositories")
+	_, signing, found := strings.Cut(script, "pacman_package=")
+	if !found {
+		t.Fatal("missing Arch package signing")
+	}
+	signing, _, found = strings.Cut(signing, "\ndocker run")
+	if !found {
+		t.Fatal("missing end of Arch package signing")
+	}
+	signing = "pacman_package=" + signing
+	writeFixture(t, filepath.Join(dir, "bin/gpg"), `#!/bin/bash
+while [[ $# -gt 0 ]]; do
+  if [[ "$1" == --output ]]; then output="$2"; shift; fi
+  input="$1"
+  shift
+done
+cp "$input" "$output"
+`, 0o755)
+	archive := "ash-1.2.0.nightly.20261011.1-1-x86_64.pkg.tar.zst"
+	writeFixture(t, filepath.Join(dir, "repo/ash-debug-1.2.0.nightly.20261011.1-1-x86_64.pkg.tar.zst"), "debug", 0o644)
+	writeFixture(t, filepath.Join(dir, "repo", archive), "main", 0o644)
+	env := []string{
+		"PATH=" + filepath.Join(dir, "bin") + ":" + os.Getenv("PATH"),
+		"pacman_repo=repo", "ARCH_VERSION=1.2.0.nightly.20261011.1", "key_id=fixture", "GPG_PASSPHRASE=fixture",
+	}
+	runFixture(t, dir, env, "bash", "-euo", "pipefail", "-c", signing)
+	data, err := os.ReadFile(filepath.Join(dir, "repo", archive+".sig"))
+	if err != nil || string(data) != "main" {
+		t.Fatalf("main Arch package was not signed: %q, %v", data, err)
+	}
+}
+
 func TestReleasePublishingToIsolatedRemote(t *testing.T) {
 	for _, channel := range []string{"beta", "stable", "nightly"} {
 		t.Run(channel, func(t *testing.T) {
