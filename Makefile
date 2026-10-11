@@ -480,16 +480,17 @@ release-validate-one:
 			shasum -a 256 "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).rpm" > "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).rpm.sha256"; \
 			;; \
 		tar.gz) \
-			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^$(notdir $(RELEASE_BINARY_PATH))$$"; \
-			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^$(APP_NAME)-broker$$"; \
-			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^LICENSE$$"; \
-			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^$(TARBALL_MAN_PATH)/$(APP_NAME)\.1$$"; \
+			entries="$$(tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz")"; \
+			grep -Fxq "$(notdir $(RELEASE_BINARY_PATH))" <<< "$$entries"; \
+			grep -Fxq "$(APP_NAME)-broker" <<< "$$entries"; \
+			grep -Fxq "LICENSE" <<< "$$entries"; \
+			grep -Fxq "$(TARBALL_MAN_PATH)/$(APP_NAME).1" <<< "$$entries"; \
 			for locale in zh_CN zh_TW es_ES ar_AE id_ID; do \
-				tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^usr/share/man/$$locale/man1/$(APP_NAME)\.1$$" || { echo "localized man page missing from tarball: $$locale"; exit 1; }; \
+				grep -Fxq "usr/share/man/$$locale/man1/$(APP_NAME).1" <<< "$$entries" || { echo "localized man page missing from tarball: $$locale"; exit 1; }; \
 			done; \
-			tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Eq "^plugins/[^/]+$$"; \
+			grep -Eq "^plugins/[^/]+$$" <<< "$$entries"; \
 			while IFS= read -r plugin; do \
-				tar -tzf "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" | grep -Fxq "plugins/$$(basename "$$plugin")" || { echo "plugin missing from tarball: $$plugin"; exit 1; }; \
+				grep -Fxq "plugins/$$(basename "$$plugin")" <<< "$$entries" || { echo "plugin missing from tarball: $$plugin"; exit 1; }; \
 			done < <(find "$(RELEASE_PLUGINS_BIN_DIR)" -maxdepth 1 -type f -perm -111 -print); \
 			shasum -a 256 "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz" > "$(RELEASE_PACKAGE_DIR)/$(RELEASE_ARTIFACT_BASE).tar.gz.sha256"; \
 			;; \
