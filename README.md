@@ -178,6 +178,27 @@ sudo apt install ash
 The APT repository supports `amd64` and `arm64`. The public signing key is
 published at `https://www.versionx.ai/apt/gpg.key`.
 
+On Fedora, RHEL, Rocky Linux, or AlmaLinux, add the signed DNF repository and
+install `ash`:
+
+```bash
+sudo rpm --import https://www.versionx.ai/rpm/gpg.key
+sudo tee /etc/yum.repos.d/versionx.repo >/dev/null <<'EOF'
+[versionx]
+name=VersionX ash repository
+baseurl=https://www.versionx.ai/rpm/
+enabled=1
+gpgcheck=0
+repo_gpgcheck=1
+gpgkey=https://www.versionx.ai/rpm/gpg.key
+EOF
+sudo dnf install ash
+```
+
+The signed repository metadata verifies package checksums; RPM files are not
+individually signed. The repository supports `x86_64` and `aarch64`; update
+installed packages with `sudo dnf upgrade ash`.
+
 | OS | amd64 | arm64 |
 | --- | --- | --- |
 | macOS (darwin) | ✅ | ✅ |

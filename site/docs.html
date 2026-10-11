@@ -32,6 +32,7 @@
       <aside class="docs-contents" aria-label="Documentation contents">
         <strong>Contents</strong>
         <a href="#apt-installation">APT installation</a>
+        <a href="#dnf-installation">DNF installation</a>
         <a href="#synopsis">Synopsis</a>
         <a href="#description">Description</a>
         <a href="#mcp">MCP servers</a>
@@ -55,6 +56,23 @@ echo "deb [signed-by=/etc/apt/keyrings/versionx-keyring.gpg] https://www.version
 sudo apt update
 sudo apt install ash</code></pre>
           <p>Verify the installed command with <code>ash --version</code>. Package-manager installations are updated with <code>sudo apt update &amp;&amp; sudo apt upgrade</code>.</p>
+        </section>
+
+        <section id="dnf-installation">
+          <h2>Install on Fedora or RHEL-compatible Linux</h2>
+          <p>The signed VersionX DNF repository supports <code>x86_64</code> and <code>aarch64</code>. Import its public key and configure the repository:</p>
+          <pre><code>sudo rpm --import https://www.versionx.ai/rpm/gpg.key
+sudo tee /etc/yum.repos.d/versionx.repo &gt;/dev/null &lt;&lt;'EOF'
+[versionx]
+name=VersionX ash repository
+baseurl=https://www.versionx.ai/rpm/
+enabled=1
+gpgcheck=0
+repo_gpgcheck=1
+gpgkey=https://www.versionx.ai/rpm/gpg.key
+EOF
+sudo dnf install ash</code></pre>
+          <p>Signed repository metadata verifies RPM package checksums; package files are not individually RPM-signed. Update ash with <code>sudo dnf upgrade ash</code>.</p>
         </section>
 
         <section id="synopsis">
