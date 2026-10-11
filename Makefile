@@ -1,4 +1,4 @@
-.PHONY: all verify build config lint language-lint site-lint yaml-lint python-lint markdown-lint sync-route-words test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install version release release-check release-clean release-build release-translate release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one release-checksums restart-broker plugins-build plugins-test plugins-lint plugins-clean plugins-install
+.PHONY: all verify verify-ci build config lint language-lint site-lint yaml-lint python-lint markdown-lint sync-route-words test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install version release release-check release-clean release-build release-translate release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one release-checksums restart-broker plugins-build plugins-test plugins-lint plugins-clean plugins-install
 
 SHELL := /bin/bash
 SITE_LOCALES ?=
@@ -34,6 +34,7 @@ RELEASE_GOOS ?= darwin
 RELEASE_FORMAT ?= pkg
 RELEASE_WATCH ?= 1
 RELEASE_WATCH_STRICT ?= 1
+RELEASE_VERIFY_TARGET ?= verify
 CHANNEL ?= beta
 BUILD_VERSION ?= $(if $(LATEST_RELEASE_TAG),$(LATEST_RELEASE_TAG),dev)
 # Resolved once at parse time; recursive expansion would re-run git after release-publish tags HEAD.
@@ -98,6 +99,13 @@ verify:
 	@./scripts/dev/run-quiet.sh "test-fuzz"   go test -fuzz=Fuzz -fuzztime=$(FUZZ_TIME) ./internal/app
 	@./scripts/dev/run-quiet.sh "benchmark"   go test -bench=. -benchmem ./...
 	@echo "verify: all checks passed"
+
+# verify-ci retains fast lint, unit, and security gates for hosted release builds.
+verify-ci:
+	@./scripts/dev/run-quiet.sh "lint"     $(MAKE) --no-print-directory lint
+	@./scripts/dev/run-quiet.sh "test"     $(MAKE) --no-print-directory test
+	@./scripts/dev/run-quiet.sh "security" $(MAKE) --no-print-directory security
+	@echo "verify-ci: all checks passed"
 
 sync-route-words:
 	@cd internal/app && go run ../../cmd/ash --internal-sync-route-words
@@ -240,7 +248,7 @@ release:
 	@$(MAKE) --no-print-directory release-publish
 	@$(MAKE) --no-print-directory release-watch
 
-release-check: $(if $(filter stable,$(CHANNEL)),verify,lint test gosec govulncheck)
+release-check: $(RELEASE_VERIFY_TARGET)
 	@if [[ -n "$$(git status --porcelain)" ]]; then \
 		echo "git working tree is dirty; commit or stash changes before release"; \
 		git status --short; \

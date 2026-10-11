@@ -53,6 +53,9 @@ run rather than trying to attach `V=1` after the fact.
 
 - Keep the working tree clean before publishing.
 - Ensure release artifacts are built and validated locally before tagging.
+- Run `make verify` locally before `make release`. `make release` runs the full
+  verification suite by default; hosted release builds use the faster
+  `make verify-ci` target.
 - `make release` creates a beta tag; use `make release CHANNEL=stable` for a
   verified stable release branch, or `make release CHANNEL=nightly` for a
   nightly prerelease.

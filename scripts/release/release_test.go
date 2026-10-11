@@ -111,7 +111,7 @@ func TestReleaseVersionRemainsFrozenAfterTagging(t *testing.T) {
 				t.Fatal(err)
 			}
 			writeFixture(t, makefile, strings.Replace(string(data),
-				"release-check: $(if $(filter stable,$(CHANNEL)),verify,lint test gosec govulncheck)",
+				"release-check: $(RELEASE_VERIFY_TARGET)",
 				"release-check:", 1), 0o644)
 			runFixture(t, dir, nil, "git", "tag", "v1.1.7")
 			want := strings.TrimSpace(runFixture(t, dir, nil, "bash", "scripts/release/next_version.sh", channel))
@@ -141,6 +141,51 @@ MAKE := $(MAKE) -f Makefile -f steps.mk
 				t.Fatalf("ran %d release steps, want 9\n%s", count, output)
 			}
 		})
+	}
+}
+
+func TestReleaseVerificationDefaultsToFullSuite(t *testing.T) {
+	root, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(root, "Makefile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	makefile := string(data)
+	if !strings.Contains(makefile, "RELEASE_VERIFY_TARGET ?= verify\n") ||
+		!strings.Contains(makefile, "release-check: $(RELEASE_VERIFY_TARGET)") {
+		t.Fatal("release target does not default to full verification")
+	}
+}
+
+func TestVerifyCIOmitsSlowChecks(t *testing.T) {
+	root, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(root, "Makefile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, section, found := strings.Cut(string(data), "verify-ci:\n")
+	if !found {
+		t.Fatal("missing verify-ci target")
+	}
+	section, _, _ = strings.Cut(section, "\nsync-route-words:")
+	for _, skipped := range []string{"test-race", "test-cover", "vet", "staticcheck", "secrets-history", "secrets-tree", "test-fuzz", "benchmark"} {
+		if strings.Contains(section, `"`+skipped+`"`) {
+			t.Errorf("verify-ci unexpectedly runs %s", skipped)
+		}
+	}
+	for _, retained := range []string{`"lint"`, `"test"`, `"security"`} {
+		if !strings.Contains(section, retained) {
+			t.Errorf("verify-ci omits expected check %s", retained)
+		}
+	}
+	if !strings.Contains(string(data), `"test-race"`) || !strings.Contains(string(data), `"benchmark"`) {
+		t.Fatal("full verify target lost checks when adding verify-ci")
 	}
 }
 
@@ -240,6 +285,55 @@ func TestRepositoryNightlyRetryVersionMapping(t *testing.T) {
 			"\nARCH_VERSION=" + strings.Replace(version, "-nightly.", ".nightly.", 1) + "\n"
 		if string(data) != want {
 			t.Fatalf("%s: got %q, want %q", tag, data, want)
+		}
+	}
+}
+
+func TestReleaseWorkflowUploadsOnlyInstallablePackages(t *testing.T) {
+	root, _ := releaseFixture(t)
+	data, err := os.ReadFile(filepath.Join(root, ".github/workflows/release.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	workflow := string(data)
+	for _, upload := range []struct {
+		name  string
+		files []string
+	}{
+		{
+			name: "macOS",
+			files: []string{
+				".pkg", ".pkg.sha256", ".tar.gz", ".tar.gz.sha256",
+			},
+		},
+		{
+			name: "Linux",
+			files: []string{
+				".deb", ".deb.sha256", ".rpm", ".rpm.sha256", ".tar.gz", ".tar.gz.sha256",
+			},
+		},
+		{
+			name:  "FreeBSD",
+			files: []string{".tar.gz", ".tar.gz.sha256"},
+		},
+	} {
+		step := "- name: Upload " + upload.name + " artifacts\n"
+		_, section, found := strings.Cut(workflow, step)
+		if !found {
+			t.Fatalf("missing %s upload step", upload.name)
+		}
+		section, _, _ = strings.Cut(section, "\n      - name:")
+		for _, suffix := range upload.files {
+			if !strings.Contains(section, "${{ github.ref_name }}-"+map[string]string{
+				"macOS":   "darwin",
+				"Linux":   "linux",
+				"FreeBSD": "freebsd",
+			}[upload.name]+"-${{ matrix.arch }}"+suffix) {
+				t.Errorf("%s upload omits expected artifact suffix %s", upload.name, suffix)
+			}
+		}
+		if strings.Contains(section, "dist/release/*") {
+			t.Errorf("%s upload uses a broad glob that can include loose build outputs", upload.name)
 		}
 	}
 }

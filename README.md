@@ -106,6 +106,7 @@ make lint
 make test
 make install
 make verify
+make verify-ci
 make sync-route-words
 make version
 make release
@@ -117,13 +118,18 @@ make release CHANNEL=stable
 - `make security` runs `gosec` and `govulncheck` for security scanning
 - `make test` runs `go test ./...`
 - `make install` builds `ash`, `ash-broker`, and bundled plugins into user-local directories, then enables Bash shell integration.
-- `make verify` runs strict checks (tests, race, coverage gate, vet, staticcheck, gosec, govulncheck)
+- `make verify` runs the complete quality gate, including race/coverage tests, vet,
+  staticcheck, security and secret scans, fuzz tests, and benchmarks
+- `make verify-ci` runs lint, unit tests, and security checks for hosted release
+  builds; it skips race/coverage tests, vet, staticcheck, secret scans, fuzz tests,
+  and benchmarks
 - `make sync-route-words` regenerates the ambiguous-word block in the shell assets from
   `internal/app/ash_bootstrap/route_words.txt`, the canonical list. Edit only that file; a test fails if
   the generated blocks are stale
 - `make version` runs quality checks and builds installer artifacts for the selected host/targets
 - `make release` creates the next beta release (`vX.Y.0-beta.N`) from the latest
-  stable release; use `make release CHANNEL=stable` to run full `make verify`,
+  stable release; release commands run full `make verify` by default. Use
+  `make release CHANNEL=stable` to run full `make verify`,
   create a `release/vX.Y` branch, and publish the corresponding `vX.Y.0` stable
   release
 - `make release CHANNEL=nightly` publishes a date-stamped nightly prerelease
@@ -131,6 +137,10 @@ make release CHANNEL=stable
   Google Translate-backed `make site-locales` process and includes it as
   `ash-site-<version>.tar.gz`; generation uses a temporary copy and does not
   modify the working tree
+- GitHub Releases publish installable platform packages and bundled tarballs,
+  their checksums, language catalogs, translated site, and verification
+  metadata. Loose build executables and plugin binaries are used internally
+  for packaging and smoke tests but are not published as separate downloads.
 - Release publishing also creates `SHA256SUMS` and a Sigstore bundle. The
   updater requires both the signed manifest and the matching SHA-256 digest.
 - Release-note generation requires `ASH_AI_ENDPOINT` and `ASH_AI_MODEL`. Make supplies

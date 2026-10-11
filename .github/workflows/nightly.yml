@@ -84,4 +84,4 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
       - name: Publish nightly release
         if: steps.changes.outputs.publish == 'true'
-        run: make release CHANNEL=nightly
+        run: make release CHANNEL=nightly RELEASE_VERIFY_TARGET=verify-ci
