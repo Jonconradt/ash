@@ -129,6 +129,7 @@ for asset in \
   "SHA256SUMS.sigstore.json" \
   "ash-site-${tag}.tar.gz" \
   "sbom.spdx.json" \
+  "THIRD_PARTY_NOTICES.md" \
   "provenance.sigstore.json"; do
   expected_assets+=("$asset")
 done

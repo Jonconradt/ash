@@ -112,6 +112,7 @@ class ${class_name} < Formula
       (share / "man" / locale / "man1").install page
     end
     (share / "licenses" / "ash").install "LICENSE"
+    (share / "licenses" / "ash").install "THIRD_PARTY_NOTICES.md"
   end
 
   test do

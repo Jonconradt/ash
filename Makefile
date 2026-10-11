@@ -343,6 +343,7 @@ release-pkg:
 		--broker "$(RELEASE_OUTPUT_DIR)/$(APP_NAME)-broker" \
 		--plugins-dir "$(RELEASE_PLUGINS_BIN_DIR)" \
 		--license-file LICENSE \
+		--third-party-notices-file THIRD_PARTY_NOTICES.md \
 		--install-path "$(RELEASE_INSTALL_PATH)" \
 		--plugin-install-path "$(PLUGIN_INSTALL_PATH_MACOS)" \
 		--license-install-path "$(LICENSE_INSTALL_PATH_MACOS)" \
@@ -351,7 +352,7 @@ release-pkg:
 		--localized-man-dir "$(LOCALIZED_MAN_DIR)" \
 		--output "$(RELEASE_PKG_PATH)"
 
-# Every release archive includes one ash executable, its broker, plugins, and license.
+# Every release archive includes one ash executable, its broker, plugins, and notices.
 release-pkg-one:
 	@mkdir -p "$(RELEASE_PACKAGE_DIR)"
 	@set -euo pipefail; \
@@ -368,6 +369,7 @@ release-pkg-one:
 				--broker "$(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)-broker" \
 				--plugins-dir "$(RELEASE_PLUGINS_BIN_DIR)" \
 				--license-file LICENSE \
+				--third-party-notices-file THIRD_PARTY_NOTICES.md \
 				--install-path "$(RELEASE_INSTALL_PATH)" \
 				--plugin-install-path "$(PLUGIN_INSTALL_PATH_MACOS)" \
 				--license-install-path "$(LICENSE_INSTALL_PATH_MACOS)" \
@@ -385,6 +387,7 @@ release-pkg-one:
 				--broker "$(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)-broker" \
 				--plugins-dir "$(RELEASE_PLUGINS_BIN_DIR)" \
 				--license-file LICENSE \
+				--third-party-notices-file THIRD_PARTY_NOTICES.md \
 				--install-path "$(RELEASE_INSTALL_PATH_LINUX)" \
 				--plugin-install-path "$(PLUGIN_INSTALL_PATH_LINUX)" \
 				--license-install-path "$(LICENSE_INSTALL_PATH_LINUX)" \
@@ -402,6 +405,7 @@ release-pkg-one:
 				--broker "$(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)-broker" \
 				--plugins-dir "$(RELEASE_PLUGINS_BIN_DIR)" \
 				--license-file LICENSE \
+				--third-party-notices-file THIRD_PARTY_NOTICES.md \
 				--install-path "$(RELEASE_INSTALL_PATH_LINUX)" \
 				--plugin-install-path "$(PLUGIN_INSTALL_PATH_LINUX)" \
 				--license-install-path "$(LICENSE_INSTALL_PATH_RPM)" \
@@ -424,9 +428,10 @@ release-pkg-one:
 			cp "$(RELEASE_BINARY_PATH)" "$$tmp_dir/$(notdir $(RELEASE_BINARY_PATH))"; \
 			cp "$(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)-broker" "$$tmp_dir/$(APP_NAME)-broker"; \
 			cp LICENSE "$$tmp_dir/LICENSE"; \
+			cp THIRD_PARTY_NOTICES.md "$$tmp_dir/THIRD_PARTY_NOTICES.md"; \
 			mkdir -p "$$tmp_dir/$(TARBALL_MAN_PATH)"; \
 			install -m 0644 "$(MAN_PAGE_PATH)" "$$tmp_dir/$(TARBALL_MAN_PATH)/$(APP_NAME).1"; \
-			tar_entries=("$(notdir $(RELEASE_BINARY_PATH))" "$(APP_NAME)-broker" "LICENSE" "$(TARBALL_MAN_PATH)/$(APP_NAME).1" "plugins"); \
+			tar_entries=("$(notdir $(RELEASE_BINARY_PATH))" "$(APP_NAME)-broker" "LICENSE" "THIRD_PARTY_NOTICES.md" "$(TARBALL_MAN_PATH)/$(APP_NAME).1" "plugins"); \
 			while IFS= read -r page; do \
 				locale="$$(basename "$$(dirname "$$page")")"; \
 				locale_man_dir="$$tmp_dir/usr/share/man/$$locale/man1"; \
@@ -496,6 +501,7 @@ release-validate-one:
 			grep -Fxq "$(notdir $(RELEASE_BINARY_PATH))" <<< "$$entries"; \
 			grep -Fxq "$(APP_NAME)-broker" <<< "$$entries"; \
 			grep -Fxq "LICENSE" <<< "$$entries"; \
+			grep -Fxq "THIRD_PARTY_NOTICES.md" <<< "$$entries"; \
 			grep -Fxq "$(TARBALL_MAN_PATH)/$(APP_NAME).1" <<< "$$entries"; \
 			for locale in zh_CN zh_TW es_ES ar_AE id_ID; do \
 				grep -Fxq "usr/share/man/$$locale/man1/$(APP_NAME).1" <<< "$$entries" || { echo "localized man page missing from tarball: $$locale"; exit 1; }; \
@@ -517,7 +523,7 @@ release-checksums:
 	manifest="$(RELEASE_PACKAGE_DIR)/SHA256SUMS"; \
 	test -s "$$manifest"; \
 	artifact_count=0; \
-	for artifact in "$(RELEASE_PACKAGE_DIR)"/ash-*.pkg "$(RELEASE_PACKAGE_DIR)"/ash-*.deb "$(RELEASE_PACKAGE_DIR)"/ash-*.rpm "$(RELEASE_PACKAGE_DIR)"/ash-*.tar.gz "$(RELEASE_PACKAGE_DIR)"/ash-*.msi "$(RELEASE_PACKAGE_DIR)"/ash-language-*.json "$(RELEASE_PACKAGE_DIR)/sbom.spdx.json"; do \
+	for artifact in "$(RELEASE_PACKAGE_DIR)"/ash-*.pkg "$(RELEASE_PACKAGE_DIR)"/ash-*.deb "$(RELEASE_PACKAGE_DIR)"/ash-*.rpm "$(RELEASE_PACKAGE_DIR)"/ash-*.tar.gz "$(RELEASE_PACKAGE_DIR)"/ash-*.msi "$(RELEASE_PACKAGE_DIR)"/ash-language-*.json "$(RELEASE_PACKAGE_DIR)/sbom.spdx.json" "$(RELEASE_PACKAGE_DIR)/THIRD_PARTY_NOTICES.md"; do \
 		if [[ -f "$$artifact" ]]; then \
 			artifact_count=$$((artifact_count + 1)); \
 			name="$$(basename "$$artifact")"; \
@@ -527,7 +533,9 @@ release-checksums:
 	done; \
 	test "$$artifact_count" -gt 0; \
 	test -f "$(RELEASE_PACKAGE_DIR)/sbom.spdx.json"; \
-	grep -Eq "^[0-9a-fA-F]{64}[[:space:]]+sbom.spdx.json$$" "$$manifest"
+	grep -Eq "^[0-9a-fA-F]{64}[[:space:]]+sbom.spdx.json$$" "$$manifest"; \
+	test -f "$(RELEASE_PACKAGE_DIR)/THIRD_PARTY_NOTICES.md"; \
+	grep -Eq "^[0-9a-fA-F]{64}[[:space:]]+THIRD_PARTY_NOTICES.md$$" "$$manifest"
 
 release-notes:
 	@mkdir -p "$(RELEASE_OUTPUT_DIR)"
