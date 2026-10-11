@@ -59,7 +59,7 @@ jobs:
           echo "publish=true" >> "$GITHUB_OUTPUT"
       - name: Set up Rust
         if: steps.changes.outputs.publish == 'true'
-        run: rustup toolchain install 1.99.0 --profile minimal
+        run: rustup toolchain install 1.99.0 --profile minimal --component clippy
       - name: Set up Go
         if: steps.changes.outputs.publish == 'true'
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
