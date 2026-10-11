@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ash | Chiedi al tuo terminale</title>
+  <meta name="description" content="ash è un assistente AI per bash, Fish e zsh. Poni domande, esamina i file e automatizza il lavoro del terminale senza uscire dalla shell.">
+  <meta name="theme-color" content="#f4f0e8">
+  <link rel="canonical" href="https://jonconradt.github.io/ash/it/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="ash | Ask your terminal">
+  <meta property="og:description" content="Un assistente AI che vive nel tuo guscio.">
+  <meta property="og:url" content="https://jonconradt.github.io/ash/it/">
+  <meta property="og:site_name" content="ash">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="ash | Ask your terminal">
+  <meta name="twitter:description" content="Un assistente AI che vive nel tuo guscio.">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="alternate" hreflang="en" href="https://jonconradt.github.io/ash/">
+  <link rel="alternate" hreflang="ar" href="https://jonconradt.github.io/ash/ar/">
+  <link rel="alternate" hreflang="de" href="https://jonconradt.github.io/ash/de/">
+  <link rel="alternate" hreflang="es" href="https://jonconradt.github.io/ash/es/">
+  <link rel="alternate" hreflang="fr" href="https://jonconradt.github.io/ash/fr/">
+  <link rel="alternate" hreflang="id" href="https://jonconradt.github.io/ash/id/">
+  <link rel="alternate" hreflang="it" href="https://jonconradt.github.io/ash/it/">
+  <link rel="alternate" hreflang="lb" href="https://jonconradt.github.io/ash/lb/">
+  <link rel="alternate" hreflang="pt-BR" href="https://jonconradt.github.io/ash/pt-BR/">
+  <link rel="alternate" hreflang="zh-CN" href="https://jonconradt.github.io/ash/zh-CN/">
+  <link rel="alternate" hreflang="zh-TW" href="https://jonconradt.github.io/ash/zh-TW/">
+  <link rel="alternate" hreflang="x-default" href="https://jonconradt.github.io/ash/">
+  <link rel="stylesheet" href="../styles.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "ash",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "macOS, Linux, FreeBSD",
+    "description": "An AI assistant integrated into bash, Fish, and zsh.",
+    "codeRepository": "https://github.com/Jonconradt/ash",
+    "license": "https://github.com/Jonconradt/ash/blob/main/LICENSE"
+  }
+  </script>
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="ash casa"><span class="brand-mark">>_</span> ash</a>
+    <nav aria-label="Navigazione primaria">
+      <a href="#how-it-works">Come funziona</a>
+      <a href="#install">Installa</a>
+      <a href="docs.html">Documenti</a>
+      <a href="faq.html">FAQ</a>
+      <a href="https://github.com/Jonconradt/ash">GitHub</a>
+      <label class="sr-only" for="site-lingual">Lingua</label>
+      <select id="site-language" class="language-select" aria-label="Scegli la lingua">
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+        <option value="de">Deutsch</option>
+        <option value="es">Español</option>
+        <option value="fr">Français</option>
+        <option value="id">Bahasa Indonesia</option>
+        <option value="it" selected>Italiano</option>
+        <option value="lb">Lëtzebuergesch</option>
+        <option value="pt-BR">Português (Brasil)</option>
+        <option value="zh-CN">简体中文</option>
+        <option value="zh-TW">繁體中文</option>
+        </select>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero page-width">
+      <div class="hero-copy">
+        <p class="eyebrow">Il tuo guscio, con un secondo cervello</p>
+        <h1>Chiedi al tuo terminale.<br><em>Mantieni il flusso.</em></h1>
+        <p class="hero-lede">ash porta l'intelligenza artificiale in bash, Fish e zsh in modo che domande, indagini e piccole automazioni avvengano laddove il lavoro è già. Connetti server MCP remoti per portare i loro strumenti nello stesso flusso di lavoro.</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#install">Installa ash <span aria-hidden="true">↓</span></a>
+          <a class="text-link" href="https://github.com/Jonconradt/ash#configure">Leggi la guida all'installazione <span aria-hidden="true">→</span></a>
+        </div>
+        <p class="compatibility"><span class="status-dot"></span> macOS · Linux · FreeBSD · Open source</p>
+      </div>
+      <div class="terminal-window" role="img" aria-label="Esempio ash sessione terminale">
+        <div class="terminal-bar"><span></span><span></span><span></span><b>bash &mdash; session 04</b></div>
+        <div class="terminal-body">
+          <p><span class="prompt">$</span> <span class="command">tempo di attività</span></p>
+          <p class="answer">11:17 in su 5 giorni, 3:13, 2 utenti, medie di carico: 1,94 3,05 3,05</p>
+          <p><span class="prompt">$</span> <span class="command">riassumi questo progetto</span></p>
+          <p class="answer">ASH è un assistente AI integrato nella shell.<br>Può ispezionare file, eseguire strumenti consentiti, pianificare attività, creare ed eseguire Python e conservare note con ambito sessione per l'esecuzione di un agente secondario.</p>
+          <p><span class="prompt">$</span> <span class="command">elenca qui i file più grandi</span></p>
+          <p class="answer table">1,2 milioni  ./README.md<br>842K   ./ash_test.go<br>312K   ./docs/ash.1</p>
+          <p><span class="cursor">█</span></p>
+        </div>
+      </div>
+    </section>
+
+    <section class="signal-strip" aria-label="Punti salienti del prodotto">
+      <div class="page-width signal-grid">
+        <div><strong>01</strong><span>Chiedi sul posto</span><p>Nessun cambio di contesto. Richiedi dalla riga di comando che già usi.</p></div>
+        <div><strong>02</strong><span>Indagare insieme</span><p>Fornire all'IA una lista deliberata di comandi che può utilizzare per esplorare.</p></div>
+        <div><strong>03</strong><span>Connetti gli strumenti MCP</span><p>Registra server MCP remoti e consenti a ash di mediare sessioni persistenti e OAuth.</p></div>
+        <div><strong>04</strong><span>Controllo locale</span><p>Utilizza modelli ospitati localmente o un provider cloud, mantenendo l'esecuzione sotto il tuo controllo.</p></div>
+      </div>
+    </section>
+
+    <section id="how-it-works" class="how page-width">
+      <div class="section-heading">
+        <p class="eyebrow">Un modo più tranquillo di utilizzare l'intelligenza artificiale</p>
+        <h2>Il terminale rimane<br><em>il centro di gravità.</em></h2>
+      </div>
+      <div class="how-grid">
+        <div class="numbered"><span>01</span><h3>Installa l'integrazione della shell</h3><p>ash funziona con bash, Fish e zsh. I comandi sconosciuti diventano prompt senza modificare le normali abitudini di comando. Posticipa quando hai bisogno di una pausa dall'elaborazione automatica dei prompt.</p></div>
+        <div class="numbered"><span>02</span><h3>Aggiornamenti facili</h3><p><code>ash update</code> mantiene la tua installazione aggiornata con l'ultima versione. Il comando gestisce automaticamente i controlli della versione, i download e la verifica. Nessun aggiornamento di base o a sorpresa.</p></div>
+        <div class="numbered"><span>03</span><h3>Mantieni il controllo</h3><p>L'esecuzione dello strumento è vincolata da elenchi di autorizzazioni e negazioni esplicite e viene eseguito come utente. Sei tu a decidere cosa ash può toccare. Aggiungi i tuoi script Python a ~/.ash/tools o i plugin nativi a ~/.ash/plugins.</p></div>
+      </div>
+    </section>
+
+    <section id="install" class="install-band">
+      <div class="page-width install-content">
+        <div><p class="eyebrow">Inizia in piccolo</p><h2>Dai al tuo guscio<br><em>un po' di compagnia.</em></h2></div>
+        <div class="install-details">
+          <p>Gli utenti Linux, macOS e FreeBSD possono installare l'ultima versione in un solo passaggio. Il programma di installazione verifica il download, installa su <code>~/.local/bin</code> e configura l'integrazione Fish, zsh o bash rilevata, ricorrendo a bash.</p>
+          <p><code>ash install</code> configura automaticamente il tuo provider AI: rileva una chiave API del provider cloud già impostata o un server di inferenza locale in esecuzione, altrimenti mostra un menu numerato per scegliere un provider e un modello. Oppure impostali tu stesso:</p>
+          <pre><code>export AI_AUTH_TOKEN='84…89'
+export AI_ENDPOINT='https://ollama.com'
+export AI_MODEL='gemma4:31b-cloud'
+</code></pre>
+          <p>Sono supportati Local, OpenAI, Anthropic, Google, Azure OpenAI, Mistral, Cohere, Groq, xAI, DeepSeek, Together AI, OpenRouter, HuggingFace, AWS Bedrock e qualsiasi altro provider con un'API compatibile con OpenAI.</p>
+          <div class="code-block-wrap">
+            <pre class="code-block"><code><span class="code-command">curl -fsSL https://jonconradt.github.io/ash/install.sh | sh</span></code></pre>
+            <button type="button" class="copy-button" data-copy-target=".code-command" aria-label="Copia il comando di installazione" data-copied-label="Copiato!">Copia</button>
+          </div>
+          <div class="install-links"><a class="button button-light" href="https://github.com/Jonconradt/ash/releases/latest">Visualizza pacchetti <span aria-hidden="true">↗</span></a><a class="text-link light-link" href="https://github.com/Jonconradt/ash#configure">Configurazione completa <span aria-hidden="true">→</span></a></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="closing page-width">
+      <p class="eyebrow">Aperto in base alla progettazione</p>
+      <h2>Utile al momento.<br><em>Comprensibile in seguito.</em></h2>
+      <p>Leggi il codice sorgente, esamina l'architettura o guarda esattamente cosa viene installato.</p>
+      <div class="closing-links">
+          <a href="docs.html">Leggi i documenti <span aria-hidden="true">→</span></a>
+          <a href="https://github.com/Jonconradt/ash">GitHub <span aria-hidden="true">↗</span></a>
+          <a href="https://github.com/Jonconradt/ash/issues/new">Segnala un problema <span aria-hidden="true">↗</span></a>
+          <a href="https://github.com/Jonconradt/ash/blob/main/SECURITY.md">Politica di sicurezza <span aria-hidden="true">↗</span></a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer page-width"><span class="brand"><span class="brand-mark">>_</span> ash</span><span>Intelligence della shell open source</span><a href="docs.html">Documentazione</a><a href="https://github.com/Jonconradt/ash">github.com/Jonconradt/ash</a></footer>
+
+  <script src="../site.js" data-site-script defer></script>
+</body>
+</html>

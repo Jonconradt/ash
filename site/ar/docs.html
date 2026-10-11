@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ash | التوثيق</title>
+  <meta name="description" content="ash الأمر والتكوين والبيئة والملفات ووثائق الأمان.">
+  <meta name="theme-color" content="#f4f0e8">
+  <link rel="canonical" href="https://jonconradt.github.io/ash/ar/docs.html">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="alternate" hreflang="en" href="https://jonconradt.github.io/ash/docs.html">
+  <link rel="alternate" hreflang="ar" href="https://jonconradt.github.io/ash/ar/docs.html">
+  <link rel="alternate" hreflang="de" href="https://jonconradt.github.io/ash/de/docs.html">
+  <link rel="alternate" hreflang="es" href="https://jonconradt.github.io/ash/es/docs.html">
+  <link rel="alternate" hreflang="fr" href="https://jonconradt.github.io/ash/fr/docs.html">
+  <link rel="alternate" hreflang="id" href="https://jonconradt.github.io/ash/id/docs.html">
+  <link rel="alternate" hreflang="it" href="https://jonconradt.github.io/ash/it/docs.html">
+  <link rel="alternate" hreflang="lb" href="https://jonconradt.github.io/ash/lb/docs.html">
+  <link rel="alternate" hreflang="pt-BR" href="https://jonconradt.github.io/ash/pt-BR/docs.html">
+  <link rel="alternate" hreflang="zh-CN" href="https://jonconradt.github.io/ash/zh-CN/docs.html">
+  <link rel="alternate" hreflang="zh-TW" href="https://jonconradt.github.io/ash/zh-TW/docs.html">
+  <link rel="alternate" hreflang="x-default" href="https://jonconradt.github.io/ash/docs.html">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="ash المنزل"><span class="brand-mark">>_</span> ash</a>
+    <nav aria-label="التنقل الأساسي">
+      <a href="./">الصفحة الرئيسية</a>
+      <a href="./#install">التثبيت</a>
+      <a href="faq.html">الأسئلة الشائعة</a>
+      <a href="https://github.com/Jonconradt/ash">GitHub</a>
+      <label class="sr-only" for="site-language">اللغة</label>
+      <select id="site-language" class="language-select" aria-label="اختر اللغة">
+        <option value="en">English</option>
+        <option value="ar" selected>العربية</option>
+        <option value="de">Deutsch</option>
+        <option value="es">Español</option>
+        <option value="fr">Français</option>
+        <option value="id">Bahasa Indonesia</option>
+        <option value="it">Italiano</option>
+        <option value="lb">Lëtzebuergesch</option>
+        <option value="pt-BR">Português (Brasil)</option>
+        <option value="zh-CN">简体中文</option>
+        <option value="zh-TW">繁體中文</option>
+        </select>
+    </nav>
+  </header>
+
+  <main class="docs-page page-width">
+    <header class="docs-header">
+      <p class="eyebrow">أوامر المستخدم · ash(1)</p>
+      <h1>ash الوثائق</h1>
+      <p>مساعد الصدفة العملي لسير عمل الأوامر التي لم يتم العثور عليها. هذه الصفحة هي إصدار الويب من <a href="https://github.com/Jonconradt/ash/blob/main/docs/ash.1"><code>ash(1)</code> صفحة الدليل</a>.</p>
+    </header>
+
+    <div class="docs-layout">
+      <aside class="docs-contents" aria-label="محتويات التوثيق">
+        <strong>المحتويات</strong>
+        <a href="#synopsis">الملخص</a>
+        <a href="#description">الوصف</a>
+        <a href="#mcp">خوادم MCP</a>
+        <a href="#commands">الأوامر</a>
+        <a href="#environment">البيئة</a>
+        <a href="#files">الملفات</a>
+        <a href="#exit-status">خروج الحالة</a>
+        <a href="#examples">أمثلة</a>
+      </aside>
+
+      <article class="docs-content">
+        <section id="synopsis">
+          <h2>الملخص</h2>
+          <pre><code>ash [text ...]
+ash install [--shell bash|zsh] [--dry-run] [--overwrite]
+ash mcp add &lt;url&gt; [--no-browser]
+ash snooze [duration|off]
+ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></pre>
+        </section>
+
+        <section id="description">
+          <h2>الوصف</h2>
+          <p><code>ash</code> يرسل نصًا سريعًا إلى نقطة نهاية الذكاء الاصطناعي التي تم تكوينها ويطبع استجابة المساعد. عندما لا يتم توفير نص موضعي، يقرأ <code>ash</code> النص الموجه من الإدخال القياسي غير التفاعلي.</p>
+          <p>يضيف الأمر الفرعي <code>install</code> كتلة تكامل مُدارة إلى ملفات بدء التشغيل Shell. يستخدم Bash <code>~/.bashrc</code>، ويستخدم zsh <code>~/.zshrc</code>.</p>
+          <p>تتم مشاركة الاتصالات بموفر الذكاء الاصطناعي من خلال وسيط محلي. يعود فشل الوسيط إلى HTTPS المباشر. </p>
+          <p>يمكن للذكاء الاصطناعي استخدام systemd لجدولة مهام الخلفية. يمكن أن تكون هذه وظائف متكررة أو لمرة واحدة. تستخدم المهام المجدولة HTTPS المباشر بشكل افتراضي.</p>
+          <p>ash يحتفظ بمساحة عمل مؤقتة على مستوى الجلسة ضمن <code>~/.ash/scratch/&lt;session-id&gt;/</code>. تتم إزالة الدلائل القديمة والخمول تلقائيًا بعد نافذة الاستبقاء التي تم تكوينها. يتم تخزين سجلات التاريخ تحت <code>~/.ash/history/</code>. يتم تنظيف ملفات السجل القديم تلقائيًا وفقًا لسياسة الاستبقاء.</p>
+          <p>تعد الأداة والبرنامج النصي والملف والمرسل والمخرجات التابعة بيانات غير موثوق بها ويجب ألا تتجاوز تعليمات النظام أو المستخدم. لا تكون ميزة تنفيذ الأداة بمثابة وضع الحماية عند تمكين التنفيذ التعسفي لـ Python أو Shell. افتراضيًا، يتم تمكين لغة Python، لذا احذر.</p>
+        </section>
+
+        <section id="mcp">
+          <h2>خوادم MCP البعيدة</h2>
+          <p>توفر خوادم MCP (بروتوكول سياق النموذج) أدوات يمكن لنموذج الذكاء الاصطناعي الاتصال بها. Ash يدعم خوادم HTTP MCP القابلة للتدفق عن بُعد ويحافظ على جلسات عمل العملاء في <code>ash-broker</code> عبر استدعاءات Ash في نفس الصدفة.</p>
+          <p>قم بتسجيل الخادم عن طريق إضافة عنوان URL الخاص به بنفسه إلى <code>~/.ash/.ash_allow</code>، أو تشغيل <code>ash mcp add &lt;url&gt;</code> من موقع تفاعلي. Ash قذيفة. يقوم الأمر بالاتصال بالخادم وتسجيله فقط بعد الاتصال الناجح:</p>
+          <pre><code>https://mcpplaygroundonline.com/mcp-complex-server</code></pre>
+          <p>يتم فتح ترخيص OAuth في متصفح سطح المكتب عند توفر واجهة المستخدم الرسومية. إذا تعذر فتح المتصفح، فسيقوم Ash بطباعة عنوان URL للتفويض القابل للنسخ وينتظر في الجهاز. استخدم <code>ash mcp add &lt;url&gt; --no-browser</code> لاستخدام هذا التدفق الطرفي دائمًا. لا يزال ترخيص URL اليدوي يتطلب متصفحًا على نفس المضيف؛ فهو ليس تدفق OAuth بدون متصفح.</p>
+          <p>أسطر URL التي تبدأ بـ <code>http://</code> أو <code>https://</code> هي تسجيلات MCP، وليست أوامر Shell. يتم التعرف على المخططات بشكل غير حساس لحالة الأحرف. Ash يستمد الاسم المحلي للخادم من أول 8 أحرف ست عشرية صغيرة من SHA-256 فوق نص عنوان URL المشذب. HTTPS مطلوب باستثناء تطوير المضيف المحلي؛ يتم رفض عناوين URL التي تحتوي على بيانات اعتماد أو سلاسل استعلام أو أجزاء مضمنة. بالنسبة لاتصالات OAuth المباشرة، يسمح الاكتشاف بعناوين IP غير العامة فقط لسلطة MCP المسجلة بالضبط؛ يظل مضيفو OAuth الآخرون خاضعين لحظر العناوين غير العامة. وكيل الخروج الذي تم تكوينه مسؤول عن تصفية عناوين الوجهة الخاصة به. تتم قراءة التغييرات عند طلب Ash التالي.</p>
+          <p>تظل تسجيلات MCP ممكنة مع <code>ASH_STRICT=1</code>. لا يزال يتم التعامل مع مخرجات الأداة المرتجعة كدليل غير موثوق به. قم بتسجيل الخوادم التي تثق بها فقط: قد تؤدي أدواتها إجراءات نيابة عنك. بالنسبة للخوادم المحمية بـ OAuth، يفتح Ash المتصفح عندما تكون واجهة المستخدم الرسومية متاحة بينما يتعامل الوسيط مع رد الاتصال والرموز المميزة. تستخدم بيانات الاعتماد مدير بيانات اعتماد نظام التشغيل عندما يكون ذلك متاحًا، أو ملفًا مشفرًا محميًا بملف عشوائي 32 بايت يقدمه المستخدم <code>ASH_MCP_CREDENTIAL_KEY</code>. لم تعد ملفات <code>~/.ash/mcp.json</code> الموجودة قابلة للقراءة؛ انقل عناوين URL للخادم إلى <code>.ash_allow</code>.</p>
+          <p>إذا فشلت تهيئة MCP، فسيواصل Ash الطلب بدون أدوات MCP عن بعد. عمليات التشغيل التفاعلية تطبع تحذيرًا؛ عمليات التشغيل غير التفاعلية تفشل بهدوء. <strong>لا تحتوي المهام المجدولة على وسيط لكل واجهة تفاعلية، وبالتالي لا يمكنها استخدام أدوات MCP عن بعد.</strong> قد يستمر تشغيل الموجه المجدول الذي يعتمد على MCP ولكن يمكن أن ينتهي بدون إجراء MCP أو البيانات المطلوبة. لا تقم بجدولة المطالبات التي تتطلب MCP.</p>
+          <p>راجع <a href="faq.html">الأسئلة الشائعة لـ MCP</a> للحصول على نظرة عامة سريعة وملاحظات الإعداد.</p>
+        </section>
+
+        <section id="commands">
+          <h2>الأوامر</h2>
+          <dl>
+            <dt><code>ash [--attach path]... [text ...]</code></dt>
+            <dd>تشغيل طلب مساعد واحد. <code>--attach</code> إرفاق ملف (صورة أو مستند) بالطلب؛ قابل للتكرار. الحجم محدود بـ <code>ASH_ATTACHMENT_MAX_BYTES</code> ويتم إرساله حاليًا عبر السلك فقط إلى مقدمي الخدمة المتوافقين مع OpenAI.</dd>
+            <dt><code>ash mcp add &lt;url&gt; [--no-browser]</code></dt>
+            <dd>قم بالاتصال وتسجيل خادم MCP عن بعد في <code>.ash_allow</code> الفعال. يفتح ترخيص OAuth في متصفح سطح المكتب عندما يكون متاحًا؛ يعود إلى عنوان URL القابل للنسخ في الجهاز. <code>--no-browser</code> يستخدم دائمًا التدفق الطرفي.</dd>
+            <dt><code>ash install [--shell bash|zsh] [--dry-run]</code></dt>
+            <dd>تثبيت أو تحديث تكامل Shell. عند حذف <code>--shell</code>، يتم استخدام الغلاف الحالي عندما يكون ذلك ممكنًا. <code>--dry-run</code> يقوم بمعاينة التغييرات بدون كتابة. عندما يكون التثبيت تفاعليًا، يقوم التثبيت أيضًا بالتكوين التلقائي <code>AI_ENDPOINT</code> و<code>AI_MODEL</code> و<code>AI_AUTH_TOKEN</code>: فهو يفضل مفتاح API لموفر السحابة الذي تم تعيينه بالفعل (OpenAI أو Anthropic أو Google Gemini أو Azure OpenAI أو Mistral أو Cohere أو Groq أو xAI أو DeepSeek أو Together AI أو OpenRouter أو HuggingFace)، ثم خادم استدلال محلي قيد التشغيل (Ollama أو LM Studio أو llama.cpp/MLX/LocalAI أو vLLM أو text-generation-webui أو Jan أو GPT4All)، وبخلاف ذلك، يتم المطالبة بقائمة موفر مرقمة. يتم اختيار النموذج من قائمة نماذج نقطة النهاية عندما يكون متاحًا.</dd>
+            <dt><code>ash snooze [duration|off]</code></dt>
+            <dd>إيقاف مؤقت للمعالجة التلقائية لمطالبات Shell. الافتراضي هو خمس دقائق. تستخدم الفترات بناء جملة Go مثل <code>30s</code> أو <code>5m</code> أو <code>1h</code>. استخدم <code>off</code> للاستئناف على الفور.</dd>
+            <dt><code>ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></dt>
+            <dd>قم بتنزيل وتثبيت أحدث إصدار ثابت من macOS أو Linux أو FreeBSD للبنية الحالية في <code>~/.local/bin/ash</code>. تتطلب الإصدارات التحقق من Sigstore والتحقق من SHA-256.</dd>
+          </dl>
+        </section>
+
+        <section id="environment">
+          <h2>البيئة</h2>
+          <dl> <!-- Always sort the list alphabetically by the first code block, the environment variable name -->
+            <dt><code>AI_AUTH_TOKEN</code></dt><dd>رمز حامل اختياري. عند التعيين، يتم إرساله كمصادقة للحامل ويكون مطلوبًا لنقاط النهاية السحابية. يتم التعامل مع عناوين الشبكة المحلية/الخاصة (RFC1918 IPv4 وIPv6 ULA) وأسماء مضيفات <code>.local</code> mDNS على أنها غير سحابية (مثل <code>localhost</code>) ما لم يتم تعيين <code>ASH_STRICT=1</code>.</dd>
+            <dt><code>AI_CACHE</code></dt><dd>تبديل اختياري لذاكرة التخزين المؤقت الأصلية للموفر. يتم تمكينه افتراضيًا عند دعمه؛ استخدم <code>off</code> أو <code>false</code> للتعطيل.</dd>
+            <dt><code>AI_ENDPOINT</code></dt><dd>عنوان URL الأساسي المطلوب لنقطة نهاية واجهة برمجة تطبيقات الدردشة.</dd>
+            <dt><code>AI_MODEL</code></dt><dd>تم إرسال اسم النموذج المطلوب إلى نقطة النهاية.</dd>
+            <dt><code>AI_PROVIDER</code></dt><dd>تجاوز الموفر الاختياري: <code>anthropic</code>، <code>bedrock</code>، <code>cohere</code>، <code>gemini</code>، <code>google</code>، <code>ollama</code>، أو <code>openai</code>. عند عدم الضبط، يكتشف ash الموفر من نقطة النهاية.</dd>
+            <dt><code>AI_TIMEOUT</code></dt><dd>مهلة الطلب الاختيارية. الافتراضي: <code>3m</code>.</dd>
+            <dt><code>ASH_ALWAYS_OPENAI_API</code></dt><dd>تبديل الاختبار الاختياري. عندما يكون الأمر حقيقيًا، يقوم بتوجيه موفر <code>ollama</code> من خلال محول SDK المتوافق مع OpenAI بدلاً من التنفيذ المدلفن يدويًا. الافتراضي: تشغيل.</dd>
+            <dt><code>ASH_ATTACHMENT_MAX_BYTES</code></dt><dd>الحجم الأقصى الاختياري بالبايت للملف الذي تم تمريره عبر <code>--attach</code>. الافتراضي: <code>10485760</code> (10 MiB).</dd>
+            <dt><code>ASH_HISTORY_MAX</code></dt><dd>الحد الأقصى الاختياري لرسائل السجل لكل مفتاح. الافتراضي: <code>40</code>.</dd>
+            <dt><code>ASH_LOG_FILE</code></dt><dd>مسار سجل تصحيح اختياري عند تمكين التسجيل المطول.</dd>
+            <dt><code>ASH_LOG_MAX_BYTES</code></dt><dd>الحد الأقصى الاختياري لحجم السجل قبل التدوير. الافتراضي: <code>1048576</code>.</dd>
+            <dt><code>ASH_MAX_AGENTS</code></dt><dd>الحد الأقصى الاختياري للوكلاء الفرعيين الذي تم إنشاؤه بواسطة عملية رئيسية واحدة. الافتراضي: <code>6</code>.</dd>
+            <dt><code>ASH_MAX_TOOL_ITERS</code></dt><dd>الحد الأقصى الاختياري لتكرارات حلقة استدعاء أداة الذكاء الاصطناعي. الافتراضي: <code>16</code>.</dd>
+            <dt><code>ASH_RELEVANCE_WINDOW</code></dt><dd>ملاحظات الأداة الحديثة الاختيارية المضمنة في حالة التنفيذ. الافتراضي: <code>4</code>.</dd>
+            <dt><code>ASH_RETRY_BASE_DELAY</code></dt><dd>تأخير قاعدة إعادة محاولة التراجع الاختيارية. الافتراضي: <code>250ms</code>.</dd>
+            <dt><code>ASH_RETRY_MAX_ATTEMPTS</code></dt><dd>محاولات طلب اختيارية قابلة لإعادة المحاولة. الافتراضي: <code>3</code>.</dd>
+            <dt><code>ASH_SCHEDULED_TASK</code></dt><dd>علامة الجدولة الداخلية المستخدمة بواسطة الدعوات المُدارة ash.</dd>
+            <dt><code>ASH_STREAM</code></dt><dd>تبديل اختياري. عندما يكون الأمر حقيقيًا، يتم بث الاستجابة من الموفرين الذين يدعمها المحول الخاص بهم (حاليًا OpenAI فقط). الافتراضي: تشغيل.</dd>
+            <dt><code>ASH_TASK_MAX</code></dt><dd>حد أقصى اختياري لمهام التنفيذ المستمدة من الطلب. الافتراضي: <code>6</code>.</dd>
+            <dt><code>ASH_TASK_STALL_ROUNDS</code></dt><dd>جولات المماطلة المساعدة الاختيارية قبل التوقف. الافتراضي: <code>2</code>.</dd>
+            <dt><code>ASH_ALLOW</code></dt><dd>القائمة المسموح بها القابلة للتنفيذ الاختيارية مفصولة بفواصل لـ <code>run_unix_command</code>. بخلاف ذلك يتم استخدام <code>~/.ash/.ash_allow</code> عند وجوده؛ لا يؤدي هذا التجاوز إلى توسيع رموز Ash الداخلية.</dd>
+            <dt><code>ASH_DENY</code></dt><dd>قائمة رفض اختيارية مفصولة بفواصل لحظر الأوامر والأدوات والمكونات الإضافية بشكل صريح. بخلاف ذلك، يتم استخدام <code>~/.ash/.ash_deny</code> عند وجوده.</dd>
+            <dt><code>ASH_TOOL_OUTPUT_MAX</code></dt><dd>الحد الأقصى الاختياري لإخراج الأداة الملتقطة بالبايت. الافتراضي: <code>8192</code>.</dd>
+            <dt><code>ASH_TOOL_TIMEOUT</code></dt><dd>مهلة أمر الأداة المحلية الاختيارية. الافتراضي: <code>15s</code>.</dd>
+            <dt><code>ASH_VERBOSE</code></dt><dd>تسجيل تصحيح الأخطاء ولوحة معلومات التنفيذ الاختيارية. تعمل القيم مثل <code>1</code> و<code>true</code> و<code>on</code> و<code>debug</code> على تمكينها.</dd>
+            <dt><code>SESSION_ID</code></dt><dd>معرف الجلسة للسجل المستمر وتسمية السجل. يتم إنشاؤه تلقائيًا لعمليات التشغيل التفاعلية عند فقدانه.</dd>
+          </dl>
+        </section>
+
+        <section id="files">
+          <h2>الملفات</h2>
+          <ul>
+            <li><code>~/.ash/.ash_system</code> — موجه النظام الأساسي. <code>$TOOLS_DIR_LIST</code> و<code>$PLUGINS_DIR_LIST</code> و<code>$IF_PYTHON_AVAILABLE</code> هي بدائل Ash داخلية، وليست متغيرات بيئة أبدًا.</li>
+            <li><code>~/.ash/.ash_allow</code> — القائمة المسموح بها للأوامر والأدوات والمكونات الإضافية الأساسية. تسمح التوجيهات المستقلة <code>$TOOLS_DIR_LIST</code> و<code>$PLUGINS_DIR_LIST</code> بالبرامج النصية المُدارة العادية والمكونات الإضافية الأصلية؛ استبدلها بأسماء حرفية للسياسة المقيدة.</li>
+            <li><code>~/.ash/.ash_deny</code> - ملف قائمة الحظر الأساسي لحظر أوامر أو أدوات أو مكونات إضافية محددة.</li>
+            <li><code>~/.ash/plugins/</code> - دليل المكونات الإضافية الثنائية الأصلية.</li>
+            <li><code>~/.ash/history/</code> - ملفات محفوظات المحادثة.</li>
+            <li><code>~/.ash/scratch/</code> - خدش على نطاق الجلسة. الملفات.</li>
+            <li><code>~/.ash/.ash_snooze_until</code> — انتهاء صلاحية التأجيل التلقائي.</li>
+          </ul>
+        </section>
+
+        <section id="exit-status">
+          <h2>حالة الخروج</h2>
+          <p><code>ash</code> تُرجع 0 عند النجاح. يُرجع قيمة غير صفرية عند فشل التكوين أو طلبات الشبكة أو تنفيذ الأداة.</p>
+        </section>
+
+        <section id="examples">
+          <h2>أمثلة</h2>
+          <pre><code>echo "summarize this directory" | ash
+ash install --shell bash
+ash install --shell zsh --dry-run</code></pre>
+        </section>
+
+        <section id="see-also">
+          <h2>انظر أيضًا</h2>
+          <p><code>bash(1)</code>، <code>zsh(1)</code>، <code>man(1)</code></p>
+        </section>
+
+        <p class="docs-source">المصدر: <a href="https://github.com/Jonconradt/ash/blob/main/docs/ash.1">docs/ash.1</a> · <a href="https://github.com/Jonconradt/ash/blob/main/README.md">اقرأني</a> · <a href="https://github.com/Jonconradt/ash/blob/main/SECURITY.md">سياسة الأمان</a></p>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer page-width"><span class="brand"><span class="brand-mark">>_</span> ash</span><span>ذكاء الصدفة مفتوح المصدر</span><a href="https://github.com/Jonconradt/ash">github.com/Jonconradt/ash</a></footer>
+  <script src="../site.js" data-site-script defer></script>
+</body>
+</html>

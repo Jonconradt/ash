@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ash | Dokumentasi</title>
+  <meta name="description" content="ash perintah, konfigurasi, lingkungan, file, dan dokumentasi keamanan.">
+  <meta name="theme-color" content="#f4f0e8">
+  <link rel="canonical" href="https://jonconradt.github.io/ash/id/docs.html">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="alternate" hreflang="en" href="https://jonconradt.github.io/ash/docs.html">
+  <link rel="alternate" hreflang="ar" href="https://jonconradt.github.io/ash/ar/docs.html">
+  <link rel="alternate" hreflang="de" href="https://jonconradt.github.io/ash/de/docs.html">
+  <link rel="alternate" hreflang="es" href="https://jonconradt.github.io/ash/es/docs.html">
+  <link rel="alternate" hreflang="fr" href="https://jonconradt.github.io/ash/fr/docs.html">
+  <link rel="alternate" hreflang="id" href="https://jonconradt.github.io/ash/id/docs.html">
+  <link rel="alternate" hreflang="it" href="https://jonconradt.github.io/ash/it/docs.html">
+  <link rel="alternate" hreflang="lb" href="https://jonconradt.github.io/ash/lb/docs.html">
+  <link rel="alternate" hreflang="pt-BR" href="https://jonconradt.github.io/ash/pt-BR/docs.html">
+  <link rel="alternate" hreflang="zh-CN" href="https://jonconradt.github.io/ash/zh-CN/docs.html">
+  <link rel="alternate" hreflang="zh-TW" href="https://jonconradt.github.io/ash/zh-TW/docs.html">
+  <link rel="alternate" hreflang="x-default" href="https://jonconradt.github.io/ash/docs.html">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="ash pulang"><span class="brand-mark">>_</span> ash</a>
+    <nav aria-label="Navigasi utama">
+      <a href="./">Beranda</a>
+      <a href="./#install">Instal</a>
+      <a href="faq.html">FAQ</a>
+      <a href="https://github.com/Jonconradt/ash">GitHub</a>
+      <label class="sr-only" for="site-lingual">Bahasa</label>
+      <select id="site-language" class="language-select" aria-label="Pilih bahasa">
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+        <option value="de">Deutsch</option>
+        <option value="es">Español</option>
+        <option value="fr">Français</option>
+        <option value="id" selected>Bahasa Indonesia</option>
+        <option value="it">Italiano</option>
+        <option value="lb">Lëtzebuergesch</option>
+        <option value="pt-BR">Português (Brasil)</option>
+        <option value="zh-CN">简体中文</option>
+        <option value="zh-TW">繁體中文</option>
+        </select>
+    </nav>
+  </header>
+
+  <main class="docs-page page-width">
+    <header class="docs-header">
+      <p class="eyebrow">Perintah pengguna · ash(1)</p>
+      <h1>ash dokumentasi</h1>
+      <p>Asisten shell praktis untuk alur kerja yang tidak ditemukan perintah. Halaman ini adalah versi web dari <a href="https://github.com/Jonconradt/ash/blob/main/docs/ash.1"><code>ash(1)</code> halaman manual</a> yang dapat diinstal.</p>
+    </header>
+
+    <div class="docs-layout">
+      <aside class="docs-contents" aria-label="Isi dokumentasi">
+        <strong>Isi</strong>
+        <a href="#synopsis">Sinopsis</a>
+        <a href="#description">Deskripsi</a>
+        <a href="#mcp">Server MCP</a>
+        <a href="#commands">Perintah</a>
+        <a href="#environment">Lingkungan</a>
+        <a href="#files">File</a>
+        <a href="#exit-status">Status keluar</a>
+        <a href="#examples">Contoh</a>
+      </aside>
+
+      <article class="docs-content">
+        <section id="synopsis">
+          <h2>Sinopsis</h2>
+          <pre><code>ash [text ...]
+ash install [--shell bash|zsh] [--dry-run] [--overwrite]
+ash mcp add &lt;url&gt; [--no-browser]
+ash snooze [duration|off]
+ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></pre>
+        </section>
+
+        <section id="description">
+          <h2>Deskripsi</h2>
+          <p><code>ash</code> mengirimkan teks perintah ke titik akhir AI yang dikonfigurasi dan mencetak respons asisten. Jika tidak ada teks posisi yang disediakan, <code>ash</code> membaca teks perintah dari input standar non-interaktif.</p>
+          <p>Sub-perintah <code>install</code> menambahkan blok integrasi terkelola ke file startup shell. Bash menggunakan <code>~/.bashrc</code>, dan zsh menggunakan <code>~/.zshrc</code>.</p>
+          <p>Koneksi ke penyedia AI dibagikan melalui broker lokal. Kegagalan broker kembali ke HTTPS langsung. </p>
+          <p>AI dapat menggunakan systemd untuk menjadwalkan tugas di latar belakang. Ini bisa berupa pekerjaan yang berulang atau hanya sekali saja. Pekerjaan terjadwal menggunakan HTTPS langsung secara default.</p>
+          <p>ash mempertahankan ruang kerja awal dengan cakupan sesi di bawah <code>~/.ash/scratch/&lt;session-id&gt;/</code>. Direktori awal yang basi dan tidak aktif akan dihapus secara otomatis setelah jendela retensi dikonfigurasi. Log riwayat disimpan di bawah <code>~/.ash/history/</code>. File riwayat lama secara otomatis dibersihkan sesuai dengan kebijakan penyimpanan.</p>
+          <p>Alat, skrip, file, saluran, dan keluaran turunan adalah data yang tidak tepercaya dan tidak boleh mengesampingkan instruksi sistem atau pengguna. Fitur eksekusi alat bukan kotak pasir ketika eksekusi Python atau shell sewenang-wenang diaktifkan. Secara default Python diaktifkan, jadi berhati-hatilah.</p>
+        </section>
+
+        <section id="mcp">
+          <h2>Server MCP jarak jauh</h2>
+          <p>Server MCP (Model Context Protocol) menyediakan alat yang dapat dipanggil oleh model AI. Ash mendukung server HTTP MCP Streamable jarak jauh dan menjaga sesi kliennya tetap di <code>ash-broker</code> di seluruh pemanggilan Ash di shell yang sama.</p>
+          <p>Daftarkan server dengan menambahkan URL-nya sendiri ke <code>~/.ash/.ash_allow</code>, atau jalankan <code>ash mcp add &lt;url&gt;</code> dari server interaktif Ash cangkang. Perintah menghubungkan dan mendaftarkan server hanya setelah koneksi berhasil:</p>
+          <pre><code>https://mcpplaygroundonline.com/mcp-complex-server</code></pre>
+          <p>Otorisasi OAuth terbuka di browser desktop ketika GUI tersedia. Jika browser tidak dapat dibuka, Ash mencetak URL otorisasi yang dapat disalin dan menunggu di terminal. Gunakan <code>ash mcp add &lt;url&gt; --no-browser</code> untuk selalu menggunakan aliran terminal ini. Otorisasi URL manual masih memerlukan browser pada host yang sama; ini bukan alur OAuth tanpa browser.</p>
+          <p>Baris URL yang dimulai dengan <code>http://</code> atau <code>https://</code> adalah pendaftaran MCP, bukan perintah shell. Skema dikenali tanpa membedakan huruf besar dan kecil. Ash mendapatkan nama lokal server dari 8 karakter heksadesimal huruf kecil pertama SHA-256 di atas teks URL yang dipangkas. HTTPS diperlukan kecuali untuk pengembangan localhost; URL dengan kredensial, string kueri, atau fragmen yang disematkan akan ditolak. Untuk koneksi OAuth langsung, penemuan mengizinkan alamat IP non-publik hanya untuk otoritas MCP yang terdaftar; host OAuth lainnya tetap tunduk pada pemblokiran alamat non-publik. Proksi jalan keluar yang dikonfigurasi bertanggung jawab untuk memfilter alamat tujuannya. Perubahan dibaca pada permintaan Ash berikutnya.</p>
+          <p>Pendaftaran MCP tetap diaktifkan dengan <code>ASH_STRICT=1</code>. Hasil alat yang dikembalikan masih dianggap sebagai bukti yang tidak dapat dipercaya. Hanya daftarkan server yang Anda percayai: alat mereka dapat melakukan tindakan atas nama Anda. Untuk server yang dilindungi OAuth, Ash membuka browser ketika GUI tersedia sementara broker menangani panggilan balik dan token. Kredensial menggunakan manajer kredensial OS jika tersedia, atau file terenkripsi yang dilindungi oleh <code>ASH_MCP_CREDENTIAL_KEY</code> acak 32-byte yang disediakan pengguna. File <code>~/.ash/mcp.json</code> yang ada tidak lagi dibaca; pindahkan URL server ke <code>.ash_allow</code>.</p>
+          <p>Jika inisialisasi MCP gagal, Ash melanjutkan permintaan tanpa alat MCP jarak jauh. Interaktif berjalan mencetak peringatan; proses non-interaktif gagal secara diam-diam. <strong>Pekerjaan terjadwal tidak memiliki broker shell per-interaktif dan oleh karena itu tidak dapat menggunakan alat MCP jarak jauh.</strong> Perintah terjadwal yang bergantung pada MCP mungkin masih berjalan namun dapat selesai tanpa tindakan atau data MCP yang diminta. Jangan jadwalkan perintah yang memerlukan MCP.</p>
+          <p>Lihat <a href="faq.html">FAQ MCP</a> untuk ikhtisar singkat dan catatan penyiapan.</p>
+        </section>
+
+        <section id="commands">
+          <h2>Perintah</h2>
+          <dl>
+            <dt><code>ash [--attach path]... [text ...]</code></dt>
+            <dd>Jalankan satu permintaan asisten. <code>--attach</code> melampirkan file (gambar atau dokumen) ke permintaan; dapat diulang. Ukuran dibatasi oleh <code>ASH_ATTACHMENT_MAX_BYTES</code> dan saat ini hanya dikirim melalui kabel ke penyedia yang kompatibel dengan OpenAI.</dd>
+            <dt><code>ash mcp add &lt;url&gt; [--no-browser]</code></dt>
+            <dd>Hubungkan dan daftarkan server MCP jarak jauh di <code>.ash_allow</code> yang efektif. Membuka otorisasi OAuth di browser desktop bila tersedia; kembali ke URL yang dapat disalin di terminal. <code>--no-browser</code> selalu menggunakan aliran terminal.</dd>
+            <dt><code>ash install [--shell bash|zsh] [--dry-run]</code></dt>
+            <dd>Instal atau perbarui integrasi shell. Ketika <code>--shell</code> dihilangkan, shell saat ini digunakan jika memungkinkan. <code>--dry-run</code> mempratinjau perubahan tanpa menulis. Saat interaktif, instal juga konfigurasi otomatis <code>AI_ENDPOINT</code>, <code>AI_MODEL</code>, dan <code>AI_AUTH_TOKEN</code>: ia lebih memilih kunci API penyedia cloud yang sudah ditetapkan (OpenAI, Anthropic, Google Gemini, Azure OpenAI, Mistral, Cohere, Groq, xAI, DeepSeek, Together AI, OpenRouter, atau HuggingFace), lalu server inferensi lokal yang berjalan (Ollama, LM Studio, llama.cpp/MLX/LocalAI, vLLM, text-generasi-webui, Jan, atau GPT4All), dan sebaliknya muncul dengan menu penyedia bernomor. Model dipilih dari daftar model titik akhir jika tersedia.</dd>
+            <dt><code>ash snooze [duration|off]</code></dt>
+            <dd>Jeda pemrosesan prompt shell otomatis. Standarnya adalah lima menit. Durasi menggunakan sintaksis Go seperti <code>30s</code>, <code>5m</code>, atau <code>1h</code>. Gunakan <code>off</code> untuk segera melanjutkan.</dd>
+            <dt><code>ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></dt>
+            <dd>Unduh dan instal rilis stabil macOS, Linux, atau FreeBSD terbaru untuk arsitektur saat ini ke <code>~/.local/bin/ash</code>. Rilis memerlukan verifikasi Sigstore dan verifikasi SHA-256.</dd>
+          </dl>
+        </section>
+
+        <section id="environment">
+          <h2>Lingkungan</h2>
+          <dl> <!-- Always sort the list alphabetically by the first code block, the environment variable name -->
+            <dt><code>AI_AUTH_TOKEN</code></dt><dd>Token pembawa opsional. Jika disetel, ini dikirim sebagai autentikasi pembawa dan diperlukan untuk titik akhir cloud. Alamat pribadi/LAN (RFC1918 IPv4, IPv6 ULA) dan nama host <code>.local</code> mDNS diperlakukan sebagai non-cloud (seperti <code>localhost</code>) kecuali <code>ASH_STRICT=1</code> disetel.</dd>
+            <dt><code>AI_CACHE</code></dt><dd>Pengalih cache asli penyedia opsional. Diaktifkan secara default bila didukung; gunakan <code>off</code> atau <code>false</code> untuk menonaktifkan.</dd>
+            <dt><code>AI_ENDPOINT</code></dt><dd>URL dasar yang diperlukan untuk titik akhir API obrolan.</dd>
+            <dt><code>AI_MODEL</code></dt><dd>Nama model yang diperlukan dikirimkan ke titik akhir.</dd>
+            <dt><code>AI_PROVIDER</code></dt><dd>Penggantian penyedia opsional: <code>anthropic</code>, <code>bedrock</code>, <code>cohere</code>, <code>gemini</code>, <code>google</code>, <code>ollama</code>, atau <code>openai</code>. Jika tidak disetel, ash mendeteksi penyedia dari titik akhir.</dd>
+            <dt><code>AI_TIMEOUT</code></dt><dd>Batas waktu permintaan opsional. Bawaan: <code>3m</code>.</dd>
+            <dt><code>ASH_ALWAYS_OPENAI_API</code></dt><dd>Tombol pengujian opsional. Jika benar, rutekan penyedia <code>ollama</code> melalui adaptor SDK yang kompatibel dengan OpenAI, bukan implementasi langsungnya. Default: aktif.</dd>
+            <dt><code>ASH_ATTACHMENT_MAX_BYTES</code></dt><dd>Ukuran maksimum opsional dalam byte untuk file yang diteruskan melalui <code>--attach</code>. Default: <code>10485760</code> (10 MiB).</dd>
+            <dt><code>ASH_HISTORY_MAX</code></dt><dd>Pesan riwayat maksimum opsional per kunci. Default: <code>40</code>.</dd>
+            <dt><code>ASH_LOG_FILE</code></dt><dd>Jalur log debug opsional saat logging verbose diaktifkan.</dd>
+            <dt><code>ASH_LOG_MAX_BYTES</code></dt><dd>Ukuran log maksimum opsional sebelum rotasi. Default: <code>1048576</code>.</dd>
+            <dt><code>ASH_MAX_AGENTS</code></dt><dd>Sub-agen maksimum opsional yang dihasilkan oleh satu proses induk. Default: <code>6</code>.</dd>
+            <dt><code>ASH_MAX_TOOL_ITERS</code></dt><dd>Iterasi loop panggilan alat AI maksimum opsional. Default: <code>16</code>.</dd>
+            <dt><code>ASH_RELEVANCE_WINDOW</code></dt><dd>Pengamatan alat terbaru opsional yang disertakan dalam status eksekusi. Default: <code>4</code>.</dd>
+            <dt><code>ASH_RETRY_BASE_DELAY</code></dt><dd>Penundaan dasar backoff coba ulang opsional. Default: <code>250ms</code>.</dd>
+            <dt><code>ASH_RETRY_MAX_ATTEMPTS</code></dt><dd>Upaya permintaan percobaan ulang opsional. Default: <code>3</code>.</dd>
+            <dt><code>ASH_SCHEDULED_TASK</code></dt><dd>Tanda penjadwal internal yang digunakan oleh pemanggilan yang dikelola ash.</dd>
+            <dt><code>ASH_STREAM</code></dt><dd>Tombol opsional. Jika benar, mengalirkan respons dari penyedia yang adaptornya mendukungnya (saat ini hanya OpenAI). Default: aktif.</dd>
+            <dt><code>ASH_TASK_MAX</code></dt><dd>Batasan opsional pada tugas eksekusi yang berasal dari permintaan. Default: <code>6</code>.</dd>
+            <dt><code>ASH_TASK_STALL_ROUNDS</code></dt><dd>Asisten opsional menghentikan putaran sebelum berhenti. Default: <code>2</code>.</dd>
+            <dt><code>ASH_ALLOW</code></dt><dd>Daftar eksekusi opsional yang dipisahkan koma untuk <code>run_unix_command</code>. Jika tidak, <code>~/.ash/.ash_allow</code> digunakan saat ada; penggantian ini tidak memperluas token Ash internal.</dd>
+            <dt><code>ASH_DENY</code></dt><dd>Daftar penolakan opsional yang dipisahkan koma untuk memblokir perintah, alat, dan plugin secara eksplisit. Jika tidak, <code>~/.ash/.ash_deny</code> akan digunakan jika ada.</dd>
+            <dt><code>ASH_TOOL_OUTPUT_MAX</code></dt><dd>Output alat pengambilan maksimum opsional dalam byte. Default: <code>8192</code>.</dd>
+            <dt><code>ASH_TOOL_TIMEOUT</code></dt><dd>Batas waktu perintah alat lokal opsional. Default: <code>15s</code>.</dd>
+            <dt><code>ASH_VERBOSE</code></dt><dd>Dasbor eksekusi dan logging debug opsional. Nilai seperti <code>1</code>, <code>true</code>, <code>on</code>, dan <code>debug</code> mengaktifkannya.</dd>
+            <dt><code>SESSION_ID</code></dt><dd>Pengidentifikasi sesi untuk riwayat persisten dan penamaan log. Dihasilkan secara otomatis untuk proses interaktif ketika tidak ada.</dd>
+          </dl>
+        </section>
+
+        <section id="files">
+          <h2>File</h2>
+          <ul>
+            <li><code>~/.ash/.ash_system</code> — perintah sistem kanonik. <code>$TOOLS_DIR_LIST</code>, <code>$PLUGINS_DIR_LIST</code>, dan <code>$IF_PYTHON_AVAILABLE</code> merupakan pengganti Ash internal, bukan variabel lingkungan.</li>
+            <li><code>~/.ash/.ash_allow</code> — perintah kanonik, alat, dan daftar plugin yang diizinkan. Izin arahan <code>$TOOLS_DIR_LIST</code> dan <code>$PLUGINS_DIR_LIST</code> yang berdiri sendiri mengizinkan skrip terkelola reguler dan plugin asli; ganti dengan nama literal untuk kebijakan yang membatasi.</li>
+            <li><code>~/.ash/.ash_deny</code> — file daftar penolakan kanonik untuk memblokir perintah, alat, atau plugin tertentu.</li>
+            <li><code>~/.ash/plugins/</code> — direktori plugin biner asli.</li>
+            <li><code>~/.ash/history/</code> — file riwayat percakapan.</li>
+            <li><code>~/.ash/scratch/</code> — coretan dalam cakupan sesi files.</li>
+            <li><code>~/.ash/.ash_snooze_until</code> — berakhirnya penundaan otomatis secara cepat.</li>
+          </ul>
+        </section>
+
+        <section id="exit-status">
+          <h2>Status keluar</h2>
+          <p><code>ash</code> menghasilkan 0 jika berhasil. Ia mengembalikan bukan nol ketika konfigurasi, permintaan jaringan, atau eksekusi alat gagal.</p>
+        </section>
+
+        <section id="examples">
+          <h2>Contoh</h2>
+          <pre><code>echo "summarize this directory" | ash
+ash install --shell bash
+ash install --shell zsh --dry-run</code></pre>
+        </section>
+
+        <section id="see-also">
+          <h2>Lihat juga</h2>
+          <p><code>bash(1)</code>, <code>zsh(1)</code>, <code>man(1)</code></p>
+        </section>
+
+        <p class="docs-source">Sumber: <a href="https://github.com/Jonconradt/ash/blob/main/docs/ash.1">docs/ash.1</a> · <a href="https://github.com/Jonconradt/ash/blob/main/README.md">README</a> · <a href="https://github.com/Jonconradt/ash/blob/main/SECURITY.md">Kebijakan keamanan</a></p>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer page-width"><span class="brand"><span class="brand-mark">>_</span> ash</span><span>Kecerdasan shell sumber terbuka</span><a href="https://github.com/Jonconradt/ash">github.com/Jonconradt/ash</a></footer>
+  <script src="../site.js" data-site-script defer></script>
+</body>
+</html>

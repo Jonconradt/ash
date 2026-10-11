@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ash | Documentazione</title>
+  <meta name="description" content="Comando ash, configurazione, ambiente, file e documentazione di sicurezza.">
+  <meta name="theme-color" content="#f4f0e8">
+  <link rel="canonical" href="https://jonconradt.github.io/ash/it/docs.html">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="alternate" hreflang="en" href="https://jonconradt.github.io/ash/docs.html">
+  <link rel="alternate" hreflang="ar" href="https://jonconradt.github.io/ash/ar/docs.html">
+  <link rel="alternate" hreflang="de" href="https://jonconradt.github.io/ash/de/docs.html">
+  <link rel="alternate" hreflang="es" href="https://jonconradt.github.io/ash/es/docs.html">
+  <link rel="alternate" hreflang="fr" href="https://jonconradt.github.io/ash/fr/docs.html">
+  <link rel="alternate" hreflang="id" href="https://jonconradt.github.io/ash/id/docs.html">
+  <link rel="alternate" hreflang="it" href="https://jonconradt.github.io/ash/it/docs.html">
+  <link rel="alternate" hreflang="lb" href="https://jonconradt.github.io/ash/lb/docs.html">
+  <link rel="alternate" hreflang="pt-BR" href="https://jonconradt.github.io/ash/pt-BR/docs.html">
+  <link rel="alternate" hreflang="zh-CN" href="https://jonconradt.github.io/ash/zh-CN/docs.html">
+  <link rel="alternate" hreflang="zh-TW" href="https://jonconradt.github.io/ash/zh-TW/docs.html">
+  <link rel="alternate" hreflang="x-default" href="https://jonconradt.github.io/ash/docs.html">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="ash casa"><span class="brand-mark">>_</span> ash</a>
+    <nav aria-label="Navigazione primaria">
+      <a href="./">Home</a>
+      <a href="./#install">Installa</a>
+      <a href="faq.html">FAQ</a>
+      <a href="https://github.com/Jonconradt/ash">GitHub</a>
+      <label class="sr-only" for="site-lingual">Lingua</label>
+      <select id="site-language" class="language-select" aria-label="Scegli la lingua">
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+        <option value="de">Deutsch</option>
+        <option value="es">Español</option>
+        <option value="fr">Français</option>
+        <option value="id">Bahasa Indonesia</option>
+        <option value="it" selected>Italiano</option>
+        <option value="lb">Lëtzebuergesch</option>
+        <option value="pt-BR">Português (Brasil)</option>
+        <option value="zh-CN">简体中文</option>
+        <option value="zh-TW">繁體中文</option>
+        </select>
+    </nav>
+  </header>
+
+  <main class="docs-page page-width">
+    <header class="docs-header">
+      <p class="eyebrow">Comandi utente · ash(1)</p>
+      <h1>Documentazione ash</h1>
+      <p>Pratico assistente shell per flussi di lavoro con comandi non trovati. Questa pagina è la versione web della <a href="https://github.com/Jonconradt/ash/blob/main/docs/ash.1"><code>ash(1)</code> pagina man</a> installabile.</p>
+    </header>
+
+    <div class="docs-layout">
+      <aside class="docs-contents" aria-label="Contenuti della documentazione">
+        <strong>Contenuto</strong>
+        <a href="#synopsis">Sintesi</a>
+        <a href="#description">Descrizione</a>
+        <a href="#mcp">Server MCP</a>
+        <a href="#commands">Comandi</a>
+        <a href="#environment">Ambiente</a>
+        <a href="#files">File</a>
+        <a href="#exit-status">Esci status</a>
+        <a href="#examples">Esempi</a>
+      </aside>
+
+      <article class="docs-content">
+        <section id="synopsis">
+          <h2>Sinossi</h2>
+          <pre><code>ash [text ...]
+ash install [--shell bash|zsh] [--dry-run] [--overwrite]
+ash mcp add &lt;url&gt; [--no-browser]
+ash snooze [duration|off]
+ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></pre>
+        </section>
+
+        <section id="description">
+          <h2>Descrizione</h2>
+          <p><code>ash</code> invia il testo del prompt all'endpoint AI configurato e stampa la risposta dell'assistente. Quando non viene fornito alcun testo posizionale, <code>ash</code> legge il testo del prompt dall'input standard non interattivo.</p>
+          <p>Il sottocomando <code>install</code> aggiunge un blocco di integrazione gestita ai file di avvio della shell. Bash utilizza <code>~/.bashrc</code> e zsh utilizza <code>~/.zshrc</code>.</p>
+          <p>Le connessioni al provider AI sono condivise tramite un broker locale. Il fallimento del broker ricorre all'HTTPS diretto. </p>
+          <p>L'intelligenza artificiale può utilizzare systemd per pianificare attività in background. Questi possono essere lavori ricorrenti o una tantum. I processi pianificati utilizzano HTTPS diretto per impostazione predefinita.</p>
+          <p>ash mantiene uno spazio di lavoro temporaneo con ambito sessione in <code>~/.ash/scratch/&lt;session-id&gt;/</code>. Le directory scratch obsolete e inattive vengono rimosse automaticamente dopo la finestra di conservazione configurata. I registri della cronologia sono archiviati in <code>~/.ash/history/</code>. I vecchi file della cronologia vengono automaticamente ripuliti in base ai criteri di conservazione.</p>
+          <p>Strumenti, script, file, reindirizzamenti e output secondari sono dati non attendibili e non devono sovrascrivere le istruzioni del sistema o dell'utente. La funzionalità di esecuzione dello strumento non è una sandbox quando è abilitata l'esecuzione arbitraria di Python o shell. Per impostazione predefinita Python è abilitato, quindi fai attenzione.</p>
+        </section>
+
+        <section id="mcp">
+          <h2>Server MCP remoti</h2>
+          <p>I server MCP (Model Context Protocol) forniscono strumenti che un modello AI può chiamare. Ash supporta server MCP HTTP Streamable remoti e mantiene le sessioni client in <code>ash-broker</code> attraverso le invocazioni Ash nella stessa shell.</p>
+          <p>Registra un server aggiungendo il suo URL, da solo, a <code>~/.ash/.ash_allow</code>, o esegui <code>ash mcp add &lt;url&gt;</code> da un'applicazione interattiva Ash conchiglia. Il comando connette e registra il server solo dopo una connessione riuscita:</p>
+          <pre><code>https://mcpplaygroundonline.com/mcp-complex-server</code></pre>
+          <p>L'autorizzazione OAuth si apre nel browser desktop quando è disponibile una GUI. Se non è possibile aprire il browser, Ash stampa un URL di autorizzazione copiabile e attende nel terminale. Utilizza <code>ash mcp add &lt;url&gt; --no-browser</code> per utilizzare sempre questo flusso terminale. L'autorizzazione manuale dell'URL richiede ancora un browser sullo stesso host; non è un flusso OAuth senza browser.</p>
+          <p>Le righe URL che iniziano con <code>http://</code> o <code>https://</code> sono registrazioni MCP, non comandi shell. Gli schemi vengono riconosciuti senza distinzione tra maiuscole e minuscole. Ash deriva il nome locale del server dai primi 8 caratteri esadecimali minuscoli di SHA-256 sul testo dell'URL tagliato. È richiesto HTTPS tranne che per lo sviluppo di localhost; Gli URL con credenziali, stringhe di query o frammenti incorporati vengono rifiutati. Per le connessioni OAuth dirette, il rilevamento consente indirizzi IP non pubblici solo per l'esatta autorità MCP registrata; gli altri host OAuth rimangono soggetti al blocco degli indirizzi non pubblici. Un proxy di uscita configurato è responsabile del filtraggio dei propri indirizzi di destinazione. Le modifiche vengono lette alla successiva richiesta Ash.</p>
+          <p>Le registrazioni MCP rimangono abilitate con <code>ASH_STRICT=1</code>. L'output restituito dallo strumento viene comunque trattato come prova non attendibile. Registra solo i server di cui ti fidi: i loro strumenti potrebbero eseguire azioni per tuo conto. Per i server protetti da OAuth, Ash apre il browser quando è disponibile una GUI mentre il broker gestisce il callback e i token. Le credenziali utilizzano il gestore credenziali del sistema operativo quando disponibile o un file crittografato protetto da un <code>ASH_MCP_CREDENTIAL_KEY</code> di 32 byte casuali fornito dall'utente. I file <code>~/.ash/mcp.json</code> esistenti non vengono più letti; sposta gli URL del server in <code>.ash_allow</code>.</p>
+          <p>Se l'inizializzazione MCP fallisce, Ash continua la richiesta senza strumenti MCP remoti. Le corse interattive stampano un avviso; le esecuzioni non interattive falliscono silenziosamente. <strong>I processi pianificati non dispongono del broker per shell interattiva e pertanto non possono utilizzare strumenti MCP remoti.</strong> Un prompt pianificato che dipende da MCP può comunque essere eseguito ma può terminare senza l'azione o i dati MCP richiesti. Non pianificare richieste che richiedono MCP.</p>
+          <p>Consulta le <a href="faq.html">FAQ MCP</a> per una rapida panoramica e note di configurazione.</p>
+        </section>
+
+        <section id="commands">
+          <h2>Comandi</h2>
+          <dl>
+            <dt><code>ash [--attach path]... [text ...]</code></dt>
+            <dd>Esegui una singola richiesta di assistente. <code>--attach</code> allega alla richiesta un file (immagine o documento); ripetibile. Dimensioni limitate da <code>ASH_ATTACHMENT_MAX_BYTES</code> e attualmente inviato in rete solo a provider compatibili con OpenAI.</dd>
+            <dt><code>ash mcp add &lt;url&gt; [--no-browser]</code></dt>
+            <dd>Connetti e registra un server MCP remoto nell'attuale <code>.ash_allow</code>. Apre l'autorizzazione OAuth in un browser desktop quando disponibile; ritorna a un URL copiabile nel terminale. <code>--no-browser</code> utilizza sempre il flusso del terminale.</dd>
+            <dt><code>ash install [--shell bash|zsh] [--dry-run]</code></dt>
+            <dd>Installa o aggiorna l'integrazione della shell. Quando <code>--shell</code> viene omesso, quando possibile viene utilizzata la shell corrente. <code>--dry-run</code> visualizza in anteprima le modifiche senza scrivere. Quando è interattivo, l'installazione si configura automaticamente anche <code>AI_ENDPOINT</code>, <code>AI_MODEL</code> e <code>AI_AUTH_TOKEN</code>: preferisce una chiave API del provider cloud già impostata (OpenAI, Anthropic, Google Gemini, Azure OpenAI, Mistral, Cohere, Groq, xAI, DeepSeek, Together AI, OpenRouter o HuggingFace), quindi un server di inferenza locale in esecuzione (Ollama, LM Studio, llama.cpp/MLX/LocalAI, vLLM, text- generation-webui, Jan o GPT4All) e in caso contrario richiede un menu del provider numerato. Il modello viene scelto dall'elenco dei modelli dell'endpoint quando disponibile.</dd>
+            <dt><code>ash snooze [duration|off]</code></dt>
+            <dd>Interrompe l'elaborazione automatica del prompt della shell. Il valore predefinito è cinque minuti. Le durate utilizzano la sintassi Go come <code>30s</code>, <code>5m</code> o <code>1h</code>. Utilizza <code>off</code> per riprendere immediatamente.</dd>
+            <dt><code>ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></dt>
+            <dd>Scarica e installa l'ultima versione stabile di macOS, Linux o FreeBSD per l'architettura corrente in <code>~/.local/bin/ash</code>. Le versioni richiedono la verifica Sigstore e la verifica SHA-256.</dd>
+          </dl>
+        </section>
+
+        <section id="environment">
+          <h2>Ambiente</h2>
+          <dl> <!-- Always sort the list alphabetically by the first code block, the environment variable name -->
+            <dt><code>AI_AUTH_TOKEN</code></dt><dd>Token al portatore opzionale. Se impostato, viene inviato come autenticazione della portante ed è richiesto per gli endpoint cloud. Gli indirizzi privati/LAN (RFC1918 IPv4, IPv6 ULA) e i nomi host mDNS <code>.local</code> vengono trattati come non cloud (come <code>localhost</code>) a meno che non sia impostato <code>ASH_STRICT=1</code>.</dd>
+            <dt><code>AI_CACHE</code></dt><dd>Attivazione/disattivazione cache nativa del provider opzionale. Abilitato per impostazione predefinita quando supportato; utilizzare <code>off</code> o <code>false</code> per disabilitare.</dd>
+            <dt><code>AI_ENDPOINT</code></dt><dd>URL di base richiesto per l'endpoint API della chat.</dd>
+            <dt><code>AI_MODEL</code></dt><dd>Nome del modello richiesto inviato al endpoint.</dd>
+            <dt><code>AI_PROVIDER</code></dt><dd>Override opzionale del provider: <code>anthropic</code>, <code>bedrock</code>, <code>cohere</code>, <code>gemini</code>, <code>google</code>, <code>ollama</code> o <code>openai</code>. Quando non impostato, ash rileva il provider dall'endpoint.</dd>
+            <dt><code>AI_TIMEOUT</code></dt><dd>Timeout della richiesta facoltativo. Impostazione predefinita: <code>3m</code>.</dd>
+            <dt><code>ASH_ALWAYS_OPENAI_API</code></dt><dd>Attiva/disattiva test facoltativo. In modalità true-like, instrada il provider <code>ollama</code> attraverso l'adattatore SDK compatibile con OpenAI invece della sua implementazione manuale. Impostazione predefinita: attiva.</dd>
+            <dt><code>ASH_ATTACHMENT_MAX_BYTES</code></dt><dd>Dimensione massima opzionale in byte per un file passato tramite <code>--attach</code>. Impostazione predefinita: <code>10485760</code> (10 MiB).</dd>
+            <dt><code>ASH_HISTORY_MAX</code></dt><dd>Messaggi storici massimi opzionali per chiave. Impostazione predefinita: <code>40</code>.</dd>
+            <dt><code>ASH_LOG_FILE</code></dt><dd>Percorso del registro di debug facoltativo quando la registrazione dettagliata è abilitata.</dd>
+            <dt><code>ASH_LOG_MAX_BYTES</code></dt><dd>Dimensione massima del registro facoltativa prima della rotazione. Predefinito: <code>1048576</code>.</dd>
+            <dt><code>ASH_MAX_AGENTS</code></dt><dd>Numero massimo di agenti secondari facoltativi generati da un processo principale. Impostazione predefinita: <code>6</code>.</dd>
+            <dt><code>ASH_MAX_TOOL_ITERS</code></dt><dd>Iterazioni massime facoltative del loop di chiamate allo strumento AI. Impostazione predefinita: <code>16</code>.</dd>
+            <dt><code>ASH_RELEVANCE_WINDOW</code></dt><dd>Osservazioni recenti facoltative dello strumento incluse nello stato di esecuzione. Impostazione predefinita: <code>4</code>.</dd>
+            <dt><code>ASH_RETRY_BASE_DELAY</code></dt><dd>Ritardo base backoff tra tentativi facoltativo. Impostazione predefinita: <code>250ms</code>.</dd>
+            <dt><code>ASH_RETRY_MAX_ATTEMPTS</code></dt><dd>Tentativi di richiesta riproducibili facoltativi. Impostazione predefinita: <code>3</code>.</dd>
+            <dt><code>ASH_SCHEDULED_TASK</code></dt><dd>Flag di pianificazione interno utilizzato dalle invocazioni gestite da ash.</dd>
+            <dt><code>ASH_STREAM</code></dt><dd>Attivazione/disattivazione facoltativa. In modalità true-like, trasmette la risposta dai provider il cui adattatore la supporta (attualmente solo OpenAI). Impostazione predefinita: attivato.</dd>
+            <dt><code>ASH_TASK_MAX</code></dt><dd>Limite facoltativo sulle attività di esecuzione derivate da una richiesta. Predefinito: <code>6</code>.</dd>
+            <dt><code>ASH_TASK_STALL_ROUNDS</code></dt><dd>L'assistente opzionale fa un giro di stallo prima di fermarsi. Impostazione predefinita: <code>2</code>.</dd>
+            <dt><code>ASH_ALLOW</code></dt><dd>Lista consentita facoltativa di eseguibili separati da virgole per <code>run_unix_command</code>. Altrimenti <code>~/.ash/.ash_allow</code> viene utilizzato quando presente; questa sostituzione non espande i token Ash interni.</dd>
+            <dt><code>ASH_DENY</code></dt><dd>Lista negata facoltativa separata da virgole per bloccare esplicitamente comandi, strumenti e plug-in. Altrimenti <code>~/.ash/.ash_deny</code> viene utilizzato quando presente.</dd>
+            <dt><code>ASH_TOOL_OUTPUT_MAX</code></dt><dd>Uscita massima opzionale dello strumento catturato in byte. Impostazione predefinita: <code>8192</code>.</dd>
+            <dt><code>ASH_TOOL_TIMEOUT</code></dt><dd>Timeout comando strumento locale opzionale. Impostazione predefinita: <code>15s</code>.</dd>
+            <dt><code>ASH_VERBOSE</code></dt><dd>Registrazione debug ed esecuzione dashboard facoltativi. Valori come <code>1</code>, <code>true</code>, <code>on</code> e <code>debug</code> lo abilitano.</dd>
+            <dt><code>SESSION_ID</code></dt><dd>Identificatore di sessione per cronologia persistente e denominazione dei registri. Generato automaticamente per le corse interattive in caso di mancanza.</dd>
+          </dl>
+        </section>
+
+        <section id="files">
+          <h2>File</h2>
+          <ul>
+            <li><code>~/.ash/.ash_system</code>: prompt del sistema canonico. <code>$TOOLS_DIR_LIST</code>, <code>$PLUGINS_DIR_LIST</code> e <code>$IF_PYTHON_AVAILABLE</code> sono sostituzioni interne Ash, mai variabili di ambiente.</li>
+            <li><code>~/.ash/.ash_allow</code> — comando canonico, strumento e lista consentita dei plugin. Le sue direttive autonome <code>$TOOLS_DIR_LIST</code> e <code>$PLUGINS_DIR_LIST</code> consentono script gestiti regolari e plugin nativi; sostituire con nomi letterali per una policy restrittiva.</li>
+            <li><code>~/.ash/.ash_deny</code> — file canonico di lista negata per bloccare comandi, strumenti o plugin specifici.</li>
+            <li><code>~/.ash/plugins/</code> — directory dei plugin binari nativi.</li>
+            <li><code>~/.ash/history/</code> — file di cronologia delle conversazioni.</li>
+            <li><code>~/.ash/scratch/</code> — scratch con ambito sessione file.</li>
+            <li><code>~/.ash/.ash_snooze_until</code>: scadenza posticipazione automatica del prompt.</li>
+          </ul>
+        </section>
+
+        <section id="exit-status">
+          <h2>Stato di uscita</h2>
+          <p><code>ash</code> restituisce 0 in caso di successo. Restituisce un valore diverso da zero quando la configurazione, le richieste di rete o l'esecuzione dello strumento falliscono.</p>
+        </section>
+
+        <section id="examples">
+          <h2>Esempi</h2>
+          <pre><code>echo "summarize this directory" | ash
+ash install --shell bash
+ash install --shell zsh --dry-run</code></pre>
+        </section>
+
+        <section id="see-also">
+          <h2>Vedi anche</h2>
+          <p><code>bash(1)</code>, <code>zsh(1)</code>, <code>man(1)</code></p>
+        </section>
+
+        <p class="docs-source">Fonte: <a href="https://github.com/Jonconradt/ash/blob/main/docs/ash.1">docs/ash.1</a> · <a href="https://github.com/Jonconradt/ash/blob/main/README.md">README</a> · <a href="https://github.com/Jonconradt/ash/blob/main/SECURITY.md">Politica di sicurezza</a></p>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer page-width"><span class="brand"><span class="brand-mark">>_</span> ash</span><span>Intelligence della shell open source</span><a href="https://github.com/Jonconradt/ash">github.com/Jonconradt/ash</a></footer>
+  <script src="../site.js" data-site-script defer></script>
+</body>
+</html>

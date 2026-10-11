@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ash |文档</title>
+  <meta name="description" content="ash 命令、配置、环境、文件和安全文档。">
+  <meta name="theme-color" content="#f4f0e8">
+  <link rel="canonical" href="https://jonconradt.github.io/ash/zh-CN/docs.html">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="alternate" hreflang="en" href="https://jonconradt.github.io/ash/docs.html">
+  <link rel="alternate" hreflang="ar" href="https://jonconradt.github.io/ash/ar/docs.html">
+  <link rel="alternate" hreflang="de" href="https://jonconradt.github.io/ash/de/docs.html">
+  <link rel="alternate" hreflang="es" href="https://jonconradt.github.io/ash/es/docs.html">
+  <link rel="alternate" hreflang="fr" href="https://jonconradt.github.io/ash/fr/docs.html">
+  <link rel="alternate" hreflang="id" href="https://jonconradt.github.io/ash/id/docs.html">
+  <link rel="alternate" hreflang="it" href="https://jonconradt.github.io/ash/it/docs.html">
+  <link rel="alternate" hreflang="lb" href="https://jonconradt.github.io/ash/lb/docs.html">
+  <link rel="alternate" hreflang="pt-BR" href="https://jonconradt.github.io/ash/pt-BR/docs.html">
+  <link rel="alternate" hreflang="zh-CN" href="https://jonconradt.github.io/ash/zh-CN/docs.html">
+  <link rel="alternate" hreflang="zh-TW" href="https://jonconradt.github.io/ash/zh-TW/docs.html">
+  <link rel="alternate" hreflang="x-default" href="https://jonconradt.github.io/ash/docs.html">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="ash 首页"><span class="brand-mark">&gt;_</span>ash</a>
+    <nav aria-label="主要导航">
+      <a href="./">家</a>
+      <a href="./#install">安装</a>
+      <a href="faq.html">常问问题</a>
+      <a href="https://github.com/Jonconradt/ash">GitHub</a>
+      <label class="sr-only" for="site-language">语言</label>
+      <select id="site-language" class="language-select" aria-label="选择语言">
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+        <option value="de">Deutsch</option>
+        <option value="es">Español</option>
+        <option value="fr">Français</option>
+        <option value="id">Bahasa Indonesia</option>
+        <option value="it">Italiano</option>
+        <option value="lb">Lëtzebuergesch</option>
+        <option value="pt-BR">Português (Brasil)</option>
+        <option value="zh-CN" selected>简体中文</option>
+        <option value="zh-TW">繁體中文</option>
+        </select>
+    </nav>
+  </header>
+
+  <main class="docs-page page-width">
+    <header class="docs-header">
+      <p class="eyebrow">用户命令·ash(1)</p>
+      <h1>ash 文档</h1>
+      <p>用于命令未找到工作流程的实用 shell 助手。此页面是可安装的网络版本<a href="https://github.com/Jonconradt/ash/blob/main/docs/ash.1"><code>ash(1)</code>手册页</a>。</p>
+    </header>
+
+    <div class="docs-layout">
+      <aside class="docs-contents" aria-label="文档内容">
+        <strong>内容</strong>
+        <a href="#synopsis">概要</a>
+        <a href="#description">描述</a>
+        <a href="#mcp">MCP服务器</a>
+        <a href="#commands">命令</a>
+        <a href="#environment">环境</a>
+        <a href="#files">文件</a>
+        <a href="#exit-status">退出状态</a>
+        <a href="#examples">示例</a>
+      </aside>
+
+      <article class="docs-content">
+        <section id="synopsis">
+          <h2>概要</h2>
+          <pre><code>ash [text ...]
+ash install [--shell bash|zsh] [--dry-run] [--overwrite]
+ash mcp add &lt;url&gt; [--no-browser]
+ash snooze [duration|off]
+ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></pre>
+        </section>
+
+        <section id="description">
+          <h2>描述</h2>
+          <p><code>ash</code>向配置的 AI 端点发送提示文本并打印助理响应。当没有提供位置文本时，<code>ash</code>从非交互式标准输入读取提示文本。</p>
+          <p>这<code>install</code>子命令将托管集成块添加到 shell 启动文件中。 bash 使用<code>~/.bashrc</code>和 zsh 使用<code>~/.zshrc</code>。</p>
+          <p>与人工智能提供商的连接通过本地代理共享。代理故障会退回到直接 HTTPS。</p>
+          <p>AI可以使用systemd来安排后台任务。这些工作可以是重复性工作，也可以是一次性工作。默认情况下，计划作业使用直接 HTTPS。</p>
+          <p>ash 在下维护一个会话范围的临时工作空间<code>~/.ash/scratch/&lt;session-id&gt;/</code>。在配置的保留窗口之后，陈旧和空闲的暂存目录将自动删除。历史日志存储在<code>~/.ash/history/</code>。旧的历史文件会根据保留策略自动清理。</p>
+          <p>工具、脚本、文件、管道和子输出是不受信任的数据，不得覆盖系统或用户指令。当启用任意 Python 或 shell 执行时，工具执行功能不是沙箱。默认情况下，Python 是启用的，所以要小心。</p>
+        </section>
+
+        <section id="mcp">
+          <h2>远程 MCP 服务器</h2>
+          <p>MCP（模型上下文协议）服务器提供 AI 模型可以调用的工具。 Ash 支持远程 Streamable HTTP MCP 服务器并将其客户端会话保持在<code>ash-broker</code>在同一 shell 中跨 Ash 调用。</p>
+          <p>通过将其 URL 本身添加到来注册服务器<code>~/.ash/.ash_allow</code>，或运行<code>ash mcp add &lt;url&gt;</code>来自交互式 Ash shell。该命令仅在连接成功后才连接并注册服务器：</p>
+          <pre><code>https://mcpplaygroundonline.com/mcp-complex-server</code></pre>
+          <p>当 GUI 可用时，OAuth 授权将在桌面浏览器中打开。如果浏览器无法打开，Ash会打印一个可复制的授权URL并在终端中等待。使用<code>ash mcp add &lt;url&gt; --no-browser</code>始终使用此终端流。手动URL授权仍然需要同一主机上的浏览器；它不是无浏览器的 OAuth 流程。</p>
+          <p>URL 行开头为<code>http://</code>或者<code>https://</code>是 MCP 注册，而不是 shell 命令。方案的识别不区分大小写。 Ash 从修剪后的 URL 文本上的 SHA-256 的前 8 个小写十六进制字符派生出服务器的本地名称。除localhost开发外都需要HTTPS；带有嵌入凭据、查询字符串或片段的 URL 将被拒绝。对于直接 OAuth 连接，发现仅允许确切注册的 MCP 机构使用非公共 IP 地址；其他 OAuth 主机仍然受到非公共地址阻止。配置的出口代理负责过滤其目标地址。更改将在下一个 Ash 请求时读取。</p>
+          <p>MCP 注册保持启用状态<code>ASH_STRICT=1</code>。返回的工具输出仍然被视为不可信的证据。仅注册您信任的服务器：他们的工具可能代表您执行操作。对于受 OAuth 保护的服务器，当 GUI 可用时，Ash 将打开浏览器，同时代理处理回调和令牌。凭证使用操作系统凭证管理器（如果可用）或由用户提供的随机 32 字节保护的加密文件<code>ASH_MCP_CREDENTIAL_KEY</code>。现存的<code>~/.ash/mcp.json</code>文件不再被读取；将服务器 URL 移至<code>.ash_allow</code>。</p>
+          <p>如果 MCP 初始化失败，Ash 会在没有远程 MCP 工具的情况下继续请求。交互式运行打印警告；非交互式运行会悄悄失败。<strong>计划作业没有每交互式 shell 代理，因此无法使用远程 MCP 工具。</strong>依赖于 MCP 的计划提示可能仍会运行，但可能会在没有请求的 MCP 操作或数据的情况下完成。不要安排需要 MCP 的提示。</p>
+          <p>请参阅<a href="faq.html">MCP常见问题解答</a>快速概览和设置说明。</p>
+        </section>
+
+        <section id="commands">
+          <h2>命令</h2>
+          <dl>
+            <dt><code>ash [--attach path]... [text ...]</code></dt>
+            <dd>运行单个助理请求。<code>--attach</code>将文件（图像或文档）附加到请求中；可重复的。尺寸限制于<code>ASH_ATTACHMENT_MAX_BYTES</code>目前仅通过网络发送给 OpenAI 兼容的提供商。</dd>
+            <dt><code>ash mcp add &lt;url&gt; [--no-browser]</code></dt>
+            <dd>连接并注册有效的远程 MCP 服务器<code>.ash_allow</code>。在桌面浏览器中打开 OAuth 授权（如果可用）；回退到终端中的可复制 URL。<code>--no-browser</code>始终使用终端流。</dd>
+            <dt><code>ash install [--shell bash|zsh] [--dry-run]</code></dt>
+            <dd>安装或更新 shell 集成。什么时候<code>--shell</code>省略，则尽可能使用当前 shell。<code>--dry-run</code>无需写入即可预览更改。交互时，安装还会自动配置<code>AI_ENDPOINT</code>,<code>AI_MODEL</code>， 和<code>AI_AUTH_TOKEN</code>：它更喜欢已设置的云提供商 API 密钥（OpenAI、Anthropic、Google Gemini、Azure OpenAI、Mistral、Cohere、Groq、xAI、DeepSeek、Together AI、OpenRouter 或 HuggingFace），然后是正在运行的本地推理服务器（Ollama、LM Studio、llama.cpp/MLX/LocalAI、vLLM、text- Generation-webui、Jan 或 GPT4All），否则会提示编号的提供商菜单。该型号是从端点的型号列表（如果可用）中选择的。</dd>
+            <dt><code>ash snooze [duration|off]</code></dt>
+            <dd>暂停自动 shell 提示处理。默认值为五分钟。持续时间使用 Go 语法，例如<code>30s</code>,<code>5m</code>， 或者<code>1h</code>。使用<code>off</code>立即恢复。</dd>
+            <dt><code>ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></dt>
+            <dd>下载适用于当前架构的最新稳定 macOS、Linux 或 FreeBSD 版本并将其安装到<code>~/.local/bin/ash</code>。发布需要 Sigstore 验证和 SHA-256 验证。</dd>
+          </dl>
+        </section>
+
+        <section id="environment">
+          <h2>环境</h2>
+          <dl> <!-- Always sort the list alphabetically by the first code block, the environment variable name -->
+            <dt><code>AI_AUTH_TOKEN</code></dt><dd>可选的不记名令牌。设置后，它作为承载身份验证发送，并且是云端点所必需的。专用/LAN 地址（RFC1918 IPv4、IPv6 ULA）和<code>.local</code>mDNS 主机名被视为非云（例如<code>localhost</code>） 除非<code>ASH_STRICT=1</code>已设置。</dd>
+            <dt><code>AI_CACHE</code></dt><dd>可选的提供者本机缓存切换。支持时默认启用；使用<code>off</code>或者<code>false</code>禁用。</dd>
+            <dt><code>AI_ENDPOINT</code></dt><dd>聊天 API 端点所需的基本 URL。</dd>
+            <dt><code>AI_MODEL</code></dt><dd>发送到端点的所需模型名称。</dd>
+            <dt><code>AI_PROVIDER</code></dt><dd>可选的提供商覆盖：<code>anthropic</code>,<code>bedrock</code>,<code>cohere</code>,<code>gemini</code>,<code>google</code>,<code>ollama</code>， 或者<code>openai</code>。未设置时，ash 从端点检测提供程序。</dd>
+            <dt><code>AI_TIMEOUT</code></dt><dd>可选的请求超时。默认：<code>3m</code>。</dd>
+            <dt><code>ASH_ALWAYS_OPENAI_API</code></dt><dd>可选测试切换。当类似 true 时，路由<code>ollama</code>通过 OpenAI 兼容的 SDK 适配器而不是手动实现来提供程序。默认值：打开。</dd>
+            <dt><code>ASH_ATTACHMENT_MAX_BYTES</code></dt><dd>通过以下方式传递的文件的可选最大大小（以字节为单位）<code>--attach</code>。默认：<code>10485760</code>（10 MiB）。</dd>
+            <dt><code>ASH_HISTORY_MAX</code></dt><dd>每个键可选的最大历史消息数。默认：<code>40</code>。</dd>
+            <dt><code>ASH_LOG_FILE</code></dt><dd>启用详细日志记录时可选的调试日志路径。</dd>
+            <dt><code>ASH_LOG_MAX_BYTES</code></dt><dd>旋转前可选的最大日志大小。默认：<code>1048576</code>。</dd>
+            <dt><code>ASH_MAX_AGENTS</code></dt><dd>一个父进程生成的可选最大子代理数。默认：<code>6</code>。</dd>
+            <dt><code>ASH_MAX_TOOL_ITERS</code></dt><dd>可选的最大 AI 工具调用循环迭代。默认：<code>16</code>。</dd>
+            <dt><code>ASH_RELEVANCE_WINDOW</code></dt><dd>执行状态中包含可选的最近工具观察结果。默认：<code>4</code>。</dd>
+            <dt><code>ASH_RETRY_BASE_DELAY</code></dt><dd>可选的重试退避基本延迟。默认：<code>250ms</code>。</dd>
+            <dt><code>ASH_RETRY_MAX_ATTEMPTS</code></dt><dd>可选的可重试请求尝试。默认：<code>3</code>。</dd>
+            <dt><code>ASH_SCHEDULED_TASK</code></dt><dd>ash 管理的调用使用的内部调度程序标志。</dd>
+            <dt><code>ASH_STREAM</code></dt><dd>可选切换。当 true-like 时，流式传输来自其适配器支持它的提供者的响应（当前仅限 OpenAI）。默认值：打开。</dd>
+            <dt><code>ASH_TASK_MAX</code></dt><dd>从请求派生的执行任务的可选上限。默认：<code>6</code>。</dd>
+            <dt><code>ASH_TASK_STALL_ROUNDS</code></dt><dd>可选的助理在停车前进行失速轮巡。默认：<code>2</code>。</dd>
+            <dt><code>ASH_ALLOW</code></dt><dd>可选的以逗号分隔的可执行白名单<code>run_unix_command</code>。否则<code>~/.ash/.ash_allow</code>当存在时使用；此覆盖不会扩展内部 Ash 标记。</dd>
+            <dt><code>ASH_DENY</code></dt><dd>可选的以逗号分隔的拒绝列表，用于显式阻止命令、工具和插件。否则<code>~/.ash/.ash_deny</code>当存在时使用。</dd>
+            <dt><code>ASH_TOOL_OUTPUT_MAX</code></dt><dd>可选的最大捕获工具输出（以字节为单位）。默认：<code>8192</code>。</dd>
+            <dt><code>ASH_TOOL_TIMEOUT</code></dt><dd>可选的本地工具命令超时。默认：<code>15s</code>。</dd>
+            <dt><code>ASH_VERBOSE</code></dt><dd>可选的调试日志记录和执行仪表板。值如<code>1</code>,<code>true</code>,<code>on</code>， 和<code>debug</code>启用它。</dd>
+            <dt><code>SESSION_ID</code></dt><dd>持久历史记录和日志命名的会话标识符。丢失时自动生成交互式运行。</dd>
+          </dl>
+        </section>
+
+        <section id="files">
+          <h2>文件</h2>
+          <ul>
+            <li><code>~/.ash/.ash_system</code> &mdash;规范的系统提示。<code>$TOOLS_DIR_LIST</code>,<code>$PLUGINS_DIR_LIST</code>， 和<code>$IF_PYTHON_AVAILABLE</code>是内部 Ash 替换，而不是环境变量。</li>
+            <li><code>~/.ash/.ash_allow</code> &mdash;规范命令、工具和插件白名单。它是独立的<code>$TOOLS_DIR_LIST</code>和<code>$PLUGINS_DIR_LIST</code>指令允许常规托管脚本和本机插件；替换为限制性策略的字面名称。</li>
+            <li><code>~/.ash/.ash_deny</code> &mdash;用于阻止特定命令、工具或插件的规范拒绝列表文件。</li>
+            <li><code>~/.ash/plugins/</code> &mdash;本机二进制插件目录。</li>
+            <li><code>~/.ash/history/</code> &mdash;对话历史记录文件。</li>
+            <li><code>~/.ash/scratch/</code> &mdash;会话范围的临时文件。</li>
+            <li><code>~/.ash/.ash_snooze_until</code> &mdash;自动提示暂停到期。</li>
+          </ul>
+        </section>
+
+        <section id="exit-status">
+          <h2>退出状态</h2>
+          <p><code>ash</code> 成功时返回 0。当配置、网络请求或工具执行失败时，它返回非零。</p>
+        </section>
+
+        <section id="examples">
+          <h2>示例</h2>
+          <pre><code>echo "summarize this directory" | ash
+ash install --shell bash
+ash install --shell zsh --dry-run</code></pre>
+        </section>
+
+        <section id="see-also">
+          <h2>参见</h2>
+          <p><code>bash(1)</code>,<code>zsh(1)</code>,<code>man(1)</code></p>
+        </section>
+
+        <p class="docs-source">来源：<a href="https://github.com/Jonconradt/ash/blob/main/docs/ash.1">文档/ash.1</a>·<a href="https://github.com/Jonconradt/ash/blob/main/README.md">自述文件</a>·<a href="https://github.com/Jonconradt/ash/blob/main/SECURITY.md">安全政策</a></p>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer page-width"><span class="brand"><span class="brand-mark">&gt;_</span>ash</span><span>开源 shell 智能</span><a href="https://github.com/Jonconradt/ash">github.com/Jonconradt/ash</a></footer>
+  <script src="../site.js" data-site-script defer></script>
+</body>
+</html>

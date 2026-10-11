@@ -10,6 +10,8 @@
 bin/
 dist/
 coverage.out
+.site-translation-cache.json
+.site-translation-cache.json.tmp
 .DS_Store
 node_modules/
 **/node_modules/
