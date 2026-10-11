@@ -200,6 +200,8 @@ if [[ -n "$localized_man_dir" ]]; then
 fi
 
 clean_version="${version#v}"
+clean_version="${clean_version/-beta./~beta.}"
+clean_version="${clean_version/-nightly./~nightly.}"
 
 fpm -s dir -t rpm \
   -n "$app_name" \

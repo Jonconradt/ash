@@ -109,7 +109,8 @@ make verify
 make sync-route-words
 make version
 make release
-make release RELEASE_VERSION=v1.2.3
+make release
+make release CHANNEL=stable
 ```
 
 - `make lint` runs `golangci-lint` checks across the module
@@ -121,17 +122,23 @@ make release RELEASE_VERSION=v1.2.3
   `internal/app/ash_bootstrap/route_words.txt`, the canonical list. Edit only that file; a test fails if
   the generated blocks are stale
 - `make version` runs quality checks and builds installer artifacts for the selected host/targets
-- `make release` runs quality checks, builds an arm64 macOS `.pkg`, validates it,
-  writes a SHA-256 checksum to `dist/release/`, generates release notes from the
-  Git history through `ash`, creates an annotated release tag containing those
-  notes, and pushes it to `origin`
+- `make release` creates the next beta release (`vX.Y.0-beta.N`) from the latest
+  stable release; use `make release CHANNEL=stable` to run full `make verify`,
+  create a `release/vX.Y` branch, and publish the corresponding `vX.Y.0` stable
+  release
+- `make release CHANNEL=nightly` publishes a date-stamped nightly prerelease
+- Every release generates the localized static website with the existing
+  Google Translate-backed `make site-locales` process and includes it as
+  `ash-site-<version>.tar.gz`; generation uses a temporary copy and does not
+  modify the working tree
 - Release publishing also creates `SHA256SUMS` and a Sigstore bundle. The
   updater requires both the signed manifest and the matching SHA-256 digest.
 - Release-note generation requires `ASH_AI_ENDPOINT` and `ASH_AI_MODEL`. Make supplies
   the Git history to `ash`; `ash` does not invoke Git. The tagged notes are
   published as the GitHub Release body.
-- If `RELEASE_VERSION` is omitted, the latest stable tag is used as the source
-  and the next version is derived as `v<major>.<minor+1>.0`.
+- Beta counters increment for each release of the next minor version. Stable
+  releases omit the prerelease suffix; nightly tags use the next minor version
+  and the UTC release date.
 
 Contributor note: run `make lint test` before submitting changes.
 
@@ -149,13 +156,17 @@ then verifies the archive digest and installs `ash` to
 `~/.local/bin` without requiring `sudo`. Set `ASH_INSTALL_DIR` to choose a
 different destination when needed.
 
-On macOS or Linux with [Homebrew](https://brew.sh), install `ash` and its
-bundled plugins, then initialize Ash for your current shell:
+On macOS or Linux with [Homebrew](https://brew.sh), choose a channel formula,
+then initialize Ash for your current shell:
 
 ```bash
 brew install Jonconradt/ash/ash
 ash install --shell $SHELL --shell-integration
 ```
+
+The `ash` formula follows stable. To follow beta or nightly, install
+`Jonconradt/ash/ash-beta` or `Jonconradt/ash/ash-nightly`; uninstall the current
+formula first when switching channels.
 
 The `ash install` command provisions Ash's embedded bootstrap and shell assets,
 adds shell integration, and helps configure your AI provider. Homebrew installs
@@ -174,6 +185,11 @@ echo "deb [signed-by=/etc/apt/keyrings/versionx-keyring.gpg] https://www.version
 sudo apt update
 sudo apt install ash
 ```
+
+The APT distribution selects the channel: use `stable`, `beta`, or `nightly`
+in the source line to switch channels. Run `sudo apt install --allow-downgrades
+ash` after changing the source so switching from a newer prerelease to stable
+can downgrade cleanly.
 
 The APT repository supports `amd64` and `arm64`. The public signing key is
 published at `https://www.versionx.ai/apt/gpg.key`.
@@ -194,6 +210,10 @@ gpgkey=https://www.versionx.ai/rpm/gpg.key
 EOF
 sudo dnf install ash
 ```
+
+Change the base URL to `https://www.versionx.ai/rpm/beta/` or
+`https://www.versionx.ai/rpm/nightly/` to follow another channel. After
+switching, run `sudo dnf distro-sync ash` to reconcile version changes.
 
 The signed repository metadata verifies package checksums; RPM files are not
 individually signed. The repository supports `x86_64` and `aarch64`; update
@@ -216,6 +236,11 @@ SigLevel = Required DatabaseRequired
 EOF
 sudo pacman -Syu ash
 ```
+
+Use repository names `versionx-beta` or `versionx-nightly` and the matching
+`https://www.versionx.ai/pacman/beta/$arch` or
+`https://www.versionx.ai/pacman/nightly/$arch` URL to follow another channel.
+Run `sudo pacman -Suu ash` after switching to permit a downgrade.
 
 The Pacman repository supports `x86_64`. Package and repository signatures are
 verified by Pacman; update ash with `sudo pacman -Syu`.

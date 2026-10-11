@@ -19,6 +19,36 @@ jobs:
         with:
           ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 0
+      - name: Resolve release channel package versions
+        run: |
+          set -euo pipefail
+          case "$RELEASE_TAG" in
+            v[0-9]*.[0-9]*.[0-9]*)
+              if [[ "$RELEASE_TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+                channel=stable
+                package_version="${BASH_REMATCH[1]}"
+                arch_version="$package_version"
+              elif [[ "$RELEASE_TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-beta\.([1-9][0-9]*)$ ]]; then
+                channel=beta
+                package_version="${BASH_REMATCH[1]}~beta.${BASH_REMATCH[2]}"
+                arch_version="${BASH_REMATCH[1]}.beta.${BASH_REMATCH[2]}"
+              elif [[ "$RELEASE_TAG" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-nightly\.([0-9]{8})$ ]]; then
+                channel=nightly
+                package_version="${BASH_REMATCH[1]}~nightly.${BASH_REMATCH[2]}"
+                arch_version="${BASH_REMATCH[1]}.nightly.${BASH_REMATCH[2]}"
+              else
+                echo "::error::unsupported package release tag: ${RELEASE_TAG}"
+                exit 1
+              fi
+              ;;
+            *)
+              echo "::error::unsupported package release tag: ${RELEASE_TAG}"
+              exit 1
+              ;;
+          esac
+          echo "PACKAGE_CHANNEL=$channel" >> "$GITHUB_ENV"
+          echo "PACKAGE_VERSION=$package_version" >> "$GITHUB_ENV"
+          echo "ARCH_VERSION=$arch_version" >> "$GITHUB_ENV"
       - name: Install repository tools
         run: |
           sudo apt-get update
@@ -28,21 +58,16 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "::error::unsupported release tag for Arch package: ${RELEASE_TAG}"
-            exit 1
-          fi
           mkdir -p "$RUNNER_TEMP/arch-build" "$RUNNER_TEMP/arch-source"
           archive_name="ash-${RELEASE_TAG}-linux-amd64.tar.gz"
           gh release download "$RELEASE_TAG" --pattern "$archive_name" --dir "$RUNNER_TEMP/arch-source"
           archive="$RUNNER_TEMP/arch-source/${archive_name}"
           test -s "$archive"
           archive_sha256="$(sha256sum "$archive" | awk '{print $1}')"
-          version="${RELEASE_TAG#v}"
           cp scripts/package/arch/PKGBUILD "$RUNNER_TEMP/arch-build/PKGBUILD"
           cp "$archive" "$RUNNER_TEMP/arch-build/ash.tar.gz"
           docker run --rm --platform linux/amd64 \
-            -e "ASH_VERSION=${version}" \
+            -e "ASH_VERSION=${ARCH_VERSION}" \
             -e "ASH_ARCHIVE_SHA256=${archive_sha256}" \
             -v "$RUNNER_TEMP/arch-build:/build" \
             archlinux:base-devel \
@@ -79,7 +104,7 @@ jobs:
             package_name="$(dpkg-deb --field "$package" Package)"
             architecture="$(dpkg-deb --field "$package" Architecture)"
             package_version="$(dpkg-deb --field "$package" Version)"
-            if [[ "$package_name" != ash || "$package_version" != "${RELEASE_TAG#v}" ]]; then
+            if [[ "$package_name" != ash || "$package_version" != "$PACKAGE_VERSION" ]]; then
               echo "::error::unexpected package metadata in $(basename "$package")"
               exit 1
             fi
@@ -119,7 +144,7 @@ jobs:
           for package in "${packages[@]}"; do
             package_metadata="$(rpm -qp --queryformat '%{NAME}|%{VERSION}|%{ARCH}' "$package")"
             IFS='|' read -r package_name package_version architecture <<< "$package_metadata"
-            if [[ "$package_name" != ash || "$package_version" != "${RELEASE_TAG#v}" ]]; then
+            if [[ "$package_name" != ash || "$package_version" != "$PACKAGE_VERSION" ]]; then
               echo "::error::unexpected RPM metadata in $(basename "$package")"
               exit 1
             fi
@@ -165,18 +190,23 @@ jobs:
             exit 1
           fi
 
-          mkdir -p site/apt/pool/main \
-            site/apt/dists/stable/main/binary-amd64 \
-            site/apt/dists/stable/main/binary-arm64 \
-            site/rpm/packages \
-            site/pacman/x86_64
-          install -m 0644 "$RUNNER_TEMP"/debs/*.deb site/apt/pool/main/
-          install -m 0644 "$RUNNER_TEMP"/rpms/*.rpm site/rpm/packages/
-          find site/pacman/x86_64 -maxdepth 1 -type f -name '*.pkg.tar.zst*' -delete
-          rm -f site/pacman/x86_64/versionx.db \
-            site/pacman/x86_64/versionx.db.tar.gz \
-            site/pacman/x86_64/versionx.db.sig
-          install -m 0644 "$RUNNER_TEMP"/arch-build/*.pkg.tar.zst site/pacman/x86_64/
+          if [[ "$PACKAGE_CHANNEL" == stable ]]; then
+            rpm_repo=site/rpm
+            pacman_repo=site/pacman/x86_64
+          else
+            rpm_repo="site/rpm/${PACKAGE_CHANNEL}"
+            pacman_repo="site/pacman/${PACKAGE_CHANNEL}/x86_64"
+          fi
+          mkdir -p "site/apt/pool/${PACKAGE_CHANNEL}/main" \
+            "site/apt/dists/${PACKAGE_CHANNEL}/main/binary-amd64" \
+            "site/apt/dists/${PACKAGE_CHANNEL}/main/binary-arm64" \
+            "$rpm_repo/packages" \
+            "$pacman_repo"
+          install -m 0644 "$RUNNER_TEMP"/debs/*.deb "site/apt/pool/${PACKAGE_CHANNEL}/main/"
+          install -m 0644 "$RUNNER_TEMP"/rpms/*.rpm "$rpm_repo/packages/"
+          find "$pacman_repo" -maxdepth 1 -type f -name '*.pkg.tar.zst*' -delete
+          rm -f "$pacman_repo"/versionx.db*
+          install -m 0644 "$RUNNER_TEMP"/arch-build/*.pkg.tar.zst "$pacman_repo/"
           gpg --batch --armor --export "$key_id" > site/apt/gpg.key
           gpg --batch --armor --export "$key_id" > site/rpm/gpg.key
           gpg --batch --armor --export "$key_id" > site/pacman/gpg.key
@@ -184,36 +214,36 @@ jobs:
           (
             cd site/apt
             for architecture in amd64 arm64; do
-              apt_directory="dists/stable/main/binary-${architecture}"
-              dpkg-scanpackages --arch "$architecture" pool/main /dev/null > "${apt_directory}/Packages"
+              apt_directory="dists/${PACKAGE_CHANNEL}/main/binary-${architecture}"
+              dpkg-scanpackages --arch "$architecture" "pool/${PACKAGE_CHANNEL}/main" /dev/null > "${apt_directory}/Packages"
               gzip -9n -c "${apt_directory}/Packages" > "${apt_directory}/Packages.gz"
             done
 
-            rm -f dists/stable/Release dists/stable/InRelease dists/stable/Release.gpg
+            rm -f "dists/${PACKAGE_CHANNEL}/Release" "dists/${PACKAGE_CHANNEL}/InRelease" "dists/${PACKAGE_CHANNEL}/Release.gpg"
             apt-ftparchive \
               -o APT::FTPArchive::Release::Origin="VersionX" \
               -o APT::FTPArchive::Release::Label="VersionX APT Repository" \
-              -o APT::FTPArchive::Release::Suite="stable" \
-              -o APT::FTPArchive::Release::Codename="stable" \
+              -o APT::FTPArchive::Release::Suite="${PACKAGE_CHANNEL}" \
+              -o APT::FTPArchive::Release::Codename="${PACKAGE_CHANNEL}" \
               -o APT::FTPArchive::Release::Architectures="amd64 arm64" \
               -o APT::FTPArchive::Release::Components="main" \
               -o APT::FTPArchive::Release::Description="Official APT repository for ash" \
-              release dists/stable > dists/stable/Release
+              release "dists/${PACKAGE_CHANNEL}" > "dists/${PACKAGE_CHANNEL}/Release"
             gpg --batch --yes --local-user "$key_id" --pinentry-mode loopback \
               --passphrase "$GPG_PASSPHRASE" --clearsign \
-              --output dists/stable/InRelease dists/stable/Release
+              --output "dists/${PACKAGE_CHANNEL}/InRelease" "dists/${PACKAGE_CHANNEL}/Release"
             gpg --batch --yes --local-user "$key_id" --pinentry-mode loopback \
               --passphrase "$GPG_PASSPHRASE" --armor --detach-sign \
-              --output dists/stable/Release.gpg dists/stable/Release
-            gpg --verify dists/stable/InRelease
-            gpg --verify dists/stable/Release.gpg dists/stable/Release
+              --output "dists/${PACKAGE_CHANNEL}/Release.gpg" "dists/${PACKAGE_CHANNEL}/Release"
+            gpg --verify "dists/${PACKAGE_CHANNEL}/InRelease"
+            gpg --verify "dists/${PACKAGE_CHANNEL}/Release.gpg" "dists/${PACKAGE_CHANNEL}/Release"
           )
-          createrepo_c --checksum sha256 site/rpm
+          createrepo_c --checksum sha256 "$rpm_repo"
           gpg --batch --yes --local-user "$key_id" --pinentry-mode loopback \
             --passphrase "$GPG_PASSPHRASE" --armor --detach-sign \
-            --output site/rpm/repodata/repomd.xml.asc site/rpm/repodata/repomd.xml
-          gpg --verify site/rpm/repodata/repomd.xml.asc site/rpm/repodata/repomd.xml
-          pacman_package="$(find site/pacman/x86_64 -maxdepth 1 -type f -name '*.pkg.tar.zst' -print -quit)"
+            --output "$rpm_repo/repodata/repomd.xml.asc" "$rpm_repo/repodata/repomd.xml"
+          gpg --verify "$rpm_repo/repodata/repomd.xml.asc" "$rpm_repo/repodata/repomd.xml"
+          pacman_package="$(find "$pacman_repo" -maxdepth 1 -type f -name '*.pkg.tar.zst' -print -quit)"
           if [[ -z "$pacman_package" ]]; then
             echo "::error::Arch package was not built"
             exit 1
@@ -222,7 +252,7 @@ jobs:
             --passphrase "$GPG_PASSPHRASE" --detach-sign \
             --output "${pacman_package}.sig" "$pacman_package"
           docker run --rm --platform linux/amd64 \
-            -v "$PWD/site/pacman/x86_64:/repo" \
+            -v "$PWD/$pacman_repo:/repo" \
             archlinux:base-devel \
             bash -euo pipefail -c '
               pacman -Syu --noconfirm
@@ -234,9 +264,9 @@ jobs:
             '
           gpg --batch --yes --local-user "$key_id" --pinentry-mode loopback \
             --passphrase "$GPG_PASSPHRASE" --detach-sign \
-            --output site/pacman/x86_64/versionx.db.sig site/pacman/x86_64/versionx.db
+            --output "$pacman_repo/versionx.db.sig" "$pacman_repo/versionx.db"
           gpg --verify "${pacman_package}.sig" "$pacman_package"
-          gpg --verify site/pacman/x86_64/versionx.db.sig site/pacman/x86_64/versionx.db
+          gpg --verify "$pacman_repo/versionx.db.sig" "$pacman_repo/versionx.db"
       - name: Commit and push package repositories
         run: |
           set -euo pipefail

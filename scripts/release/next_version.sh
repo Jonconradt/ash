@@ -4,20 +4,44 @@
 
 set -euo pipefail
 
+channel="${1:-beta}"
 latest_tag="$(git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | head -n1 || true)"
 
 if [[ -z "$latest_tag" ]]; then
-  echo "v0.1.0"
-  exit 0
+  major=0
+  minor=0
+  patch=0
+else
+  if [[ ! "$latest_tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+    echo "failed to parse latest stable tag: $latest_tag" >&2
+    exit 1
+  fi
+
+  major="${BASH_REMATCH[1]}"
+  minor="${BASH_REMATCH[2]}"
+  patch="${BASH_REMATCH[3]}"
 fi
 
-if [[ ! "$latest_tag" =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
-  echo "failed to parse latest stable tag: $latest_tag" >&2
-  exit 1
-fi
-
-major="${BASH_REMATCH[1]}"
-minor="${BASH_REMATCH[2]}"
 next_minor=$((minor + 1))
 
-echo "v${major}.${next_minor}.0"
+case "$channel" in
+  beta)
+    base_version="v${major}.${next_minor}.0"
+    latest_beta="$(git tag --list "${base_version}-beta.*" | grep -E "^${base_version}-beta\\.[0-9]+$" | sed -E 's/.*-beta\.//' | sort -n | tail -n1 || true)"
+    beta_number=1
+    if [[ -n "$latest_beta" ]]; then
+      beta_number=$((latest_beta + 1))
+    fi
+    echo "${base_version}-beta.${beta_number}"
+    ;;
+  stable)
+    echo "v${major}.${next_minor}.0"
+    ;;
+  nightly)
+    echo "v${major}.${next_minor}.0-nightly.$(date -u +%Y%m%d)"
+    ;;
+  *)
+    echo "unsupported release channel: $channel (expected beta, stable, or nightly)" >&2
+    exit 2
+    ;;
+esac

@@ -128,10 +128,10 @@ def is_block(node: Node) -> bool:
     return node.tag in BLOCK_TAGS and bool(node.children)
 
 
-def translate_request(text: str, target: str) -> str:
+def translate_request(text: str, target: str, force: bool = False) -> str:
     global UNSAVED_CACHE_ENTRIES
     key = hashlib.sha256(f"{target}\0{text}".encode("utf-8")).hexdigest()
-    if key in TRANSLATION_CACHE:
+    if not force and key in TRANSLATION_CACHE:
         return TRANSLATION_CACHE[key]
 
     command = [
@@ -179,9 +179,13 @@ def translate_request(text: str, target: str) -> str:
                 if chunk and isinstance(chunk[0], str)
             )
         if not translated:
-                raise RuntimeError(
-                    f"Translation service returned no text for {target}: {text[:120]!r}"
-                )
+            if attempt < 5:
+                time.sleep(min(2**attempt, 30))
+                continue
+            raise RuntimeError(
+                f"Translation service returned no text for {target} after 6 attempts: "
+                f"{text[:120]!r}"
+            )
         TRANSLATION_CACHE[key] = translated
         UNSAVED_CACHE_ENTRIES += 1
         if UNSAVED_CACHE_ENTRIES >= 10:
@@ -239,6 +243,29 @@ def protect_text(text: str, replacements: dict[str, str]) -> str:
     return BRAND_PATTERN.sub(
         lambda match: make_token(replacements, match.group(0)), text
     )
+
+
+def translate_protected_text(text: str, target: str) -> str:
+    replacements: dict[str, str] = {}
+    protected = protect_text(text, replacements)
+    if not replacements:
+        return translate_request(protected, target) if protected.strip() else text
+
+    token_pattern = re.compile("|".join(re.escape(token) for token in replacements))
+    translated = []
+    position = 0
+    for match in token_pattern.finditer(protected):
+        segment = protected[position : match.start()]
+        translated.append(
+            translate_request(segment, target) if segment.strip() else segment
+        )
+        translated.append(replacements[match.group(0)])
+        position = match.end()
+    segment = protected[position:]
+    translated.append(
+        translate_request(segment, target) if segment.strip() else segment
+    )
+    return "".join(translated)
 
 
 def has_translatable_text(text: str) -> bool:
@@ -339,46 +366,15 @@ def repair_tokens(nodes: list[Node], replacements: dict[str, str]) -> None:
 
 
 def translated_plain_text(text: str, target: str) -> str:
-    replacements: dict[str, str] = {}
-    protected = protect_text(text, replacements)
-    translated = (
-        translate_request(protected, target)
-        if has_translatable_text(protected)
-        else protected
-    )
-    node = Node(text=translated)
-    repair_tokens([node], replacements)
-    for token, value in replacements.items():
-        if token not in node.text:
-            raise RuntimeError(f"Translation altered protected text for {target}")
-        node.text = node.text.replace(token, value)
-    return node.text
+    return translate_protected_text(text, target)
 
 
 def translate_text_nodes(node: Node, target: str) -> None:
     if node.tag is None:
         if not node.text.strip() or node.text.startswith(("<", "&")):
             return
-        replacements: dict[str, str] = {}
-        source = protect_text(node.text, replacements)
-        if not has_translatable_text(source):
-            for token, value in replacements.items():
-                source = source.replace(token, value)
-            node.text = source
-            return
-        for attempt in range(3):
-            translated = Node(text=translate_request(source, target))
-            repair_tokens([translated], replacements)
-            if all(token in translated.text for token in replacements):
-                for token, value in replacements.items():
-                    translated.text = translated.text.replace(token, value)
-                node.text = translated.text
-                return
-            if attempt < 2:
-                time.sleep(2**attempt)
-        raise RuntimeError(
-            f"Translation altered protected text in an HTML text node for {target}"
-        )
+        node.text = translate_protected_text(node.text, target)
+        return
     if node.tag in SKIP_TAGS:
         return
     for child in node.children:
@@ -430,7 +426,7 @@ def translate_group(
 
     protected_nodes, replacements = protect_nodes(nodes)
     source = "".join(serialize(node) for node in protected_nodes)
-    translated = parse_fragment(translate_request(source, target))
+    translated = parse_fragment(translate_request(source, target, force=retry > 0))
     translated_blocks = [node for node in translated if is_block(node)]
     if len(translated_blocks) != len(nodes):
         if len(nodes) == 1:

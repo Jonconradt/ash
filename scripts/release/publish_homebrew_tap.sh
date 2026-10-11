@@ -3,20 +3,30 @@ set -euo pipefail
 
 release_tag="${1:?usage: publish_homebrew_tap.sh <release-tag> <checksums-file>}"
 checksums_file="${2:?usage: publish_homebrew_tap.sh <release-tag> <checksums-file>}"
-token="${HOMEBREW_TAP_GITHUB_TOKEN:?Set the HOMEBREW_TAP_GITHUB_TOKEN repository secret}"
 owner="Jonconradt"
 tap_repo="homebrew-ash"
 api_url="https://api.github.com"
 
-if [[ ! "$release_tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
-	echo "Skipping Homebrew update for non-stable release tag: $release_tag"
-	exit 0
+if [[ "$release_tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+	formula_name="ash"
+	class_name="Ash"
+elif [[ "$release_tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-beta\.[1-9][0-9]*$ ]]; then
+	formula_name="ash-beta"
+	class_name="AshBeta"
+elif [[ "$release_tag" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)-nightly\.[0-9]{8}$ ]]; then
+	formula_name="ash-nightly"
+	class_name="AshNightly"
+else
+	echo "Unsupported Homebrew release tag: $release_tag" >&2
+	exit 1
 fi
+
+token="${HOMEBREW_TAP_GITHUB_TOKEN:?Set the HOMEBREW_TAP_GITHUB_TOKEN repository secret}"
 if [[ ! -s "$checksums_file" ]]; then
 	echo "Release checksum manifest is missing or empty: $checksums_file" >&2
 	exit 1
 fi
-version="${BASH_REMATCH[1]}"
+version="${release_tag#v}"
 
 sha256_for() {
 	local artifact="$1"
@@ -61,8 +71,8 @@ auth_config="$(printf 'x-access-token:%s' "$token" | base64 | tr -d '\n')"
 git -c "http.extraheader=AUTHORIZATION: basic $auth_config" \
 	clone --quiet "https://github.com/$owner/$tap_repo.git" "$tmp_dir/tap"
 mkdir -p "$tmp_dir/tap/Formula"
-cat > "$tmp_dir/tap/Formula/ash.rb" <<FORMULA
-class Ash < Formula
+cat > "$tmp_dir/tap/Formula/${formula_name}.rb" <<FORMULA
+class ${class_name} < Formula
   desc "AI assistant for bash, Fish, and zsh"
   homepage "https://github.com/Jonconradt/ash"
   version "$version"
@@ -112,7 +122,7 @@ FORMULA
 
 git -C "$tmp_dir/tap" config user.name "github-actions[bot]"
 git -C "$tmp_dir/tap" config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-git -C "$tmp_dir/tap" add Formula/ash.rb
+git -C "$tmp_dir/tap" add "Formula/${formula_name}.rb"
 if git -C "$tmp_dir/tap" diff --cached --quiet; then
 	echo "Homebrew formula is already current for $release_tag"
 	exit 0
@@ -121,4 +131,4 @@ git -C "$tmp_dir/tap" commit -m "Update Homebrew formula to $release_tag" \
 	-m "Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 branch="$(git -C "$tmp_dir/tap" branch --show-current)"
 git -C "$tmp_dir/tap" -c "http.extraheader=AUTHORIZATION: basic $auth_config" push origin "$branch"
-echo "Updated $owner/$tap_repo/Formula/ash.rb to $release_tag"
+echo "Updated $owner/$tap_repo/Formula/${formula_name}.rb to $release_tag"

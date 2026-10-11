@@ -1,4 +1,4 @@
-.PHONY: all verify build config lint language-lint site-lint site-locales yaml-lint python-lint markdown-lint sync-route-words test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install version release release-check release-clean release-build release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one release-checksums restart-broker plugins-build plugins-test plugins-lint plugins-clean plugins-install
+.PHONY: all verify build config lint language-lint site-lint yaml-lint python-lint markdown-lint sync-route-words test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install version release release-check release-clean release-build release-translate release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one release-checksums restart-broker plugins-build plugins-test plugins-lint plugins-clean plugins-install
 
 SHELL := /bin/bash
 SITE_LOCALES ?=
@@ -32,6 +32,7 @@ RELEASE_GOOS ?= darwin
 RELEASE_FORMAT ?= pkg
 RELEASE_WATCH ?= 1
 RELEASE_WATCH_STRICT ?= 1
+CHANNEL ?= beta
 BUILD_VERSION ?= $(if $(LATEST_RELEASE_TAG),$(LATEST_RELEASE_TAG),dev)
 # Resolved once at parse time; recursive expansion would re-run git after release-publish tags HEAD.
 ifeq ($(origin BUILD_COMMIT),undefined)
@@ -42,7 +43,7 @@ ifeq ($(origin LATEST_RELEASE_TAG),undefined)
 LATEST_RELEASE_TAG := $(shell git tag --list 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$$' | head -n1)
 endif
 ifeq ($(origin AUTO_RELEASE_VERSION),undefined)
-AUTO_RELEASE_VERSION := $(shell ./scripts/release/next_version.sh)
+AUTO_RELEASE_VERSION := $(shell ./scripts/release/next_version.sh "$(CHANNEL)")
 endif
 RELEASE_VERSION ?= $(AUTO_RELEASE_VERSION)
 RELEASE_PKG_NAME ?= $(APP_NAME)-$(RELEASE_VERSION)-darwin-$(RELEASE_ARCH).pkg
@@ -222,12 +223,25 @@ install: test lint gosec plugins-build plugins-install
 
 version: release-check release-artifacts
 
-release: release-check release-clean release-build release-pkg release-validate release-notes release-publish release-watch
+release:
+	@$(MAKE) --no-print-directory release-check
+	@$(MAKE) --no-print-directory release-clean
+	@$(MAKE) --no-print-directory release-build
+	@$(MAKE) --no-print-directory release-translate
+	@$(MAKE) --no-print-directory release-pkg
+	@$(MAKE) --no-print-directory release-validate
+	@$(MAKE) --no-print-directory release-notes
+	@$(MAKE) --no-print-directory release-publish
+	@$(MAKE) --no-print-directory release-watch
 
-release-check: lint test gosec govulncheck
+release-check: $(if $(filter stable,$(CHANNEL)),verify,lint test gosec govulncheck)
 	@if [[ -n "$$(git status --porcelain)" ]]; then \
 		echo "git working tree is dirty; commit or stash changes before release"; \
 		git status --short; \
+		exit 1; \
+	fi
+	@if ! [[ "$(CHANNEL)" =~ ^(beta|stable|nightly)$$ ]]; then \
+		echo "CHANNEL must be beta, stable, or nightly; got: $(CHANNEL)"; \
 		exit 1; \
 	fi
 	@echo "Using RELEASE_VERSION=$(RELEASE_VERSION)"
@@ -236,8 +250,14 @@ release-check: lint test gosec govulncheck
 	else \
 		echo "Latest stable release tag: $(LATEST_RELEASE_TAG)"; \
 	fi
-	@if ! [[ "$(RELEASE_VERSION)" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$$ ]]; then \
-		echo "RELEASE_VERSION must look like vX.Y.Z (optionally with suffix), got: $(RELEASE_VERSION)"; \
+	@if ! { \
+		case "$(CHANNEL)" in \
+			stable) [[ "$(RELEASE_VERSION)" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$$ ]] ;; \
+			beta) [[ "$(RELEASE_VERSION)" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-beta\.[1-9][0-9]*$$ ]] ;; \
+			nightly) [[ "$(RELEASE_VERSION)" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-nightly\.[0-9]{8}$$ ]] ;; \
+		esac; \
+	}; then \
+		echo "RELEASE_VERSION does not match CHANNEL=$(CHANNEL): $(RELEASE_VERSION)"; \
 		exit 1; \
 	fi
 
@@ -249,6 +269,32 @@ release-build:
 	GOOS=darwin GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X github.com/Jonconradt/ash/internal/app.ashVersion=$(RELEASE_VERSION) -X github.com/Jonconradt/ash/internal/app.ashCommit=$(RELEASE_COMMIT)" -o "$(RELEASE_OUTPUT_DIR)/$(APP_NAME)" ./cmd/ash
 	GOOS=darwin GOARCH=$(RELEASE_ARCH) CGO_ENABLED=0 go build -trimpath -ldflags "-s -w" -o "$(RELEASE_OUTPUT_DIR)/$(APP_NAME)-broker" ./cmd/ash-broker
 	$(MAKE) plugins-build PLUGINS_BIN_DIR="$(RELEASE_PLUGINS_BIN_DIR)" PLUGIN_TARGET_GOOS=darwin PLUGIN_TARGET_GOARCH="$(RELEASE_ARCH)"
+
+release-translate:
+	@set -euo pipefail; \
+	work_dir="$$(mktemp -d)"; \
+	cleanup() { \
+		status=$$?; \
+		trap - EXIT; \
+		if [[ -f "$$work_dir/.site-translation-cache.json" ]]; then \
+			cp "$$work_dir/.site-translation-cache.json" .site-translation-cache.json || status=$$?; \
+		fi; \
+		rm -rf "$$work_dir" || status=$$?; \
+		exit "$$status"; \
+	}; \
+	trap cleanup EXIT; \
+	mkdir -p "$$work_dir/site" "$$work_dir/internal/localize"; \
+	cp -R site/. "$$work_dir/site/"; \
+	cp -R internal/localize/languages "$$work_dir/internal/localize/"; \
+	if [[ -f .site-translation-cache.json ]]; then \
+		cp .site-translation-cache.json "$$work_dir/.site-translation-cache.json"; \
+	fi; \
+	(cd "$$work_dir" && python3 site/generate_locales.py); \
+	mkdir -p "$(RELEASE_OUTPUT_DIR)"; \
+	tar -C "$$work_dir/site" -czf "$(RELEASE_OUTPUT_DIR)/ash-site-$(RELEASE_VERSION).tar.gz" .; \
+	tar -tzf "$(RELEASE_OUTPUT_DIR)/ash-site-$(RELEASE_VERSION).tar.gz" | grep -Fxq "./index.html"; \
+	tar -tzf "$(RELEASE_OUTPUT_DIR)/ash-site-$(RELEASE_VERSION).tar.gz" | grep -Fxq "./fr/index.html"; \
+	echo "translated website release artifact: $(RELEASE_OUTPUT_DIR)/ash-site-$(RELEASE_VERSION).tar.gz"
 
 release-build-one:
 	@mkdir -p "$(RELEASE_OUTPUT_DIR)"
@@ -558,8 +604,20 @@ release-publish:
 		echo "cannot publish release from detached HEAD"; \
 		exit 1; \
 	fi; \
-	./scripts/release/push_with_retry.sh "pushing branch $$current_branch to origin" git push origin "$$current_branch" && \
-	echo "pushed branch $$current_branch to origin"
+	publish_branch="$$current_branch"; \
+	if [[ "$(CHANNEL)" == "stable" ]]; then \
+		publish_branch="release/$$(printf '%s' "$(RELEASE_VERSION)" | sed -E 's/^(v[0-9]+\.[0-9]+)\..*/\1/')"; \
+		if [[ "$$current_branch" != "$$publish_branch" ]]; then \
+			if git show-ref --verify --quiet "refs/heads/$$publish_branch" || \
+				git ls-remote --exit-code --heads origin "$$publish_branch" >/dev/null 2>&1; then \
+				echo "stable branch already exists: $$publish_branch"; \
+				exit 1; \
+			fi; \
+			git switch -c "$$publish_branch"; \
+		fi; \
+	fi; \
+	./scripts/release/push_with_retry.sh "pushing branch $$publish_branch to origin" git push origin "$$publish_branch" && \
+	echo "pushed branch $$publish_branch to origin"
 	@head_sha="$$(git rev-parse HEAD)"; \
 	local_sha="$$(git rev-parse -q --verify "refs/tags/$(RELEASE_VERSION)^{}" 2>/dev/null || true)"; \
 	if [[ -n "$$local_sha" && "$$local_sha" != "$$head_sha" ]]; then \

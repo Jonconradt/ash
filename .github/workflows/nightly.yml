@@ -1,0 +1,86 @@
+name: nightly
+on:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+permissions:
+  actions: read
+  contents: write
+concurrency:
+  group: nightly-release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: macos-14
+    env:
+      GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
+      ASH_AI_ENDPOINT: ${{ secrets.ASH_AI_ENDPOINT }}
+      ASH_AI_MODEL: ${{ secrets.ASH_AI_MODEL }}
+      ASH_AI_AUTH_TOKEN: ${{ secrets.ASH_AI_AUTH_TOKEN }}
+    steps:
+      - name: Validate release credentials
+        env:
+          RELEASE_GITHUB_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
+          ASH_AI_ENDPOINT: ${{ secrets.ASH_AI_ENDPOINT }}
+          ASH_AI_MODEL: ${{ secrets.ASH_AI_MODEL }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$RELEASE_GITHUB_TOKEN" ]]; then
+            echo "::error::configure the RELEASE_GITHUB_TOKEN repository secret before enabling nightly releases"
+            exit 1
+          fi
+          if [[ -z "$ASH_AI_ENDPOINT" || -z "$ASH_AI_MODEL" ]]; then
+            echo "::error::configure the ASH_AI_ENDPOINT and ASH_AI_MODEL repository secrets before enabling nightly releases"
+            exit 1
+          fi
+      - name: Checkout default branch and tags
+        uses: actions/checkout@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+          token: ${{ secrets.RELEASE_GITHUB_TOKEN }}
+      - name: Check for changes since the latest nightly
+        id: changes
+        run: |
+          set -euo pipefail
+          latest_tag="$(git tag --list 'v*-nightly.*' --sort=-v:refname | head -n1 || true)"
+          if [[ -n "$latest_tag" && "$(git rev-parse "${latest_tag}^{}")" == "$GITHUB_SHA" ]]; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "No repository changes since $latest_tag"
+            exit 0
+          fi
+          release_tag="$(./scripts/release/next_version.sh nightly)"
+          if git show-ref --verify --quiet "refs/tags/$release_tag"; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "Nightly $release_tag was already published"
+            exit 0
+          fi
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+      - name: Set up Rust
+        if: steps.changes.outputs.publish == 'true'
+        run: rustup toolchain install 1.99.0 --profile minimal
+      - name: Set up Go
+        if: steps.changes.outputs.publish == 'true'
+        uses: actions/setup-go@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          go-version-file: go.mod
+      - name: Set up uv
+        if: steps.changes.outputs.publish == 'true'
+        uses: astral-sh/setup-uv@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v10.0.1
+        with:
+          version: "0.12.5"
+      - name: Set up Node.js
+        if: steps.changes.outputs.publish == 'true'
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22.23.3
+      - name: Restore translation cache
+        if: steps.changes.outputs.publish == 'true'
+        uses: actions/cache@0c45773b623bea8c8e75f6c82b208c3cf94ea4f7 # v4.2.4
+        with:
+          path: .site-translation-cache.json
+          key: site-translation-cache-v1-${{ hashFiles('site/generate_locales.py') }}
+          restore-keys: site-translation-cache-v1-
+      - name: Publish nightly release
+        if: steps.changes.outputs.publish == 'true'
+        run: make release CHANNEL=nightly

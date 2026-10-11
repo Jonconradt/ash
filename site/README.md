@@ -51,3 +51,8 @@ To add a locale, first add its app catalog under
 Run `make site-locales` to refresh the picker and generate its pages. Generated
 translations should be reviewed for technical accuracy and natural wording
 before publishing.
+
+`make release` runs the same generator against a temporary copy of the site and
+attaches the resulting complete localized site as
+`ash-site-<version>.tar.gz`. This keeps release-time translation from modifying
+the checked-in English pages, generated locale pages, sitemap, or local cache.
