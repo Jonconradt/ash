@@ -295,6 +295,8 @@ func TestDashboardRequiresSuccessfulWorkflow(t *testing.T) {
 	root, dir := releaseFixture(t)
 	copyFixture(t, root, dir, "scripts/release/release_dashboard.sh")
 	tag := "v1.2.0-beta.1"
+	runFixture(t, dir, nil, "git", "tag", tag)
+	commit := strings.TrimSpace(runFixture(t, dir, nil, "git", "rev-parse", tag))
 	var assets []map[string]string
 	for _, target := range []string{"darwin-amd64", "darwin-arm64", "linux-amd64", "linux-arm64", "freebsd-amd64"} {
 		formats := []string{"tar.gz"}
@@ -320,17 +322,20 @@ func TestDashboardRequiresSuccessfulWorkflow(t *testing.T) {
 	writeFixture(t, filepath.Join(dir, "assets.json"), string(data), 0o644)
 	writeFixture(t, filepath.Join(dir, "bin/gh"), `#!/bin/bash
 case "$1 $2" in
-  "run list") echo 123 ;;
-  "run view") printf '{"status":"completed","conclusion":"%s","jobs":[]}' "$TEST_CONCLUSION" ;;
+  "run list") [[ "$*" == *"--commit $TEST_EXPECTED_COMMIT"* ]] || exit 1; echo 123 ;;
+  "run view") printf '{"databaseId":123,"status":"completed","conclusion":"%s","jobs":[]}' "$TEST_CONCLUSION" ;;
   "release view") cat assets.json ;;
   *) exit 1 ;;
 esac
 `, 0o755)
 	for _, conclusion := range []string{"success", "failure"} {
-		env := []string{"PATH=" + filepath.Join(dir, "bin") + ":" + os.Getenv("PATH"), "TEST_CONCLUSION=" + conclusion}
+		env := []string{"PATH=" + filepath.Join(dir, "bin") + ":" + os.Getenv("PATH"), "TEST_CONCLUSION=" + conclusion, "TEST_EXPECTED_COMMIT=" + commit}
 		output, err := fixtureCommand(dir, env, "/bin/bash", "scripts/release/release_dashboard.sh", "--tag", tag, "--repo", "fixture/repo", "--once").CombinedOutput()
 		if (err == nil) != (conclusion == "success") {
 			t.Fatalf("dashboard conclusion=%s: %v\n%s", conclusion, err, output)
+		}
+		if !strings.Contains(string(output), "Run: 123") {
+			t.Fatalf("dashboard did not match the tag commit: %s", output)
 		}
 	}
 }

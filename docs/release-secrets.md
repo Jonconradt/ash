@@ -217,6 +217,7 @@ gh run view RUN_ID --repo Jonconradt/ash --log-failed
 ```
 
 Make's release dashboard waits for the tag-triggered release workflow, including
-Homebrew publication; Linux repository publication and Pages deployment are
+Homebrew publication, matching both the local tag name and its commit. Fetch
+the tag before using the dashboard from another checkout. Linux repository publication and Pages deployment are
 separate runs and must also be checked. Token values and scopes, provider/model
 access, and the GPG passphrase cannot be verified through `gh secret list`.
