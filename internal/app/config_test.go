@@ -215,6 +215,19 @@ func TestManagedPluginRootsAndUserOverride(t *testing.T) {
 	if got := systemPluginRoot("windows"); got != "" {
 		t.Fatalf("systemPluginRoot(windows) = %q, want empty", got)
 	}
+
+	roots, err := managedPluginRoots()
+	if err != nil {
+		t.Fatalf("managedPluginRoots() returned unexpected error: %v", err)
+	}
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatalf("os.Executable() returned unexpected error: %v", err)
+	}
+	wantHomebrewRoot := filepath.Clean(filepath.Join(filepath.Dir(executable), "..", "lib", "ash", "plugins"))
+	if got := roots[len(roots)-1]; got != wantHomebrewRoot {
+		t.Fatalf("managedPluginRoots() last root = %q, want %q", got, wantHomebrewRoot)
+	}
 }
 
 // TestParseAIConfigFromEnvOllamaOpenAIAPIDefault covers the ASH_ALWAYS_OPENAI_API

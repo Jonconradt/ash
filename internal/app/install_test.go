@@ -107,6 +107,9 @@ func TestInstallTargetResolutionByOS(t *testing.T) {
 	if _, err := resolveInstallShellTarget("bash"); err != nil {
 		t.Fatalf("expected bash target, got error: %v", err)
 	}
+	if _, err := resolveInstallShellTarget("/bin/zsh"); err != nil {
+		t.Fatalf("expected zsh executable path to resolve, got error: %v", err)
+	}
 	if _, err := resolveInstallShellTarget("zsh"); err != nil {
 		t.Fatalf("expected zsh target, got error: %v", err)
 	}

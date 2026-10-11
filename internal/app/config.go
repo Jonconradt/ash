@@ -715,6 +715,11 @@ func managedPluginRoots() ([]string, error) {
 	if systemRoot := systemPluginRoot(runtime.GOOS); systemRoot != "" {
 		roots = append(roots, systemRoot)
 	}
+	executable, err := os.Executable()
+	if err != nil {
+		return nil, fmt.Errorf("resolve executable path for bundled plugins: %w", err)
+	}
+	roots = append(roots, filepath.Clean(filepath.Join(filepath.Dir(executable), "..", "lib", "ash", "plugins")))
 	return roots, nil
 }
 

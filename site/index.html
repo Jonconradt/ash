@@ -94,6 +94,10 @@
         <div><p class="eyebrow">Start small</p><h2>Give your shell<br><em>some company.</em></h2></div>
         <div class="install-details">
           <p>Linux, macOS, and FreeBSD users can install the latest release in one step. Install Sigstore <code>cosign</code> first so the installer can verify the signed checksum manifest. It installs to <code>~/.local/bin</code> and asks before adding opt-in Fish, zsh, or bash shell integration.</p>
+          <p>On macOS or Linux with <a href="https://brew.sh">Homebrew</a>, install ash and its bundled plugins, then initialize its embedded assets, provider settings, and shell integration:</p>
+          <pre><code>brew install Jonconradt/ash/ash
+ash install --shell $SHELL --shell-integration</code></pre>
+          <p>The formula is updated automatically for each stable release. The install command provisions Ash's embedded assets, sets up shell integration for your current shell, and helps configure your AI provider.</p>
           <p><code>ash install</code> auto-configures your AI provider: it detects an already-set cloud provider API key or a running local inference server, otherwise it shows a numbered menu to pick a provider and model. Or set these yourself:</p>
           <pre><code>export ASH_AI_AUTH_TOKEN='your-token'
 export ASH_AI_ENDPOINT='https://ollama.com'

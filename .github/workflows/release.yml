@@ -307,3 +307,7 @@ jobs:
           body_path: release-notes.md
           files: |
             dist/release/*
+      - name: Update Homebrew tap
+        env:
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+        run: bash scripts/release/publish_homebrew_tap.sh "${GITHUB_REF_NAME}" dist/release/SHA256SUMS

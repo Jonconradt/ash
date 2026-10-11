@@ -149,6 +149,18 @@ then verifies the archive digest and installs `ash` to
 `~/.local/bin` without requiring `sudo`. Set `ASH_INSTALL_DIR` to choose a
 different destination when needed.
 
+On macOS or Linux with [Homebrew](https://brew.sh), install `ash` and its
+bundled plugins, then initialize Ash for your current shell:
+
+```bash
+brew install Jonconradt/ash/ash
+ash install --shell $SHELL --shell-integration
+```
+
+The `ash install` command provisions Ash's embedded bootstrap and shell assets,
+adds shell integration, and helps configure your AI provider. Homebrew installs
+are package-manager-owned and are updated with `brew upgrade`.
+
 | OS | amd64 | arm64 |
 | --- | --- | --- |
 | macOS (darwin) | ✅ | ✅ |
@@ -245,6 +257,12 @@ Canonical publishing is tag-driven in GitHub Actions.
 - `ash-v1.2.3-<os>-<arch>.tar.gz`
 - matching `.sha256` files for each artifact
 - `SHA256SUMS` and `SHA256SUMS.sigstore.json`
+
+After publishing a stable version, the workflow creates the public
+`Jonconradt/homebrew-ash` tap if it does not exist and commits an updated formula
+for macOS and Linux. Add a repository secret named
+`HOMEBREW_TAP_GITHUB_TOKEN` containing a classic personal access token with
+permission to create and push to public repositories.
 
 Installer man pages are included in release artifacts:
 

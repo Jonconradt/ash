@@ -77,6 +77,9 @@ func defaultInstallShell(shellPath string) string {
 
 func resolveInstallShellTarget(shellName string) (installShellTarget, error) {
 	normalized := normalizeShellName(shellName)
+	if _, ok := installShellTargets[normalized]; !ok {
+		normalized = detectShellName(shellName)
+	}
 	target, ok := installShellTargets[normalized]
 	if !ok {
 		supported := strings.Join(supportedShells(), ", ")
