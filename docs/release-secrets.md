@@ -216,9 +216,11 @@ The pushed annotated tag starts `release.yml`, which verifies and builds all
 platform artifacts, runs smoke tests, signs checksums, and creates the GitHub
 Release using `RELEASE_GITHUB_TOKEN`. The published-release event starts
 `apt.yml`, which signs and commits channel-specific package repositories using
-the same token. That push to the default branch starts `site.yml`; Pages
-deploys from the default branch, not from a prerelease tag. Homebrew updates
-run within `release.yml` using the separate tap token.
+the same token. After a successful stable package-repository update, `apt.yml`
+dispatches `site.yml`; Pages deploys the default branch. Nightly and Beta
+repository updates do not trigger a Pages deployment, and individual pushes
+to the default branch do not trigger one either. Homebrew updates run within
+`release.yml` using the separate tap token.
 
 Verify workflow outcomes, not just secret names:
 

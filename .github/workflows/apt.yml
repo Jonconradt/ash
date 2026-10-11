@@ -281,6 +281,7 @@ jobs:
           gpg --verify "${pacman_package}.sig" "$pacman_package"
           gpg --verify "$pacman_repo/versionx.db.sig" "$pacman_repo/versionx.db"
       - name: Commit and push package repositories
+        id: repository_update
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
@@ -288,6 +289,7 @@ jobs:
           git add site/apt site/rpm site/pacman
           if git diff --cached --quiet; then
             echo "APT repository is already up to date"
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git commit -m "chore(repositories): publish ash ${RELEASE_TAG}" \
@@ -295,3 +297,13 @@ jobs:
           git fetch origin "$DEFAULT_BRANCH"
           git rebase "origin/${DEFAULT_BRANCH}"
           git push origin "HEAD:${DEFAULT_BRANCH}"
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+      - name: Dispatch stable site update
+        if: startsWith(env.RELEASE_TAG, 'v') && !contains(env.RELEASE_TAG, '-') && steps.repository_update.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/dispatches" \
+            -f event_type=stable-release-updated \
+            -F "client_payload[tag]=${RELEASE_TAG}"

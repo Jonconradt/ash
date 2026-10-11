@@ -1,11 +1,7 @@
 name: Deploy site
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'site/**'
-      - '.github/workflows/site.yml'
-  workflow_dispatch:
+  repository_dispatch:
+    types: [stable-release-updated]
 permissions:
   contents: read
   pages: write
@@ -15,6 +11,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   deploy:
+    if: startsWith(github.event.client_payload.tag, 'v') && !contains(github.event.client_payload.tag, '-')
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

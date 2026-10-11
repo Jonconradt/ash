@@ -289,6 +289,47 @@ func TestRepositoryNightlyRetryVersionMapping(t *testing.T) {
 	}
 }
 
+func TestSiteDeploymentOnlyRunsAfterStableRepositoryUpdate(t *testing.T) {
+	root, _ := releaseFixture(t)
+	data, err := os.ReadFile(filepath.Join(root, ".github/workflows/site.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	siteWorkflow := string(data)
+	for _, required := range []string{
+		"repository_dispatch:",
+		"types: [stable-release-updated]",
+		"if: startsWith(github.event.client_payload.tag, 'v') && !contains(github.event.client_payload.tag, '-')",
+	} {
+		if !strings.Contains(siteWorkflow, required) {
+			t.Errorf("site workflow missing stable-release condition %q", required)
+		}
+	}
+	for _, forbidden := range []string{"\n  push:", "\n  workflow_dispatch:"} {
+		if strings.Contains(siteWorkflow, forbidden) {
+			t.Errorf("site workflow still has non-release trigger %q", strings.TrimSpace(forbidden))
+		}
+	}
+
+	repositoryStep := workflowStep(t, root, "apt.yml", "Commit and push package repositories")
+	if !strings.Contains(repositoryStep, `echo "changed=false" >> "$GITHUB_OUTPUT"`) ||
+		!strings.Contains(repositoryStep, `echo "changed=true" >> "$GITHUB_OUTPUT"`) {
+		t.Fatal("package repository step does not report whether it updated files")
+	}
+	dispatchStep := workflowStep(t, root, "apt.yml", "Dispatch stable site update")
+	if !strings.Contains(dispatchStep, "event_type=stable-release-updated") ||
+		!strings.Contains(dispatchStep, `client_payload[tag]=${RELEASE_TAG}`) {
+		t.Fatal("stable repository update does not dispatch the site workflow with the release tag")
+	}
+	aptData, err := os.ReadFile(filepath.Join(root, ".github/workflows/apt.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(aptData), "if: startsWith(env.RELEASE_TAG, 'v') && !contains(env.RELEASE_TAG, '-') && steps.repository_update.outputs.changed == 'true'") {
+		t.Fatal("site deployment is not gated on a changed stable repository")
+	}
+}
+
 func TestReleaseWorkflowUploadsOnlyInstallablePackages(t *testing.T) {
 	root, _ := releaseFixture(t)
 	data, err := os.ReadFile(filepath.Join(root, ".github/workflows/release.yml"))
