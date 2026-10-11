@@ -1,0 +1,136 @@
+name: Publish APT repository
+on:
+  release:
+    types: [published]
+permissions:
+  contents: write
+concurrency:
+  group: apt-repository
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      RELEASE_TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - name: Checkout default branch
+        uses: actions/checkout@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+      - name: Download release packages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/debs"
+          gh release download "$RELEASE_TAG" --pattern '*.deb' --dir "$RUNNER_TEMP/debs"
+          packages=("$RUNNER_TEMP"/debs/*.deb)
+          if [[ ${#packages[@]} -ne 2 ]]; then
+            echo "::error::expected amd64 and arm64 .deb packages for ${RELEASE_TAG}, found ${#packages[@]}"
+            exit 1
+          fi
+          amd64_found=0
+          arm64_found=0
+          for package in "${packages[@]}"; do
+            package_name="$(dpkg-deb --field "$package" Package)"
+            architecture="$(dpkg-deb --field "$package" Architecture)"
+            package_version="$(dpkg-deb --field "$package" Version)"
+            if [[ "$package_name" != ash || "$package_version" != "${RELEASE_TAG#v}" ]]; then
+              echo "::error::unexpected package metadata in $(basename "$package")"
+              exit 1
+            fi
+            case "$architecture" in
+              amd64)
+                if [[ "$amd64_found" -eq 1 ]]; then
+                  echo "::error::duplicate amd64 .deb package"
+                  exit 1
+                fi
+                amd64_found=1
+                ;;
+              arm64)
+                if [[ "$arm64_found" -eq 1 ]]; then
+                  echo "::error::duplicate arm64 .deb package"
+                  exit 1
+                fi
+                arm64_found=1
+                ;;
+              *)
+                echo "::error::unsupported Debian package architecture: ${architecture}"
+                exit 1
+                ;;
+            esac
+          done
+          if [[ "$amd64_found" -ne 1 || "$arm64_found" -ne 1 ]]; then
+            echo "::error::release must include one amd64 and one arm64 .deb package"
+            exit 1
+          fi
+      - name: Install APT repository tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y apt-utils dpkg-dev
+      - name: Import signing key and update repository
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$GPG_PRIVATE_KEY" ]]; then
+            echo "::error::configure the GPG_PRIVATE_KEY repository secret with the base64-encoded exported secret key"
+            exit 1
+          fi
+          printf '%s' "$GPG_PRIVATE_KEY" | base64 --decode | gpg --batch --import
+          key_id="$(gpg --batch --with-colons --list-secret-keys | awk -F: '$1 == "fpr" { print $10; exit }')"
+          if [[ -z "$key_id" ]]; then
+            echo "::error::GPG_PRIVATE_KEY did not import a signing key"
+            exit 1
+          fi
+
+          mkdir -p site/apt/pool/main \
+            site/apt/dists/stable/main/binary-amd64 \
+            site/apt/dists/stable/main/binary-arm64
+          install -m 0644 "$RUNNER_TEMP"/debs/*.deb site/apt/pool/main/
+          gpg --batch --armor --export "$key_id" > site/apt/gpg.key
+
+          (
+            cd site/apt
+            for architecture in amd64 arm64; do
+              apt_directory="dists/stable/main/binary-${architecture}"
+              dpkg-scanpackages --arch "$architecture" pool/main /dev/null > "${apt_directory}/Packages"
+              gzip -9n -c "${apt_directory}/Packages" > "${apt_directory}/Packages.gz"
+            done
+
+            rm -f dists/stable/Release dists/stable/InRelease dists/stable/Release.gpg
+            apt-ftparchive \
+              -o APT::FTPArchive::Release::Origin="VersionX" \
+              -o APT::FTPArchive::Release::Label="VersionX APT Repository" \
+              -o APT::FTPArchive::Release::Suite="stable" \
+              -o APT::FTPArchive::Release::Codename="stable" \
+              -o APT::FTPArchive::Release::Architectures="amd64 arm64" \
+              -o APT::FTPArchive::Release::Components="main" \
+              -o APT::FTPArchive::Release::Description="Official APT repository for ash" \
+              release dists/stable > dists/stable/Release
+            gpg --batch --yes --local-user "$key_id" --pinentry-mode loopback \
+              --passphrase "$GPG_PASSPHRASE" --clearsign \
+              --output dists/stable/InRelease dists/stable/Release
+            gpg --batch --yes --local-user "$key_id" --pinentry-mode loopback \
+              --passphrase "$GPG_PASSPHRASE" --armor --detach-sign \
+              --output dists/stable/Release.gpg dists/stable/Release
+            gpg --verify dists/stable/InRelease
+            gpg --verify dists/stable/Release.gpg dists/stable/Release
+          )
+      - name: Commit and push APT repository
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add site/apt
+          if git diff --cached --quiet; then
+            echo "APT repository is already up to date"
+            exit 0
+          fi
+          git commit -m "chore(apt): publish ash ${RELEASE_TAG}"
+          git fetch origin "$DEFAULT_BRANCH"
+          git rebase "origin/${DEFAULT_BRANCH}"
+          git push origin "HEAD:${DEFAULT_BRANCH}"

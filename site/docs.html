@@ -31,6 +31,7 @@
     <div class="docs-layout">
       <aside class="docs-contents" aria-label="Documentation contents">
         <strong>Contents</strong>
+        <a href="#apt-installation">APT installation</a>
         <a href="#synopsis">Synopsis</a>
         <a href="#description">Description</a>
         <a href="#mcp">MCP servers</a>
@@ -42,6 +43,20 @@
       </aside>
 
       <article class="docs-content">
+        <section id="apt-installation">
+          <h2>Install on Debian or Ubuntu</h2>
+          <p>The signed VersionX APT repository supports <code>amd64</code> and <code>arm64</code>. Add its public signing key and package source, then install <code>ash</code>:</p>
+          <pre><code>sudo install -d -m 0755 /etc/apt/keyrings
+curl -fsSL https://www.versionx.ai/apt/gpg.key |
+  sudo gpg --dearmor --batch --yes -o /etc/apt/keyrings/versionx-keyring.gpg
+sudo chmod 0644 /etc/apt/keyrings/versionx-keyring.gpg
+echo "deb [signed-by=/etc/apt/keyrings/versionx-keyring.gpg] https://www.versionx.ai/apt stable main" |
+  sudo tee /etc/apt/sources.list.d/versionx.list
+sudo apt update
+sudo apt install ash</code></pre>
+          <p>Verify the installed command with <code>ash --version</code>. Package-manager installations are updated with <code>sudo apt update &amp;&amp; sudo apt upgrade</code>.</p>
+        </section>
+
         <section id="synopsis">
           <h2>Synopsis</h2>
           <pre><code>ash [text ...]

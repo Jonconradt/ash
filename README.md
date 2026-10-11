@@ -161,6 +161,23 @@ The `ash install` command provisions Ash's embedded bootstrap and shell assets,
 adds shell integration, and helps configure your AI provider. Homebrew installs
 are package-manager-owned and are updated with `brew upgrade`.
 
+On Debian or Ubuntu, install the signed APT package and receive updates with
+`apt upgrade`:
+
+```bash
+sudo install -d -m 0755 /etc/apt/keyrings
+curl -fsSL https://www.versionx.ai/apt/gpg.key |
+  sudo gpg --dearmor --batch --yes -o /etc/apt/keyrings/versionx-keyring.gpg
+sudo chmod 0644 /etc/apt/keyrings/versionx-keyring.gpg
+echo "deb [signed-by=/etc/apt/keyrings/versionx-keyring.gpg] https://www.versionx.ai/apt stable main" |
+  sudo tee /etc/apt/sources.list.d/versionx.list
+sudo apt update
+sudo apt install ash
+```
+
+The APT repository supports `amd64` and `arm64`. The public signing key is
+published at `https://www.versionx.ai/apt/gpg.key`.
+
 | OS | amd64 | arm64 |
 | --- | --- | --- |
 | macOS (darwin) | ✅ | ✅ |

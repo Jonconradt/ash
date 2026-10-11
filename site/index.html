@@ -98,6 +98,7 @@
           <pre><code>brew install Jonconradt/ash/ash
 ash install --shell $SHELL --shell-integration</code></pre>
           <p>The formula is updated automatically for each stable release. The install command provisions Ash's embedded assets, sets up shell integration for your current shell, and helps configure your AI provider.</p>
+          <p>On Debian or Ubuntu, you can install and update ash with APT. Follow the <a href="docs.html#apt-installation">APT repository setup instructions</a>.</p>
           <p><code>ash install</code> auto-configures your AI provider: it detects an already-set cloud provider API key or a running local inference server, otherwise it shows a numbered menu to pick a provider and model. Or set these yourself:</p>
           <pre><code>export ASH_AI_AUTH_TOKEN='your-token'
 export ASH_AI_ENDPOINT='https://ollama.com'
