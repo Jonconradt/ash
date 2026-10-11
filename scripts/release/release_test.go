@@ -374,6 +374,20 @@ Path("site/fr/index.html").write_text("translated")
 	}
 }
 
+func TestFailedBranchPushStopsBeforeTagging(t *testing.T) {
+	_, dir := releaseFixture(t)
+	writeFixture(t, filepath.Join(dir, "scripts/release/push_with_retry.sh"), "#!/bin/bash\nexit 42\n", 0o755)
+	runFixture(t, dir, nil, "git", "add", ".")
+	runFixture(t, dir, nil, "git", "commit", "-m", "failing push fixture")
+	writeFixture(t, filepath.Join(dir, "dist/release/release-notes.md"), "fixture notes", 0o644)
+	if output, err := fixtureCommand(dir, nil, "make", "release-publish", "RELEASE_VERSION=v1.2.0-beta.1").CombinedOutput(); err == nil {
+		t.Fatalf("failed branch push returned success: %s", output)
+	}
+	if err := fixtureCommand(dir, nil, "git", "show-ref", "--verify", "--quiet", "refs/tags/v1.2.0-beta.1").Run(); err == nil {
+		t.Fatal("tag created after branch push failure")
+	}
+}
+
 func TestArtifactBuildStopsOnFailure(t *testing.T) {
 	_, dir := releaseFixture(t)
 	writeFixture(t, filepath.Join(dir, "steps.mk"), `

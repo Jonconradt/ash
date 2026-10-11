@@ -1,0 +1,14 @@
+title = "ash secret scanning"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+
+# Translation cache JSON uses SHA-256 digests as object keys.
+[[rules.allowlists]]
+condition = "AND"
+paths = ['''(^|/)(\.site-translation-cache|\.cache/ash/site-translation-cache)\.json$''']
+regexTarget = "match"
+regexes = ['''", "[a-f0-9]{64}"$''']

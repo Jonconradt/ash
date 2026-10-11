@@ -93,8 +93,8 @@ verify:
 	@./scripts/dev/run-quiet.sh "vet"         go vet ./...
 	@./scripts/dev/run-quiet.sh "staticcheck" $(MAKE) --no-print-directory staticcheck
 	@./scripts/dev/run-quiet.sh "security"    $(MAKE) --no-print-directory security
-	@./scripts/dev/run-quiet.sh "secrets-history" gitleaks git --redact --verbose --log-opts=--all .
-	@./scripts/dev/run-quiet.sh "secrets-tree"    gitleaks dir --redact --verbose .
+	@./scripts/dev/run-quiet.sh "secrets-history" go run github.com/zricethezav/gitleaks/v8@$(GITLEAKS_VERSION) git --redact --verbose --log-opts=--all .
+	@./scripts/dev/run-quiet.sh "secrets-tree"    go run github.com/zricethezav/gitleaks/v8@$(GITLEAKS_VERSION) dir --redact --verbose .
 	@./scripts/dev/run-quiet.sh "test-fuzz"   go test -fuzz=Fuzz -fuzztime=$(FUZZ_TIME) ./internal/app
 	@./scripts/dev/run-quiet.sh "benchmark"   go test -bench=. -benchmem ./...
 	@echo "verify: all checks passed"
@@ -649,7 +649,7 @@ release-publish:
 			git switch -c "$$publish_branch"; \
 		fi; \
 	fi; \
-	./scripts/release/push_with_retry.sh "pushing branch $$publish_branch to origin" git push origin "$$publish_branch" && \
+	./scripts/release/push_with_retry.sh "pushing branch $$publish_branch to origin" git push origin "$$publish_branch"; \
 	echo "pushed branch $$publish_branch to origin"
 	@set -euo pipefail; \
 	head_sha="$$(git rev-parse HEAD)"; \
@@ -668,7 +668,7 @@ release-publish:
 		echo "local tag $(RELEASE_VERSION) already exists at HEAD"; \
 	fi
 	@echo "pushing tag $(RELEASE_VERSION) to origin"; \
-	./scripts/release/push_with_retry.sh "pushing tag $(RELEASE_VERSION) to origin" git push origin "refs/tags/$(RELEASE_VERSION):refs/tags/$(RELEASE_VERSION)" && \
+	./scripts/release/push_with_retry.sh "pushing tag $(RELEASE_VERSION) to origin" git push origin "refs/tags/$(RELEASE_VERSION):refs/tags/$(RELEASE_VERSION)" || exit $$?; \
 	echo "pushed tag $(RELEASE_VERSION) to origin"
 
 release-watch:

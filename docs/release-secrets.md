@@ -204,6 +204,13 @@ Fetch all remote tags before releasing from a local checkout. Never move or
 delete release tags, including failed attempts: Go's public checksum database
 can index a tag before a GitHub Release exists. Publish a new version instead;
 do not disable checksum verification.
+Release quality checks run the pinned Gitleaks version through Go, so a separate
+`gitleaks` executable is not required. The release quality job checks out full
+Git history for the history scan. Branch and tag push failures stop publication;
+sync the branch and rerun release preparation rather than tagging stale code.
+The secret-scan configuration retains the default rules and excludes only
+SHA-256 object-key matches in the translation cache from the generic API-key
+rule; credential values in that file remain subject to scanning.
 
 The pushed annotated tag starts `release.yml`, which verifies and builds all
 platform artifacts, runs smoke tests, signs checksums, and creates the GitHub
