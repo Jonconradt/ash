@@ -23,6 +23,43 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y apt-utils createrepo-c dpkg-dev rpm
+      - name: Download and build Arch package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::unsupported release tag for Arch package: ${RELEASE_TAG}"
+            exit 1
+          fi
+          mkdir -p "$RUNNER_TEMP/arch-build" "$RUNNER_TEMP/arch-source"
+          archive_name="ash-${RELEASE_TAG}-linux-amd64.tar.gz"
+          gh release download "$RELEASE_TAG" --pattern "$archive_name" --dir "$RUNNER_TEMP/arch-source"
+          archive="$RUNNER_TEMP/arch-source/${archive_name}"
+          test -s "$archive"
+          archive_sha256="$(sha256sum "$archive" | awk '{print $1}')"
+          version="${RELEASE_TAG#v}"
+          cp scripts/package/arch/PKGBUILD "$RUNNER_TEMP/arch-build/PKGBUILD"
+          cp "$archive" "$RUNNER_TEMP/arch-build/ash.tar.gz"
+          docker run --rm --platform linux/amd64 \
+            -e "ASH_VERSION=${version}" \
+            -e "ASH_ARCHIVE_SHA256=${archive_sha256}" \
+            -v "$RUNNER_TEMP/arch-build:/build" \
+            archlinux:base-devel \
+            bash -euo pipefail -c '
+              pacman -Syu --noconfirm
+              useradd --create-home builder
+              chown -R builder:builder /build
+              runuser -u builder -- env \
+                "ASH_VERSION=$ASH_VERSION" \
+                "ASH_ARCHIVE_SHA256=$ASH_ARCHIVE_SHA256" \
+                bash -euo pipefail -c "cd /build && makepkg --noconfirm --clean"
+              package="/build/ash-${ASH_VERSION}-1-x86_64.pkg.tar.zst"
+              test -s "$package"
+              bsdtar -xOf "$package" .PKGINFO | grep -Fx "pkgname = ash"
+              bsdtar -xOf "$package" .PKGINFO | grep -Fx "pkgver = ${ASH_VERSION}-1"
+              bsdtar -xOf "$package" .PKGINFO | grep -Fx "arch = x86_64"
+            '
       - name: Download and validate release packages
         env:
           GH_TOKEN: ${{ github.token }}
@@ -131,11 +168,18 @@ jobs:
           mkdir -p site/apt/pool/main \
             site/apt/dists/stable/main/binary-amd64 \
             site/apt/dists/stable/main/binary-arm64 \
-            site/rpm/packages
+            site/rpm/packages \
+            site/pacman/x86_64
           install -m 0644 "$RUNNER_TEMP"/debs/*.deb site/apt/pool/main/
           install -m 0644 "$RUNNER_TEMP"/rpms/*.rpm site/rpm/packages/
+          find site/pacman/x86_64 -maxdepth 1 -type f -name '*.pkg.tar.zst*' -delete
+          rm -f site/pacman/x86_64/versionx.db \
+            site/pacman/x86_64/versionx.db.tar.gz \
+            site/pacman/x86_64/versionx.db.sig
+          install -m 0644 "$RUNNER_TEMP"/arch-build/*.pkg.tar.zst site/pacman/x86_64/
           gpg --batch --armor --export "$key_id" > site/apt/gpg.key
           gpg --batch --armor --export "$key_id" > site/rpm/gpg.key
+          gpg --batch --armor --export "$key_id" > site/pacman/gpg.key
 
           (
             cd site/apt
@@ -169,12 +213,36 @@ jobs:
             --passphrase "$GPG_PASSPHRASE" --armor --detach-sign \
             --output site/rpm/repodata/repomd.xml.asc site/rpm/repodata/repomd.xml
           gpg --verify site/rpm/repodata/repomd.xml.asc site/rpm/repodata/repomd.xml
+          pacman_package="$(find site/pacman/x86_64 -maxdepth 1 -type f -name '*.pkg.tar.zst' -print -quit)"
+          if [[ -z "$pacman_package" ]]; then
+            echo "::error::Arch package was not built"
+            exit 1
+          fi
+          gpg --batch --yes --local-user "$key_id" --pinentry-mode loopback \
+            --passphrase "$GPG_PASSPHRASE" --detach-sign \
+            --output "${pacman_package}.sig" "$pacman_package"
+          docker run --rm --platform linux/amd64 \
+            -v "$PWD/site/pacman/x86_64:/repo" \
+            archlinux:base-devel \
+            bash -euo pipefail -c '
+              pacman -Syu --noconfirm
+              cd /repo
+              repo-add versionx.db.tar.gz *.pkg.tar.zst
+              rm -f versionx.db
+              cp versionx.db.tar.gz versionx.db
+              rm -f versionx.files versionx.files.tar.gz
+            '
+          gpg --batch --yes --local-user "$key_id" --pinentry-mode loopback \
+            --passphrase "$GPG_PASSPHRASE" --detach-sign \
+            --output site/pacman/x86_64/versionx.db.sig site/pacman/x86_64/versionx.db
+          gpg --verify "${pacman_package}.sig" "$pacman_package"
+          gpg --verify site/pacman/x86_64/versionx.db.sig site/pacman/x86_64/versionx.db
       - name: Commit and push package repositories
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add site/apt site/rpm
+          git add site/apt site/rpm site/pacman
           if git diff --cached --quiet; then
             echo "APT repository is already up to date"
             exit 0

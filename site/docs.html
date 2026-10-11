@@ -33,6 +33,7 @@
         <strong>Contents</strong>
         <a href="#apt-installation">APT installation</a>
         <a href="#dnf-installation">DNF installation</a>
+        <a href="#pacman-installation">Pacman installation</a>
         <a href="#synopsis">Synopsis</a>
         <a href="#description">Description</a>
         <a href="#mcp">MCP servers</a>
@@ -73,6 +74,23 @@ gpgkey=https://www.versionx.ai/rpm/gpg.key
 EOF
 sudo dnf install ash</code></pre>
           <p>Signed repository metadata verifies RPM package checksums; package files are not individually RPM-signed. Update ash with <code>sudo dnf upgrade ash</code>.</p>
+        </section>
+
+        <section id="pacman-installation">
+          <h2>Install on Arch Linux</h2>
+          <p>The signed VersionX Pacman repository supports <code>x86_64</code>. Verify the signing key fingerprint shown below matches <code>32C6 C11D 2F86 BFE4 6EB7 7FFC 5257 FEA6 1368 919F</code>, then import and locally trust it:</p>
+          <pre><code>curl -fsSL https://www.versionx.ai/pacman/gpg.key -o /tmp/versionx.gpg
+gpg --show-keys --with-fingerprint /tmp/versionx.gpg
+sudo pacman-key --add /tmp/versionx.gpg
+sudo pacman-key --lsign-key 32C6C11D2F86BFE46EB77FFC5257FEA61368919F
+rm /tmp/versionx.gpg
+sudo tee -a /etc/pacman.conf &gt;/dev/null &lt;&lt;'EOF'
+[versionx]
+Server = https://www.versionx.ai/pacman/$arch
+SigLevel = Required DatabaseRequired
+EOF
+sudo pacman -Syu ash</code></pre>
+          <p>Pacman verifies both package and repository signatures. Update ash with <code>sudo pacman -Syu</code>.</p>
         </section>
 
         <section id="synopsis">

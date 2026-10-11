@@ -9,7 +9,7 @@ releases). This is marketing/docs content only — it is not part of the Go buil
 - `docs.html` — usage/configuration documentation.
 - `faq.html` — frequently asked questions.
 - `install.sh` — the `curl -fsSL .../install.sh | sh` one-line installer; downloads the latest release archive for the detected OS/arch and runs `ash install`.
-- `apt/` and `rpm/` — the signed APT and DNF repositories, updated from published releases by [`.github/workflows/apt.yml`](../.github/workflows/apt.yml).
+- `apt/`, `rpm/`, and `pacman/` — the signed APT, DNF, and Pacman repositories, updated from published releases by [`.github/workflows/apt.yml`](../.github/workflows/apt.yml).
 - `styles.css` — shared stylesheet for the HTML pages.
 - `favicon.svg` — site favicon.
 - `CNAME` — custom domain configuration for GitHub Pages.
@@ -22,4 +22,5 @@ passphrase. On each published release, the workflow exports the matching public
 key to `apt/gpg.key` and `rpm/gpg.key`, signs both APT and DNF repository
 metadata, and commits the updated repository files to the default branch. RPM
 package checksums are covered by the signed repository metadata; RPM files are
-not individually signed.
+not individually signed. Arch packages and the Pacman repository database are
+individually signed.

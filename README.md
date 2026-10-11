@@ -199,6 +199,27 @@ The signed repository metadata verifies package checksums; RPM files are not
 individually signed. The repository supports `x86_64` and `aarch64`; update
 installed packages with `sudo dnf upgrade ash`.
 
+On Arch Linux, import and locally trust the repository signing key, then add
+the repository to `/etc/pacman.conf`. Confirm the displayed key fingerprint
+matches `32C6 C11D 2F86 BFE4 6EB7 7FFC 5257 FEA6 1368 919F` before trusting it:
+
+```bash
+curl -fsSL https://www.versionx.ai/pacman/gpg.key -o /tmp/versionx.gpg
+gpg --show-keys --with-fingerprint /tmp/versionx.gpg
+sudo pacman-key --add /tmp/versionx.gpg
+sudo pacman-key --lsign-key 32C6C11D2F86BFE46EB77FFC5257FEA61368919F
+rm /tmp/versionx.gpg
+sudo tee -a /etc/pacman.conf >/dev/null <<'EOF'
+[versionx]
+Server = https://www.versionx.ai/pacman/$arch
+SigLevel = Required DatabaseRequired
+EOF
+sudo pacman -Syu ash
+```
+
+The Pacman repository supports `x86_64`. Package and repository signatures are
+verified by Pacman; update ash with `sudo pacman -Syu`.
+
 | OS | amd64 | arm64 |
 | --- | --- | --- |
 | macOS (darwin) | ✅ | ✅ |

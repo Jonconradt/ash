@@ -1,0 +1,20 @@
+pkgname=ash
+pkgver="${ASH_VERSION:?ASH_VERSION must be set}"
+pkgrel=1
+pkgdesc="A shell assistant for command-not-found workflows"
+arch=('x86_64')
+url="https://www.versionx.ai"
+license=('MIT')
+depends=('gcc-libs' 'glibc')
+optdepends=('python: enable Python-based tools')
+source=('ash.tar.gz')
+sha256sums=("${ASH_ARCHIVE_SHA256:?ASH_ARCHIVE_SHA256 must be set}")
+
+package() {
+  install -Dm0755 "$srcdir/ash-v${pkgver}-linux-amd64" "$pkgdir/usr/bin/ash"
+  install -Dm0755 "$srcdir/ash-broker" "$pkgdir/usr/bin/ash-broker"
+  install -Dm0644 "$srcdir/LICENSE" "$pkgdir/usr/share/licenses/ash/LICENSE"
+  install -Dm0755 "$srcdir"/plugins/* -t "$pkgdir/usr/lib/ash/plugins"
+  install -d "$pkgdir/usr/share/man"
+  cp -a "$srcdir/usr/share/man/." "$pkgdir/usr/share/man/"
+}
