@@ -19,8 +19,13 @@ import (
 	"time"
 )
 
-// TestMain keeps the suite from building real virtualenvs during explicit provisioning tests.
+// TestMain isolates XDG paths from the host and avoids real virtualenv provisioning.
 func TestMain(m *testing.M) {
+	for _, name := range []string{"XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME", "XDG_CACHE_HOME", "XDG_RUNTIME_DIR"} {
+		if err := os.Unsetenv(name); err != nil {
+			panic(err)
+		}
+	}
 	provisionPythonEnv = func(io.Writer) {}
 	os.Exit(m.Run())
 }
