@@ -27,7 +27,7 @@
     <a class="brand" href="./" aria-label="ashبيت"><span class="brand-mark">&gt;_</span> ash</a>
     <nav aria-label="التنقل الأساسي">
       <a href="./">بيت</a>
-      <a href="./#install">ثَبَّتَ</a>
+      <a href="install.html">التثبيت</a>
       <a href="faq.html">التعليمات</a>
       <a href="developer.html">المطورين</a>
       <a href="https://github.com/Jonconradt/ash">جيثب</a>
@@ -74,50 +74,17 @@
       <article class="docs-content">
         <section id="apt-installation">
           <h2>التثبيت على دبيان أو أوبونتو</h2>
-          <p>يدعم مستودع VersionX APT الموقع<code>amd64</code>و<code>arm64</code>. أضف مفتاح التوقيع العام ومصدر الحزمة، ثم قم بالتثبيت<code>ash</code>:</p>
-          <pre><code>sudo install -d -m 0755 /etc/apt/keyrings
-curl -fsSL https://www.versionx.ai/apt/gpg.key |
-  sudo gpg --dearmor --batch --yes -o /etc/apt/keyrings/versionx-keyring.gpg
-sudo chmod 0644 /etc/apt/keyrings/versionx-keyring.gpg
-echo "deb [signed-by=/etc/apt/keyrings/versionx-keyring.gpg] https://www.versionx.ai/apt stable main" |
-  sudo tee /etc/apt/sources.list.d/versionx.list
-sudo apt update
-sudo apt install ash</code></pre>
-          <p>تحقق من الأمر المثبت باستخدام<code>ash --version</code>. يتم تحديث عمليات تثبيت مدير الحزم باستخدام<code>sudo apt update &amp;&amp; sudo apt upgrade</code>.</p>
+          <p>راجع <a href="install.html#apt-installation">دليل تثبيت APT</a> للمتطلبات ومفاتيح التوقيع وإعداد المستودع والقنوات والتحديث والإزالة.</p>
         </section>
 
         <section id="dnf-installation">
           <h2>التثبيت على نظام Linux المتوافق مع Fedora أو RHEL</h2>
-          <p>يدعم مستودع VersionX DNF الموقع<code>x86_64</code>و<code>aarch64</code>. قم باستيراد مفتاحه العام وتكوين المستودع:</p>
-          <pre><code>sudo rpm --import https://www.versionx.ai/rpm/gpg.key
-sudo tee /etc/yum.repos.d/versionx.repo &gt;/dev/null &lt;&lt;'EOF'
-[versionx]
-name=VersionX ash repository
-baseurl=https://www.versionx.ai/rpm/
-enabled=1
-gpgcheck=0
-repo_gpgcheck=1
-gpgkey=https://www.versionx.ai/rpm/gpg.key
-EOF
-sudo dnf install ash</code></pre>
-          <p>تتحقق بيانات تعريف المستودع الموقعة من المجموع الاختباري لحزمة RPM؛ ملفات الحزمة ليست موقعة بشكل فردي من قبل RPM. قم بتحديث ash بـ <code>sudo dnf upgrade ash</code>.</p>
+          <p>راجع <a href="install.html#dnf-installation">دليل تثبيت DNF</a> للمتطلبات والتحقق من البيانات الوصفية وإعداد المستودع والقنوات والتحديث والإزالة.</p>
         </section>
 
         <section id="pacman-installation">
           <h2>التثبيت على آرتش لينكس</h2>
-          <p>يدعم مستودع VersionX Pacman الموقع<code>x86_64</code>. تحقق من تطابق بصمة مفتاح التوقيع الموضحة أدناه<code>32C6 C11D 2F86 BFE4 6EB7 7FFC 5257 FEA6 1368 919F</code>، ثم قم باستيراده والوثوق به محليًا:</p>
-          <pre><code>curl -fsSL https://www.versionx.ai/pacman/gpg.key -o /tmp/versionx.gpg
-gpg --show-keys --with-fingerprint /tmp/versionx.gpg
-sudo pacman-key --add /tmp/versionx.gpg
-sudo pacman-key --lsign-key 32C6C11D2F86BFE46EB77FFC5257FEA61368919F
-rm /tmp/versionx.gpg
-sudo tee -a /etc/pacman.conf &gt;/dev/null &lt;&lt;'EOF'
-[versionx]
-Server = https://www.versionx.ai/pacman/$arch
-SigLevel = Required DatabaseRequired
-EOF
-sudo pacman -Syu ash</code></pre>
-          <p>يتحقق Pacman من توقيعات الحزمة والمستودع. قم بتحديث ash بـ <code>sudo pacman -Syu</code>.</p>
+          <p>راجع <a href="install.html#pacman-installation">دليل تثبيت Pacman</a> للمتطلبات والتحقق من المفتاح وإعداد المستودع والقنوات والتحديث والإزالة.</p>
         </section>
 
         <section id="synopsis">

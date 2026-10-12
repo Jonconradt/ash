@@ -25,7 +25,7 @@
     <a class="brand" href="./" aria-label="ash家"><span class="brand-mark">&gt;_</span> ash</a>
     <nav aria-label="主要導航">
       <a href="index.html#how-it-works">它是如何運作的</a>
-      <a href="index.html#install">安裝</a>
+      <a href="install.html">安裝</a>
       <a href="docs.html">文件</a>
       <a href="faq.html" aria-current="page">常問問題</a>
       <a href="developer.html">開發商</a>
@@ -87,10 +87,10 @@
           <p>不是原生的。ash支援 macOS、Linux 和 FreeBSD 上的 bash、zsh 和 Fish；沒有 PowerShell 安裝目標。使用 WSL 獲得支援的 Linux 體驗。</p>
 
           <h3>我該如何安裝ash在適用於 Linux 的 Windows 子系統 (WSL) 中？</h3>
-          <p>將其作為 Linux 安裝在 WSL 發行版中：安裝 Sigstore<code>cosign</code>，然後運行<code>curl -fsSL https://jonconradt.github.io/ash/install.sh | sh</code>。配置<code>ASH_AI_ENDPOINT</code>和<code>ASH_AI_MODEL</code>，並選擇與 shell 集成<code>ash install --shell bash --shell-integration</code>當需要時。</p>
+          <p>在 WSL 發行版內依<a href="install.html#linux">Linux 安裝說明</a>，優先其管理器。再<a href="install.html#initialize">設定供應商並選用 Bash 整合</a>。無原生 Windows 安裝程式。</p>
 
           <h3>我該如何更新ash到最新的發行版本？</h3>
-          <p>跑步<code>ash update</code>在 macOS、Linux 或 FreeBSD 上。它下載最新的穩定匹配存檔，使用其 Sigstore 捆綁包和 SHA-256 摘要驗證發布清單，然後安裝到<code>~/.local/bin/ash</code>。如果簽章驗證失敗或存檔包含不支援的條目，則需要互動式確認；除非您獨立信任發布來源，否則不要批准失敗的簽章。跳過不支援的有效負載，非互動式運行拒絕這些異常。使用<code>ash update --version vX.Y.Z</code>對於特定版本；使用<code>--yes</code>僅當您想要替換自訂託管文件時。</p>
+          <p>Homebrew/APT/DNF/Pacman 用所屬管理器。<code>ash update</code> 僅用於 <code>~/.local/bin</code> 下穩定 Release；驗證 Sigstore 簽署清單與摘要，拒絕失敗簽章。原生 .pkg 和自訂目錄需原安裝程式/手動替換。Release、Beta、Nightly 見<a href="install.html#updates">更新與通道訂閱</a>。</p>
 
           <h3>我跑了<code>ash install</code>。為什麼這個終端沒有任何變化？</h3>
           <p>預設情況下停用 Shell 整合。要啟用它，請運行<code>ash install --shell bash --shell-integration</code>（或選擇<code>zsh</code>或者<code>fish</code>）；它不會重寫已經運行的 shell 進程。開啟新終端或重新載入選定的啟動檔。跑步<code>ash install --shell bash --disable-shell-integration</code>刪除Ash的託管區塊，同時保留周圍的內容。</p>

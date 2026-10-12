@@ -27,7 +27,7 @@
     <a class="brand" href="./" aria-label="ashheim"><span class="brand-mark">&gt;_</span> ash</a>
     <nav aria-label="Primäre Navigation">
       <a href="./">Heim</a>
-      <a href="./#install">Installieren</a>
+      <a href="install.html">Installieren</a>
       <a href="faq.html">FAQ</a>
       <a href="developer.html">Entwickler</a>
       <a href="https://github.com/Jonconradt/ash">GitHub</a>
@@ -74,50 +74,17 @@
       <article class="docs-content">
         <section id="apt-installation">
           <h2>Auf Debian oder Ubuntu installieren</h2>
-          <p>Das signierte VersionX APT-Repository unterstützt<code>amd64</code>Und<code>arm64</code>. Fügen Sie den öffentlichen Signaturschlüssel und die Paketquelle hinzu und installieren Sie es<code>ash</code>:</p>
-          <pre><code>sudo install -d -m 0755 /etc/apt/keyrings
-curl -fsSL https://www.versionx.ai/apt/gpg.key |
-  sudo gpg --dearmor --batch --yes -o /etc/apt/keyrings/versionx-keyring.gpg
-sudo chmod 0644 /etc/apt/keyrings/versionx-keyring.gpg
-echo "deb [signed-by=/etc/apt/keyrings/versionx-keyring.gpg] https://www.versionx.ai/apt stable main" |
-  sudo tee /etc/apt/sources.list.d/versionx.list
-sudo apt update
-sudo apt install ash</code></pre>
-          <p>Überprüfen Sie den installierten Befehl mit<code>ash --version</code>. Paketmanager-Installationen werden mit aktualisiert<code>sudo apt update &amp;&amp; sudo apt upgrade</code>.</p>
+          <p>Die <a href="install.html#apt-installation">APT-Installationsanleitung</a> erklärt Voraussetzungen, Signaturschlüssel, Repository-Einrichtung, Kanäle, Updates und Entfernung.</p>
         </section>
 
         <section id="dnf-installation">
           <h2>Installation unter Fedora oder RHEL-kompatiblem Linux</h2>
-          <p>Das signierte VersionX-DNF-Repository unterstützt<code>x86_64</code>Und<code>aarch64</code>. Importieren Sie den öffentlichen Schlüssel und konfigurieren Sie das Repository:</p>
-          <pre><code>sudo rpm --import https://www.versionx.ai/rpm/gpg.key
-sudo tee /etc/yum.repos.d/versionx.repo &gt;/dev/null &lt;&lt;'EOF'
-[versionx]
-name=VersionX ash repository
-baseurl=https://www.versionx.ai/rpm/
-enabled=1
-gpgcheck=0
-repo_gpgcheck=1
-gpgkey=https://www.versionx.ai/rpm/gpg.key
-EOF
-sudo dnf install ash</code></pre>
-          <p>Signierte Repository-Metadaten überprüfen die Prüfsummen des RPM-Pakets. Paketdateien sind nicht einzeln RPM-signiert. Aktualisieren Sie ash mit <code>sudo dnf upgrade ash</code>.</p>
+          <p>Die <a href="install.html#dnf-installation">DNF-Installationsanleitung</a> erklärt Voraussetzungen, Metadatenverifikation, Repository-Einrichtung, Kanäle, Updates und Entfernung.</p>
         </section>
 
         <section id="pacman-installation">
           <h2>Auf Arch Linux installieren</h2>
-          <p>Das signierte VersionX Pacman-Repository unterstützt<code>x86_64</code>. Überprüfen Sie, ob der unten angezeigte Fingerabdruck des Signaturschlüssels übereinstimmt<code>32C6 C11D 2F86 BFE4 6EB7 7FFC 5257 FEA6 1368 919F</code>, dann importieren und lokal vertrauen:</p>
-          <pre><code>curl -fsSL https://www.versionx.ai/pacman/gpg.key -o /tmp/versionx.gpg
-gpg --show-keys --with-fingerprint /tmp/versionx.gpg
-sudo pacman-key --add /tmp/versionx.gpg
-sudo pacman-key --lsign-key 32C6C11D2F86BFE46EB77FFC5257FEA61368919F
-rm /tmp/versionx.gpg
-sudo tee -a /etc/pacman.conf &gt;/dev/null &lt;&lt;'EOF'
-[versionx]
-Server = https://www.versionx.ai/pacman/$arch
-SigLevel = Required DatabaseRequired
-EOF
-sudo pacman -Syu ash</code></pre>
-          <p>Pacman überprüft sowohl Paket- als auch Repository-Signaturen. Aktualisieren Sie ash mit <code>sudo pacman -Syu</code>.</p>
+          <p>Die <a href="install.html#pacman-installation">Pacman-Installationsanleitung</a> erklärt Voraussetzungen, Schlüsselverifikation, Repository-Einrichtung, Kanäle, Updates und Entfernung.</p>
         </section>
 
         <section id="synopsis">

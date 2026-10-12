@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ash | Installéieren, konfiguréieren, aktualiséieren an deinstalléieren</title>
+  <meta name="description" content="Installéiert ash op macOS, Linux oder FreeBSD. Wielt Package-Manager, konfiguréiert Ollama oder gratis Cloud, wielt Updatekanal an deinstalléiert sécher.">
+  <meta name="theme-color" content="#f4f0e8">
+  <link rel="canonical" href="https://jonconradt.github.io/ash/lb/install.html">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="ash-Installatiounsguide">
+  <meta property="og:description" content="Vun de Viraussetzungen bis éischt Ufro, Updates a Botzen.">
+  <meta property="og:url" content="https://jonconradt.github.io/ash/lb/install.html">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="alternate" hreflang="en" href="https://jonconradt.github.io/ash/install.html">
+  <link rel="alternate" hreflang="ar" href="https://jonconradt.github.io/ash/ar/install.html">
+  <link rel="alternate" hreflang="de" href="https://jonconradt.github.io/ash/de/install.html">
+  <link rel="alternate" hreflang="es" href="https://jonconradt.github.io/ash/es/install.html">
+  <link rel="alternate" hreflang="fr" href="https://jonconradt.github.io/ash/fr/install.html">
+  <link rel="alternate" hreflang="id" href="https://jonconradt.github.io/ash/id/install.html">
+  <link rel="alternate" hreflang="it" href="https://jonconradt.github.io/ash/it/install.html">
+  <link rel="alternate" hreflang="lb" href="https://jonconradt.github.io/ash/lb/install.html">
+  <link rel="alternate" hreflang="pt-BR" href="https://jonconradt.github.io/ash/pt-BR/install.html">
+  <link rel="alternate" hreflang="zh-CN" href="https://jonconradt.github.io/ash/zh-CN/install.html">
+  <link rel="alternate" hreflang="zh-TW" href="https://jonconradt.github.io/ash/zh-TW/install.html">
+  <link rel="alternate" hreflang="x-default" href="https://jonconradt.github.io/ash/install.html">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#guide">Bei d’Installatiounsguide sprangen</a>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="ash-Startsäit"><span class="brand-mark">&gt;_</span> ash</a>
+    <nav aria-label="Haaptnavigatioun">
+      <a href="./">Startsäit</a>
+      <a href="install.html" aria-current="page">Installéieren</a>
+      <a href="docs.html">Dokumentatioun</a>
+      <a href="faq.html">FAQ</a>
+      <a href="developer.html">Entwéckler</a>
+      <a href="https://github.com/Jonconradt/ash">GitHub</a>
+      <label class="sr-only" for="site-language">Sprooch</label>
+      <select id="site-language" class="language-select" aria-label="Sprooch wielen">
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+        <option value="de">Deutsch</option>
+        <option value="es">Español</option>
+        <option value="fr">Français</option>
+        <option value="id">Bahasa Indonesia</option>
+        <option value="it">Italiano</option>
+        <option value="lb" selected>Lëtzebuergesch</option>
+        <option value="pt-BR">Português (Brasil)</option>
+        <option value="zh-CN">简体中文</option>
+        <option value="zh-TW">繁體中文</option>
+      </select>
+    </nav>
+  </header>
+  <main id="guide" class="docs-page page-width install-guide">
+    <header class="docs-header">
+      <p class="eyebrow">Installéieren · konfiguréieren · ënnerhalen</p>
+      <h1>E kloere Wee bei<br><em>Är éischt Ufro.</em></h1>
+      <p>Wielt Äre System, installéiert mam Package-Manager a verbënnt e Modell. Fänkt mat Release un; Beta oder Nightly kënnt Dir spéider wielen.</p>
+      <div class="os-choices" aria-label="Betribssystem wielen">
+        <a class="method-card" href="#macos"><strong>macOS</strong><span>Homebrew recommandéiert</span><small>Apple Silicon an Intel</small></a>
+        <a class="method-card" href="#linux"><strong>Linux</strong><span>APT, DNF oder Pacman</span><small>Architektur hänkt vum Repository of</small></a>
+        <a class="method-card" href="#freebsd"><strong>FreeBSD</strong><span>Verifizéiert Archiv oder Skript</span><small>Nëmmen amd64; keen nativen ash-pkg</small></a>
+      </div>
+    </header>
+    <div class="docs-layout">
+      <nav class="docs-contents" aria-label="Installatiounsinhalt">
+        <strong>Op dëser Säit</strong>
+        <a href="#prerequisites">Ier Dir ufänkt</a>
+        <a href="#macos">macOS</a>
+        <a href="#linux">Linux</a>
+        <a href="#freebsd">FreeBSD</a>
+        <a href="#initialize">Initialiséieren a kontrolléieren</a>
+        <a href="#ollama">Lokalen Ollama</a>
+        <a href="#cloud">Gratis Cloud-Offeren</a>
+        <a href="#script">Installatioun per Skript</a>
+        <a href="#verify-download">Download verifizéieren</a>
+        <a href="#updates">Aktualiséierungen a Kanäl</a>
+        <a href="#uninstall">Deinstalléieren</a>
+        <a href="#troubleshooting">Problemer léisen</a>
+      </nav>
+      <article class="docs-content" data-copy-label="Befehler kopéieren" data-copied-label="Kopéiert!" data-copy-error="Kopéieren net méiglech. Wielt a kopéiert d’Befehler manuell.">
+        <section id="prerequisites">
+          <h2>Ier Dir ufänkt</h2>
+          <ol>
+            <li><strong>Ënnerstëtzte System a Shell:</strong> macOS oder Linux op amd64/x86_64 oder arm64/aarch64, oder FreeBSD op amd64. Benotzt Bash, zsh oder Fish. Arch-Pakete sinn nëmmen x86_64. Et gëtt keen nativen Windows-/PowerShell-Installer.</li>
+            <li><strong>Download-Zougang:</strong> funktionéierenden Internet a vertrauenswürdegen HTTPS-Zougang op GitHub, de gewielte Repository an de Modellubidder. Lokal Inferenz brauch och en éischte Modelldownload.</li>
+            <li><strong>Rechter:</strong> beschreiwbaren Heemverzeechnes fir Benotzerdateien. Linux-Systempaketen a macOS-.pkg brauchen Administratioun; féiert Homebrew an <code>ash install</code> als normale Benotzer aus.</li>
+            <li><strong>E Modell:</strong> lokalen Inferenzserver mat erofgeluedenem Modell oder Cloud-Konto/API-Schlëssel. Wielt e Modell mat Tool-Opriff, net nëmme Bild/Audio. Lokal RAM-, Späicher- a GPU-Bedierfnesser hänke vum Modell of.</li>
+          </ol>
+          <p>Fäerdeg ash-Pakete brauchen net Go, Rust, Node.js oder Xcode-Buildtools. Package-Managere kënnen eege Viraussetzungen hunn; befollegt fir d’éischt hir offiziell Ariichtung.</p>
+          <div class="guide-note">
+            <h3>Optional: matgeliwwert Python-Tools</h3>
+            <p>Basisgebrauch brauch kee Python. Matgeliwwert Tools brauche Python 3 mat <code>venv</code> an <code>ensurepip</code> an Zougang fir Ofhängegkeeten erofzelueden. Op Debian/Ubuntu installéiert <code>python3</code> an <code>python3-venv</code>; Homebrew-Python enthält venv. Op FreeBSD benotzt de pip-Package passend zur Python-Versioun. Widderhuelt <code>ash install</code>. Eng isoléiert Ëmwelt entsteet ënner <code>$XDG_DATA_HOME/ash/venv</code> (Standard <code>~/.local/share/ash/venv</code>); e Feeler deaktivéiert dës Tools, net ash selwer.</p>
+          </div>
+        </section>
+        <section id="macos">
+          <h2>macOS</h2>
+          <h3 id="homebrew">Recommandéiert: Homebrew</h3>
+          <p>Viraussetzungen: <a href="https://docs.brew.sh/Installation">Homebrew</a>, ënnerstëtzte macOS-Ëmwelt a funktionéierende <code>brew</code>-Befeel. Den Tap wielt automatesch Intel- oder Apple-Silicon-Archiv. Installéiert Release ouni sudo:</p>
+          <pre><code>brew install Jonconradt/ash/ash
+ash version</code></pre>
+          <p>Homebrew verwalt Binären, native Plugins, Man-Säiten a Lizenzhiweiser am eegene Präfix (normalerweis <code>/opt/homebrew</code> op Apple Silicon oder <code>/usr/local</code> op Intel). Et kontrolléiert d’Archiv mam SHA-256 vun der Formel. Ubidder a Shell-Startdatei ginn net konfiguréiert: fuert mat der <a href="#initialize">Initialiséierung pro Benotzer</a> virun. Aktualiséiert mat <code>brew upgrade ash</code>, läscht Release mat <code>brew uninstall ash</code>; fir Beta/Nightly kuckt <a href="#updates">Kanalformelen</a>.</p>
+          <h3 id="macos-pkg">Alternativ: nativen .pkg</h3>
+          <p>Luet <code>darwin-arm64.pkg</code> fir Apple Silicon oder <code>darwin-amd64.pkg</code> fir Intel vun enger <a href="https://github.com/Jonconradt/ash/releases">publizéierter Versioun</a>. <a href="#verify-download">Verifizéiert dat ënnerschriwwent Prüfsummemanifest</a>, ier Dir den Installer opmaacht. Administratiounsrechter sinn néideg.</p>
+          <div class="guide-note guide-warning"><p><strong>De macOS-Package ass net ënnerschriwwen oder notariséiert.</strong> D’Manifest bitt separat Ubidder-/Prüfsummeverifikatioun, keng Apple-Notarisatioun. Deaktivéiert net Gatekeeper a ëmgoot keng Warnunge just fir ash; benotzt Homebrew wann Är Sécherheetspolitik et verlaangt.</p></div>
+          <p>De Package schreift <code>ash</code> an <code>ash-broker</code> op <code>/usr/local/bin</code>, Plugins op <code>/usr/local/lib/ash/plugins</code>, Man-Säiten op <code>/usr/local/share/man</code>, Hiweiser op <code>/usr/local/share/licenses/ash</code>. D’Quittung ass <code>dev.ash.cli</code>. Et initialiséiert kee Benotzer an abonnéiert keng Updates: <a href="#initialize">initialiséiert</a> duerno, ersetzt mat engem méi neie verifizéierte .pkg fir Updates a benotzt <a href="#manual-macos">manuellt Ewechhuelen</a> fir d’Deinstallatioun. Net iwwer eng Homebrew-Kopie installéieren.</p>
+        </section>
+        <section id="linux">
+          <h2>Linux</h2>
+          <p>Benotzt wa méiglech de Manager vun Ärer Distributioun. Dës Pakete verwalten <code>/usr/bin/ash</code>, <code>/usr/bin/ash-broker</code>, <code>/usr/lib/ash/plugins</code>, Man-Säiten ënner <code>/usr/share/man</code> a Lizenzhiweiser. Ubidderastellungen a Shell-Hooks bleiwe fir d’<a href="#initialize">Initialiséierung pro Benotzer</a>.</p>
+          <h3 id="apt-installation">Debian an Ubuntu: APT</h3>
+          <p>Viraussetzungen: amd64/arm64, Administratioun, APT, <code>curl</code>, <code>gpg</code>, CA-Zertifikater. Installéiert feelend Download-/Schlësseltools aus der Distributioun virum Repository. Release heescht <code>stable</code>:</p>
+          <pre><code>sudo apt update
+sudo apt install ca-certificates curl gnupg
+sudo install -d -m 0755 /etc/apt/keyrings
+curl -fsSL https://www.versionx.ai/apt/gpg.key -o versionx-apt.asc
+gpg --show-keys --with-fingerprint versionx-apt.asc
+sudo gpg --dearmor --batch --yes -o /etc/apt/keyrings/versionx-keyring.gpg versionx-apt.asc
+sudo chmod 0644 /etc/apt/keyrings/versionx-keyring.gpg
+echo "deb [signed-by=/etc/apt/keyrings/versionx-keyring.gpg] https://www.versionx.ai/apt stable main" |
+  sudo tee /etc/apt/sources.list.d/versionx.list
+sudo apt update
+sudo apt install ash
+rm versionx-apt.asc</code></pre>
+          <p>Virum Schlësselimport kontrolléiert de Fangerofdrock mat enger vertrauenswürdeger Ubidderquell. VersionX huet <code>32C6 C11D 2F86 BFE4 6EB7 7FFC 5257 FEA6 1368 919F</code>. APT kontrolléiert ënnerschriwwe Metadaten an enthale Package-Prüfsummen; <code>signed-by</code> limitéiert de Schlësselberäich. Aktualiséieren: <code>sudo apt update &amp;&amp; sudo apt upgrade ash</code>; läschen: <code>sudo apt remove ash</code>.</p>
+          <h3 id="dnf-installation">Fedora a RHEL-kompatibel Systemer: DNF</h3>
+          <p>Viraussetzungen: x86_64/aarch64, Administratioun, DNF/RPM, <code>curl</code>, <code>gpg</code>, CA-Zertifikater. Installéiert feelend Tools aus der Distributioun. Kontrolléiert Schlëssel a Fangerofdrock uewen virum Import:</p>
+          <pre><code>curl -fsSL https://www.versionx.ai/rpm/gpg.key -o versionx-rpm.asc
+gpg --show-keys --with-fingerprint versionx-rpm.asc
+sudo rpm --import versionx-rpm.asc
+sudo tee /etc/yum.repos.d/versionx.repo &gt;/dev/null &lt;&lt;'EOF'
+[versionx]
+name=VersionX ash repository
+baseurl=https://www.versionx.ai/rpm/
+enabled=1
+gpgcheck=0
+repo_gpgcheck=1
+gpgkey=https://www.versionx.ai/rpm/gpg.key
+EOF
+sudo dnf install ash
+rm versionx-rpm.asc</code></pre>
+          <p>RPM-Dateie sinn net eenzel ënnerschriwwen. <code>repo_gpgcheck=1</code> verifizéiert Metadate mat hire Prüfsummen; <code>gpgcheck=0</code> entsprécht feelende Packagesignaturen, net ausgeschalter Repository-Verifikatioun. Wann Är Politik ënnerschriwwe RPM-Inhalter verlaangt, geet dëse Repository net duer. Aktualiséieren: <code>sudo dnf upgrade ash</code>; läschen: <code>sudo dnf remove ash</code>.</p>
+          <h3 id="pacman-installation">Arch Linux: Pacman</h3>
+          <p>Viraussetzungen: x86_64, Administratioun, Pacman mat initialiséiertem Schlësselbund, <code>curl</code>, <code>gpg</code>. Vertraut eréischt wann den ugewisene Fangerofdrock dem uewen entsprécht. Füügt de Repository eemol derbäi, net bei all Update:</p>
+          <pre><code>curl -fsSL https://www.versionx.ai/pacman/gpg.key -o versionx-pacman.asc
+gpg --show-keys --with-fingerprint versionx-pacman.asc
+sudo pacman-key --add versionx-pacman.asc
+sudo pacman-key --lsign-key 32C6C11D2F86BFE46EB77FFC5257FEA61368919F
+sudo tee -a /etc/pacman.conf &gt;/dev/null &lt;&lt;'EOF'
+[versionx]
+Server = https://www.versionx.ai/pacman/$arch
+SigLevel = Required DatabaseRequired
+EOF
+sudo pacman -Syu ash
+rm versionx-pacman.asc</code></pre>
+          <p>Pacman verifizéiert Package- an Datebanksignaturen. Synchroniséiert Arch mat <code>sudo pacman -Syu</code>, keng partiell Updates; läscht ash mat <code>sudo pacman -R ash</code>.</p>
+          <h3>Aner Linux-Methoden</h3>
+          <p>Benotzt Dir schonn <a href="https://docs.brew.sh/Homebrew-on-Linux">Homebrew op Linux</a>? Déi <a href="#homebrew">selwecht Tap-Instruktiounen</a> ënnerstëtzen amd64/arm64; Brew verwalt d’Dateien, net APT/DNF. Soss benotzt eng verifizéiert <a href="#script">Skript-/Archivinstallatioun</a> oder passende <a href="https://github.com/Jonconradt/ash/releases">.deb-/.rpm-Download</a>. Installéiert verifizéiert .deb mat <code>sudo apt install ./PACKAGE.deb</code>, .rpm mat <code>sudo dnf install ./PACKAGE.rpm</code> (Dateinimm ersetzen). Direkt Pakete bleiwen verwalt, addéieren awer kee Repository oder automatescht Abonnement op spéider Versiounen. Aktuelle RPM ass net ënnerschriwwen; befollegt d’Politik amplaz Kontrollen auszeschalten.</p>
+        </section>
+        <section id="freebsd">
+          <h2>FreeBSD</h2>
+          <p>Viraussetzungen: amd64, Bash (och mat interaktivem zsh/Fish), Download-/Verifikatiounstools a beschreiwbaren Installatiounsdossier. Installéiert Bash mam native FreeBSD-Manager:</p>
+          <pre><code>sudo pkg install bash</code></pre>
+          <p>FreeBSD säin <code>pkg</code> verwalt Viraussetzungen, net ash: aktuell gëtt et keen ash-.pkg-Repository oder arm64-Archiv. Benotzt de <a href="#script">verifizéierte Skript</a>, oder <a href="#verify-download">verifizéiert en FreeBSD-amd64-Tarball</a>, entpaakt an en temporären Dossier a setzt säi versionéierten ash-Binär als <code>~/.local/bin/ash</code> nieft <code>ash-broker</code>. Kopéiert native Plugins op <code>$XDG_DATA_HOME/ash/plugins</code> (Standard <code>~/.local/share/ash/plugins</code>), dann <a href="#initialize">initialiséiert</a>. Dir verwalt dës Dateien; <code>pkg delete</code> läscht se net. Benotzt <a href="#updates">Release-Selbstupdates</a> um Standarduert oder ersetzt verifizéiert Artefakte manuell.</p>
+        </section>
+        <section id="initialize">
+          <h2>Initialiséieren a kontrolléieren</h2>
+          <p>No de Binäre féiert d’Ariichtung interaktiv als normale Benotzer aus. Nëmmen Assets ariichten ännert keng Startdateien:</p>
+          <pre><code>ash install</code></pre>
+          <p>Fir onbekannt Befehler z’integréieren, wielt genee ee Befeel fir Är Shell:</p>
+          <p><strong>Bash</strong></p>
+          <pre><code>ash install --shell bash --shell-integration</code></pre>
+          <p><strong>zsh</strong></p>
+          <pre><code>ash install --shell zsh --shell-integration</code></pre>
+          <p><strong>Fish</strong></p>
+          <pre><code>ash install --shell fish --shell-integration</code></pre>
+          <p>Bash benotzt <code>~/.bashrc</code>, zsh <code>~/.zshrc</code>, Fish <code>$XDG_CONFIG_HOME/fish/config.fish</code> (Standard <code>~/.config/fish/config.fish</code>). Maacht duerno eng nei Shell op; bestoend behalen hire Broker. Integratioun stellt <code>~/.local/bin</code> virum PATH: läscht al lokal Kopien ier Dir e Systempackage erwaart.</p>
+          <p>Feelen Ubidderastellungen, erkennt d’Ariichtung bestoend Schlësselen oder e lokale Server; soss bitt se e Menü a freet Zougangsdaten. Wielt e verfügbare Modell mat Tools. Gëlteg Astellunge bleiwen; nees ariichten wiesselt net den Ubidder.</p>
+          <p>Astellunge leien an <code>$XDG_CONFIG_HOME/ash/.ash_env</code> (Standard <code>~/.config/ash/.ash_env</code>, privat Dateirechter). Integratioun luet se. Ouni kënnen Bash/zsh d’Datei am normale Startup lueden; Fish muss <code>ASH_AI_*</code>-Variabele mat Fish-Syntax setzen, net d’Bash-Datei lueden. Schützt Token-Dateien a committéiert se ni.</p>
+          <p>Ouni Integratioun füügt de richtege lokale Verzeechnes an de PATH. Bash/zsh: <code>export PATH="$HOME/.local/bin:$PATH"</code>. Fish: <code>fish_add_path "$HOME/.local/bin"</code>. Späichert et an der Startkonfiguratioun; ersetzt duerch Ären eegene Verzeechnes wann néideg.</p>
+          <pre><code>command -v ash
+command -v ash-broker
+ash version
+ash "Say hello in one sentence"</code></pre>
+          <p>Déi éischt Befehler mussen déi gewielten Installatioun fannen. D’Ufro brauch e lafende Server oder gëlteg Cloud-Zougangsdaten; ash installéiere setzt kee Modell op.</p>
+        </section>
+        <section id="ollama">
+          <h2>Lokalen Ollama: kee Cloud-Konto néideg</h2>
+          <p>Installéiert Ollama no den <a href="https://ollama.com/download">offiziellen OS-Instruktiounen</a>. Start App/Déngscht oder <code>ollama serve</code> an engem aneren Terminal wann nach kee Server leeft. ash op FreeBSD heescht keen nativen Ollama-Installer: benotzt wann néideg e bereikbare Server op engem aneren ënnerstëtzten Host.</p>
+          <p>Luet e Modell mat Tools passend zu Ärer Hardware; <code>llama3.1:8b</code> ass e Beispill, kee Minimum. Alternativen am <a href="https://ollama.com/search?c=tools">aktuelle Tool-Katalog</a>:</p>
+          <pre><code>ollama pull llama3.1:8b
+ollama list
+curl -fsS http://localhost:11434/api/tags
+ash install</code></pre>
+          <p>Ouni gesate Cloud-Schlësselen erkennt d’Ariichtung de lokale Server a bitt de geluedene Modell. Ass en aneren Ubidder konfiguréiert, ännert Endpoint/Modell manuell. Bash/zsh-Beispill:</p>
+          <pre><code>export ASH_AI_ENDPOINT="http://localhost:11434"
+export ASH_AI_MODEL="llama3.1:8b"
+unset ASH_AI_AUTH_TOKEN
+ash "Say hello in one sentence"</code></pre>
+          <p>Fish-Entspriechung:</p>
+          <pre><code>set -gx ASH_AI_ENDPOINT http://localhost:11434
+set -gx ASH_AI_MODEL llama3.1:8b
+set -e ASH_AI_AUTH_TOKEN
+ash "Say hello in one sentence"</code></pre>
+          <p>Dës Ännerunge gëllen nëmme fir déi aktuell Shell. Späichert se an der geschützter ash-Ëmweltdatei oder Shell-Konfiguratioun an ersetzt al Ubidderastellungen. Lokalen Ollama brauch keen Token. Halt de Server op Loopback ausser Dir séchert Zougang bewosst; remote Servere kréien Ufroen an Tool-Ausgaben.</p>
+          <p>Optional: setzt <code>OLLAMA_KEEP_ALIVE=30m</code> an der Ëmwelt vum <em>Ollama-Server</em> a start nei fir Modeller gelueden ze halen. <code>-1</code> hält se onbegrenzten, verbraucht awer Späicher tëscht Ufroen. Nëmmen am ash-Clientterminal gesat konfiguréiert et kee lafende Server nei.</p>
+          <p>Lokal Inferenz huet keng API-Rechnung, benotzt awer Hardware/Späicher/Stroum. <a href="https://ollama.com/cloud">Ollama Cloud</a> ass e separate Service mat Authentifikatioun an Tarifgrenzen, net dës lokal Ariichtung.</p>
+        </section>
+        <section id="cloud">
+          <h2>Gratis Cloud-Offeren</h2>
+          <div class="guide-note guide-warning"><p><strong>Gratis heescht net onlimitéiert oder privat.</strong> Konten, Regiounen, Quoten, Modeller an Datepolitike variéieren a kënnen änneren. Ufroen a relevant Tool-Ausgabe verloossen Äre Rechner. Liest aktuell Grenzen/Konditiounen; aktivéiert Bezuelen nëmme wann Dir bezuele wëllt.</p></div>
+          <p>Erstellt e Schlëssel iwwer d’Links, start <code>ash install</code> interaktiv a wielt den Ubidder. Token gëtt gefrot, Modeller ginn opgelëscht wa méiglech. Wielt en aktuelle gratis <em>Textmodell mat Tool-Opriff</em>; opgelëscht heescht net garantéiert gratis fir Äre Konto.</p>
+          <div class="table-scroll" role="region" aria-label="Cloud-Ubidderkonfiguratioun" tabindex="0">
+            <table>
+              <caption>Konten, Endpoints an Zougangsdaten-Erkennung</caption>
+              <thead><tr><th scope="col">Ubidder</th><th scope="col">Endpoint an erkannte Schlëssel</th><th scope="col">Gratis-Tarif kontrolléieren</th></tr></thead>
+              <tbody>
+                <tr><th scope="row"><a href="https://aistudio.google.com/app/apikey">Google AI Studio / Gemini</a></th><td><code>https://generativelanguage.googleapis.com/v1beta/openai/</code><br><code>GEMINI_API_KEY</code> oder <code>GOOGLE_API_KEY</code></td><td>Kontrolléiert <a href="https://ai.google.dev/gemini-api/docs/models">Modellkatalog</a> a <a href="https://ai.google.dev/gemini-api/docs/pricing">Gratispräisser</a>. Gratisinhalter kënne Google-Produkter verbesseren; liest <a href="https://ai.google.dev/gemini-api/terms">Konditiounen</a>.</td></tr>
+                <tr><th scope="row"><a href="https://console.groq.com/keys">Groq</a></th><td><code>https://api.groq.com/openai/v1</code><br><code>GROQ_API_KEY</code></td><td>Wielt e Chat-/Tool-Modell am <a href="https://console.groq.com/docs/models">Katalog</a>. Kontrolléiert <a href="https://console.groq.com/docs/rate-limits">Ufrolimiten</a> a <a href="https://console.groq.com/docs/your-data">Datepolitik</a>; Virschaumodeller kënnen verschwannen.</td></tr>
+                <tr><th scope="row"><a href="https://openrouter.ai/settings/keys">OpenRouter</a></th><td><code>https://openrouter.ai/api/v1</code><br><code>OPENROUTER_API_KEY</code></td><td>Wielt e <a href="https://openrouter.ai/models?max_price=0">Gratis-Modell</a> mat Tools. Suffix <code>:free</code> geet nëmme mat enger <a href="https://openrouter.ai/docs/guides/routing/model-variants/free">publizéierter Gratisvariant</a>. Liest <a href="https://openrouter.ai/docs/api/reference/limits">Limiten</a> a <a href="https://openrouter.ai/docs/guides/privacy/logging">Privatsphärastellungen</a> vun de weideren Ubidder.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>Schonn en erkannte Schlëssel exportéiert? Ariichtung erkennt en; bei méi freet se eng Wiel. Keng echt Schlësselen an Historik, Opnamen oder Code pechen. D’Datei enthält e Geheimnis, kee verschlësselte Safe.</p>
+          <h3>Manuell Konfiguratioun oder Ubidderwiessel</h3>
+          <p>Ersetzt den Endpoint hei ënnen duerch den Tabellenwäert an <code>MODEL_ID</code> duerch e Modell kontrolléiert am Konto. Ass de Schlëssel schonn als <code>GROQ_API_KEY</code> exportéiert, benotzt dëst Bash/zsh-Beispill en ouni Geheimnis ze tippen:</p>
+          <pre><code>export ASH_AI_ENDPOINT="https://api.groq.com/openai/v1"
+export ASH_AI_MODEL="MODEL_ID"
+export ASH_AI_AUTH_TOKEN="$GROQ_API_KEY"</code></pre>
+          <p>Fish-Entspriechung:</p>
+          <pre><code>set -gx ASH_AI_ENDPOINT https://api.groq.com/openai/v1
+set -gx ASH_AI_MODEL MODEL_ID
+set -gx ASH_AI_AUTH_TOKEN "$GROQ_API_KEY"</code></pre>
+          <p>Fir Gemini/OpenRouter benotzt hiren Endpoint a Schlësselvariabel. Späichert sécher fir spéider Shells. Cloud brauch HTTPS an Token; lokalen HTTP ass keng Cloud-Ofkierzung. Kuckt <a href="docs.html#environment">Ëmweltreferenz</a> an <a href="faq.html#ai">aner ënnerstëtzten Ubidder</a> fir bezuelten Déngschter a fortgeschratt Astellungen.</p>
+        </section>
+        <section id="script">
+          <h2>Skriptinstallatioun: Alternativ, net éischt Wiel</h2>
+          <p>Bevirzucht Homebrew, APT, DNF oder Pacman: si verfollegen Dateien, verifizéieren Downloads no hirer Vertrauenskonfiguratioun a bidden bekannt Updates/Entfernung. Vertrauen an Ubidder an Installatiounsaktioune bleift néideg.</p>
+          <div class="guide-note guide-warning"><p><strong>E Website-Skript féiert Code mat Äre Kontorechter aus.</strong> Eng kompromittéiert Säit/Ubidder oder verännert Skript ka Geheimnisser liesen, Dateien änneren oder Software installéieren. HTTPS schützt Transport, net Code-Intentioun. URL direkt an eng Shell leeden exekutéiert virum Iwwerpréiwen. Archivsignature verifizéieren net de Skript selwer. Ni mat sudo ausféieren oder Verifikatioun auszeschalten.</p></div>
+          <p>Viraussetzungen: ënnerstëtzten OS/Architektur, <code>$SHELL</code> mat Bash/zsh/Fish, <a href="https://docs.sigstore.dev/cosign/system_config/installation/">Sigstore cosign</a>, <code>tar</code>, <code>uname</code>, <code>install</code>, Standard-Shelltools, SHA-256-Befeel (<code>sha256sum</code>, <code>shasum</code> oder <code>sha256</code>), Downloader (<code>curl</code>, <code>wget</code> oder Python). Beispill benotzt curl. FreeBSD brauch och Bash. Heem-/Installatiounsdossier muss beschreiwbar sinn.</p>
+          <p>Luet eng lokal Datei, kontrolléiert am Editor, féiert nëmmen aus wann Dir Quell a Verhalen vertraut. Kontroll garantéiert keng Sécherheet; net blann ausféieren:</p>
+          <pre><code>curl -fsSL https://jonconradt.github.io/ash/install.sh -o ash-install.sh
+less ash-install.sh</code></pre>
+          <p>No der Kontroll féiert déi gespäichert Kopie als normale Benotzer aus:</p>
+          <pre><code>sh ./ash-install.sh
+rm ./ash-install.sh</code></pre>
+          <p><code>install.sh</code> luet leschte Release, kontrolléiert Sigstore-Manifest an Archivdigest, installéiert <code>ash</code>/<code>ash-broker</code> an <code>~/.local/bin</code>. Plugins ginn op <code>$XDG_DATA_HOME/ash/plugins</code>. Ariichtung pro Benotzer freet virun Shell-Integratioun. Ouni interaktiven Terminal kënnen Ubidder-/Integratiounsfroen ausfalen: start <code>ash install</code> duerno interaktiv.</p>
+          <p>Setzt <code>ASH_INSTALL_DIR</code> virum Skript fir en anert Zil. Füügt selwer an de PATH. <strong>Selbstupdate gëtt nëmmen ënner <code>~/.local/bin</code> ënnerstëtzt</strong>; aner Ziler brauchen manuellt Ersetzen. De Skript huet kee Beta-/Nightly-Selector.</p>
+        </section>
+        <section id="verify-download">
+          <h2>Direkte Package oder Archiv verifizéieren</h2>
+          <p>Viraussetzungen: cosign a SHA-256-Tool. Luet Package/Archiv, <code>SHA256SUMS</code> an <code>SHA256SUMS.sigstore.json</code> vun derselwechter Versioun. Schafft an engem neien Dossier. Ersetzt <code>vX.Y.Z</code> mam geneeën Tag, inklusive Virversiounssuffix:</p>
+          <pre><code>cosign verify-blob SHA256SUMS \
+  --bundle SHA256SUMS.sigstore.json \
+  --certificate-identity "https://github.com/Jonconradt/ash/.github/workflows/release.yml@refs/tags/vX.Y.Z" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com"</code></pre>
+          <p>Eréischt nom Succès berechent de Digest mat <code>shasum -a 256 PACKAGE</code> op macOS, <code>sha256sum PACKAGE</code> op Linux oder <code>sha256 -q PACKAGE</code> op FreeBSD. Ersetzt <code>PACKAGE</code> mam Downloadnumm a vergläicht genee mam Eintrag am verifizéierte Manifest. Bei feelendem Eintrag oder Ënnerscheed stoppen. Onënnerschriwwe Prüfsumm nieft der Datei ass keng verifizéiert Ubiddermetadaten.</p>
+        </section>
+        <section id="updates">
+          <h2>Aktualiséierungen an dräi Kanäl</h2>
+          <ul>
+            <li><strong>Release (recommandéiert):</strong> stabil Versioune wéi <code>vX.Y.Z</code>; am Repository <code>stable</code> genannt.</li>
+            <li><strong>Beta:</strong> Virversiounstester, Tag <code>vX.Y.Z-beta.N</code>; Ännerungen a Regressiounen erwaarden.</li>
+            <li><strong>Nightly:</strong> rezent Standardbranch-Ännerungen, Tag <code>vX.Y.Z-nightly.YYYYMMDD.N</code>; héchst Regressiounsgefor. Geplangte Builds kënnen ouni Ännerung oder bei Publikatiounsfeeler ausfalen.</li>
+          </ul>
+          <p>Eng Publikatioun aktualiséiert déi passend Homebrew-Formel oder ënnerschriwwent Linux-Repository. Dir kritt se mam Upgrade vum zoustännege Manager oder OS-Politik. Publikatioun, Repository a Website kënnen zäitlech versat sinn; kontrolléiert Disponibilitéit virum Kanalwiessel. ash installéiert keng heemlech Hannergrond-Binärupdates.</p>
+          <div class="table-scroll" role="region" aria-label="Updatekanal-Abonnementer" tabindex="0">
+            <table>
+              <caption>Abonnéieren iwwer Är Installatiounsmethod</caption>
+              <thead><tr><th scope="col">Method</th><th scope="col">Release</th><th scope="col">Beta</th><th scope="col">Nightly</th></tr></thead>
+              <tbody>
+                <tr><th scope="row">Homebrew-Formel</th><td><code>Jonconradt/ash/ash</code></td><td><code>Jonconradt/ash/ash-beta</code></td><td><code>Jonconradt/ash/ash-nightly</code></td></tr>
+                <tr><th scope="row">APT-Distributioun</th><td><code>stable</code></td><td><code>beta</code></td><td><code>nightly</code></td></tr>
+                <tr><th scope="row">DNF-baseurl</th><td><code>https://www.versionx.ai/rpm/</code></td><td><code>https://www.versionx.ai/rpm/beta/</code></td><td><code>https://www.versionx.ai/rpm/nightly/</code></td></tr>
+                <tr><th scope="row">Pacman-Server</th><td><code>https://www.versionx.ai/pacman/$arch</code></td><td><code>https://www.versionx.ai/pacman/beta/$arch</code></td><td><code>https://www.versionx.ai/pacman/nightly/$arch</code></td></tr>
+                <tr><th scope="row">Skript / ash update</th><td>Nëmmen Release</td><td>Keen Abonnement</td><td>Keen Abonnement</td></tr>
+                <tr><th scope="row">Direkte Package / Tarball</th><td colspan="3">Keen automatescht Abonnement: wielt e publizéierten Tag an ersetzt e verifizéierten Artefakt manuell.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <h3>Homebrew: Formelen installéieren oder wiesselen</h3>
+          <p>Fir nei Beta/Nightly benotzt komplette Formelnumm uewen an <code>brew install</code>. Beim Wiessel läscht déi aktuell Formel fir d’éischt: all dräi liwweren déiselwecht Binären. Beispill Release op Beta:</p>
+          <pre><code>brew uninstall ash
+brew install Jonconradt/ash/ash-beta
+brew update
+brew upgrade ash-beta</code></pre>
+          <p>Benotzt <code>ash-nightly</code> fir Nightly oder <code>ash</code> fir Release an Installatioun/Upgrade. Läscht déi richteg al Kanalformel, net ëmmer <code>ash</code>. Benotzerastellunge bleiwen; maacht eng nei Shell op.</p>
+          <h3>Linux: ee Repository-Kanal wielen</h3>
+          <p><strong>APT:</strong> benotzt <a href="#apt-installation">APT-Ariichtung</a> mat genee enger Tabellendistributioun. Fir ze wiesselen ännert <code>/etc/apt/sources.list.d/versionx.list</code>, ersetzt <code>stable</code> duerch <code>beta</code> oder <code>nightly</code> (oder zeréck <code>stable</code>), dann:</p>
+          <pre><code>sudo apt update
+sudo apt install --allow-downgrades ash</code></pre>
+          <p><strong>DNF:</strong> benotzt <a href="#dnf-installation">DNF-Ariichtung</a> mat gewielter baseurl. Bei bestoender Installatioun ersetzt <code>baseurl</code> an <code>/etc/yum.repos.d/versionx.repo</code>, behält Signaturastellungen, dann:</p>
+          <pre><code>sudo dnf --refresh distro-sync ash</code></pre>
+          <p><strong>Pacman:</strong> benotzt <a href="#pacman-installation">Pacman-Ariichtung</a> mat gewielter Server-URL. Behält Abschnitt <code>[versionx]</code>: all Kanal publizéiert Datebank <code>versionx.db</code>. Ännert Server do amplaz eng anescht benannten Datebank. Fir Wiessel inklusiv Downgrade:</p>
+          <pre><code>sudo pacman -Syuu ash</code></pre>
+          <p>Kontrolléiert Transaktioun: zeréck op Release ka ash erofsetzen, Pacman säin duebelt <code>u</code> och aner Pakete. Séchert Konfiguratioun virum Wiessel. Duerno normal APT/DNF/Pacman-Upgrades aus OS-Abschnëtter; net méi ash-Kanalquellen aktiv loossen.</p>
+          <h3>Benotzerlokal Release-Updates</h3>
+          <pre><code>ash update</code></pre>
+          <p>Verifizéiert an installéiert stabil nëmme wann aktiven ash ënner <code>~/.local/bin</code> läit. Aktualiséiert och Assets/Plugins mat Wiel fir ugepasst Dateien. <code>ash update --version vX.Y.Z</code> wielt stabile Tag, kee Kanal; keen Downgrade-Befeel. Et gëtt keng <code>--channel</code>-Optioun. Package-Manager, macOS-.pkg an eegene Skriptzil brauchen zoustännege Manager/Installer. FreeBSD Beta/Nightly benotzt manuell verifizéiert Archiver, kee Selbstupdate-Abonnement. Duerno nei Shell.</p>
+        </section>
+        <section id="uninstall">
+          <h2>Deinstalléieren ouni friem Dateien ze läschen</h2>
+          <h3>1. Als éischt Shell-Integratioun deaktivéieren</h3>
+          <p>Virum Binärläsche féiert de Befeel fir all Shell mat Integratioun aus:</p>
+          <p><strong>Bash</strong></p>
+          <pre><code>ash install --shell bash --disable-shell-integration</code></pre>
+          <p><strong>zsh</strong></p>
+          <pre><code>ash install --shell zsh --disable-shell-integration</code></pre>
+          <p><strong>Fish</strong></p>
+          <pre><code>ash install --shell fish --disable-shell-integration</code></pre>
+          <p>Feelt ash schonn, ännert Startdatei aus <a href="#initialize">Initialiséierung</a> a läscht nëmmen de Block tëscht <code># &gt;&gt;&gt; ash install &gt;&gt;&gt;</code> an <code># &lt;&lt;&lt; ash install &lt;&lt;&lt;</code>. Läsche manuell ash-PATH-/Ëmweltzeilen, net aner Konfiguratioun. Duerno ash-Shells zoumaache fir Broker ze stoppen.</p>
+          <h3>2. De zoustännege Manager läscht seng Dateien</h3>
+          <p><strong>Homebrew (Release)</strong></p>
+          <pre><code>brew uninstall ash</code></pre>
+          <p><strong>APT</strong></p>
+          <pre><code>sudo apt remove ash</code></pre>
+          <p><strong>DNF</strong></p>
+          <pre><code>sudo dnf remove ash</code></pre>
+          <p><strong>Pacman</strong></p>
+          <pre><code>sudo pacman -R ash</code></pre>
+          <p>Wielt nëmmen Är Method; Homebrew Beta/Nightly benotzt <code>ash-beta</code>/<code>ash-nightly</code>. APT/DNF/Pacman läschen eege Binären, Plugins, Man-Säiten, net perséinlech Konfiguratioun/Historik. Keng Package-Dateien manuell läschen.</p>
+          <p>Optional Repository-Botzen: ash-Quell <code>/etc/apt/sources.list.d/versionx.list</code> a spezifesche <code>/etc/apt/keyrings/versionx-keyring.gpg</code>, Repository <code>/etc/yum.repos.d/versionx.repo</code>, oder ash-Abschnitt <code>[versionx]</code> aus <code>/etc/pacman.conf</code> läschen. Kontrolléiert datt keng aner Pakete se benotzen. RPM/Pacman-Schlëssel eréischt nom Fangerofdrockcheck an ouni aner Ofhängegkeeten läschen; ni gemeinsame Schlësselbund vun der Distributioun.</p>
+          <h3 id="manual-macos">3a. macOS-.pkg manuell läschen</h3>
+          <p>macOS Installer späichert Quittung, huet awer keen ash-Deinstaller. Kontrolléiert .pkg, net Homebrew, an exakt Dateilëscht:</p>
+          <pre><code>pkgutil --pkg-info dev.ash.cli
+pkgutil --files dev.ash.cli</code></pre>
+          <p>Mat Quittung als Inventar läscht nëmmen ash-Dateien: <code>/usr/local/bin/ash</code>, <code>/usr/local/bin/ash-broker</code>, Dateien an <code>/usr/local/lib/ash/plugins</code>, <code>/usr/local/share/man/man1/ash.1</code>, opgelëscht lokaliséiert <code>ash.1</code>-Säiten, Hiweiser an <code>/usr/local/share/licenses/ash</code>. Administratioun néideg. Wann aneren Installer ersat huet, kontrolléiert Besëtz; net seng Kopie läschen. Eidel ash-eegen Dossiere läschen, net gemeinsam <code>/usr/local</code>, <code>bin</code>, Man-Dossieren.</p>
+          <p>No Dateiläsche optional Quittung läschen:</p>
+          <pre><code>sudo pkgutil --forget dev.ash.cli</code></pre>
+          <p><strong>Quittung vergiessen läscht keng installéiert Dateien.</strong> Behält se bis Inventarkontroll fäerdeg ass.</p>
+          <h3 id="manual-linux">3b. Lokal / Linux / FreeBSD Archiver manuell läschen</h3>
+          <p>Fannt aktiv Kopie mat <code>command -v ash</code> an <code>command -v ash-broker</code>. Fir Standardskript no Hook-Deaktivatioun genee dës zwee läschen:</p>
+          <pre><code>rm "$HOME/.local/bin/ash" "$HOME/.local/bin/ash-broker"</code></pre>
+          <p>Fir <code>ASH_INSTALL_DIR</code> oder manuell Archiv nëmme richteg ash-/Broker-Pfade läschen. Plugins/Man-Säiten/Hiweiser no ursprénglechem Inventar; Skriptplugins am ash-Benotzerdossier. Ënner <code>/usr/bin</code> éischt Besëtz mat <code>dpkg -S /usr/bin/ash</code>, <code>rpm -qf /usr/bin/ash</code>, <code>pacman -Qo /usr/bin/ash</code> kontrolléieren. Verwalt Kopie muss iwwer Manager ewech, och bei Einzeldownload.</p>
+          <h3>4. Optional: lokal Astellungen, Tools an Historik läschen</h3>
+          <div class="guide-note guide-warning"><p><strong>Sécher alles wat Dir behale wëllt.</strong> Separate Schrëtt ka Providerastellungen/Tokens, eege Tools/Plugins, Gespréicher an Aarbechtsdateien läschen. Binären deinstalléieren heescht keng Zoustëmmung dozou.</p></div>
+          <ul>
+            <li>Konfiguratioun: <code>$XDG_CONFIG_HOME/ash</code>, Standard <code>~/.config/ash</code>.</li>
+            <li>Daten, Plugins, Python-Ëmwelt: <code>$XDG_DATA_HOME/ash</code>, Standard <code>~/.local/share/ash</code>.</li>
+            <li>Historik a Status: <code>$XDG_STATE_HOME/ash</code>, Standard <code>~/.local/state/ash</code>.</li>
+            <li>Cache: <code>$XDG_CACHE_HOME/ash</code>, Standard <code>~/.cache/ash</code>.</li>
+            <li>Broker-Runtime: <code>$XDG_RUNTIME_DIR/ash</code>, oder <code>$XDG_STATE_HOME/ash/runtime</code> ouni Runtime-Wuerzel.</li>
+          </ul>
+          <p>Kontrolléiert richteg absolut XDG-Iwwerschreiwungen virum Läsche vun nëmmen ash-Ënnerdossieren; ni XDG-Wuerzel oder Heemverzeechnes. No Zoumaache vun allen ash-Shells Runtime-Reschter läschen wann néideg. MCP-OAuth kann am OS-Zougangsdatenmanager bleiwen: ash-Entréeën läschen an Zougang beim MCP-Ubidder widderruffen. Onbenotzt KI-Schlësselen am Konto widderruffen; Datei läschen widderrifft näischt. Net Ollama/Modeller, Python oder gemeinsam Ofhängegkeeten mat ash deinstalléieren.</p>
+        </section>
+        <section id="troubleshooting">
+          <h2>Séier Problemer léisen</h2>
+          <dl>
+            <dt>Befeel feelt oder falsch Versioun</dt><dd>Kontrolléiert PATH an <code>command -v ash</code>/<code>command -v ash-broker</code>. Al Kopie an <code>~/.local/bin</code> ka Package verdecken. Ee Besëtzer/Kanal gläichzäiteg an nei Shell benotzen.</dd>
+            <dt>Ubiddermenü feelt</dt><dd>Start <code>ash install</code> interaktiv. Gëlteg Astellunge bleiwen; <a href="#cloud">manuell Konfiguratioun</a> fir Wiessel. Ouni Integratioun Astellungen an CLI-Ëmwelt exportéieren.</dd>
+            <dt>Kee Modell oder Verbindung refuséiert</dt><dd>Fir Ollama Server a Modell an <code>ollama list</code> kontrolléieren. Fir Cloud Endpoint, Berechtegung, HTTPS, Token, Quote kontrolléieren; keng Token-Logs deelen.</dd>
+            <dt>Repository oder Kanal net verfügbar</dt><dd>Kontrolléiert Architektur a publizéiert Versioun/Repository. Publikatioun ka spéit sinn; keng Signaturen ausschalten als Ëmwee.</dd>
+            <dt>Python-Ariichtung feelgeschloen</dt><dd>Installéiert Python mat venv/ensurepip, erlaabt Downloads, widderhuelt <code>ash install</code>. Basis-ash bleift ouni Tools notzbar.</dd>
+          </dl>
+          <p>Méi Detailer? <a href="docs.html">Befehlsreferenz</a>, <a href="faq.html">FAQ</a>, oder <a href="https://github.com/Jonconradt/ash/issues">Problem mellen</a> ouni Zougangsdaten.</p>
+        </section>
+      </article>
+    </div>
+  </main>
+  <footer class="site-footer page-width"><span class="brand"><span class="brand-mark">&gt;_</span> ash</span><a href="docs.html">Dokumentatioun</a><a href="https://github.com/Jonconradt/ash">GitHub</a></footer>
+  <script src="../site.js" data-site-script defer></script>
+</body>
+</html>

@@ -25,7 +25,7 @@
     <a class="brand" href="./" aria-label="ashبيت"><span class="brand-mark">&gt;_</span> ash</a>
     <nav aria-label="التنقل الأساسي">
       <a href="index.html#how-it-works">كيف يعمل</a>
-      <a href="index.html#install">ثَبَّتَ</a>
+      <a href="install.html">التثبيت</a>
       <a href="docs.html">المستندات</a>
       <a href="faq.html" aria-current="page">التعليمات</a>
       <a href="developer.html">المطورين</a>
@@ -87,10 +87,10 @@
           <p>ليس أصليا.ashيدعم bash وzsh وFish على أنظمة التشغيل macOS وLinux وFreeBSD؛ لا يوجد هدف تثبيت PowerShell. استخدم WSL لتجربة Linux المدعومة.</p>
 
           <h3>كيف أقوم بالتثبيتashفي نظام Windows الفرعي لنظام Linux (WSL)؟</h3>
-          <p>قم بتثبيته داخل توزيع WSL الخاص بك مثل Linux: قم بتثبيت Sigstore<code>cosign</code>، ثم تشغيل<code>curl -fsSL https://jonconradt.github.io/ash/install.sh | sh</code>. تكوين<code>ASH_AI_ENDPOINT</code>و<code>ASH_AI_MODEL</code>، وقم بالاشتراك في التكامل مع<code>ash install --shell bash --shell-integration</code>عند الرغبة.</p>
+          <p>اتبع <a href="install.html#linux">تعليمات تثبيت Linux</a> داخل توزيعة WSL، مفضّلًا مدير حزمها. ثم <a href="install.html#initialize">اضبط المزوّد وفعّل دمج Bash اختياريًا</a>. لا مثبّت Windows أصليًا.</p>
 
           <h3>كيف أقوم بالتحديثashإلى أحدث نسخة الإصدار؟</h3>
-          <p>يجري<code>ash update</code>على نظام التشغيل MacOS أو Linux أو FreeBSD. يقوم بتنزيل أحدث أرشيف مطابق ثابت، ويتحقق من بيان الإصدار باستخدام حزمة Sigstore وملخص SHA-256، ثم يتم التثبيت على<code>~/.local/bin/ash</code>. إذا فشل التحقق من التوقيع أو كان الأرشيف يحتوي على إدخالات غير مدعومة، فيجب الحصول على تأكيد تفاعلي؛ لا توافق على التوقيع الفاشل إلا إذا كنت تثق بشكل مستقل في مصدر الإصدار. يتم تخطي الحمولات غير المدعومة، وترفض عمليات التشغيل غير التفاعلية هذه الاستثناءات. يستخدم<code>ash update --version vX.Y.Z</code>لنسخة محددة؛ يستخدم<code>--yes</code>فقط عندما تريد استبدال الملفات المُدارة المخصصة.</p>
+          <p>استخدم مدير الحزم المسؤول لتثبيت Homebrew/APT/DNF/Pacman. <code>ash update</code> مخصص لـ Release المستقر تحت <code>~/.local/bin</code>؛ يتحقق من بيان Sigstore الموقّع وملخص الأرشيف ويرفض التوقيع الفاشل. .pkg الأصلي والمجلد المخصص يتطلبان المثبّت الأصلي/استبدالًا يدويًا. راجع <a href="install.html#updates">التحديثات واشتراكات القنوات</a> لـ Release وBeta وNightly.</p>
 
           <h3>ركضت<code>ash install</code>. لماذا لا يتغير شيء في هذه المحطة؟</h3>
           <p>يتم تعطيل تكامل Shell بشكل افتراضي. لتمكينه، قم بتشغيل<code>ash install --shell bash --shell-integration</code>(أو حدد<code>zsh</code>أو<code>fish</code>); ولا يعيد كتابة عملية الصدفة الجارية بالفعل. افتح محطة جديدة أو أعد تحميل ملف بدء التشغيل المحدد. يجري<code>ash install --shell bash --disable-shell-integration</code>لإزالةAshالكتلة المُدارة مع الحفاظ على المحتوى المحيط.</p>

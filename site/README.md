@@ -6,15 +6,17 @@ that change `site/`, on pushes of release tags (`v*`), or on manually published
 releases). This is marketing/docs content only — it is not part of the Go build.
 
 - `index.html` — landing page.
+- `install.html` — canonical OS-specific prerequisites, installation, providers, channels, updates, and uninstall guide; older installation anchors link here.
 - `docs.html` — usage/configuration documentation.
 - `faq.html` — frequently asked questions.
 - `developer.html` — contributor setup, Make targets, release builders, diagnostics, and VM package tests.
 - `languages.json` — language-picker labels, URL paths, and translation-service locale mapping.
 - `generate_locales.py` — generates the locale pages from the English source pages.
-- `site.js` — language switching and install-command copy behavior.
-- `install.sh` — the `curl -fsSL .../install.sh | sh` one-line installer; downloads the latest release archive for the detected OS/arch and runs `ash install`.
+- `site.js` — language switching and command copying with explicit clipboard-failure feedback.
+- `install.sh` — alternative user-local installer; download and inspect it before executing. It verifies the latest Release archive for the detected OS/arch and runs `ash install`. Package managers are preferred.
 - `apt/`, `rpm/`, and `pacman/` — the signed APT, DNF, and Pacman repositories, updated from published releases by [`.github/workflows/apt.yml`](../.github/workflows/apt.yml).
 - `styles.css` — shared stylesheet for the HTML pages.
+- `site.test.cjs` — dependency-free Node tests for command copying, language switching, guide structure, and local links; run by `make test`.
 - `favicon.svg` — site favicon.
 - `CNAME` — custom domain configuration for GitHub Pages.
 - `robots.txt`, `sitemap.xml` — search engine crawl/indexing hints.

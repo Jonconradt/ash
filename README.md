@@ -156,10 +156,19 @@ Contributor note: run `make lint test` before submitting changes.
 
 ## Install on Linux, macOS, or FreeBSD
 
-Install Sigstore `cosign` first, then install the latest release:
+Start with the [installation guide](https://jonconradt.github.io/ash/install.html)
+for OS-specific prerequisites, recommended package managers, Ollama and free cloud
+tiers, channel subscriptions, updates, and uninstall instructions.
+Prefer your package manager over executing a website script.
+
+If you choose the alternative script installer, install Sigstore `cosign` first,
+download and inspect the script, and execute the saved copy only if you trust it:
 
 ```bash
-curl -fsSL https://jonconradt.github.io/ash/install.sh | sh
+curl -fsSL https://jonconradt.github.io/ash/install.sh -o ash-install.sh
+less ash-install.sh
+sh ./ash-install.sh
+rm ./ash-install.sh
 ```
 
 The installer supports Linux and macOS on `amd64` and `arm64`, and FreeBSD on
@@ -249,10 +258,11 @@ EOF
 sudo pacman -Syu ash
 ```
 
-Use repository names `versionx-beta` or `versionx-nightly` and the matching
+Keep the repository name `versionx` (all channels publish `versionx.db`) and use the matching
 `https://www.versionx.ai/pacman/beta/$arch` or
 `https://www.versionx.ai/pacman/nightly/$arch` URL to follow another channel.
-Run `sudo pacman -Suu ash` after switching to permit a downgrade.
+Run `sudo pacman -Syuu ash` after switching to refresh metadata and permit a
+downgrade; review the transaction because other packages can be downgraded too.
 
 The Pacman repository supports `x86_64`. Package and repository signatures are
 verified by Pacman; update ash with `sudo pacman -Syu`.

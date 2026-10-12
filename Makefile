@@ -170,6 +170,7 @@ language-lint:
 
 site-lint:
 	@./scripts/dev/run-quiet.sh "site-lint" sh -n site/install.sh
+	@./scripts/dev/run-quiet.sh "site-js-syntax" node --check site/site.js
 
 site-locales:
 	@python3 site/generate_locales.py $(foreach locale,$(SITE_LOCALES),--locale $(locale))
@@ -194,6 +195,7 @@ govulncheck:
 	@./scripts/dev/run-quiet.sh "govulncheck" go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...
 
 test: plugins-test
+	@./scripts/dev/run-quiet.sh "site-tests" node --test site/site.test.cjs
 	@./scripts/dev/run-quiet.sh "go-test" go test ./...
 	@echo "test: ok"
 

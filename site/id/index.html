@@ -47,7 +47,7 @@
     <a class="brand" href="./" aria-label="ashrumah"><span class="brand-mark">&gt;_</span> ash</a>
     <nav aria-label="Navigasi utama">
       <a href="#how-it-works">Bagaimana cara kerjanya</a>
-      <a href="#install">Memasang</a>
+      <a href="install.html">Pasang</a>
       <a href="docs.html">dokumen</a>
       <a href="faq.html">Pertanyaan Umum</a>
       <a href="developer.html">Pengembang</a>
@@ -76,7 +76,7 @@
         <h1>Tanyakan terminal Anda.<br><em>Pertahankan arus Anda.</em></h1>
         <p class="hero-lede">ash menghadirkan AI ke dalam bash, Fish, dan zsh sehingga pertanyaan, investigasi, dan otomatisasi kecil terjadi di tempat pekerjaan sudah ada. Hubungkan server MCP jarak jauh untuk membawa alat mereka ke dalam alur kerja yang sama.</p>
         <div class="hero-actions">
-          <a class="button button-primary" href="#install">Memasangash <span aria-hidden="true">&#8595;</span></a>
+          <a class="button button-primary" href="install.html">Pasang ash <span aria-hidden="true">&#8594;</span></a>
           <a class="text-link" href="https://github.com/Jonconradt/ash#configure">Baca panduan pengaturan<span aria-hidden="true">&#8594;</span></a>
         </div>
         <p class="compatibility"><span class="status-dot"></span> macOS · Linux · FreeBSD · Sumber terbuka</p>
@@ -111,7 +111,7 @@
       </div>
       <div class="how-grid">
         <div class="numbered"><span>01</span><h3>Ikut serta dalam integrasi shell</h3><p>ash berfungsi dengan bash, Fish, dan zsh. Penginstal terverifikasi bertanya sebelum menambahkan shell hook yang dikelolanya; perintah yang tidak diketahui menjadi petunjuk setelah Anda mengaktifkannya. Tunda saat Anda perlu istirahat dari pemrosesan perintah otomatis.</p></div>
-        <div class="numbered"><span>02</span><h3>Pembaruan yang mudah</h3><p><code>ash update</code> terus memperbarui instalasi Anda dengan rilis terbaru. Perintah ini menangani pemeriksaan versi, pengunduhan, dan verifikasi secara otomatis. Tidak ada pembaruan latar belakang atau kejutan.</p></div>
+        <div class="numbered"><span>02</span><h3>Pembaruan yang mudah</h3><p>Perbarui melalui pengelola paket, atau <code>ash update</code> untuk Release di <code>~/.local/bin</code>. Pilih Release, Beta, Nightly melalui repositori didukung. Tanpa kejutan pembaruan latar belakang.</p></div>
         <div class="numbered"><span>03</span><h3>Tetap terkendali</h3><p>Eksekusi alat dibatasi oleh daftar izin dan penolakan eksplisit dan dijalankan sebagai pengguna Anda. Anda memutuskan apaashdiperbolehkan untuk disentuh. Tambahkan skrip Python Anda sendiri ke<code>$XDG_DATA_HOME/ash/tools</code>atau plugin asli ke<code>$XDG_DATA_HOME/ash/plugins</code>.</p></div>
       </div>
     </section>
@@ -120,23 +120,8 @@
       <div class="page-width install-content">
         <div><p class="eyebrow">Mulailah dari yang kecil</p><h2>Berikan cangkang Anda<br><em>temani.</em></h2></div>
         <div class="install-details">
-          <p>Pengguna Linux, macOS, dan FreeBSD dapat menginstal rilis terbaru dalam satu langkah. Instal Sigstore<code>cosign</code>terlebih dahulu agar penginstal dapat memverifikasi manifes checksum yang ditandatangani. Ini menginstal ke<code>~/.local/bin</code>dan bertanya sebelum menambahkan integrasi Fish, zsh, atau bash shell.</p>
-          <p>Di macOS atau Linux dengan<a href="https://brew.sh">minuman rumahan</a>, instalashdan plugin yang dibundelnya, lalu inisialisasi aset yang disematkan, pengaturan penyedia, dan integrasi shell:</p>
-          <pre><code>brew install Jonconradt/ash/ash
-ash install --shell $SHELL --shell-integration</code></pre>
-          <p>Rumusnya diperbarui secara otomatis untuk setiap rilis stabil. Ketentuan perintah installAshaset yang disematkan, menyiapkan integrasi shell untuk shell Anda saat ini, dan membantu mengonfigurasi penyedia AI Anda.</p>
-          <p>Di Debian atau Ubuntu, instal dan perbaruiashdengan<a href="docs.html#apt-installation">TEPAT</a>; pada sistem yang kompatibel dengan Fedora dan RHEL, gunakan<a href="docs.html#dnf-installation">DNF</a>; Pengguna Arch Linux dapat menggunakan<a href="docs.html#pacman-installation">Pacman</a>.</p>
-          <p><code>ash install</code>mengonfigurasikan penyedia AI Anda secara otomatis: ia mendeteksi kunci API penyedia cloud yang sudah ditetapkan atau server inferensi lokal yang sedang berjalan, jika tidak, ia akan menampilkan menu bernomor untuk memilih penyedia dan model. Atau atur sendiri:</p>
-          <pre><code>export ASH_AI_AUTH_TOKEN='your-token'
-export ASH_AI_ENDPOINT='https://ollama.com'
-export ASH_AI_MODEL='gemma4:31b-cloud'
-</code></pre>
-          <p>Lokal, OpenAI, Anthropic, Google, Azure OpenAI, Mistral, Cohere, Groq, xAI, DeepSeek, Together AI, OpenRouter, HuggingFace, AWS Bedrock, dan penyedia lain dengan API yang kompatibel dengan OpenAI didukung.</p>
-          <div class="code-block-wrap">
-            <pre class="code-block"><code><span class="code-command">curl -fsSL https://jonconradt.github.io/ash/install.sh | sh</span></code></pre>
-            <button type="button" class="copy-button" data-copy-target=".code-command" aria-label="Salin perintah instal" data-copied-label="Disalin!">Salin</button>
-          </div>
-          <div class="install-links"><a class="button button-light" href="https://github.com/Jonconradt/ash/releases/latest">Lihat paket<span aria-hidden="true">&#8599;</span></a><a class="text-link light-link" href="https://github.com/Jonconradt/ash#configure">Konfigurasi penuh<span aria-hidden="true">&#8594;</span></a></div>
+          <p>Mulai dengan pengelola paket di macOS/Linux. Panduan mencakup prasyarat, Ollama lokal, cloud gratis, kanal pembaruan, dan penghapusan aman. Petunjuk arsip FreeBSD serta skrip alternatif juga disertakan.</p>
+          <div class="install-links"><a class="button button-light" href="install.html">Pilih pemasangan Anda <span aria-hidden="true">&#8594;</span></a><a class="text-link light-link" href="install.html#updates">Pembaruan dan kanal <span aria-hidden="true">&#8594;</span></a></div>
         </div>
       </div>
     </section>

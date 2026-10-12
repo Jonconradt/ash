@@ -47,7 +47,7 @@
     <a class="brand" href="./" aria-label="ash家"><span class="brand-mark">&gt;_</span> ash</a>
     <nav aria-label="主要导航">
       <a href="#how-it-works">它是如何运作的</a>
-      <a href="#install">安装</a>
+      <a href="install.html">安装</a>
       <a href="docs.html">文档</a>
       <a href="faq.html">常问问题</a>
       <a href="developer.html">开发商</a>
@@ -76,7 +76,7 @@
         <h1>询问你的终端。<br><em>保持流程。</em></h1>
         <p class="hero-lede">ash 将 AI 引入 bash、Fish 和 zsh，因此问题、调查和小型自动化可以在已有工作的地方进行。连接远程 MCP 服务器，将其工具纳入同一工作流程。</p>
         <div class="hero-actions">
-          <a class="button button-primary" href="#install">安装ash <span aria-hidden="true">&#8595;</span></a>
+          <a class="button button-primary" href="install.html">安装 ash <span aria-hidden="true">&#8594;</span></a>
           <a class="text-link" href="https://github.com/Jonconradt/ash#configure">阅读设置指南<span aria-hidden="true">&#8594;</span></a>
         </div>
         <p class="compatibility"><span class="status-dot"></span> macOS · Linux · FreeBSD · 开源</p>
@@ -111,7 +111,7 @@
       </div>
       <div class="how-grid">
         <div class="numbered"><span>01</span><h3>选择加入 shell 集成</h3><p>ash 适用于 bash、Fish 和 zsh。经过验证的安装程序在添加其托管 shell 挂钩之前会进行询问；一旦启用，未知命令就会变成提示。当您需要从自动提示处理中休息一下时，请小睡一下。</p></div>
-        <div class="numbered"><span>02</span><h3>轻松更新</h3><p><code>ash update</code> 让您的安装保持最新版本。该命令自动处理版本检查、下载和验证。没有背景或意外更新。</p></div>
+        <div class="numbered"><span>02</span><h3>轻松更新</h3><p>通过包管理器更新，或对 <code>~/.local/bin</code> 下的 Release 使用 <code>ash update</code>。通过支持的仓库选择 Release、Beta 或 Nightly。没有意外后台更新。</p></div>
         <div class="numbered"><span>03</span><h3>保持控制</h3><p>工具执行受到显式允许和拒绝列表的限制，并以您的用户身份运行。你决定什么ash被允许触摸。添加您自己的 Python 脚本<code>$XDG_DATA_HOME/ash/tools</code>或本机插件<code>$XDG_DATA_HOME/ash/plugins</code>。</p></div>
       </div>
     </section>
@@ -120,23 +120,8 @@
       <div class="page-width install-content">
         <div><p class="eyebrow">从小事做起</p><h2>给你的外壳<br><em>一些陪伴。</em></h2></div>
         <div class="install-details">
-          <p>Linux、macOS 和 FreeBSD 用户可以一步安装最新版本。安装 Sigstore<code>cosign</code>首先，安装程序可以验证签名的校验和清单。它安装到<code>~/.local/bin</code>并在添加选择加入 Fish、zsh 或 bash shell 集成之前进行询问。</p>
-          <p>在 macOS 或 Linux 上<a href="https://brew.sh">自制</a>， 安装ash及其捆绑的插件，然后初始化其嵌入式资产、提供程序设置和 shell 集成：</p>
-          <pre><code>brew install Jonconradt/ash/ash
-ash install --shell $SHELL --shell-integration</code></pre>
-          <p>该公式会针对每个稳定版本自动更新。安装命令规定Ash的嵌入式资产，为您当前的 shell 设置 shell 集成，并帮助配置您的 AI 提供程序。</p>
-          <p>在 Debian 或 Ubuntu 上，安装并更新ash和<a href="docs.html#apt-installation">易于</a>;在 Fedora 和 RHEL 兼容系统上，使用<a href="docs.html#dnf-installation">地下城与勇士</a>; Arch Linux 用户可以使用<a href="docs.html#pacman-installation">吃豆人</a>。</p>
-          <p><code>ash install</code>自动配置您的 AI 提供商：它会检测已设置的云提供商 API 密钥或正在运行的本地推理服务器，否则它会显示一个编号菜单来选择提供商和模型。或者自己设置这些：</p>
-          <pre><code>export ASH_AI_AUTH_TOKEN='your-token'
-export ASH_AI_ENDPOINT='https://ollama.com'
-export ASH_AI_MODEL='gemma4:31b-cloud'
-</code></pre>
-          <p>支持 Local、OpenAI、Anthropic、Google、Azure OpenAI、Mistral、Cohere、Groq、xAI、DeepSeek、Together AI、OpenRouter、HuggingFace、AWS Bedrock 以及具有 OpenAI 兼容 API 的任何其他提供商。</p>
-          <div class="code-block-wrap">
-            <pre class="code-block"><code><span class="code-command">curl -fsSL https://jonconradt.github.io/ash/install.sh | sh</span></code></pre>
-            <button type="button" class="copy-button" data-copy-target=".code-command" aria-label="复制安装命令" data-copied-label="复制了！">复制</button>
-          </div>
-          <div class="install-links"><a class="button button-light" href="https://github.com/Jonconradt/ash/releases/latest">查看套餐<span aria-hidden="true">&#8599;</span></a><a class="text-link light-link" href="https://github.com/Jonconradt/ash#configure">配置齐全<span aria-hidden="true">&#8594;</span></a></div>
+          <p>在 macOS 或 Linux 上优先使用包管理器。安装指南涵盖前提、本地 Ollama、云端免费额度、更新渠道和安全移除，也包括 FreeBSD 压缩包与替代脚本安装。</p>
+          <div class="install-links"><a class="button button-light" href="install.html">选择安装方式 <span aria-hidden="true">&#8594;</span></a><a class="text-link light-link" href="install.html#updates">更新与渠道 <span aria-hidden="true">&#8594;</span></a></div>
         </div>
       </div>
     </section>

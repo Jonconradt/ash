@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ash | 安装、配置、更新与卸载</title>
+  <meta name="description" content="在 macOS、Linux 或 FreeBSD 安装 ash。选择包管理器，配置 Ollama 或免费云额度，选择更新渠道并安全卸载。">
+  <meta name="theme-color" content="#f4f0e8">
+  <link rel="canonical" href="https://jonconradt.github.io/ash/zh-CN/install.html">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="ash 安装指南">
+  <meta property="og:description" content="从前提准备到首次提问、更新及清理。">
+  <meta property="og:url" content="https://jonconradt.github.io/ash/zh-CN/install.html">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="alternate" hreflang="en" href="https://jonconradt.github.io/ash/install.html">
+  <link rel="alternate" hreflang="ar" href="https://jonconradt.github.io/ash/ar/install.html">
+  <link rel="alternate" hreflang="de" href="https://jonconradt.github.io/ash/de/install.html">
+  <link rel="alternate" hreflang="es" href="https://jonconradt.github.io/ash/es/install.html">
+  <link rel="alternate" hreflang="fr" href="https://jonconradt.github.io/ash/fr/install.html">
+  <link rel="alternate" hreflang="id" href="https://jonconradt.github.io/ash/id/install.html">
+  <link rel="alternate" hreflang="it" href="https://jonconradt.github.io/ash/it/install.html">
+  <link rel="alternate" hreflang="lb" href="https://jonconradt.github.io/ash/lb/install.html">
+  <link rel="alternate" hreflang="pt-BR" href="https://jonconradt.github.io/ash/pt-BR/install.html">
+  <link rel="alternate" hreflang="zh-CN" href="https://jonconradt.github.io/ash/zh-CN/install.html">
+  <link rel="alternate" hreflang="zh-TW" href="https://jonconradt.github.io/ash/zh-TW/install.html">
+  <link rel="alternate" hreflang="x-default" href="https://jonconradt.github.io/ash/install.html">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#guide">跳至安装指南</a>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="ash 首页"><span class="brand-mark">&gt;_</span> ash</a>
+    <nav aria-label="主导航">
+      <a href="./">首页</a>
+      <a href="install.html" aria-current="page">安装</a>
+      <a href="docs.html">文档</a>
+      <a href="faq.html">常见问题</a>
+      <a href="developer.html">开发者</a>
+      <a href="https://github.com/Jonconradt/ash">GitHub</a>
+      <label class="sr-only" for="site-language">语言</label>
+      <select id="site-language" class="language-select" aria-label="选择语言">
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+        <option value="de">Deutsch</option>
+        <option value="es">Español</option>
+        <option value="fr">Français</option>
+        <option value="id">Bahasa Indonesia</option>
+        <option value="it">Italiano</option>
+        <option value="lb">Lëtzebuergesch</option>
+        <option value="pt-BR">Português (Brasil)</option>
+        <option value="zh-CN" selected>简体中文</option>
+        <option value="zh-TW">繁體中文</option>
+      </select>
+    </nav>
+  </header>
+  <main id="guide" class="docs-page page-width install-guide">
+    <header class="docs-header">
+      <p class="eyebrow">安装 · 配置 · 维护</p>
+      <h1>轻松开启<br><em>第一次提问。</em></h1>
+      <p>选择操作系统，通过其包管理器安装，再连接模型。建议从 Release 开始；以后可选择 Beta 或 Nightly。</p>
+      <div class="os-choices" aria-label="选择操作系统">
+        <a class="method-card" href="#macos"><strong>macOS</strong><span>推荐 Homebrew</span><small>Apple Silicon 和 Intel</small></a>
+        <a class="method-card" href="#linux"><strong>Linux</strong><span>APT、DNF 或 Pacman</span><small>架构支持取决于仓库</small></a>
+        <a class="method-card" href="#freebsd"><strong>FreeBSD</strong><span>已验证的压缩包或脚本</span><small>仅 amd64；无原生 ash pkg</small></a>
+      </div>
+    </header>
+    <div class="docs-layout">
+      <nav class="docs-contents" aria-label="安装目录">
+        <strong>本页目录</strong>
+        <a href="#prerequisites">开始之前</a>
+        <a href="#macos">macOS</a>
+        <a href="#linux">Linux</a>
+        <a href="#freebsd">FreeBSD</a>
+        <a href="#initialize">初始化与验证</a>
+        <a href="#ollama">本地 Ollama</a>
+        <a href="#cloud">云端免费额度</a>
+        <a href="#script">脚本安装</a>
+        <a href="#verify-download">验证下载</a>
+        <a href="#updates">更新与渠道</a>
+        <a href="#uninstall">卸载</a>
+        <a href="#troubleshooting">故障排查</a>
+      </nav>
+      <article class="docs-content" data-copy-label="复制命令" data-copied-label="已复制！" data-copy-error="无法复制。请手动选中并复制命令。">
+        <section id="prerequisites">
+          <h2>开始之前</h2>
+          <ol>
+            <li><strong>受支持的系统和 shell：</strong>amd64/x86_64 或 arm64/aarch64 上的 macOS、Linux，或 amd64 上的 FreeBSD。使用 Bash、zsh 或 Fish。Arch 包仅支持 x86_64。没有原生 Windows/PowerShell 安装程序。</li>
+            <li><strong>下载访问：</strong>可用的互联网连接，以及对 GitHub、选定软件仓库和模型提供商的可信 HTTPS 访问。本地推理也需要先下载模型。</li>
+            <li><strong>权限：</strong>主目录须可写，以保存用户文件。Linux 系统包和 macOS .pkg 需要管理员权限；Homebrew 和 <code>ash install</code> 应以普通用户运行。</li>
+            <li><strong>模型：</strong>已下载模型的本地推理服务器，或云端账户/API 密钥。选择支持工具调用的模型，而非仅图像/音频模型。本地内存、磁盘和 GPU 需求取决于模型。</li>
+          </ol>
+          <p>预编译 ash 包不需要 Go、Rust、Node.js 或 Xcode 构建工具。包管理器可能有自己的要求；请先遵循其官方设置说明。</p>
+          <div class="guide-note">
+            <h3>可选：内置 Python 工具</h3>
+            <p>基本使用无需 Python。内置 Python 工具需要带 <code>venv</code> 和 <code>ensurepip</code> 的 Python 3，并能下载依赖。在 Debian/Ubuntu 安装 <code>python3</code> 和 <code>python3-venv</code>；Homebrew Python 包含 venv 支持。FreeBSD 请使用与 Python 版本匹配的 pip 包。然后重新运行 <code>ash install</code>。设置会在 <code>$XDG_DATA_HOME/ash/venv</code>（默认 <code>~/.local/share/ash/venv</code>）创建隔离环境；失败只禁用这些工具，不影响基本功能。</p>
+          </div>
+        </section>
+        <section id="macos">
+          <h2>macOS</h2>
+          <h3 id="homebrew">推荐：Homebrew</h3>
+          <p>前提：<a href="https://docs.brew.sh/Installation">Homebrew</a>、受支持的 macOS 环境和可用的 <code>brew</code> 命令。tap 自动选择 Intel 或 Apple Silicon 压缩包。安装 Release 无需 sudo：</p>
+          <pre><code>brew install Jonconradt/ash/ash
+ash version</code></pre>
+          <p>Homebrew 管理其前缀内的二进制、原生插件、手册页和许可声明（Apple Silicon 通常为 <code>/opt/homebrew</code>，Intel 为 <code>/usr/local</code>）。它按配方的 SHA-256 校验压缩包。不配置提供商，也不修改 shell 启动文件：请继续<a href="#initialize">用户初始化</a>。用 <code>brew upgrade ash</code> 更新，用 <code>brew uninstall ash</code> 移除 Release；Beta/Nightly 见<a href="#updates">渠道配方</a>。</p>
+          <h3 id="macos-pkg">替代方案：原生 .pkg</h3>
+          <p>从<a href="https://github.com/Jonconradt/ash/releases">已发布版本</a>下载 Apple Silicon 的 <code>darwin-arm64.pkg</code> 或 Intel 的 <code>darwin-amd64.pkg</code>。打开安装程序前，<a href="#verify-download">验证其签名校验和清单</a>。需要管理员权限。</p>
+          <div class="guide-note guide-warning"><p><strong>macOS 包未经签名或公证。</strong>发布清单提供独立的发布者/校验和验证，不是 Apple 公证。不要仅为安装 ash 而禁用 Gatekeeper 或绕过安全警告；如安全政策有要求，请优先使用 Homebrew。</p></div>
+          <p>包将 <code>ash</code> 和 <code>ash-broker</code> 写入 <code>/usr/local/bin</code>，插件写入 <code>/usr/local/lib/ash/plugins</code>，手册写入 <code>/usr/local/share/man</code>，声明写入 <code>/usr/local/share/licenses/ash</code>。收据为 <code>dev.ash.cli</code>。不执行用户初始化或订阅更新：安装后<a href="#initialize">初始化</a>，更新时替换为已验证的新版 .pkg，卸载时遵循<a href="#manual-macos">手动移除步骤</a>。不要覆盖 Homebrew 管理的版本。</p>
+        </section>
+        <section id="linux">
+          <h2>Linux</h2>
+          <p>尽量使用发行版的包管理器。这些包管理 <code>/usr/bin/ash</code>、<code>/usr/bin/ash-broker</code>、<code>/usr/lib/ash/plugins</code>、<code>/usr/share/man</code> 下的手册及许可声明。提供商设置和 shell 钩子留给<a href="#initialize">用户初始化</a>。</p>
+          <h3 id="apt-installation">Debian 和 Ubuntu：APT</h3>
+          <p>前提：amd64 或 arm64、管理员权限、APT、<code>curl</code>、<code>gpg</code> 和 CA 证书。添加仓库前，通过发行版安装缺失的下载/密钥工具。Release 名为 <code>stable</code>：</p>
+          <pre><code>sudo apt update
+sudo apt install ca-certificates curl gnupg
+sudo install -d -m 0755 /etc/apt/keyrings
+curl -fsSL https://www.versionx.ai/apt/gpg.key -o versionx-apt.asc
+gpg --show-keys --with-fingerprint versionx-apt.asc
+sudo gpg --dearmor --batch --yes -o /etc/apt/keyrings/versionx-keyring.gpg versionx-apt.asc
+sudo chmod 0644 /etc/apt/keyrings/versionx-keyring.gpg
+echo "deb [signed-by=/etc/apt/keyrings/versionx-keyring.gpg] https://www.versionx.ai/apt stable main" |
+  sudo tee /etc/apt/sources.list.d/versionx.list
+sudo apt update
+sudo apt install ash
+rm versionx-apt.asc</code></pre>
+          <p>导入任何仓库密钥前，使用可信发布者来源核对指纹。VersionX 指纹为 <code>32C6 C11D 2F86 BFE4 6EB7 7FFC 5257 FEA6 1368 919F</code>。APT 验证已签名仓库元数据及其中的包摘要；<code>signed-by</code> 限制密钥适用范围。用 <code>sudo apt update &amp;&amp; sudo apt upgrade ash</code> 更新；用 <code>sudo apt remove ash</code> 移除。</p>
+          <h3 id="dnf-installation">Fedora 和兼容 RHEL 的系统：DNF</h3>
+          <p>前提：x86_64 或 aarch64、管理员权限、DNF/RPM、<code>curl</code>、<code>gpg</code> 和 CA 证书。从发行版安装缺失工具。导入前查看密钥并核对上述指纹：</p>
+          <pre><code>curl -fsSL https://www.versionx.ai/rpm/gpg.key -o versionx-rpm.asc
+gpg --show-keys --with-fingerprint versionx-rpm.asc
+sudo rpm --import versionx-rpm.asc
+sudo tee /etc/yum.repos.d/versionx.repo &gt;/dev/null &lt;&lt;'EOF'
+[versionx]
+name=VersionX ash repository
+baseurl=https://www.versionx.ai/rpm/
+enabled=1
+gpgcheck=0
+repo_gpgcheck=1
+gpgkey=https://www.versionx.ai/rpm/gpg.key
+EOF
+sudo dnf install ash
+rm versionx-rpm.asc</code></pre>
+          <p>RPM 文件未单独签名。<code>repo_gpgcheck=1</code> 验证覆盖其校验和的仓库元数据；<code>gpgcheck=0</code> 表示没有单包签名，不是禁用仓库验证。如政策要求已签名 RPM 内容，此仓库不符合要求。用 <code>sudo dnf upgrade ash</code> 更新；用 <code>sudo dnf remove ash</code> 移除。</p>
+          <h3 id="pacman-installation">Arch Linux：Pacman</h3>
+          <p>前提：x86_64、管理员权限、已初始化密钥环的 Pacman、<code>curl</code> 和 <code>gpg</code>。信任前核对显示的指纹与上述一致。只添加一次仓库，不要每次更新都添加：</p>
+          <pre><code>curl -fsSL https://www.versionx.ai/pacman/gpg.key -o versionx-pacman.asc
+gpg --show-keys --with-fingerprint versionx-pacman.asc
+sudo pacman-key --add versionx-pacman.asc
+sudo pacman-key --lsign-key 32C6C11D2F86BFE46EB77FFC5257FEA61368919F
+sudo tee -a /etc/pacman.conf &gt;/dev/null &lt;&lt;'EOF'
+[versionx]
+Server = https://www.versionx.ai/pacman/$arch
+SigLevel = Required DatabaseRequired
+EOF
+sudo pacman -Syu ash
+rm versionx-pacman.asc</code></pre>
+          <p>Pacman 验证包和数据库签名。用 <code>sudo pacman -Syu</code> 保持 Arch 同步，不要部分升级；用 <code>sudo pacman -R ash</code> 移除 ash。</p>
+          <h3>其他 Linux 安装方式</h3>
+          <p>已使用 <a href="https://docs.brew.sh/Homebrew-on-Linux">Linux 上的 Homebrew</a>？<a href="#homebrew">相同 tap 说明</a>支持 amd64 和 arm64；文件由 Brew 管理，不是 APT/DNF。否则使用已验证的<a href="#script">脚本/压缩包安装</a>，或匹配的 <a href="https://github.com/Jonconradt/ash/releases">.deb/.rpm 下载</a>。用 <code>sudo apt install ./PACKAGE.deb</code> 安装已验证的 .deb，或用 <code>sudo dnf install ./PACKAGE.rpm</code> 安装 .rpm（替换文件名）。直接包仍由包管理器管理，但不添加仓库或自动订阅未来版本。当前 RPM 内容未签名；遵循发行版政策，不要禁用签名检查。</p>
+        </section>
+        <section id="freebsd">
+          <h2>FreeBSD</h2>
+          <p>前提：amd64、Bash（即使交互 shell 为 zsh/Fish）、下载/验证工具和可写安装目录。使用 FreeBSD 原生管理器安装 Bash：</p>
+          <pre><code>sudo pkg install bash</code></pre>
+          <p>FreeBSD 的 <code>pkg</code> 管理前提组件，不管理 ash：目前没有 ash .pkg 仓库或 arm64 发布压缩包。使用<a href="#script">已验证脚本</a>，或<a href="#verify-download">验证 FreeBSD amd64 tarball</a>，解压到临时目录，将版本化 ash 二进制安装为 <code>~/.local/bin/ash</code>，与 <code>ash-broker</code> 放在一起。复制原生插件到 <code>$XDG_DATA_HOME/ash/plugins</code>（默认 <code>~/.local/share/ash/plugins</code>），然后<a href="#initialize">初始化</a>。这些文件由您管理，<code>pkg delete</code> 不会移除它们。在默认位置使用 <a href="#updates">Release 自更新</a>，或手动替换已验证文件。</p>
+        </section>
+        <section id="initialize">
+          <h2>初始化与验证</h2>
+          <p>安装二进制后，以普通用户交互运行设置。仅设置用户文件不会改动启动文件：</p>
+          <pre><code>ash install</code></pre>
+          <p>如要启用“命令未找到”集成，请按所用 shell 选择且仅选择一条命令：</p>
+          <p><strong>Bash</strong></p>
+          <pre><code>ash install --shell bash --shell-integration</code></pre>
+          <p><strong>zsh</strong></p>
+          <pre><code>ash install --shell zsh --shell-integration</code></pre>
+          <p><strong>Fish</strong></p>
+          <pre><code>ash install --shell fish --shell-integration</code></pre>
+          <p>Bash 使用 <code>~/.bashrc</code>，zsh 使用 <code>~/.zshrc</code>，Fish 使用 <code>$XDG_CONFIG_HOME/fish/config.fish</code>（默认 <code>~/.config/fish/config.fish</code>）。随后打开新 shell；已有 shell 保留运行中的 broker。集成将 <code>~/.local/bin</code> 加到 PATH 前面：要让系统包被选中，先删除旧的用户本地版本。</p>
+          <p>若缺少提供商设置，会检测现有密钥或运行中的本地服务器；否则显示提供商菜单并要求凭据。选择可用、支持工具调用的模型。有效设置会保留，所以重新设置不是切换提供商命令。</p>
+          <p>设置保存于 <code>$XDG_CONFIG_HOME/ash/.ash_env</code>（默认 <code>~/.config/ash/.ash_env</code>，私有文件权限）。托管集成会加载它。无集成时，Bash/zsh 可在正常启动配置中加载此文件；Fish 应使用 Fish 语法设置对应 <code>ASH_AI_*</code> 变量，不要加载 Bash 格式文件。保护含令牌的文件，切勿提交到仓库。</p>
+          <p>本地安装不启用集成时，将实际目录加入 PATH。Bash/zsh：<code>export PATH="$HOME/.local/bin:$PATH"</code>。Fish：<code>fish_add_path "$HOME/.local/bin"</code>。在启动配置中持久保存；如适用，请替换为自定义安装目录。</p>
+          <pre><code>command -v ash
+command -v ash-broker
+ash version
+ash "Say hello in one sentence"</code></pre>
+          <p>前几条命令应指向选定安装。提问需要运行中的服务器或有效云端凭据；安装 ash 不会安装模型。</p>
+        </section>
+        <section id="ollama">
+          <h2>本地 Ollama：无需云端账户</h2>
+          <p>按 <a href="https://ollama.com/download">官方操作系统说明</a>安装 Ollama。启动应用/服务；如果服务器未运行，可在另一个终端运行 <code>ollama serve</code>。ash 支持 FreeBSD 不代表有原生 Ollama 安装程序：必要时使用其他受支持主机上的可达服务器。</p>
+          <p>下载适合硬件、支持工具调用的模型；<code>llama3.1:8b</code> 是示例，不是最低要求。其他选择见<a href="https://ollama.com/search?c=tools">当前工具模型目录</a>：</p>
+          <pre><code>ollama pull llama3.1:8b
+ollama list
+curl -fsS http://localhost:11434/api/tags
+ash install</code></pre>
+          <p>若未设置云端密钥，设置可检测本地服务器并提供已下载模型。如果已配置其他提供商，请手动更改端点/模型。Bash/zsh 示例：</p>
+          <pre><code>export ASH_AI_ENDPOINT="http://localhost:11434"
+export ASH_AI_MODEL="llama3.1:8b"
+unset ASH_AI_AUTH_TOKEN
+ash "Say hello in one sentence"</code></pre>
+          <p>Fish 等效命令：</p>
+          <pre><code>set -gx ASH_AI_ENDPOINT http://localhost:11434
+set -gx ASH_AI_MODEL llama3.1:8b
+set -e ASH_AI_AUTH_TOKEN
+ash "Say hello in one sentence"</code></pre>
+          <p>这些更改仅影响当前 shell。在受保护的 ash 环境文件或适当 shell 配置中保存，替换旧提供商覆盖设置。本地 Ollama 不需令牌。除非有意保护远程访问，否则将服务器保持在 loopback；远程服务器会收到提问及工具输出。</p>
+          <p>可选：在 <em>Ollama 服务器</em>环境中设置 <code>OLLAMA_KEEP_ALIVE=30m</code> 并重启服务器，保持模型加载。<code>-1</code> 无限保持加载，但请求间仍占用内存。仅在 ash 客户端终端设置，不会重配已运行服务器。</p>
+          <p>本地推理没有提供商 API 账单，但消耗硬件/存储/电力。<a href="https://ollama.com/cloud">Ollama 云服务</a>是独立服务，有身份验证和套餐限制，不等同于本地设置。</p>
+        </section>
+        <section id="cloud">
+          <h2>云端免费额度</h2>
+          <div class="guide-note guide-warning"><p><strong>免费不代表无限或私密。</strong>账户、地区、额度、模型和数据政策不同，也可能变化。提问及相关工具输出会离开设备。查阅最新限制和条款；除非准备付费，否则不要启用付费计费。</p></div>
+          <p>通过下方链接创建密钥，再交互运行 <code>ash install</code> 并选择提供商。设置会要求令牌，并在支持时列出模型。选择当前可用的免费<em>文本工具调用模型</em>；出现在列表中不保证对您的账户免费。</p>
+          <div class="table-scroll" role="region" aria-label="云提供商配置" tabindex="0">
+            <table>
+              <caption>账户、端点与凭据检测</caption>
+              <thead><tr><th scope="col">提供商</th><th scope="col">端点与识别的密钥</th><th scope="col">免费额度检查</th></tr></thead>
+              <tbody>
+                <tr><th scope="row"><a href="https://aistudio.google.com/app/apikey">Google AI Studio / Gemini</a></th><td><code>https://generativelanguage.googleapis.com/v1beta/openai/</code><br><code>GEMINI_API_KEY</code> 或 <code>GOOGLE_API_KEY</code></td><td>查看<a href="https://ai.google.dev/gemini-api/docs/models">模型目录</a>和<a href="https://ai.google.dev/gemini-api/docs/pricing">免费额度价格</a>。免费内容可能用于改进 Google 产品；请查看<a href="https://ai.google.dev/gemini-api/terms">条款</a>。</td></tr>
+                <tr><th scope="row"><a href="https://console.groq.com/keys">Groq</a></th><td><code>https://api.groq.com/openai/v1</code><br><code>GROQ_API_KEY</code></td><td>从<a href="https://console.groq.com/docs/models">目录</a>选择支持的聊天/工具模型。检查账户<a href="https://console.groq.com/docs/rate-limits">速率限制</a>和<a href="https://console.groq.com/docs/your-data">数据政策</a>；预览模型可能下线。</td></tr>
+                <tr><th scope="row"><a href="https://openrouter.ai/settings/keys">OpenRouter</a></th><td><code>https://openrouter.ai/api/v1</code><br><code>OPENROUTER_API_KEY</code></td><td>选择支持工具的<a href="https://openrouter.ai/models?max_price=0">免费模型</a>。<code>:free</code> 后缀仅适用于有<a href="https://openrouter.ai/docs/guides/routing/model-variants/free">公开免费变体</a>的模型。查看下游提供商的<a href="https://openrouter.ai/docs/api/reference/limits">限制</a>和<a href="https://openrouter.ai/docs/guides/privacy/logging">隐私设置</a>。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>已经导出已识别密钥？设置会检测它；若有多个则要求选择。不要将真实密钥粘贴到历史、录像或源码。配置文件包含秘密，不是加密保险库。</p>
+          <h3>手动配置或切换提供商</h3>
+          <p>将以下端点替换为表中值，将 <code>MODEL_ID</code> 替换为在提供商账户核实的模型。若密钥已导出为 <code>GROQ_API_KEY</code>，此 Bash/zsh 示例无需输入秘密即可复用：</p>
+          <pre><code>export ASH_AI_ENDPOINT="https://api.groq.com/openai/v1"
+export ASH_AI_MODEL="MODEL_ID"
+export ASH_AI_AUTH_TOKEN="$GROQ_API_KEY"</code></pre>
+          <p>Fish 等效命令：</p>
+          <pre><code>set -gx ASH_AI_ENDPOINT https://api.groq.com/openai/v1
+set -gx ASH_AI_MODEL MODEL_ID
+set -gx ASH_AI_AUTH_TOKEN "$GROQ_API_KEY"</code></pre>
+          <p>Gemini/OpenRouter 请使用各自端点与密钥变量。安全保存设置供后续 shell 使用。云端要求 HTTPS 和令牌；本地 HTTP 不是访问云服务的捷径。付费服务和高级覆盖设置见<a href="docs.html#environment">环境参考</a>及<a href="faq.html#ai">其他支持提供商</a>。</p>
+        </section>
+        <section id="script">
+          <h2>脚本安装：替代方案，非首选</h2>
+          <p>优先选择 Homebrew、APT、DNF 或 Pacman：它们跟踪所属文件，根据其信任配置验证下载，并提供熟悉的更新/移除功能。但仍需信任发布者及包安装行为。</p>
+          <div class="guide-note guide-warning"><p><strong>网站脚本会以您的账户权限执行代码。</strong>被攻破的网站/发布者或变化的脚本可读取秘密、修改文件或安装其他软件。HTTPS 保护传输，不保护代码意图。直接将 URL 管道传给 shell，会在检查前执行。压缩包签名验证不能认证脚本自身。切勿以 sudo 运行或禁用验证。</p></div>
+          <p>前提：受支持系统/架构、标识 Bash/zsh/Fish 的 <code>$SHELL</code>、<a href="https://docs.sigstore.dev/cosign/system_config/installation/">Sigstore cosign</a>、<code>tar</code>、<code>uname</code>、<code>install</code>、标准 shell 工具、SHA-256 命令（<code>sha256sum</code>、<code>shasum</code> 或 <code>sha256</code>）及下载器（<code>curl</code>、<code>wget</code> 或 Python）。示例使用 curl。FreeBSD 还需要 Bash。主目录/安装目录必须可写。</p>
+          <p>下载到本地文件，用编辑器检查，仅当信任来源及行为时运行。检查不保证安全；不要盲目执行：</p>
+          <pre><code>curl -fsSL https://jonconradt.github.io/ash/install.sh -o ash-install.sh
+less ash-install.sh</code></pre>
+          <p>检查后，以普通用户运行保存的副本：</p>
+          <pre><code>sh ./ash-install.sh
+rm ./ash-install.sh</code></pre>
+          <p><code>install.sh</code> 下载最新 Release，验证 Sigstore 签名清单及压缩包摘要，将 <code>ash</code>/<code>ash-broker</code> 安装到 <code>~/.local/bin</code>。原生插件放到 <code>$XDG_DATA_HOME/ash/plugins</code>。它执行用户设置并在启用集成前询问。无交互终端时可能跳过提供商/集成提示：随后交互运行 <code>ash install</code>。</p>
+          <p>运行脚本前可设置 <code>ASH_INSTALL_DIR</code> 选择其他目录。自行加入 PATH。<strong>自更新仅支持 <code>~/.local/bin</code></strong>；自定义目录需手动替换。脚本无 Beta/Nightly 选择器。</p>
+        </section>
+        <section id="verify-download">
+          <h2>验证直接下载的包或压缩包</h2>
+          <p>前提：cosign 和 SHA-256 工具。从同一发布版本下载包/压缩包、<code>SHA256SUMS</code> 和 <code>SHA256SUMS.sigstore.json</code>。在新目录中操作。将 <code>vX.Y.Z</code> 替换为精确标签，必要时包含预发布后缀：</p>
+          <pre><code>cosign verify-blob SHA256SUMS \
+  --bundle SHA256SUMS.sigstore.json \
+  --certificate-identity "https://github.com/Jonconradt/ash/.github/workflows/release.yml@refs/tags/vX.Y.Z" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com"</code></pre>
+          <p>仅在验证成功后，用 macOS 的 <code>shasum -a 256 PACKAGE</code>、Linux 的 <code>sha256sum PACKAGE</code> 或 FreeBSD 的 <code>sha256 -q PACKAGE</code> 计算摘要。将 <code>PACKAGE</code> 替换为下载文件名，与已验证清单中该文件的条目精确比较。缺条目或任何不匹配应停止。随文件下载的未签名校验和不等于已验证的发布者元数据。</p>
+        </section>
+        <section id="updates">
+          <h2>更新与三个渠道</h2>
+          <ul>
+            <li><strong>Release（推荐）：</strong>如 <code>vX.Y.Z</code> 的稳定发布；仓库配置称为 <code>stable</code>。</li>
+            <li><strong>Beta：</strong>预发布测试，标签 <code>vX.Y.Z-beta.N</code>；可能有变化和回归。</li>
+            <li><strong>Nightly：</strong>默认分支最新变动，标签 <code>vX.Y.Z-nightly.YYYYMMDD.N</code>；回归风险最高。构建按计划运行，但无变化或发布失败时可能跳过。</li>
+          </ul>
+          <p>发布版本会更新对应 Homebrew 配方或签名 Linux 仓库。运行所属管理器的升级命令（或由系统更新政策执行）才会收到更新。发布、仓库更新和网站部署可能不同步；切换前检查可用性。ash 不会静默安装后台二进制更新。</p>
+          <div class="table-scroll" role="region" aria-label="更新渠道订阅" tabindex="0">
+            <table>
+              <caption>按您使用的安装方式订阅</caption>
+              <thead><tr><th scope="col">方式</th><th scope="col">Release</th><th scope="col">Beta</th><th scope="col">Nightly</th></tr></thead>
+              <tbody>
+                <tr><th scope="row">Homebrew 配方</th><td><code>Jonconradt/ash/ash</code></td><td><code>Jonconradt/ash/ash-beta</code></td><td><code>Jonconradt/ash/ash-nightly</code></td></tr>
+                <tr><th scope="row">APT 发行渠道</th><td><code>stable</code></td><td><code>beta</code></td><td><code>nightly</code></td></tr>
+                <tr><th scope="row">DNF baseurl</th><td><code>https://www.versionx.ai/rpm/</code></td><td><code>https://www.versionx.ai/rpm/beta/</code></td><td><code>https://www.versionx.ai/rpm/nightly/</code></td></tr>
+                <tr><th scope="row">Pacman Server</th><td><code>https://www.versionx.ai/pacman/$arch</code></td><td><code>https://www.versionx.ai/pacman/beta/$arch</code></td><td><code>https://www.versionx.ai/pacman/nightly/$arch</code></td></tr>
+                <tr><th scope="row">脚本 / ash update</th><td>仅 Release</td><td>无订阅</td><td>无订阅</td></tr>
+                <tr><th scope="row">直接包 / tarball</th><td colspan="3">无自动订阅：选择已发布标签，手动替换已验证文件。</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <h3>Homebrew：安装或切换配方</h3>
+          <p>新装 Beta/Nightly 时，在 <code>brew install</code> 中使用上表完整配方名称。切换时先卸载当前配方：三个配方提供相同二进制。Release 转 Beta 示例：</p>
+          <pre><code>brew uninstall ash
+brew install Jonconradt/ash/ash-beta
+brew update
+brew upgrade ash-beta</code></pre>
+          <p>安装/升级命令中，Nightly 用 <code>ash-nightly</code>，Release 用 <code>ash</code>。卸载旧渠道的实际配方，不总是 <code>ash</code>。用户设置保留；切换后打开新 shell。</p>
+          <h3>Linux：选择一个仓库渠道</h3>
+          <p><strong>APT：</strong>按<a href="#apt-installation">APT 设置</a>使用表中且仅一个发行渠道。切换现有安装时编辑 <code>/etc/apt/sources.list.d/versionx.list</code>，将 <code>stable</code> 替换为 <code>beta</code> 或 <code>nightly</code>（或改回 <code>stable</code>），然后：</p>
+          <pre><code>sudo apt update
+sudo apt install --allow-downgrades ash</code></pre>
+          <p><strong>DNF：</strong>按<a href="#dnf-installation">DNF 设置</a>使用选定 baseurl。现有安装中替换 <code>/etc/yum.repos.d/versionx.repo</code> 内的 <code>baseurl</code>，保留签名设置，然后：</p>
+          <pre><code>sudo dnf --refresh distro-sync ash</code></pre>
+          <p><strong>Pacman：</strong>按<a href="#pacman-installation">Pacman 设置</a>使用选定 Server URL。保留节名 <code>[versionx]</code>：每个渠道都发布名为 <code>versionx.db</code> 的数据库。更改同一节的 Server，而非添加异名数据库。切换（包含降级）：</p>
+          <pre><code>sudo pacman -Syuu ash</code></pre>
+          <p>检查拟议事务：回到 Release 可能降级 ash，Pacman 双 <code>u</code> 也可能降级其他包。切换前备份配置。随后按系统章节使用常规 APT/DNF/Pacman 升级；不要同时启用多个 ash 渠道源。</p>
+          <h3>用户本地 Release 更新</h3>
+          <pre><code>ash update</code></pre>
+          <p>仅在当前 ash 执行文件位于 <code>~/.local/bin</code> 时验证并安装稳定版。还会更新内置文件/插件，并对自定义文件提供选项。<code>ash update --version vX.Y.Z</code> 选择稳定标签，不选择渠道；不是降级命令。没有 <code>--channel</code> 选项。包管理器、macOS .pkg 和自定义脚本目录安装须使用所属管理器/安装程序。FreeBSD Beta/Nightly 使用手动验证的压缩包，非自更新订阅。更新后打开新 shell。</p>
+        </section>
+        <section id="uninstall">
+          <h2>卸载而不删除无关文件</h2>
+          <h3>1. 先禁用 shell 集成</h3>
+          <p>删除二进制前，对每个启用集成的 shell 执行相应命令：</p>
+          <p><strong>Bash</strong></p>
+          <pre><code>ash install --shell bash --disable-shell-integration</code></pre>
+          <p><strong>zsh</strong></p>
+          <pre><code>ash install --shell zsh --disable-shell-integration</code></pre>
+          <p><strong>Fish</strong></p>
+          <pre><code>ash install --shell fish --disable-shell-integration</code></pre>
+          <p>若 ash 已不存在，按<a href="#initialize">初始化</a>说明编辑对应启动文件，仅删除 <code># &gt;&gt;&gt; ash install &gt;&gt;&gt;</code> 与 <code># &lt;&lt;&lt; ash install &lt;&lt;&lt;</code> 之间的块。移除手动添加的 ash 专用 PATH/环境行，不要删除无关配置。随后关闭启用 ash 的 shell，使其管理的 broker 退出。</p>
+          <h3>2. 让所属包管理器移除其文件</h3>
+          <p><strong>Homebrew (Release)</strong></p>
+          <pre><code>brew uninstall ash</code></pre>
+          <p><strong>APT</strong></p>
+          <pre><code>sudo apt remove ash</code></pre>
+          <p><strong>DNF</strong></p>
+          <pre><code>sudo dnf remove ash</code></pre>
+          <p><strong>Pacman</strong></p>
+          <pre><code>sudo pacman -R ash</code></pre>
+          <p>只选择实际安装方式；Homebrew Beta/Nightly 用 <code>ash-beta</code>/<code>ash-nightly</code>。APT/DNF/Pacman 移除包所属二进制、插件和手册，不删除主目录配置/历史。不要手动删包文件。</p>
+          <p>可选仓库清理：移除 ash 源文件 <code>/etc/apt/sources.list.d/versionx.list</code> 及其专用 <code>/etc/apt/keyrings/versionx-keyring.gpg</code>，或仓库文件 <code>/etc/yum.repos.d/versionx.repo</code>，或 <code>/etc/pacman.conf</code> 内的 ash <code>[versionx]</code> 节。先检查没有其他包使用。确认指纹且无其他依赖后才能移除 RPM/Pacman 信任密钥；切勿删除发行版共享密钥环。</p>
+          <h3 id="manual-macos">3a. 手动移除 macOS .pkg</h3>
+          <p>macOS Installer 记录收据，但无 ash 卸载程序。确认这是 .pkg 而非 Homebrew 安装，并检查其精确内容：</p>
+          <pre><code>pkgutil --pkg-info dev.ash.cli
+pkgutil --files dev.ash.cli</code></pre>
+          <p>按收据清单仅删除 ash 文件：<code>/usr/local/bin/ash</code>、<code>/usr/local/bin/ash-broker</code>、<code>/usr/local/lib/ash/plugins</code> 内文件、<code>/usr/local/share/man/man1/ash.1</code>、列出的本地化 <code>ash.1</code> 页及 <code>/usr/local/share/licenses/ash</code> 内声明。需要管理员权限。若另一安装程序已替换文件，先查归属，不要删除其副本。仅删除空的 ash 专用目录，不删除共享 <code>/usr/local</code>、<code>bin</code> 或手册目录。</p>
+          <p>删除内容后，可选移除收据：</p>
+          <pre><code>sudo pkgutil --forget dev.ash.cli</code></pre>
+          <p><strong>遗忘收据不会删除任何已安装文件。</strong>在完成内容检查前保留它。</p>
+          <h3 id="manual-linux">3b. 手动移除用户本地 / Linux / FreeBSD 压缩包</h3>
+          <p>用 <code>command -v ash</code> 和 <code>command -v ash-broker</code> 找到当前版本。默认脚本安装禁用钩子后，仅删除这两个文件：</p>
+          <pre><code>rm "$HOME/.local/bin/ash" "$HOME/.local/bin/ash-broker"</code></pre>
+          <p>对 <code>ASH_INSTALL_DIR</code> 或手动解压版本，仅删除实际 ash/broker 路径。按原始清单移除自行安装的插件/手册/声明；脚本插件在 ash 用户数据目录。如文件在 <code>/usr/bin</code>，先用相应 <code>dpkg -S /usr/bin/ash</code>、<code>rpm -qf /usr/bin/ash</code> 或 <code>pacman -Qo /usr/bin/ash</code> 查归属。包所属版本即使来自独立下载，也必须通过管理器移除。</p>
+          <h3>4. 可选：清除本地设置、工具与历史</h3>
+          <div class="guide-note guide-warning"><p><strong>备份所有要保留的内容。</strong>此独立步骤会删除提供商设置/令牌、自定义工具/插件、会话历史及工作文件。卸载二进制不等于同意清除它们。</p></div>
+          <ul>
+            <li>配置：<code>$XDG_CONFIG_HOME/ash</code>，默认 <code>~/.config/ash</code>。</li>
+            <li>数据、插件和 Python 环境：<code>$XDG_DATA_HOME/ash</code>，默认 <code>~/.local/share/ash</code>。</li>
+            <li>历史与状态：<code>$XDG_STATE_HOME/ash</code>，默认 <code>~/.local/state/ash</code>。</li>
+            <li>缓存：<code>$XDG_CACHE_HOME/ash</code>，默认 <code>~/.cache/ash</code>。</li>
+            <li>Broker 运行数据：<code>$XDG_RUNTIME_DIR/ash</code>；无运行根目录时为 <code>$XDG_STATE_HOME/ash/runtime</code>。</li>
+          </ul>
+          <p>检查实际绝对 XDG 覆盖路径后，仅删除 ash 子目录；切勿删除 XDG 根或主目录。关闭所有 ash shell 后，按需清理运行残留。MCP OAuth 凭据可能仍在系统凭据管理器：删除 ash 专属项并在 MCP 提供商撤销访问。在账户撤销不再使用的 AI 密钥；删本地文件不撤销密钥。移除 ash 时不要卸载 Ollama/模型、Python 或共享依赖。</p>
+        </section>
+        <section id="troubleshooting">
+          <h2>快速故障排查</h2>
+          <dl>
+            <dt>命令不存在或版本错误</dt><dd>检查 PATH 及 <code>command -v ash</code>/<code>command -v ash-broker</code>。<code>~/.local/bin</code> 中旧版可能遮蔽包。一次只使用一个管理方/渠道，并打开新 shell。</dd>
+            <dt>没有出现提供商菜单</dt><dd>从交互终端运行 <code>ash install</code>。有效设置会保留；使用<a href="#cloud">手动配置</a>切换提供商。无集成时，确保设置已导出到 CLI 环境。</dd>
+            <dt>没有模型或连接被拒绝</dt><dd>Ollama 请确认服务器运行且 <code>ollama list</code> 包含所选模型。云服务请检查端点、模型资格、HTTPS、令牌与额度；不要分享含令牌日志。</dd>
+            <dt>仓库或渠道不可用</dt><dd>检查架构及发布版本/仓库。发布可能滞后；不要禁用签名验证绕过不可用仓库。</dd>
+            <dt>Python 工具设置失败</dt><dd>安装支持 venv/ensurepip 的 Python，允许下载依赖，再运行 <code>ash install</code>。没有这些工具仍可使用基本 ash。</dd>
+          </dl>
+          <p>需要更多详情？查看<a href="docs.html">命令参考</a>、<a href="faq.html">常见问题</a>，或<a href="https://github.com/Jonconradt/ash/issues">报告问题</a>，不要附带凭据。</p>
+        </section>
+      </article>
+    </div>
+  </main>
+  <footer class="site-footer page-width"><span class="brand"><span class="brand-mark">&gt;_</span> ash</span><a href="docs.html">文档</a><a href="https://github.com/Jonconradt/ash">GitHub</a></footer>
+  <script src="../site.js" data-site-script defer></script>
+</body>
+</html>

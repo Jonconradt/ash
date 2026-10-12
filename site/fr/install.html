@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ash | Installer, configurer, mettre à jour et désinstaller</title>
+  <meta name="description" content="Installez ash sur macOS, Linux ou FreeBSD. Choisissez un gestionnaire, configurez Ollama ou une offre cloud gratuite, sélectionnez un canal et désinstallez en sécurité.">
+  <meta name="theme-color" content="#f4f0e8">
+  <link rel="canonical" href="https://jonconradt.github.io/ash/fr/install.html">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Guide d’installation ash">
+  <meta property="og:description" content="Des prérequis à la première demande, aux mises à jour et au nettoyage.">
+  <meta property="og:url" content="https://jonconradt.github.io/ash/fr/install.html">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="alternate" hreflang="en" href="https://jonconradt.github.io/ash/install.html">
+  <link rel="alternate" hreflang="ar" href="https://jonconradt.github.io/ash/ar/install.html">
+  <link rel="alternate" hreflang="de" href="https://jonconradt.github.io/ash/de/install.html">
+  <link rel="alternate" hreflang="es" href="https://jonconradt.github.io/ash/es/install.html">
+  <link rel="alternate" hreflang="fr" href="https://jonconradt.github.io/ash/fr/install.html">
+  <link rel="alternate" hreflang="id" href="https://jonconradt.github.io/ash/id/install.html">
+  <link rel="alternate" hreflang="it" href="https://jonconradt.github.io/ash/it/install.html">
+  <link rel="alternate" hreflang="lb" href="https://jonconradt.github.io/ash/lb/install.html">
+  <link rel="alternate" hreflang="pt-BR" href="https://jonconradt.github.io/ash/pt-BR/install.html">
+  <link rel="alternate" hreflang="zh-CN" href="https://jonconradt.github.io/ash/zh-CN/install.html">
+  <link rel="alternate" hreflang="zh-TW" href="https://jonconradt.github.io/ash/zh-TW/install.html">
+  <link rel="alternate" hreflang="x-default" href="https://jonconradt.github.io/ash/install.html">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <a class="skip-link" href="#guide">Aller au guide d’installation</a>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="Accueil ash"><span class="brand-mark">&gt;_</span> ash</a>
+    <nav aria-label="Navigation principale">
+      <a href="./">Accueil</a>
+      <a href="install.html" aria-current="page">Installer</a>
+      <a href="docs.html">Documentation</a>
+      <a href="faq.html">FAQ</a>
+      <a href="developer.html">Développeurs</a>
+      <a href="https://github.com/Jonconradt/ash">GitHub</a>
+      <label class="sr-only" for="site-language">Langue</label>
+      <select id="site-language" class="language-select" aria-label="Choisir la langue">
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+        <option value="de">Deutsch</option>
+        <option value="es">Español</option>
+        <option value="fr" selected>Français</option>
+        <option value="id">Bahasa Indonesia</option>
+        <option value="it">Italiano</option>
+        <option value="lb">Lëtzebuergesch</option>
+        <option value="pt-BR">Português (Brasil)</option>
+        <option value="zh-CN">简体中文</option>
+        <option value="zh-TW">繁體中文</option>
+      </select>
+    </nav>
+  </header>
+  <main id="guide" class="docs-page page-width install-guide">
+    <header class="docs-header">
+      <p class="eyebrow">Installer · configurer · entretenir</p>
+      <h1>Un chemin clair vers<br><em>votre première demande.</em></h1>
+      <p>Choisissez votre système, installez avec son gestionnaire de paquets, puis connectez un modèle. Commencez par Release ; vous pourrez choisir Beta ou Nightly ensuite.</p>
+      <div class="os-choices" aria-label="Choisir votre système">
+        <a class="method-card" href="#macos"><strong>macOS</strong><span>Homebrew recommandé</span><small>Apple Silicon et Intel</small></a>
+        <a class="method-card" href="#linux"><strong>Linux</strong><span>APT, DNF ou Pacman</span><small>Architecture selon le dépôt</small></a>
+        <a class="method-card" href="#freebsd"><strong>FreeBSD</strong><span>Archive vérifiée ou script</span><small>amd64 uniquement ; aucun pkg ash natif</small></a>
+      </div>
+    </header>
+    <div class="docs-layout">
+      <nav class="docs-contents" aria-label="Sommaire d’installation">
+        <strong>Sur cette page</strong>
+        <a href="#prerequisites">Avant de commencer</a>
+        <a href="#macos">macOS</a>
+        <a href="#linux">Linux</a>
+        <a href="#freebsd">FreeBSD</a>
+        <a href="#initialize">Initialiser et vérifier</a>
+        <a href="#ollama">Ollama local</a>
+        <a href="#cloud">Offres cloud gratuites</a>
+        <a href="#script">Installation par script</a>
+        <a href="#verify-download">Vérifier un téléchargement</a>
+        <a href="#updates">Mises à jour et canaux</a>
+        <a href="#uninstall">Désinstaller</a>
+        <a href="#troubleshooting">Dépannage</a>
+      </nav>
+      <article class="docs-content" data-copy-label="Copier les commandes" data-copied-label="Copié !" data-copy-error="Copie impossible. Sélectionnez et copiez manuellement les commandes.">
+        <section id="prerequisites">
+          <h2>Avant de commencer</h2>
+          <ol>
+            <li><strong>Système et shell compatibles :</strong> macOS ou Linux sur amd64/x86_64 ou arm64/aarch64, ou FreeBSD sur amd64. Utilisez Bash, zsh ou Fish. Les paquets Arch sont uniquement x86_64. Aucun installateur Windows/PowerShell natif n’existe.</li>
+            <li><strong>Accès aux téléchargements :</strong> connexion Internet fonctionnelle et accès HTTPS fiable à GitHub, au dépôt choisi et au fournisseur du modèle. L’inférence locale nécessite aussi un téléchargement initial du modèle.</li>
+            <li><strong>Permissions :</strong> dossier personnel accessible en écriture pour les fichiers utilisateur. Les paquets système Linux et .pkg macOS nécessitent des droits administrateur ; exécutez Homebrew et <code>ash install</code> avec votre utilisateur habituel.</li>
+            <li><strong>Un modèle :</strong> serveur d’inférence local avec modèle téléchargé ou compte cloud/clé API. Choisissez un modèle prenant en charge les appels d’outils, pas uniquement les images/l’audio. Les besoins locaux en RAM, disque et GPU dépendent du modèle.</li>
+          </ol>
+          <p>Les paquets ash précompilés ne nécessitent ni Go, Rust, Node.js, ni outils de compilation Xcode. Le gestionnaire de paquets peut avoir ses propres prérequis ; suivez d’abord sa procédure officielle.</p>
+          <div class="guide-note">
+            <h3>Facultatif : outils Python fournis</h3>
+            <p>L’usage de base ne nécessite pas Python. Les outils Python fournis nécessitent Python 3 avec <code>venv</code> et <code>ensurepip</code>, et l’accès au téléchargement de leurs dépendances. Sur Debian/Ubuntu, installez <code>python3</code> et <code>python3-venv</code> ; Python Homebrew comprend venv. Sur FreeBSD, utilisez le paquet pip correspondant à votre version Python. Relancez ensuite <code>ash install</code>. Un environnement isolé est créé dans <code>$XDG_DATA_HOME/ash/venv</code> (par défaut <code>~/.local/share/ash/venv</code>) ; un échec désactive ces outils, pas ash de base.</p>
+          </div>
+        </section>
+        <section id="macos">
+          <h2>macOS</h2>
+          <h3 id="homebrew">Recommandé : Homebrew</h3>
+          <p>Prérequis : <a href="https://docs.brew.sh/Installation">Homebrew</a>, un environnement macOS pris en charge et une commande <code>brew</code> fonctionnelle. Le tap sélectionne automatiquement l’archive Intel ou Apple Silicon. Installez Release sans sudo :</p>
+          <pre><code>brew install Jonconradt/ash/ash
+ash version</code></pre>
+          <p>Homebrew gère les binaires, plugins natifs, pages de manuel et notices de licence dans son préfixe (généralement <code>/opt/homebrew</code> sur Apple Silicon ou <code>/usr/local</code> sur Intel). Il vérifie l’archive avec la somme SHA-256 de la formule. Il ne configure ni fournisseur ni fichier de démarrage du shell : poursuivez avec <a href="#initialize">l’initialisation utilisateur</a>. Mettez à jour avec <code>brew upgrade ash</code>, supprimez Release avec <code>brew uninstall ash</code> ; voir les <a href="#updates">formules des canaux</a> pour Beta/Nightly.</p>
+          <h3 id="macos-pkg">Alternative : .pkg natif</h3>
+          <p>Téléchargez <code>darwin-arm64.pkg</code> pour Apple Silicon ou <code>darwin-amd64.pkg</code> pour Intel depuis une <a href="https://github.com/Jonconradt/ash/releases">version publiée</a>. <a href="#verify-download">Vérifiez son manifeste signé de sommes de contrôle</a> avant d’ouvrir l’installateur. Des droits administrateur sont requis.</p>
+          <div class="guide-note guide-warning"><p><strong>Le paquet macOS n’est ni signé ni notarié.</strong> Le manifeste fournit une vérification distincte de l’éditeur/des sommes de contrôle, pas une notarisation Apple. Ne désactivez pas Gatekeeper et ne contournez pas d’avertissement pour installer ash ; préférez Homebrew si votre politique de sécurité l’exige.</p></div>
+          <p>Le paquet écrit <code>ash</code> et <code>ash-broker</code> dans <code>/usr/local/bin</code>, les plugins dans <code>/usr/local/lib/ash/plugins</code>, les manuels dans <code>/usr/local/share/man</code> et les notices dans <code>/usr/local/share/licenses/ash</code>. Le reçu est <code>dev.ash.cli</code>. Il n’initialise pas l’utilisateur et n’abonne pas aux mises à jour : <a href="#initialize">initialisez</a> après installation, remplacez-le par un .pkg plus récent vérifié pour actualiser, et suivez la <a href="#manual-macos">suppression manuelle</a> pour désinstaller. Ne l’installez pas par-dessus une copie gérée par Homebrew.</p>
+        </section>
+        <section id="linux">
+          <h2>Linux</h2>
+          <p>Utilisez si possible le gestionnaire de votre distribution. Ces paquets gèrent <code>/usr/bin/ash</code>, <code>/usr/bin/ash-broker</code>, <code>/usr/lib/ash/plugins</code>, les manuels dans <code>/usr/share/man</code> et les notices de licence. Les réglages du fournisseur et hooks du shell relèvent de <a href="#initialize">l’initialisation utilisateur</a>.</p>
+          <h3 id="apt-installation">Debian et Ubuntu : APT</h3>
+          <p>Prérequis : amd64 ou arm64, droits administrateur, APT, <code>curl</code>, <code>gpg</code> et certificats CA. Installez les outils de téléchargement/clé manquants via votre distribution avant d’ajouter le dépôt. Release s’appelle <code>stable</code> :</p>
+          <pre><code>sudo apt update
+sudo apt install ca-certificates curl gnupg
+sudo install -d -m 0755 /etc/apt/keyrings
+curl -fsSL https://www.versionx.ai/apt/gpg.key -o versionx-apt.asc
+gpg --show-keys --with-fingerprint versionx-apt.asc
+sudo gpg --dearmor --batch --yes -o /etc/apt/keyrings/versionx-keyring.gpg versionx-apt.asc
+sudo chmod 0644 /etc/apt/keyrings/versionx-keyring.gpg
+echo "deb [signed-by=/etc/apt/keyrings/versionx-keyring.gpg] https://www.versionx.ai/apt stable main" |
+  sudo tee /etc/apt/sources.list.d/versionx.list
+sudo apt update
+sudo apt install ash
+rm versionx-apt.asc</code></pre>
+          <p>Avant tout import de clé, vérifiez son empreinte auprès d’une source fiable de l’éditeur. L’empreinte VersionX est <code>32C6 C11D 2F86 BFE4 6EB7 7FFC 5257 FEA6 1368 919F</code>. APT vérifie les métadonnées signées du dépôt et les condensats des paquets qu’elles contiennent ; <code>signed-by</code> limite la portée de la clé. Mise à jour : <code>sudo apt update &amp;&amp; sudo apt upgrade ash</code> ; suppression : <code>sudo apt remove ash</code>.</p>
+          <h3 id="dnf-installation">Fedora et systèmes compatibles RHEL : DNF</h3>
+          <p>Prérequis : x86_64 ou aarch64, droits administrateur, DNF/RPM, <code>curl</code>, <code>gpg</code> et certificats CA. Installez les outils manquants via votre distribution. Inspectez la clé et comparez l’empreinte ci-dessus avant l’import :</p>
+          <pre><code>curl -fsSL https://www.versionx.ai/rpm/gpg.key -o versionx-rpm.asc
+gpg --show-keys --with-fingerprint versionx-rpm.asc
+sudo rpm --import versionx-rpm.asc
+sudo tee /etc/yum.repos.d/versionx.repo &gt;/dev/null &lt;&lt;'EOF'
+[versionx]
+name=VersionX ash repository
+baseurl=https://www.versionx.ai/rpm/
+enabled=1
+gpgcheck=0
+repo_gpgcheck=1
+gpgkey=https://www.versionx.ai/rpm/gpg.key
+EOF
+sudo dnf install ash
+rm versionx-rpm.asc</code></pre>
+          <p>Les RPM ne sont pas signés individuellement. <code>repo_gpgcheck=1</code> vérifie les métadonnées couvrant leurs sommes de contrôle ; <code>gpgcheck=0</code> reflète l’absence de signatures par paquet, pas l’arrêt de la vérification du dépôt. Si votre politique exige des charges RPM signées, ce dépôt ne la satisfait pas. Mise à jour : <code>sudo dnf upgrade ash</code> ; suppression : <code>sudo dnf remove ash</code>.</p>
+          <h3 id="pacman-installation">Arch Linux : Pacman</h3>
+          <p>Prérequis : x86_64, droits administrateur, Pacman avec trousseau initialisé, <code>curl</code> et <code>gpg</code>. Vérifiez que l’empreinte affichée correspond à celle ci-dessus avant de lui faire confiance. Ajoutez le dépôt une seule fois, pas à chaque mise à jour :</p>
+          <pre><code>curl -fsSL https://www.versionx.ai/pacman/gpg.key -o versionx-pacman.asc
+gpg --show-keys --with-fingerprint versionx-pacman.asc
+sudo pacman-key --add versionx-pacman.asc
+sudo pacman-key --lsign-key 32C6C11D2F86BFE46EB77FFC5257FEA61368919F
+sudo tee -a /etc/pacman.conf &gt;/dev/null &lt;&lt;'EOF'
+[versionx]
+Server = https://www.versionx.ai/pacman/$arch
+SigLevel = Required DatabaseRequired
+EOF
+sudo pacman -Syu ash
+rm versionx-pacman.asc</code></pre>
+          <p>Pacman vérifie les signatures des paquets et de la base. Synchronisez Arch avec <code>sudo pacman -Syu</code>, sans mise à jour partielle ; supprimez ash avec <code>sudo pacman -R ash</code>.</p>
+          <h3>Autres installations Linux</h3>
+          <p>Utilisez-vous déjà <a href="https://docs.brew.sh/Homebrew-on-Linux">Homebrew sur Linux</a> ? Les <a href="#homebrew">mêmes instructions du tap</a> prennent en charge amd64 et arm64 ; Brew gère ces fichiers, pas APT/DNF. Sinon utilisez une <a href="#script">installation par script/archive vérifiée</a> ou un <a href="https://github.com/Jonconradt/ash/releases">téléchargement .deb/.rpm</a> adapté. Installez un .deb vérifié avec <code>sudo apt install ./PACKAGE.deb</code>, ou un .rpm avec <code>sudo dnf install ./PACKAGE.rpm</code> (remplacez les noms). Le paquet direct reste géré, mais n’ajoute ni dépôt ni abonnement automatique aux versions futures. La charge RPM actuelle n’est pas signée ; suivez la politique de votre distribution plutôt que de désactiver les vérifications.</p>
+        </section>
+        <section id="freebsd">
+          <h2>FreeBSD</h2>
+          <p>Prérequis : amd64, Bash (même si votre shell interactif est zsh ou Fish), outils de téléchargement/vérification et dossier d’installation accessible en écriture. Installez Bash avec le gestionnaire natif FreeBSD :</p>
+          <pre><code>sudo pkg install bash</code></pre>
+          <p>Le <code>pkg</code> de FreeBSD gère les prérequis, pas ash : il n’existe actuellement ni dépôt ash .pkg ni archive arm64. Utilisez le <a href="#script">script vérifié</a>, ou <a href="#verify-download">vérifiez une archive FreeBSD amd64</a>, extrayez-la dans un dossier temporaire et installez le binaire ash versionné sous <code>~/.local/bin/ash</code>, à côté de <code>ash-broker</code>. Copiez les plugins natifs dans <code>$XDG_DATA_HOME/ash/plugins</code> (par défaut <code>~/.local/share/ash/plugins</code>), puis <a href="#initialize">initialisez</a>. Vous gérez ces fichiers ; <code>pkg delete</code> ne les supprime pas. Utilisez les <a href="#updates">auto-mises à jour Release</a> à l’emplacement par défaut ou remplacez manuellement les fichiers vérifiés.</p>
+        </section>
+        <section id="initialize">
+          <h2>Initialiser et vérifier</h2>
+          <p>Après les binaires, lancez la configuration interactivement avec votre utilisateur habituel. La configuration des seuls fichiers laisse les fichiers de démarrage inchangés :</p>
+          <pre><code>ash install</code></pre>
+          <p>Pour activer aussi l’intégration des commandes introuvables, choisissez exactement une commande correspondant à votre shell :</p>
+          <p><strong>Bash</strong></p>
+          <pre><code>ash install --shell bash --shell-integration</code></pre>
+          <p><strong>zsh</strong></p>
+          <pre><code>ash install --shell zsh --shell-integration</code></pre>
+          <p><strong>Fish</strong></p>
+          <pre><code>ash install --shell fish --shell-integration</code></pre>
+          <p>Bash utilise <code>~/.bashrc</code>, zsh <code>~/.zshrc</code>, Fish <code>$XDG_CONFIG_HOME/fish/config.fish</code> (par défaut <code>~/.config/fish/config.fish</code>). Ouvrez ensuite un nouveau shell ; les anciens conservent leur broker actif. L’intégration ajoute <code>~/.local/bin</code> en tête du PATH : supprimez toute ancienne copie locale avant d’attendre la sélection d’un paquet système.</p>
+          <p>Si les réglages manquent, la configuration détecte les clés existantes ou un serveur local actif ; sinon elle propose un menu de fournisseurs et demande les identifiants. Choisissez un modèle disponible avec appels d’outils. Les réglages valides sont conservés : relancer n’est pas une commande de changement de fournisseur.</p>
+          <p>Les réglages sont dans <code>$XDG_CONFIG_HOME/ash/.ash_env</code> (par défaut <code>~/.config/ash/.ash_env</code>, permissions privées). L’intégration gérée les charge. Sans intégration, Bash/zsh peuvent sourcer ce fichier dans leur configuration habituelle ; Fish doit définir les variables <code>ASH_AI_*</code> avec sa syntaxe, sans sourcer le fichier Bash. Protégez les fichiers avec des jetons et ne les commitez jamais.</p>
+          <p>Pour une installation locale sans intégration, ajoutez son dossier réel au PATH. Bash/zsh : <code>export PATH="$HOME/.local/bin:$PATH"</code>. Fish : <code>fish_add_path "$HOME/.local/bin"</code>. Rendez cela permanent dans la configuration de démarrage ; substituez votre dossier personnalisé au besoin.</p>
+          <pre><code>command -v ash
+command -v ash-broker
+ash version
+ash "Say hello in one sentence"</code></pre>
+          <p>Les premières commandes doivent trouver l’installation choisie. La demande nécessite un serveur actif ou des identifiants cloud valides ; installer ash n’installe pas de modèle.</p>
+        </section>
+        <section id="ollama">
+          <h2>Ollama local : aucun compte cloud requis</h2>
+          <p>Installez Ollama selon ses <a href="https://ollama.com/download">instructions officielles pour votre système</a>. Démarrez l’application/service, ou lancez <code>ollama serve</code> dans un autre terminal si aucun serveur ne tourne. Le support FreeBSD d’ash n’implique pas un installateur Ollama natif : utilisez au besoin un serveur accessible sur un autre hôte compatible.</p>
+          <p>Téléchargez un modèle avec appels d’outils adapté à votre matériel ; <code>llama3.1:8b</code> est un exemple, pas un minimum. Consultez le <a href="https://ollama.com/search?c=tools">catalogue actuel des outils</a> pour d’autres modèles :</p>
+          <pre><code>ollama pull llama3.1:8b
+ollama list
+curl -fsS http://localhost:11434/api/tags
+ash install</code></pre>
+          <p>Sans clés cloud déjà définies, la configuration peut détecter le serveur local et proposer le modèle téléchargé. Si un autre fournisseur est déjà configuré, changez manuellement le point d’accès/modèle. Exemple Bash/zsh :</p>
+          <pre><code>export ASH_AI_ENDPOINT="http://localhost:11434"
+export ASH_AI_MODEL="llama3.1:8b"
+unset ASH_AI_AUTH_TOKEN
+ash "Say hello in one sentence"</code></pre>
+          <p>Équivalent Fish :</p>
+          <pre><code>set -gx ASH_AI_ENDPOINT http://localhost:11434
+set -gx ASH_AI_MODEL llama3.1:8b
+set -e ASH_AI_AUTH_TOKEN
+ash "Say hello in one sentence"</code></pre>
+          <p>Ces changements ne concernent que le shell actuel. Enregistrez-les dans votre fichier d’environnement ash protégé ou la configuration du shell, en remplaçant les anciennes substitutions. Ollama local n’a pas besoin de jeton. Gardez le serveur sur loopback sauf accès volontairement sécurisé ; un serveur distant reçoit demandes et sorties d’outils.</p>
+          <p>Facultatif : définissez <code>OLLAMA_KEEP_ALIVE=30m</code> dans l’environnement du <em>serveur Ollama</em>, puis redémarrez-le pour garder les modèles chargés. <code>-1</code> les garde indéfiniment mais consomme de la mémoire entre requêtes. Le définir seulement dans le terminal client ash ne reconfigure pas un serveur actif.</p>
+          <p>L’inférence locale n’a pas de facture API mais utilise votre matériel/stockage/électricité. <a href="https://ollama.com/cloud">Ollama cloud</a> est un service distinct avec authentification et limites de forfait, pas cette configuration locale.</p>
+        </section>
+        <section id="cloud">
+          <h2>Offres cloud gratuites</h2>
+          <div class="guide-note guide-warning"><p><strong>Gratuit ne signifie ni illimité ni privé.</strong> Comptes, régions, quotas, modèles admissibles et politiques de données varient et changent. Demandes et sorties d’outils pertinentes quittent votre machine. Vérifiez limites et conditions actuelles ; n’activez la facturation payante que si vous voulez payer.</p></div>
+          <p>Créez une clé avec les liens ci-dessous, lancez <code>ash install</code> interactivement et choisissez le fournisseur. La configuration demande le jeton et liste les modèles si possible. Choisissez un <em>modèle texte gratuit avec appels d’outils</em> actuellement disponible ; sa présence dans la liste ne garantit pas sa gratuité pour votre compte.</p>
+          <div class="table-scroll" role="region" aria-label="Configuration du fournisseur cloud" tabindex="0">
+            <table>
+              <caption>Comptes, points d’accès et détection des identifiants</caption>
+              <thead><tr><th scope="col">Fournisseur</th><th scope="col">Point d’accès et clé reconnue</th><th scope="col">Vérifications de l’offre gratuite</th></tr></thead>
+              <tbody>
+                <tr><th scope="row"><a href="https://aistudio.google.com/app/apikey">Google AI Studio / Gemini</a></th><td><code>https://generativelanguage.googleapis.com/v1beta/openai/</code><br><code>GEMINI_API_KEY</code> ou <code>GOOGLE_API_KEY</code></td><td>Consultez le <a href="https://ai.google.dev/gemini-api/docs/models">catalogue de modèles</a> et les <a href="https://ai.google.dev/gemini-api/docs/pricing">tarifs gratuits</a>. Le contenu gratuit peut améliorer les produits Google ; consultez les <a href="https://ai.google.dev/gemini-api/terms">conditions</a>.</td></tr>
+                <tr><th scope="row"><a href="https://console.groq.com/keys">Groq</a></th><td><code>https://api.groq.com/openai/v1</code><br><code>GROQ_API_KEY</code></td><td>Choisissez un modèle conversation/outils compatible dans le <a href="https://console.groq.com/docs/models">catalogue</a>. Vérifiez les <a href="https://console.groq.com/docs/rate-limits">limites de débit</a> du compte et <a href="https://console.groq.com/docs/your-data">politiques de données</a> ; les modèles en aperçu peuvent disparaître.</td></tr>
+                <tr><th scope="row"><a href="https://openrouter.ai/settings/keys">OpenRouter</a></th><td><code>https://openrouter.ai/api/v1</code><br><code>OPENROUTER_API_KEY</code></td><td>Choisissez un <a href="https://openrouter.ai/models?max_price=0">modèle gratuit</a> avec outils. Le suffixe <code>:free</code> ne fonctionne que pour les modèles ayant une <a href="https://openrouter.ai/docs/guides/routing/model-variants/free">variante gratuite publiée</a>. Consultez les <a href="https://openrouter.ai/docs/api/reference/limits">limites</a> et <a href="https://openrouter.ai/docs/guides/privacy/logging">réglages de confidentialité</a> des fournisseurs en aval.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>Une clé reconnue est déjà exportée ? La configuration la détecte ; avec plusieurs clés elle demande de choisir. Ne collez pas de vraies clés dans l’historique, les enregistrements ou le code. Le fichier de configuration contient un secret, pas un coffre chiffré.</p>
+          <h3>Configuration manuelle ou changement de fournisseur</h3>
+          <p>Remplacez le point d’accès ci-dessous par celui du tableau et <code>MODEL_ID</code> par un modèle vérifié dans votre compte. Si votre clé est déjà exportée sous <code>GROQ_API_KEY</code>, cet exemple Bash/zsh la réutilise sans saisir le secret :</p>
+          <pre><code>export ASH_AI_ENDPOINT="https://api.groq.com/openai/v1"
+export ASH_AI_MODEL="MODEL_ID"
+export ASH_AI_AUTH_TOKEN="$GROQ_API_KEY"</code></pre>
+          <p>Équivalent Fish :</p>
+          <pre><code>set -gx ASH_AI_ENDPOINT https://api.groq.com/openai/v1
+set -gx ASH_AI_MODEL MODEL_ID
+set -gx ASH_AI_AUTH_TOKEN "$GROQ_API_KEY"</code></pre>
+          <p>Pour Gemini/OpenRouter, utilisez leur point d’accès et leur variable de clé reconnue. Sauvegardez les réglages en sécurité pour les futurs shells. Le cloud nécessite HTTPS et jeton ; HTTP local n’est pas un raccourci cloud. Voir la <a href="docs.html#environment">référence d’environnement</a> et les <a href="faq.html#ai">autres fournisseurs compatibles</a> pour services payants et substitutions avancées.</p>
+        </section>
+        <section id="script">
+          <h2>Installation par script : une alternative, pas le premier choix</h2>
+          <p>Préférez Homebrew, APT, DNF ou Pacman : ils suivent leurs fichiers, vérifient les téléchargements selon leur configuration de confiance et offrent mises à jour/suppression familières. Ils exigent néanmoins de faire confiance aux éditeurs et actions d’installation.</p>
+          <div class="guide-note guide-warning"><p><strong>Un script web exécute du code avec les permissions de votre compte.</strong> Un site/éditeur compromis ou un script modifié peut lire des secrets, modifier des fichiers ou installer d’autres logiciels. HTTPS protège le transport, pas l’intention du code. Envoyer directement une URL au shell exécute avant examen. La vérification des signatures d’archives n’authentifie pas le script lui-même. Ne l’exécutez jamais avec sudo et ne désactivez pas sa vérification.</p></div>
+          <p>Prérequis : système/architecture compatibles, <code>$SHELL</code> identifiant Bash/zsh/Fish, <a href="https://docs.sigstore.dev/cosign/system_config/installation/">Sigstore cosign</a>, <code>tar</code>, <code>uname</code>, <code>install</code>, utilitaires shell standards, commande SHA-256 (<code>sha256sum</code>, <code>shasum</code> ou <code>sha256</code>) et téléchargeur (<code>curl</code>, <code>wget</code> ou Python). L’exemple utilise curl. FreeBSD nécessite aussi Bash. Le dossier personnel/d’installation doit être accessible en écriture.</p>
+          <p>Téléchargez un fichier local, inspectez-le dans un éditeur et exécutez-le uniquement si sa source et son comportement sont fiables. L’examen ne garantit pas la sécurité ; ne suivez pas aveuglément ces étapes :</p>
+          <pre><code>curl -fsSL https://jonconradt.github.io/ash/install.sh -o ash-install.sh
+less ash-install.sh</code></pre>
+          <p>Après examen, exécutez la copie enregistrée avec votre utilisateur habituel :</p>
+          <pre><code>sh ./ash-install.sh
+rm ./ash-install.sh</code></pre>
+          <p><code>install.sh</code> télécharge le dernier Release, vérifie son manifeste signé Sigstore et le condensat de l’archive, puis installe <code>ash</code>/<code>ash-broker</code> dans <code>~/.local/bin</code>. Les plugins natifs vont dans <code>$XDG_DATA_HOME/ash/plugins</code>. Il configure l’utilisateur et demande avant l’intégration shell. Sans terminal interactif, les questions fournisseur/intégration peuvent être ignorées : lancez ensuite <code>ash install</code> interactivement.</p>
+          <p>Définissez <code>ASH_INSTALL_DIR</code> avant le script pour choisir une autre destination. Ajoutez-la vous-même au PATH. <strong>L’auto-mise à jour est limitée à <code>~/.local/bin</code></strong> ; toute destination personnalisée nécessite un remplacement manuel. Le script n’a pas de sélecteur Beta/Nightly.</p>
+        </section>
+        <section id="verify-download">
+          <h2>Vérifier un paquet ou une archive directe</h2>
+          <p>Prérequis : cosign et utilitaire SHA-256. Téléchargez le paquet/archive, <code>SHA256SUMS</code> et <code>SHA256SUMS.sigstore.json</code> depuis la même version publiée. Travaillez dans un nouveau dossier. Remplacez <code>vX.Y.Z</code> par l’étiquette exacte, suffixe de préversion inclus si nécessaire :</p>
+          <pre><code>cosign verify-blob SHA256SUMS \
+  --bundle SHA256SUMS.sigstore.json \
+  --certificate-identity "https://github.com/Jonconradt/ash/.github/workflows/release.yml@refs/tags/vX.Y.Z" \
+  --certificate-oidc-issuer "https://token.actions.githubusercontent.com"</code></pre>
+          <p>Seulement après réussite, calculez le condensat avec <code>shasum -a 256 PACKAGE</code> sur macOS, <code>sha256sum PACKAGE</code> sur Linux ou <code>sha256 -q PACKAGE</code> sur FreeBSD. Remplacez <code>PACKAGE</code> par le nom téléchargé et comparez exactement à son entrée dans le manifeste vérifié. Arrêtez en cas d’entrée absente ou différence. Une somme non signée téléchargée à côté d’un fichier n’équivaut pas à des métadonnées d’éditeur vérifiées.</p>
+        </section>
+        <section id="updates">
+          <h2>Mises à jour et trois canaux</h2>
+          <ul>
+            <li><strong>Release (recommandé) :</strong> versions stables publiées comme <code>vX.Y.Z</code> ; nommé <code>stable</code> dans le dépôt.</li>
+            <li><strong>Beta :</strong> tests de préversion, étiquette <code>vX.Y.Z-beta.N</code> ; changements et régressions possibles.</li>
+            <li><strong>Nightly :</strong> changements récents de la branche par défaut, étiquette <code>vX.Y.Z-nightly.YYYYMMDD.N</code> ; risque maximal de régression. Les builds sont planifiés mais peuvent être omis sans changements ou lors d’un échec de publication.</li>
+          </ul>
+          <p>Une publication actualise la formule Homebrew ou le dépôt Linux signé correspondant. Vous la recevez en exécutant la mise à niveau du gestionnaire propriétaire, ou selon votre politique système. Publication, dépôts et site peuvent être décalés ; vérifiez la disponibilité avant de changer de canal. ash n’installe pas silencieusement des binaires en arrière-plan.</p>
+          <div class="table-scroll" role="region" aria-label="Abonnements aux canaux" tabindex="0">
+            <table>
+              <caption>S’abonner avec votre méthode d’installation</caption>
+              <thead><tr><th scope="col">Méthode</th><th scope="col">Release</th><th scope="col">Beta</th><th scope="col">Nightly</th></tr></thead>
+              <tbody>
+                <tr><th scope="row">Formule Homebrew</th><td><code>Jonconradt/ash/ash</code></td><td><code>Jonconradt/ash/ash-beta</code></td><td><code>Jonconradt/ash/ash-nightly</code></td></tr>
+                <tr><th scope="row">Distribution APT</th><td><code>stable</code></td><td><code>beta</code></td><td><code>nightly</code></td></tr>
+                <tr><th scope="row">baseurl DNF</th><td><code>https://www.versionx.ai/rpm/</code></td><td><code>https://www.versionx.ai/rpm/beta/</code></td><td><code>https://www.versionx.ai/rpm/nightly/</code></td></tr>
+                <tr><th scope="row">Server Pacman</th><td><code>https://www.versionx.ai/pacman/$arch</code></td><td><code>https://www.versionx.ai/pacman/beta/$arch</code></td><td><code>https://www.versionx.ai/pacman/nightly/$arch</code></td></tr>
+                <tr><th scope="row">Script / ash update</th><td>Release uniquement</td><td>Aucun abonnement</td><td>Aucun abonnement</td></tr>
+                <tr><th scope="row">Paquet direct / archive tar</th><td colspan="3">Sans abonnement automatique : choisissez une étiquette publiée et remplacez manuellement un fichier vérifié.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <h3>Homebrew : installer ou changer de formule</h3>
+          <p>Pour une nouvelle installation Beta/Nightly, utilisez le nom complet du tableau dans <code>brew install</code>. Pour changer, désinstallez d’abord la formule actuelle : les trois fournissent les mêmes binaires. Exemple Release vers Beta :</p>
+          <pre><code>brew uninstall ash
+brew install Jonconradt/ash/ash-beta
+brew update
+brew upgrade ash-beta</code></pre>
+          <p>Utilisez <code>ash-nightly</code> pour Nightly ou <code>ash</code> pour Release dans les commandes d’installation/mise à niveau. Désinstallez la vraie formule de l’ancien canal, pas systématiquement <code>ash</code>. Les réglages utilisateur restent ; ouvrez ensuite un nouveau shell.</p>
+          <h3>Linux : sélectionner un seul canal de dépôt</h3>
+          <p><strong>APT :</strong> suivez la <a href="#apt-installation">configuration APT</a> avec exactement une distribution du tableau. Pour changer, modifiez <code>/etc/apt/sources.list.d/versionx.list</code>, remplaçant <code>stable</code> par <code>beta</code> ou <code>nightly</code> (ou de nouveau <code>stable</code>), puis :</p>
+          <pre><code>sudo apt update
+sudo apt install --allow-downgrades ash</code></pre>
+          <p><strong>DNF :</strong> suivez la <a href="#dnf-installation">configuration DNF</a> avec la baseurl choisie. Pour une installation existante, remplacez <code>baseurl</code> dans <code>/etc/yum.repos.d/versionx.repo</code> en conservant les réglages de signature, puis :</p>
+          <pre><code>sudo dnf --refresh distro-sync ash</code></pre>
+          <p><strong>Pacman :</strong> suivez la <a href="#pacman-installation">configuration Pacman</a> avec l’URL Server choisie. Conservez le nom <code>[versionx]</code> : chaque canal publie une base <code>versionx.db</code>. Changez Server dans cette section, n’ajoutez pas une base sous un autre nom. Pour changer, rétrogradation comprise :</p>
+          <pre><code>sudo pacman -Syuu ash</code></pre>
+          <p>Examinez la transaction : revenir à Release peut rétrograder ash, et le double <code>u</code> de Pacman aussi d’autres paquets. Sauvegardez la configuration avant le changement. Utilisez ensuite les commandes normales APT/DNF/Pacman des sections système ; n’activez pas plusieurs sources de canaux ash.</p>
+          <h3>Mises à jour Release locales à l’utilisateur</h3>
+          <pre><code>ash update</code></pre>
+          <p>Ceci vérifie et installe une version stable uniquement si l’exécutable actif est dans <code>~/.local/bin</code>. Les fichiers/plugins fournis sont aussi actualisés, avec choix pour les fichiers personnalisés. <code>ash update --version vX.Y.Z</code> sélectionne une étiquette stable, pas un canal, et n’est pas une commande de rétrogradation. Pas d’option <code>--channel</code>. Les installations par gestionnaire, .pkg macOS et script à destination personnalisée utilisent leur gestionnaire/installateur. FreeBSD Beta/Nightly utilise des archives vérifiées manuelles, pas un abonnement à l’auto-mise à jour. Ouvrez ensuite un nouveau shell.</p>
+        </section>
+        <section id="uninstall">
+          <h2>Désinstaller sans supprimer les fichiers étrangers</h2>
+          <h3>1. Désactiver d’abord l’intégration shell</h3>
+          <p>Avant les binaires, exécutez la commande pour chaque shell où l’intégration est active :</p>
+          <p><strong>Bash</strong></p>
+          <pre><code>ash install --shell bash --disable-shell-integration</code></pre>
+          <p><strong>zsh</strong></p>
+          <pre><code>ash install --shell zsh --disable-shell-integration</code></pre>
+          <p><strong>Fish</strong></p>
+          <pre><code>ash install --shell fish --disable-shell-integration</code></pre>
+          <p>Si ash manque déjà, modifiez le fichier de démarrage indiqué dans <a href="#initialize">l’initialisation</a> et supprimez uniquement le bloc entre <code># &gt;&gt;&gt; ash install &gt;&gt;&gt;</code> et <code># &lt;&lt;&lt; ash install &lt;&lt;&lt;</code>. Supprimez les lignes PATH/environnement ash ajoutées manuellement, pas les autres réglages. Fermez ensuite les shells ash pour arrêter leurs brokers.</p>
+          <h3>2. Laisser le gestionnaire propriétaire supprimer ses fichiers</h3>
+          <p><strong>Homebrew (Release)</strong></p>
+          <pre><code>brew uninstall ash</code></pre>
+          <p><strong>APT</strong></p>
+          <pre><code>sudo apt remove ash</code></pre>
+          <p><strong>DNF</strong></p>
+          <pre><code>sudo dnf remove ash</code></pre>
+          <p><strong>Pacman</strong></p>
+          <pre><code>sudo pacman -R ash</code></pre>
+          <p>Choisissez uniquement votre méthode ; pour Homebrew Beta/Nightly, utilisez <code>ash-beta</code>/<code>ash-nightly</code>. APT/DNF/Pacman suppriment binaires, plugins et manuels gérés, pas les réglages/historique personnels. Ne supprimez pas manuellement leurs fichiers.</p>
+          <p>Nettoyage facultatif du dépôt : supprimez la source ash <code>/etc/apt/sources.list.d/versionx.list</code> et sa clé dédiée <code>/etc/apt/keyrings/versionx-keyring.gpg</code>, le dépôt ash <code>/etc/yum.repos.d/versionx.repo</code>, ou la section ash <code>[versionx]</code> dans <code>/etc/pacman.conf</code>. Vérifiez d’abord qu’aucun autre paquet ne les utilise. Ne retirez une clé RPM/Pacman qu’après vérification de son empreinte et absence d’autres utilisateurs ; jamais le trousseau partagé de la distribution.</p>
+          <h3 id="manual-macos">3a. Suppression manuelle du .pkg macOS</h3>
+          <p>macOS Installer conserve un reçu mais n’a pas de désinstallateur ash. Confirmez une installation .pkg, pas Homebrew, et examinez son contenu exact :</p>
+          <pre><code>pkgutil --pkg-info dev.ash.cli
+pkgutil --files dev.ash.cli</code></pre>
+          <p>Avec le reçu comme inventaire, supprimez uniquement les fichiers ash : <code>/usr/local/bin/ash</code>, <code>/usr/local/bin/ash-broker</code>, fichiers de <code>/usr/local/lib/ash/plugins</code>, <code>/usr/local/share/man/man1/ash.1</code>, pages <code>ash.1</code> traduites indiquées et notices dans <code>/usr/local/share/licenses/ash</code>. Des droits administrateur sont nécessaires. Vérifiez la propriété si un autre installateur les a remplacés ; ne supprimez pas sa copie. Supprimez les dossiers vides propres à ash, pas les dossiers partagés <code>/usr/local</code>, <code>bin</code> ou de manuels.</p>
+          <p>Après les fichiers, retirez éventuellement le reçu :</p>
+          <pre><code>sudo pkgutil --forget dev.ash.cli</code></pre>
+          <p><strong>Oublier un reçu ne supprime aucun fichier installé.</strong> Gardez-le jusqu’à la fin de la vérification du contenu.</p>
+          <h3 id="manual-linux">3b. Suppression manuelle d’archives locales / Linux / FreeBSD</h3>
+          <p>Repérez la copie active avec <code>command -v ash</code> et <code>command -v ash-broker</code>. Après désactivation des hooks, supprimez exactement ces deux fichiers pour l’installation script par défaut :</p>
+          <pre><code>rm "$HOME/.local/bin/ash" "$HOME/.local/bin/ash-broker"</code></pre>
+          <p>Pour <code>ASH_INSTALL_DIR</code> ou une archive extraite manuellement, supprimez seulement les véritables chemins ash/broker. Retirez plugins/manuels/notices installés selon l’inventaire d’origine ; les plugins du script sont dans les données utilisateur ash. Dans <code>/usr/bin</code>, vérifiez d’abord la propriété avec <code>dpkg -S /usr/bin/ash</code>, <code>rpm -qf /usr/bin/ash</code> ou <code>pacman -Qo /usr/bin/ash</code>. Une copie gérée doit être supprimée par son gestionnaire, même issue d’un téléchargement autonome.</p>
+          <h3>4. Facultatif : effacer réglages, outils et historique locaux</h3>
+          <div class="guide-note guide-warning"><p><strong>Sauvegardez tout ce que vous souhaitez garder.</strong> Cette étape distincte peut effacer réglages/jetons, outils/plugins personnalisés, historique et fichiers de travail. Désinstaller les binaires ne vaut pas consentement à cet effacement.</p></div>
+          <ul>
+            <li>Configuration : <code>$XDG_CONFIG_HOME/ash</code>, par défaut <code>~/.config/ash</code>.</li>
+            <li>Données, plugins et environnement Python : <code>$XDG_DATA_HOME/ash</code>, par défaut <code>~/.local/share/ash</code>.</li>
+            <li>Historique et état : <code>$XDG_STATE_HOME/ash</code>, par défaut <code>~/.local/state/ash</code>.</li>
+            <li>Cache : <code>$XDG_CACHE_HOME/ash</code>, par défaut <code>~/.cache/ash</code>.</li>
+            <li>Exécution du broker : <code>$XDG_RUNTIME_DIR/ash</code>, ou <code>$XDG_STATE_HOME/ash/runtime</code> sans racine d’exécution disponible.</li>
+          </ul>
+          <p>Inspectez les substitutions XDG absolues réelles avant de supprimer uniquement ces sous-dossiers ash ; jamais une racine XDG ou le dossier personnel. Après fermeture de tous les shells ash, supprimez au besoin les restes d’exécution. Des identifiants MCP OAuth peuvent rester dans le gestionnaire du système : supprimez les entrées ash et révoquez l’accès chez le fournisseur MCP. Révoquez les clés IA inutilisées chez leur fournisseur ; supprimer un fichier ne révoque pas la clé. Ne désinstallez pas Ollama/modèles, Python ou dépendances partagées avec ash.</p>
+        </section>
+        <section id="troubleshooting">
+          <h2>Dépannage rapide</h2>
+          <dl>
+            <dt>Commande absente ou mauvaise version</dt><dd>Vérifiez PATH et <code>command -v ash</code>/<code>command -v ash-broker</code>. Une ancienne copie dans <code>~/.local/bin</code> peut masquer un paquet. Utilisez un seul propriétaire/canal à la fois, puis un nouveau shell.</dd>
+            <dt>Menu fournisseur absent</dt><dd>Lancez <code>ash install</code> dans un terminal interactif. Les réglages valides restent ; utilisez la <a href="#cloud">configuration manuelle</a> pour changer. Sans intégration, exportez les réglages dans l’environnement CLI.</dd>
+            <dt>Modèle absent ou connexion refusée</dt><dd>Pour Ollama, vérifiez le serveur et la présence du modèle dans <code>ollama list</code>. Pour le cloud, vérifiez point d’accès, admissibilité, HTTPS, jeton et quota ; ne partagez jamais de journaux avec jetons.</dd>
+            <dt>Dépôt ou canal indisponible</dt><dd>Vérifiez l’architecture et la version/le dépôt publié. Une publication peut tarder ; ne désactivez pas les signatures pour contourner un dépôt indisponible.</dd>
+            <dt>Échec de configuration Python</dt><dd>Installez Python avec venv/ensurepip, autorisez les téléchargements de dépendances et relancez <code>ash install</code>. ash de base reste utilisable sans ces outils.</dd>
+          </dl>
+          <p>Plus de détails ? Voir la <a href="docs.html">référence des commandes</a>, la <a href="faq.html">FAQ</a>, ou <a href="https://github.com/Jonconradt/ash/issues">signaler un problème</a> sans identifiants.</p>
+        </section>
+      </article>
+    </div>
+  </main>
+  <footer class="site-footer page-width"><span class="brand"><span class="brand-mark">&gt;_</span> ash</span><a href="docs.html">Documentation</a><a href="https://github.com/Jonconradt/ash">GitHub</a></footer>
+  <script src="../site.js" data-site-script defer></script>
+</body>
+</html>

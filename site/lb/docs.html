@@ -27,7 +27,7 @@
     <a class="brand" href="./" aria-label="ashdoheem"><span class="brand-mark">&gt;_</span> ash</a>
     <nav aria-label="Primär Navigatioun">
       <a href="./">Doheem</a>
-      <a href="./#install">Installéieren</a>
+      <a href="install.html">Installéieren</a>
       <a href="faq.html">FAQ</a>
       <a href="developer.html">Entwéckler</a>
       <a href="https://github.com/Jonconradt/ash">GitHub</a>
@@ -74,50 +74,17 @@
       <article class="docs-content">
         <section id="apt-installation">
           <h2>Installéiert op Debian oder Ubuntu</h2>
-          <p>De ënnerschriwwene VersionX APT Repository ënnerstëtzt<code>amd64</code>an<code>arm64</code>. Füügt säin ëffentlechen Ënnerschrëftschlëssel a Packagequell derbäi, installéiert dann<code>ash</code>:</p>
-          <pre><code>sudo install -d -m 0755 /etc/apt/keyrings
-curl -fsSL https://www.versionx.ai/apt/gpg.key |
-  sudo gpg --dearmor --batch --yes -o /etc/apt/keyrings/versionx-keyring.gpg
-sudo chmod 0644 /etc/apt/keyrings/versionx-keyring.gpg
-echo "deb [signed-by=/etc/apt/keyrings/versionx-keyring.gpg] https://www.versionx.ai/apt stable main" |
-  sudo tee /etc/apt/sources.list.d/versionx.list
-sudo apt update
-sudo apt install ash</code></pre>
-          <p>Verifizéiert den installéierten Kommando mat<code>ash --version</code>. Package-Manager Installatiounen ginn aktualiséiert mat<code>sudo apt update &amp;&amp; sudo apt upgrade</code>.</p>
+          <p>D’<a href="install.html#apt-installation">APT-Installatiounsguide</a> erkläert Viraussetzungen, Signaturschlësselen, Repository-Ariichtung, Kanäl, Updates an Entfernung.</p>
         </section>
 
         <section id="dnf-installation">
           <h2>Installéiert op Fedora oder RHEL-kompatibel Linux</h2>
-          <p>De ënnerschriwwene VersionX DNF Repository ënnerstëtzt<code>x86_64</code>an<code>aarch64</code>. Importéiert säin ëffentleche Schlëssel a konfiguréiert de Repository:</p>
-          <pre><code>sudo rpm --import https://www.versionx.ai/rpm/gpg.key
-sudo tee /etc/yum.repos.d/versionx.repo &gt;/dev/null &lt;&lt;'EOF'
-[versionx]
-name=VersionX ash repository
-baseurl=https://www.versionx.ai/rpm/
-enabled=1
-gpgcheck=0
-repo_gpgcheck=1
-gpgkey=https://www.versionx.ai/rpm/gpg.key
-EOF
-sudo dnf install ash</code></pre>
-          <p>Ungezeechent Repository Metadaten verifizéiert RPM Package Kontrollsummen; Package Dateien sinn net individuell RPM-ënnerschriwwen. Update ash mat <code>sudo dnf upgrade ash</code>.</p>
+          <p>D’<a href="install.html#dnf-installation">DNF-Installatiounsguide</a> erkläert Viraussetzungen, Metadateverifikatioun, Repository-Ariichtung, Kanäl, Updates an Entfernung.</p>
         </section>
 
         <section id="pacman-installation">
           <h2>Installéiert op Arch Linux</h2>
-          <p>De ënnerschriwwene VersionX Pacman Repository ënnerstëtzt<code>x86_64</code>. Vergewëssert Iech datt d'Ënnerschreiwe Schlëssel Fangerofdrock hei ënnendrënner passt<code>32C6 C11D 2F86 BFE4 6EB7 7FFC 5257 FEA6 1368 919F</code>, dann importéiert a vertrauen et lokal:</p>
-          <pre><code>curl -fsSL https://www.versionx.ai/pacman/gpg.key -o /tmp/versionx.gpg
-gpg --show-keys --with-fingerprint /tmp/versionx.gpg
-sudo pacman-key --add /tmp/versionx.gpg
-sudo pacman-key --lsign-key 32C6C11D2F86BFE46EB77FFC5257FEA61368919F
-rm /tmp/versionx.gpg
-sudo tee -a /etc/pacman.conf &gt;/dev/null &lt;&lt;'EOF'
-[versionx]
-Server = https://www.versionx.ai/pacman/$arch
-SigLevel = Required DatabaseRequired
-EOF
-sudo pacman -Syu ash</code></pre>
-          <p>Pacman verifizéiert souwuel Package wéi och Repository Ënnerschrëften. Update ash mat <code>sudo pacman -Syu</code>.</p>
+          <p>D’<a href="install.html#pacman-installation">Pacman-Installatiounsguide</a> erkläert Viraussetzungen, Schlësselverifikatioun, Repository-Ariichtung, Kanäl, Updates an Entfernung.</p>
         </section>
 
         <section id="synopsis">

@@ -19,7 +19,7 @@ from pathlib import Path
 SITE_DIR = Path(__file__).resolve().parent
 REPO_DIR = SITE_DIR.parent
 BASE_URL = "https://jonconradt.github.io/ash/"
-PAGES = ("index.html", "docs.html", "faq.html", "developer.html")
+PAGES = ("index.html", "install.html", "docs.html", "faq.html", "developer.html")
 CATALOG_DIR = REPO_DIR / "internal" / "localize" / "languages"
 CACHE_FILE = REPO_DIR / ".site-translation-cache.json"
 CACHE_VERSION = 1
@@ -28,6 +28,7 @@ MAX_BATCH_LENGTH = 4200
 BLOCK_TAGS = {
     "a",
     "button",
+    "caption",
     "dd",
     "dt",
     "h1",
@@ -38,8 +39,11 @@ BLOCK_TAGS = {
     "li",
     "p",
     "span",
+    "small",
     "strong",
     "summary",
+    "td",
+    "th",
     "title",
 }
 VOID_TAGS = {
@@ -528,7 +532,7 @@ def update_picker(html_text: str, languages: list[dict], selected_path: str) -> 
 
 def translate_attributes(html_text: str, target: str) -> str:
     attr_pattern = re.compile(
-        r'\b(aria-label|alt|data-copied-label)="([^"]*)"'
+        r'\b(aria-label|alt|data-copy-label|data-copied-label|data-copy-error)="([^"]*)"'
     )
 
     def translate_attribute(match: re.Match) -> str:
@@ -571,6 +575,9 @@ def localized_url(language: dict, page: str) -> str:
 
 def set_locale_urls(html_text: str, language: dict, page: str, languages: list[dict]) -> str:
     page_url = localized_url(language, page)
+    html_text = re.sub(r'\sdir="(?:ltr|rtl)"', "", html_text, count=1)
+    if language["htmlLang"] == "ar":
+        html_text = re.sub(r"(<html\b[^>]*)(>)", r'\1 dir="rtl"\2', html_text, count=1)
     html_text = re.sub(
         r'(<html\b[^>]*\blang=")[^"]+(")',
         rf"\g<1>{language['htmlLang']}\2",
@@ -588,6 +595,12 @@ def set_locale_urls(html_text: str, language: dict, page: str, languages: list[d
         rf"\g<1>{page_url}\2",
         html_text,
         count=1,
+    )
+    html_text = re.sub(
+        r'^[ \t]*<link rel="alternate" hreflang="[^"]+" href="[^"]+">\n',
+        "",
+        html_text,
+        flags=re.MULTILINE,
     )
     alternate_links = [
         f'  <link rel="alternate" hreflang="{entry["htmlLang"]}" '

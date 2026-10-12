@@ -35,7 +35,7 @@
     <a class="brand" href="./" aria-label="ash home"><span class="brand-mark">&gt;_</span> ash</a>
     <nav aria-label="Primary navigation">
       <a href="#how-it-works">How it works</a>
-      <a href="#install">Install</a>
+      <a href="install.html">Install</a>
       <a href="docs.html">Docs</a>
       <a href="faq.html">FAQ</a>
       <a href="developer.html">Developers</a>
@@ -64,8 +64,8 @@
         <h1>Ask your terminal.<br><em>Keep your flow.</em></h1>
         <p class="hero-lede">ash brings AI into bash, Fish, and zsh so questions, investigations, and small automations happen where the work already is. Connect remote MCP servers to bring their tools into the same workflow.</p>
         <div class="hero-actions">
-          <a class="button button-primary" href="#install">Install ash <span aria-hidden="true">&#8595;</span></a>
-          <a class="text-link" href="https://github.com/Jonconradt/ash#configure">Read the setup guide <span aria-hidden="true">&#8594;</span></a>
+          <a class="button button-primary" href="install.html">Install ash <span aria-hidden="true">&#8594;</span></a>
+          <a class="text-link" href="install.html#initialize">Read the setup guide <span aria-hidden="true">&#8594;</span></a>
         </div>
         <p class="compatibility"><span class="status-dot"></span> macOS &middot; Linux &middot; FreeBSD &middot; Open source</p>
       </div>
@@ -99,7 +99,7 @@
       </div>
       <div class="how-grid">
         <div class="numbered"><span>01</span><h3>Opt in to shell integration</h3><p>ash works with bash, Fish, and zsh. The verified installer asks before adding its managed shell hook; unknown commands become prompts once you enable it. Snooze when you need a break from automatic prompt processing.</p></div>
-        <div class="numbered"><span>02</span><h3>Easy updates</h3><p><code>ash update</code> keeps your installation up to date with the latest release. The command handles version checks, downloads, and verification automatically. No background or surprise updates.</p></div>
+        <div class="numbered"><span>02</span><h3>Easy updates</h3><p>Update with your package manager, or use <code>ash update</code> for a Release installed under <code>~/.local/bin</code>. Choose Release, Beta, or Nightly through supported package repositories. No surprise background updates.</p></div>
         <div class="numbered"><span>03</span><h3>Stay in control</h3><p>Tool execution is constrained by explicit allow and deny lists and runs as your user. You decide what ash is allowed to touch. Add your own Python scripts to <code>$XDG_DATA_HOME/ash/tools</code> or native plugins to <code>$XDG_DATA_HOME/ash/plugins</code>.</p></div>
       </div>
     </section>
@@ -108,23 +108,8 @@
       <div class="page-width install-content">
         <div><p class="eyebrow">Start small</p><h2>Give your shell<br><em>some company.</em></h2></div>
         <div class="install-details">
-          <p>Linux, macOS, and FreeBSD users can install the latest release in one step. Install Sigstore <code>cosign</code> first so the installer can verify the signed checksum manifest. It installs to <code>~/.local/bin</code> and asks before adding opt-in Fish, zsh, or bash shell integration.</p>
-          <p>On macOS or Linux with <a href="https://brew.sh">Homebrew</a>, install ash and its bundled plugins, then initialize its embedded assets, provider settings, and shell integration:</p>
-          <pre><code>brew install Jonconradt/ash/ash
-ash install --shell $SHELL --shell-integration</code></pre>
-          <p>The formula is updated automatically for each stable release. The install command provisions Ash's embedded assets, sets up shell integration for your current shell, and helps configure your AI provider.</p>
-          <p>On Debian or Ubuntu, install and update ash with <a href="docs.html#apt-installation">APT</a>; on Fedora and RHEL-compatible systems, use <a href="docs.html#dnf-installation">DNF</a>; Arch Linux users can use <a href="docs.html#pacman-installation">Pacman</a>.</p>
-          <p><code>ash install</code> auto-configures your AI provider: it detects an already-set cloud provider API key or a running local inference server, otherwise it shows a numbered menu to pick a provider and model. Or set these yourself:</p>
-          <pre><code>export ASH_AI_AUTH_TOKEN='your-token'
-export ASH_AI_ENDPOINT='https://ollama.com'
-export ASH_AI_MODEL='gemma4:31b-cloud'
-</code></pre>
-          <p>Local, OpenAI, Anthropic, Google, Azure OpenAI, Mistral, Cohere, Groq, xAI, DeepSeek, Together AI, OpenRouter, HuggingFace, AWS Bedrock, and any other provider with an OpenAI compatible API are supported.</p>
-          <div class="code-block-wrap">
-            <pre class="code-block"><code><span class="code-command">curl -fsSL https://jonconradt.github.io/ash/install.sh | sh</span></code></pre>
-            <button type="button" class="copy-button" data-copy-target=".code-command" aria-label="Copy install command" data-copied-label="Copied!">Copy</button>
-          </div>
-          <div class="install-links"><a class="button button-light" href="https://github.com/Jonconradt/ash/releases/latest">View packages <span aria-hidden="true">&#8599;</span></a><a class="text-link light-link" href="https://github.com/Jonconradt/ash#configure">Full configuration <span aria-hidden="true">&#8594;</span></a></div>
+          <p>Start with your package manager on macOS or Linux. Our installation guide walks through prerequisites, local Ollama and free cloud tiers, update channels, and safe removal. FreeBSD archive instructions and the alternative script installer are included too.</p>
+          <div class="install-links"><a class="button button-light" href="install.html">Choose your installation <span aria-hidden="true">&#8594;</span></a><a class="text-link light-link" href="install.html#updates">Updates and channels <span aria-hidden="true">&#8594;</span></a></div>
         </div>
       </div>
     </section>

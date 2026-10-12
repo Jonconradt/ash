@@ -47,7 +47,7 @@
     <a class="brand" href="./" aria-label="ashheim"><span class="brand-mark">&gt;_</span> ash</a>
     <nav aria-label="Primäre Navigation">
       <a href="#how-it-works">Wie es funktioniert</a>
-      <a href="#install">Installieren</a>
+      <a href="install.html">Installieren</a>
       <a href="docs.html">Dokumente</a>
       <a href="faq.html">FAQ</a>
       <a href="developer.html">Entwickler</a>
@@ -76,7 +76,7 @@
         <h1>Fragen Sie Ihr Terminal.<br><em>Behalten Sie Ihren Fluss.</em></h1>
         <p class="hero-lede">ash bringt KI in Bash, Fish und ZSH, sodass Fragen, Untersuchungen und kleine Automatisierungen dort stattfinden, wo die Arbeit bereits ist. Verbinden Sie Remote-MCP-Server, um ihre Tools in denselben Workflow zu integrieren.</p>
         <div class="hero-actions">
-          <a class="button button-primary" href="#install">Installierenash <span aria-hidden="true">&#8595;</span></a>
+          <a class="button button-primary" href="install.html">Installieren ash <span aria-hidden="true">&#8594;</span></a>
           <a class="text-link" href="https://github.com/Jonconradt/ash#configure">Lesen Sie die Einrichtungsanleitung<span aria-hidden="true">&#8594;</span></a>
         </div>
         <p class="compatibility"><span class="status-dot"></span> macOS · Linux · FreeBSD · Open Source</p>
@@ -111,7 +111,7 @@
       </div>
       <div class="how-grid">
         <div class="numbered"><span>01</span><h3>Shell-Integration aktivieren</h3><p>ash funktioniert mit Bash, Fish und ZSH. Das verifizierte Installationsprogramm fragt, bevor es seinen verwalteten Shell-Hook hinzufügt. Unbekannte Befehle werden zu Eingabeaufforderungen, sobald Sie sie aktivieren. Machen Sie eine Schlummerfunktion, wenn Sie eine Pause von der automatischen Eingabeaufforderungsverarbeitung benötigen.</p></div>
-        <div class="numbered"><span>02</span><h3>Einfache Updates</h3><p><code>ash update</code> hält Ihre Installation auf dem neuesten Stand. Der Befehl führt automatisch Versionsprüfungen, Downloads und Verifizierungen durch. Keine Hintergrund- oder Überraschungsupdates.</p></div>
+        <div class="numbered"><span>02</span><h3>Einfache Updates</h3><p>Aktualisieren Sie über die Paketverwaltung oder mit <code>ash update</code> für Release unter <code>~/.local/bin</code>. Wählen Sie Release, Beta oder Nightly über unterstützte Repositories. Keine überraschenden Hintergrundupdates.</p></div>
         <div class="numbered"><span>03</span><h3>Behalten Sie die Kontrolle</h3><p>Die Ausführung des Tools wird durch explizite Zulassungs- und Verweigerungslisten eingeschränkt und wird als Ihr Benutzer ausgeführt. Sie entscheiden, wasashdarf anfassen. Fügen Sie Ihre eigenen Python-Skripte hinzu<code>$XDG_DATA_HOME/ash/tools</code>oder native Plugins zu<code>$XDG_DATA_HOME/ash/plugins</code>.</p></div>
       </div>
     </section>
@@ -120,23 +120,8 @@
       <div class="page-width install-content">
         <div><p class="eyebrow">Klein anfangen</p><h2>Geben Sie Ihrer Hülle<br><em>etwas Gesellschaft.</em></h2></div>
         <div class="install-details">
-          <p>Benutzer von Linux, macOS und FreeBSD können die neueste Version in einem Schritt installieren. Installieren Sie Sigstore<code>cosign</code>zuerst, damit das Installationsprogramm das signierte Prüfsummenmanifest überprüfen kann. Es wird installiert<code>~/.local/bin</code>und fragt vor dem Hinzufügen der optionalen Fish-, ZSH- oder Bash-Shell-Integration.</p>
-          <p>Auf macOS oder Linux mit<a href="https://brew.sh">Homebrew</a>, installierenashund seine gebündelten Plugins, dann initialisieren Sie seine eingebetteten Assets, Anbietereinstellungen und Shell-Integration:</p>
-          <pre><code>brew install Jonconradt/ash/ash
-ash install --shell $SHELL --shell-integration</code></pre>
-          <p>Die Formel wird für jede stabile Version automatisch aktualisiert. Der Installationsbefehl stellt bereitAsh, richtet die Shell-Integration für Ihre aktuelle Shell ein und hilft bei der Konfiguration Ihres KI-Anbieters.</p>
-          <p>Unter Debian oder Ubuntu installieren und aktualisierenashmit<a href="docs.html#apt-installation">GEEIGNET</a>; auf Fedora- und RHEL-kompatiblen Systemen verwenden<a href="docs.html#dnf-installation">DNF</a>; Benutzer von Arch Linux können es verwenden<a href="docs.html#pacman-installation">Pacman</a>.</p>
-          <p><code>ash install</code>Konfiguriert Ihren KI-Anbieter automatisch: Er erkennt einen bereits festgelegten Cloud-Anbieter-API-Schlüssel oder einen laufenden lokalen Inferenzserver. Andernfalls wird ein nummeriertes Menü zur Auswahl eines Anbieters und Modells angezeigt. Oder stellen Sie diese selbst ein:</p>
-          <pre><code>export ASH_AI_AUTH_TOKEN='your-token'
-export ASH_AI_ENDPOINT='https://ollama.com'
-export ASH_AI_MODEL='gemma4:31b-cloud'
-</code></pre>
-          <p>Local, OpenAI, Anthropic, Google, Azure OpenAI, Mistral, Cohere, Groq, xAI, DeepSeek, Together AI, OpenRouter, HuggingFace, AWS Bedrock und alle anderen Anbieter mit einer OpenAI-kompatiblen API werden unterstützt.</p>
-          <div class="code-block-wrap">
-            <pre class="code-block"><code><span class="code-command">curl -fsSL https://jonconradt.github.io/ash/install.sh | sh</span></code></pre>
-            <button type="button" class="copy-button" data-copy-target=".code-command" aria-label="Installationsbefehl kopieren" data-copied-label="Kopiert!">Kopieren</button>
-          </div>
-          <div class="install-links"><a class="button button-light" href="https://github.com/Jonconradt/ash/releases/latest">Pakete ansehen<span aria-hidden="true">&#8599;</span></a><a class="text-link light-link" href="https://github.com/Jonconradt/ash#configure">Vollständige Konfiguration<span aria-hidden="true">&#8594;</span></a></div>
+          <p>Beginnen Sie auf macOS oder Linux mit Ihrer Paketverwaltung. Die Installationsanleitung erklärt Voraussetzungen, lokales Ollama und kostenlose Cloud-Tarife, Updatekanäle und sichere Entfernung. FreeBSD-Archive und der alternative Skriptinstaller sind ebenfalls beschrieben.</p>
+          <div class="install-links"><a class="button button-light" href="install.html">Installationsmethode wählen <span aria-hidden="true">&#8594;</span></a><a class="text-link light-link" href="install.html#updates">Updates und Kanäle <span aria-hidden="true">&#8594;</span></a></div>
         </div>
       </div>
     </section>

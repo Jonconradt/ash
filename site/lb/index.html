@@ -47,7 +47,7 @@
     <a class="brand" href="./" aria-label="ashdoheem"><span class="brand-mark">&gt;_</span> ash</a>
     <nav aria-label="Primär Navigatioun">
       <a href="#how-it-works">Wéi et funktionnéiert</a>
-      <a href="#install">Installéieren</a>
+      <a href="install.html">Installéieren</a>
       <a href="docs.html">Docs</a>
       <a href="faq.html">FAQ</a>
       <a href="developer.html">Entwéckler</a>
@@ -76,7 +76,7 @@
         <h1>Frot Ären Terminal.<br><em>Halt Äre Flux.</em></h1>
         <p class="hero-lede">ash bréngt AI an Bash, Fish, an zsh sou datt Froen, Ermëttlungen a kleng Automatisatioune geschéien, wou d'Aarbecht schonn ass. Connect Remote MCP Server fir hir Tools an dee selwechte Workflow ze bréngen.</p>
         <div class="hero-actions">
-          <a class="button button-primary" href="#install">Installéierenash <span aria-hidden="true">&#8595;</span></a>
+          <a class="button button-primary" href="install.html">Installéieren ash <span aria-hidden="true">&#8594;</span></a>
           <a class="text-link" href="https://github.com/Jonconradt/ash#configure">Liest de Setup Guide<span aria-hidden="true">&#8594;</span></a>
         </div>
         <p class="compatibility"><span class="status-dot"></span> macOS · Linux · FreeBSD · Open Source</p>
@@ -111,7 +111,7 @@
       </div>
       <div class="how-grid">
         <div class="numbered"><span>01</span><h3>Opt an Shell Integratioun</h3><p>ash funktionnéiert mat Bash, Fish, an zsh. De verifizéierte Installateur freet ier hien säi verwalteten Shell-Hook bäidréit; onbekannt Kommandoen ginn Ufroen wann Dir et aktivéiert. Snooze wann Dir eng Paus vun der automatescher Promptveraarbechtung braucht.</p></div>
-        <div class="numbered"><span>02</span><h3>Einfach Updates</h3><p><code>ash update</code> hält Är Installatioun mat der leschter Verëffentlechung aktuell. De Kommando handhabt Versiounschecken, Downloads a Verifizéierung automatesch. Keen Hannergrond oder Iwwerraschungsupdates.</p></div>
+        <div class="numbered"><span>02</span><h3>Einfach Updates</h3><p>Aktualiséiert mam Package-Manager oder <code>ash update</code> fir Release ënner <code>~/.local/bin</code>. Wielt Release, Beta oder Nightly iwwer ënnerstëtzt Repositories. Keng iwwerraschend Hannergrondupdates.</p></div>
         <div class="numbered"><span>03</span><h3>Bleift a Kontroll</h3><p>D'Ausféierung vum Tool ass limitéiert duerch explizit Erlaabt an Oflehnungslëschten a leeft als Äre Benotzer. Dir decidéiert watashass erlaabt ze beréieren. Füügt Är eege Python Scripten un<code>$XDG_DATA_HOME/ash/tools</code>oder gebierteg Plugins zu<code>$XDG_DATA_HOME/ash/plugins</code>.</p></div>
       </div>
     </section>
@@ -120,23 +120,8 @@
       <div class="page-width install-content">
         <div><p class="eyebrow">Kleng ufänken</p><h2>Gitt Är Schell<br><em>eng Firma.</em></h2></div>
         <div class="install-details">
-          <p>Linux, macOS, a FreeBSD Benotzer kënnen déi lescht Verëffentlechung an engem Schrëtt installéieren. Installéiert Sigstore<code>cosign</code>als éischt sou datt den Installateur den ënnerschriwwene Kontrollsummanifest verifizéiere kann. Et installéiert ze<code>~/.local/bin</code>a freet ier Dir Opt-In Fish, Zsh oder Bash Shell Integratioun bäidréit.</p>
-          <p>Op macOS oder Linux mat<a href="https://brew.sh">Homebrew</a>, installéierenasha seng gebündelte Plugins, initialiséiert dann seng embedded Verméigen, Provider Astellungen, a Shell Integratioun:</p>
-          <pre><code>brew install Jonconradt/ash/ash
-ash install --shell $SHELL --shell-integration</code></pre>
-          <p>D'Formel gëtt automatesch fir all stabil Verëffentlechung aktualiséiert. D'Installatioun Kommando BestëmmungenAshseng embedded Verméigen, setzt Shellintegratioun fir Är aktuell Shell op, an hëlleft Ären AI Provider ze konfiguréieren.</p>
-          <p>Op Debian oder Ubuntu, installéieren an aktualiséierenashmat<a href="docs.html#apt-installation">APT</a>; op Fedora a RHEL-kompatibel Systemer, benotzen<a href="docs.html#dnf-installation">DNF</a>; Arch Linux Benotzer kënne benotzen<a href="docs.html#pacman-installation">Pacman</a>.</p>
-          <p><code>ash install</code>auto-konfiguréiert Ären AI Provider: et erkennt e scho gesate Cloud Provider API Schlëssel oder e lafende lokalen Inferenzserver, soss weist et e nummeréiert Menü fir e Provider a Modell ze wielen. Oder setzt dës selwer:</p>
-          <pre><code>export ASH_AI_AUTH_TOKEN='your-token'
-export ASH_AI_ENDPOINT='https://ollama.com'
-export ASH_AI_MODEL='gemma4:31b-cloud'
-</code></pre>
-          <p>Local, OpenAI, Anthropic, Google, Azure OpenAI, Mistral, Cohere, Groq, xAI, DeepSeek, Together AI, OpenRouter, HuggingFace, AWS Bedrock, an all aner Provider mat enger OpenAI-kompatibel API ginn ënnerstëtzt.</p>
-          <div class="code-block-wrap">
-            <pre class="code-block"><code><span class="code-command">curl -fsSL https://jonconradt.github.io/ash/install.sh | sh</span></code></pre>
-            <button type="button" class="copy-button" data-copy-target=".code-command" aria-label="Kopie installéieren Kommando" data-copied-label="Kopéiert!">Kopie</button>
-          </div>
-          <div class="install-links"><a class="button button-light" href="https://github.com/Jonconradt/ash/releases/latest">Kuckt Packagen<span aria-hidden="true">&#8599;</span></a><a class="text-link light-link" href="https://github.com/Jonconradt/ash#configure">Voll Configuratioun<span aria-hidden="true">&#8594;</span></a></div>
+          <p>Fänkt op macOS oder Linux mam Package-Manager un. D’Guide erkläert Viraussetzungen, lokalen Ollama, gratis Cloud, Updatekanäl a sécher Entfernung. FreeBSD-Archiver an alternative Skriptinstaller sinn och dobäi.</p>
+          <div class="install-links"><a class="button button-light" href="install.html">Installatioun wielen <span aria-hidden="true">&#8594;</span></a><a class="text-link light-link" href="install.html#updates">Aktualiséierungen a Kanäl <span aria-hidden="true">&#8594;</span></a></div>
         </div>
       </div>
     </section>

@@ -25,7 +25,7 @@
     <a class="brand" href="./" aria-label="ashheim"><span class="brand-mark">&gt;_</span> ash</a>
     <nav aria-label="Primäre Navigation">
       <a href="index.html#how-it-works">Wie es funktioniert</a>
-      <a href="index.html#install">Installieren</a>
+      <a href="install.html">Installieren</a>
       <a href="docs.html">Dokumente</a>
       <a href="faq.html" aria-current="page">FAQ</a>
       <a href="developer.html">Entwickler</a>
@@ -87,10 +87,10 @@
           <p>Nicht nativ.ashunterstützt Bash, ZSH und Fish unter macOS, Linux und FreeBSD; Es gibt kein PowerShell-Installationsziel. Verwenden Sie WSL für das unterstützte Linux-Erlebnis.</p>
 
           <h3>Wie installiere ichashim Windows-Subsystem für Linux (WSL)?</h3>
-          <p>Installieren Sie es in Ihrer WSL-Distribution als Linux: Installieren Sie Sigstore<code>cosign</code>, dann rennen<code>curl -fsSL https://jonconradt.github.io/ash/install.sh | sh</code>. Konfigurieren<code>ASH_AI_ENDPOINT</code>Und<code>ASH_AI_MODEL</code>, und aktivieren Sie die Shell-Integration mit<code>ash install --shell bash --shell-integration</code>wenn gewünscht.</p>
+          <p>Befolgen Sie in Ihrer WSL-Distribution die <a href="install.html#linux">Linux-Installationsanleitung</a>, bevorzugt mit deren Paketverwaltung. Anschließend <a href="install.html#initialize">konfigurieren Sie einen Anbieter und aktivieren optional Bash-Integration</a>. Es gibt keinen nativen Windows-Installer.</p>
 
           <h3>Wie aktualisiere ichashauf die neueste Release-Version?</h3>
-          <p>Laufen<code>ash update</code>auf macOS, Linux oder FreeBSD. Es lädt das neueste stabile passende Archiv herunter, überprüft das Release-Manifest mit seinem Sigstore-Bundle und dem SHA-256-Digest und installiert es dann<code>~/.local/bin/ash</code>. Wenn die Signaturprüfung fehlschlägt oder das Archiv nicht unterstützte Einträge enthält, ist eine interaktive Bestätigung erforderlich; Genehmigen Sie eine fehlgeschlagene Signatur nicht, es sei denn, Sie vertrauen unabhängig der Veröffentlichungsquelle. Nicht unterstützte Nutzlasten werden übersprungen und nicht interaktive Ausführungen lehnen diese Ausnahmen ab. Verwenden<code>ash update --version vX.Y.Z</code>für eine bestimmte Version; verwenden<code>--yes</code>Nur wenn Sie benutzerdefinierte verwaltete Dateien ersetzen möchten.</p>
+          <p>Verwenden Sie bei Homebrew/APT/DNF/Pacman die zuständige Paketverwaltung. <code>ash update</code> ist nur für stabile Release-Installationen unter <code>~/.local/bin</code>; es prüft das Sigstore-signierte Manifest und den Archivdigest und lehnt fehlgeschlagene Signaturen ab. Native .pkg- und eigene Verzeichnisinstallationen benötigen ursprünglichen Installer/manuelles Ersetzen. Siehe <a href="install.html#updates">Updates und Kanalabonnements</a> für Release, Beta und Nightly.</p>
 
           <h3>Ich bin gerannt<code>ash install</code>. Warum ändert sich an diesem Terminal nichts?</h3>
           <p>Die Shell-Integration ist standardmäßig deaktiviert. Um es zu aktivieren, führen Sie es aus<code>ash install --shell bash --shell-integration</code>(oder auswählen<code>zsh</code>oder<code>fish</code>); Der bereits laufende Shell-Prozess wird nicht neu geschrieben. Öffnen Sie ein neues Terminal oder laden Sie die ausgewählte Startdatei neu. Laufen<code>ash install --shell bash --disable-shell-integration</code>zu entfernenAsh's verwalteter Block unter Beibehaltung des umgebenden Inhalts.</p>

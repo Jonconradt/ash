@@ -25,7 +25,7 @@
     <a class="brand" href="./" aria-label="ashdoheem"><span class="brand-mark">&gt;_</span> ash</a>
     <nav aria-label="Primär Navigatioun">
       <a href="index.html#how-it-works">Wéi et funktionnéiert</a>
-      <a href="index.html#install">Installéieren</a>
+      <a href="install.html">Installéieren</a>
       <a href="docs.html">Docs</a>
       <a href="faq.html" aria-current="page">FAQ</a>
       <a href="developer.html">Entwéckler</a>
@@ -87,10 +87,10 @@
           <p>Net gebierteg.ashënnerstëtzt bash, zsh, a Fish op macOS, Linux, a FreeBSD; et gëtt keen PowerShell Installatiounsziel. Benotzt WSL fir déi ënnerstëtzt Linux Erfahrung.</p>
 
           <h3>Wéi installéieren echasham Windows Subsystem fir Linux (WSL)?</h3>
-          <p>Installéiert et an Ärer WSL Verdeelung als Linux: installéiere Sigstore<code>cosign</code>, dann lafen<code>curl -fsSL https://jonconradt.github.io/ash/install.sh | sh</code>. Configuréieren<code>ASH_AI_ENDPOINT</code>an<code>ASH_AI_MODEL</code>, an entscheede fir Shell Integratioun mat<code>ash install --shell bash --shell-integration</code>wann gewënscht.</p>
+          <p>Befollegt <a href="install.html#linux">Linux-Instruktiounen</a> an Ärer WSL-Distributioun, am beschte mam Package-Manager. Dann <a href="install.html#initialize">Ubidder konfiguréieren an optional Bash integréieren</a>. Keen nativen Windows-Installer.</p>
 
           <h3>Wéi update echashop déi lescht Verëffentlechungsversioun?</h3>
-          <p>Lafen<code>ash update</code>op macOS, Linux oder FreeBSD. Et luet dat lescht stabilt passende Archiv erof, verifizéiert de Verëffentlechungsmanifest mat sengem Sigstore Bündel a SHA-256 Verdauung, installéiert dann op<code>~/.local/bin/ash</code>. Wann d'Ënnerschrëft Verifizéierung feelt oder d'Archiv net ënnerstëtzt Entréen enthält, ass eng interaktiv Bestätegung erfuerderlech; net eng gescheitert Ënnerschrëft stëmmen ausser Dir onofhängeg der Verëffentlechung Quell vertraut. Net-ënnerstëtzt Notzlaascht ginn iwwersprangen, an net-interaktiv Lafen refuséieren dës Ausnahmen. Benotzt<code>ash update --version vX.Y.Z</code>fir eng spezifesch Versioun; benotzen<code>--yes</code>nëmmen wann Dir personaliséiert verwaltete Dateien ersat wëllt.</p>
+          <p>Benotzt de zoustännege Manager fir Homebrew/APT/DNF/Pacman. <code>ash update</code> ass nëmme fir stabile Release ënner <code>~/.local/bin</code>; kontrolléiert Sigstore-Manifest an Archivdigest a refuséiert feelgeschloe Signaturen. Native .pkg an eege Verzeechnesser brauchen ursprénglechen Installer/manuellt Ersetzen. Kuckt <a href="install.html#updates">Updates a Kanalabonnementer</a> fir Release, Beta, Nightly.</p>
 
           <h3>Ech sinn gelaf<code>ash install</code>. Firwat ännert sech näischt an dësem Terminal?</h3>
           <p>Shell Integratioun ass par défaut deaktivéiert. Fir et z'aktivéieren, lafen<code>ash install --shell bash --shell-integration</code>(oder wielt<code>zsh</code>oder<code>fish</code>); et iwwerschreift net de Shellprozess dee scho leeft. Öffnen en neien Terminal oder lued déi gewielte Startupdatei nei. Lafen<code>ash install --shell bash --disable-shell-integration</code>ewechzehuelenAsh's verwaltete Block wärend Ëmgéigend Inhalt erhaalen.</p>

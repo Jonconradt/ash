@@ -27,7 +27,7 @@
     <a class="brand" href="./" aria-label="ash家"><span class="brand-mark">&gt;_</span> ash</a>
     <nav aria-label="主要導航">
       <a href="./">家</a>
-      <a href="./#install">安裝</a>
+      <a href="install.html">安裝</a>
       <a href="faq.html">常問問題</a>
       <a href="developer.html">開發商</a>
       <a href="https://github.com/Jonconradt/ash">GitHub</a>
@@ -74,50 +74,17 @@
       <article class="docs-content">
         <section id="apt-installation">
           <h2>在 Debian 或 Ubuntu 上安裝</h2>
-          <p>已簽署的 VersionX APT 儲存庫支援<code>amd64</code>和<code>arm64</code>。新增其公共簽署金鑰和套件來源，然後安裝<code>ash</code>:</p>
-          <pre><code>sudo install -d -m 0755 /etc/apt/keyrings
-curl -fsSL https://www.versionx.ai/apt/gpg.key |
-  sudo gpg --dearmor --batch --yes -o /etc/apt/keyrings/versionx-keyring.gpg
-sudo chmod 0644 /etc/apt/keyrings/versionx-keyring.gpg
-echo "deb [signed-by=/etc/apt/keyrings/versionx-keyring.gpg] https://www.versionx.ai/apt stable main" |
-  sudo tee /etc/apt/sources.list.d/versionx.list
-sudo apt update
-sudo apt install ash</code></pre>
-          <p>驗證已安裝的命令<code>ash --version</code>。套件管理器安裝更新為<code>sudo apt update &amp;&amp; sudo apt upgrade</code>。</p>
+          <p>需求、簽章金鑰、軟體庫設定、通道、更新和移除，見 <a href="install.html#apt-installation">APT 安裝指南</a>。</p>
         </section>
 
         <section id="dnf-installation">
           <h2>在 Fedora 或 RHEL 相容的 Linux 上安裝</h2>
-          <p>已簽署的 VersionX DNF 儲存庫支持<code>x86_64</code>和<code>aarch64</code>。導入其公鑰並配置儲存庫：</p>
-          <pre><code>sudo rpm --import https://www.versionx.ai/rpm/gpg.key
-sudo tee /etc/yum.repos.d/versionx.repo &gt;/dev/null &lt;&lt;'EOF'
-[versionx]
-name=VersionX ash repository
-baseurl=https://www.versionx.ai/rpm/
-enabled=1
-gpgcheck=0
-repo_gpgcheck=1
-gpgkey=https://www.versionx.ai/rpm/gpg.key
-EOF
-sudo dnf install ash</code></pre>
-          <p>簽署的儲存庫元資料驗證 RPM 包校驗和；軟體包檔案沒有單獨進行 RPM 簽章。將 ash 更新為 <code>sudo dnf upgrade ash</code>。 </p>
+          <p>需求、中繼資料驗證、軟體庫設定、通道、更新和移除，見 <a href="install.html#dnf-installation">DNF 安裝指南</a>。</p>
         </section>
 
         <section id="pacman-installation">
           <h2>在 Arch Linux 上安裝</h2>
-          <p>簽署的 VersionX Pacman 儲存庫支持<code>x86_64</code>。验证下面显示的签名密钥指纹是否匹配<code>32C6 C11D 2F86 BFE4 6EB7 7FFC 5257 FEA6 1368 919F</code>，然後導入並在本地信任它：</p>
-          <pre><code>curl -fsSL https://www.versionx.ai/pacman/gpg.key -o /tmp/versionx.gpg
-gpg --show-keys --with-fingerprint /tmp/versionx.gpg
-sudo pacman-key --add /tmp/versionx.gpg
-sudo pacman-key --lsign-key 32C6C11D2F86BFE46EB77FFC5257FEA61368919F
-rm /tmp/versionx.gpg
-sudo tee -a /etc/pacman.conf &gt;/dev/null &lt;&lt;'EOF'
-[versionx]
-Server = https://www.versionx.ai/pacman/$arch
-SigLevel = Required DatabaseRequired
-EOF
-sudo pacman -Syu ash</code></pre>
-          <p>Pacman 驗證套件和儲存庫簽章。將 ash 更新為 <code>sudo pacman -Syu</code>。 </p>
+          <p>需求、金鑰驗證、軟體庫設定、通道、更新和移除，見 <a href="install.html#pacman-installation">Pacman 安裝指南</a>。</p>
         </section>
 
         <section id="synopsis">
