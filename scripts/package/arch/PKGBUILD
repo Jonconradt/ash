@@ -16,6 +16,7 @@ package() {
   install -Dm0755 "$srcdir/ash-${release_tag}-linux-amd64" "$pkgdir/usr/bin/ash"
   install -Dm0755 "$srcdir/ash-broker" "$pkgdir/usr/bin/ash-broker"
   install -Dm0644 "$srcdir/LICENSE" "$pkgdir/usr/share/licenses/ash/LICENSE"
+  install -Dm0644 "$srcdir/THIRD_PARTY_NOTICES.md" "$pkgdir/usr/share/licenses/ash/THIRD_PARTY_NOTICES.md"
   install -Dm0755 "$srcdir"/plugins/* -t "$pkgdir/usr/lib/ash/plugins"
   install -d "$pkgdir/usr/share/man"
   cp -a "$srcdir/usr/share/man/." "$pkgdir/usr/share/man/"

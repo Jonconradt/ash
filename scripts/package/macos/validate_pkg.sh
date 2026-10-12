@@ -81,13 +81,14 @@ expected_path="${install_path%/}/$app_name"
 expected_broker_path="${install_path%/}/ash-broker"
 expected_man_path="${man_path%/}"
 expected_license_path="${license_path#/}"
+expected_notices_path="$(dirname "$expected_license_path")/THIRD_PARTY_NOTICES.md"
 payload_list="$(pkgutil --payload-files "$pkg_path" | sed 's#^\./##')"
 
 if [[ -z "$payload_list" ]]; then
   echo "package payload listing is empty: $pkg_path" >&2
   exit 1
 fi
-for expected in "${expected_broker_path#/}" "$expected_license_path"; do
+for expected in "${expected_broker_path#/}" "$expected_license_path" "$expected_notices_path"; do
   if ! grep -Fxq "$expected" <<<"$payload_list"; then
     echo "expected payload entry missing: /$expected" >&2
     exit 1

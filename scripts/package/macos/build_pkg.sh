@@ -7,7 +7,7 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  build_pkg.sh --app-name <name> --version <vX.Y.Z> --binary <path> --broker <path> --plugins-dir <dir> --license-file <path> --install-path </path> --plugin-install-path </path> --license-install-path </path> --man-page <path> --man-install-path </path> [--localized-man-dir <dir>] --output <path.pkg>
+  build_pkg.sh --app-name <name> --version <vX.Y.Z> --binary <path> --broker <path> --plugins-dir <dir> --license-file <path> --third-party-notices-file <path> --install-path </path> --plugin-install-path </path> --license-install-path </path> --man-page <path> --man-install-path </path> [--localized-man-dir <dir>] --output <path.pkg>
 EOF
 }
 
@@ -17,6 +17,7 @@ binary_path=""
 broker_path=""
 plugins_dir=""
 license_file=""
+third_party_notices_file=""
 install_path=""
 plugin_install_path=""
 license_install_path=""
@@ -49,6 +50,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --license-file)
       license_file="${2:-}"
+      shift 2
+      ;;
+    --third-party-notices-file)
+      third_party_notices_file="${2:-}"
       shift 2
       ;;
     --install-path)
@@ -91,7 +96,7 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$app_name" || -z "$version" || -z "$binary_path" || -z "$broker_path" || -z "$plugins_dir" || -z "$license_file" || -z "$install_path" || -z "$plugin_install_path" || -z "$license_install_path" || -z "$man_page_path" || -z "$man_install_path" || -z "$output_path" ]]; then
+if [[ -z "$app_name" || -z "$version" || -z "$binary_path" || -z "$broker_path" || -z "$plugins_dir" || -z "$license_file" || -z "$third_party_notices_file" || -z "$install_path" || -z "$plugin_install_path" || -z "$license_install_path" || -z "$man_page_path" || -z "$man_install_path" || -z "$output_path" ]]; then
   echo "all arguments are required" >&2
   usage >&2
   exit 1
@@ -120,6 +125,10 @@ done
 
 if [[ ! -f "$license_file" ]]; then
   echo "license file not found: $license_file" >&2
+  exit 1
+fi
+if [[ ! -f "$third_party_notices_file" ]]; then
+  echo "third-party notices file not found: $third_party_notices_file" >&2
   exit 1
 fi
 
@@ -160,6 +169,7 @@ install -m 0755 "$binary_path" "$target_dir/$app_name"
 install -m 0755 "$broker_path" "$target_dir/ash-broker"
 find "$plugins_dir" -maxdepth 1 -type f -perm -111 -exec install -m 0755 {} "$target_plugin_dir/" \;
 install -m 0644 "$license_file" "$payload_root$license_install_path"
+install -m 0644 "$third_party_notices_file" "$target_license_dir/THIRD_PARTY_NOTICES.md"
 install -m 0644 "$man_page_path" "$target_man_dir/$app_name.1"
 if [[ -n "$localized_man_dir" ]]; then
   if [[ ! -d "$localized_man_dir" ]]; then
