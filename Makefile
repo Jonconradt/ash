@@ -182,7 +182,7 @@ python-lint:
 	@./scripts/dev/run-quiet.sh "ruff-format" uvx ruff@$(RUFF_VERSION) format --check internal/app/ash_bootstrap/tools
 
 markdown-lint:
-	@./scripts/dev/run-quiet.sh "markdown-lint" npx --yes markdownlint-cli2@$(MARKDOWNLINT_CLI2_VERSION) "**/*.md" "!dist/**" "!node_modules/**" "!**/node_modules/**" "!**/target/**"
+	@./scripts/dev/run-quiet.sh "markdown-lint" npx --yes markdownlint-cli2@$(MARKDOWNLINT_CLI2_VERSION) "**/*.md" "!dist/**" "!.venv/**" "!node_modules/**" "!**/node_modules/**" "!**/target/**"
 
 security: gosec govulncheck
 	@echo "security: ok"

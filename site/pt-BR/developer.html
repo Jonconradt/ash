@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ash| Guia do desenvolvedor</title>
+  <meta name="description" content="Crie, teste, depure, empacote e contribua paraash.">
+  <meta name="theme-color" content="#f4f0e8">
+  <link rel="canonical" href="https://jonconradt.github.io/ash/pt-BR/developer.html">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="alternate" hreflang="en" href="https://jonconradt.github.io/ash/developer.html">
+  <link rel="alternate" hreflang="ar" href="https://jonconradt.github.io/ash/ar/developer.html">
+  <link rel="alternate" hreflang="de" href="https://jonconradt.github.io/ash/de/developer.html">
+  <link rel="alternate" hreflang="es" href="https://jonconradt.github.io/ash/es/developer.html">
+  <link rel="alternate" hreflang="fr" href="https://jonconradt.github.io/ash/fr/developer.html">
+  <link rel="alternate" hreflang="id" href="https://jonconradt.github.io/ash/id/developer.html">
+  <link rel="alternate" hreflang="it" href="https://jonconradt.github.io/ash/it/developer.html">
+  <link rel="alternate" hreflang="lb" href="https://jonconradt.github.io/ash/lb/developer.html">
+  <link rel="alternate" hreflang="pt-BR" href="https://jonconradt.github.io/ash/pt-BR/developer.html">
+  <link rel="alternate" hreflang="zh-CN" href="https://jonconradt.github.io/ash/zh-CN/developer.html">
+  <link rel="alternate" hreflang="zh-TW" href="https://jonconradt.github.io/ash/zh-TW/developer.html">
+  <link rel="alternate" hreflang="x-default" href="https://jonconradt.github.io/ash/developer.html">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="ashlar"><span class="brand-mark">&gt;_</span> ash</a>
+    <nav aria-label="Navegação primária">
+      <a href="./">Lar</a>
+      <a href="./#install">Instalar</a>
+      <a href="docs.html">Documentos</a>
+      <a href="faq.html">Perguntas frequentes</a>
+      <a href="developer.html" aria-current="page">Desenvolvedores</a>
+      <a href="https://github.com/Jonconradt/ash">GitHub</a>
+      <label class="sr-only" for="site-language">Linguagem</label>
+      <select id="site-language" class="language-select" aria-label="Escolha o idioma">
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+        <option value="de">Deutsch</option>
+        <option value="es">Español</option>
+        <option value="fr">Français</option>
+        <option value="id">Bahasa Indonesia</option>
+        <option value="it">Italiano</option>
+        <option value="lb">Lëtzebuergesch</option>
+        <option value="pt-BR" selected>Português (Brasil)</option>
+        <option value="zh-CN">简体中文</option>
+        <option value="zh-TW">繁體中文</option>
+        </select>
+    </nav>
+  </header>
+
+  <main class="docs-page page-width">
+    <header class="docs-header">
+      <p class="eyebrow">Contribuir · construir · depurar</p>
+      <h1>Guia do desenvolvedor</h1>
+      <p>Um guia prático para configurar um checkout, escolher alvos Make, entender os construtores de lançamento, diagnosticar logs de tempo de execução e testar instalações de pacotes nativos em VMs Tart.</p>
+    </header>
+
+    <div class="docs-layout">
+      <aside class="docs-contents" aria-label="Conteúdo do guia do desenvolvedor">
+        <strong>Conteúdo</strong>
+        <a href="#setup">Configuração do conjunto de ferramentas</a>
+        <a href="#workflow">Fluxo de trabalho diário</a>
+        <a href="#make-targets">Faça metas</a>
+        <a href="#plugins">Construtores de plug-ins</a>
+        <a href="#release-builders">Construtores de versão</a>
+        <a href="#runtime-logging">Registro detalhado</a>
+        <a href="#find-log-source">Localizando uma origem de log</a>
+        <a href="#vm-testing">Testes de VM de pacote nativo</a>
+        <a href="#source-guides">Guias de origem</a>
+      </aside>
+
+      <article class="docs-content">
+        <section id="setup">
+          <h2>Configure o conjunto de ferramentas do desenvolvedor</h2>
+          <p>O projeto usa Go para CLI e corretor, além de conjuntos de ferramentas de plug-ins nativos e ferramentas de qualidade de site. No macOS,<code>make config</code>usa Homebrew; no Debian ou Ubuntu ele usa o apt. Ele instala Go, Node.js/npm, Python,<code>uv</code>, Rust/Cargo e as ferramentas de segurança e fiapos do projeto. O módulo Go do repositório especifica a versão Go esperada pela compilação.</p>
+          <pre><code>make config</code></pre>
+          <p>Os instaladores do macOS também usam as ferramentas de linha de comando Xcode da Apple. Empacotando Linux<code>.deb</code>e<code>.rpm</code>artefatos requer Ruby,<code>fpm</code>e utilitários de empacotamento RPM. O script de configuração instala os pré-requisitos comuns, mas ferramentas de empacotamento específicas da plataforma ainda podem ser necessárias para compilações de lançamento.</p>
+          <p>Para detalhes de configuração inicial e expectativas de contribuição, consulte<a href="https://github.com/Jonconradt/ash/blob/main/CONTRIBUTING.md">CONTRIBUINDO.md</a>.</p>
+        </section>
+
+        <section id="workflow">
+          <h2>Fluxo de trabalho diário de desenvolvimento</h2>
+          <p>Para uma alteração normal do código, execute os testes focados durante a iteração e, em seguida, execute o lint e as portas de teste necessários do repositório antes de terminar:</p>
+          <pre><code>go test ./internal/app -run 'TestName'
+make lint test</code></pre>
+          <p>A maioria faz com que os alvos usem<code>scripts/dev/run-quiet.sh</code>: etapas bem-sucedidas imprimem uma concisa<code>ok</code>linha, enquanto as etapas com falha imprimem sua saída capturada. Prefixar um alvo com<code>V=1</code>para transmitir sua saída completa enquanto é executado:</p>
+          <pre><code>make V=1 lint
+make V=1 test
+make V=1 verify</code></pre>
+          <p><code>V=1</code>controla o invólucro silencioso do Make. É separado de<code>ASH_VERBOSE</code>, que permite diagnósticos em tempo de execução noAshprograma.</p>
+        </section>
+
+        <section id="make-targets">
+          <h2>Fazer referência de destino</h2>
+          <dl>
+            <dt><code>make lint</code></dt>
+            <dd>Verifica catálogos de localização, sintaxe de shell para o instalador do site, fluxo de trabalho YAML, lint/formato Python, Markdown, plugin lint e Go lint.</dd>
+            <dt><code>make test</code></dt>
+            <dd>Constrói e testa plug-ins nativos e depois executa<code>go test ./...</code>.</dd>
+            <dt><code>make verify-ci</code></dt>
+            <dd>Executa lint, testes e verificações de segurança – a porta de qualidade de CI mais rápida.</dd>
+            <dt><code>make verify</code></dt>
+            <dd>Executa todo o portão de qualidade local: lint, testes, testes de corrida, cobertura, veterinário, análise estática, segurança, varreduras secretas, difusão e benchmarks.</dd>
+            <dt><code>make test-race</code></dt>
+            <dd>Executa testes Go com o detector de corrida.</dd>
+            <dt><code>make test-cover</code></dt>
+            <dd>Escreve<code>coverage.out</code>e compara o total<code>COVERAGE_MIN</code>(60% por padrão).</dd>
+            <dt><code>make test-fuzz</code></dt>
+            <dd>Executa testes fuzz de aplicativos para<code>FUZZ_TIME</code>(10 segundos por padrão).</dd>
+            <dt><code>make security</code></dt>
+            <dd>Executa ambos<code>gosec</code>e<code>govulncheck</code>.</dd>
+            <dt><code>make build</code></dt>
+            <dd>Executa lint e testes, cria e instala plug-ins nativos e cria<code>ash</code>mais<code>ash-broker</code>sob<code>~/.local/bin</code>.</dd>
+            <dt><code>make install</code></dt>
+            <dd>Executa testes, lint,<code>gosec</code>, e compilação/instalação do plugin, cria ambos os binários e, em seguida, executa<code>ash install --shell bash --shell-integration --overwrite</code>. Use-o quando pretender atualizar a integração local do Bash.</dd>
+            <dt><code>make plugins-build</code>,<code>plugins-test</code>,<code>plugins-lint</code></dt>
+            <dd>Crie, teste ou lint cada plugin em<code>internal/app/ash_bootstrap/plugins_src</code>.<code>make plugins-clean</code>remove a saída de compilação do plugin local.</dd>
+            <dt><code>make site-locales</code></dt>
+            <dd>Gera páginas traduzidas e atualiza o mapa do site. Usar<code>make site-locales SITE_LOCALES="zh-TW lb_LU"</code>para selecionar localidades.</dd>
+          </dl>
+          <p><code>make all</code>corre<code>verify</code>e então<code>install</code>. As receitas de destino completas e as variáveis ​​substituíveis estão no<a href="https://github.com/Jonconradt/ash/blob/main/Makefile">Makefile</a>.</p>
+        </section>
+
+        <section id="plugins">
+          <h2>Construtores de plug-ins</h2>
+          <p>Plugins são executáveis ​​independentes com um contrato independente de idioma. O plugin Makefiles seleciona o conjunto de ferramentas de cada plugin; compilações locais têm como alvo o host por padrão. Passe de versões de lançamento<code>PLUGIN_TARGET_GOOS</code>e<code>PLUGIN_TARGET_GOARCH</code>então Rust e outros binários de plugins não-Go correspondem ao artefato de lançamento.</p>
+          <p>Usar<code>make plugins-build</code>para construí-los em<code>bin/plugins</code>,<code>make plugins-test</code>para executar seus testes e<code>make plugins-install</code>para copiá-los para o diretório do plugin do usuário. Veja o<a href="https://github.com/Jonconradt/ash/blob/main/docs/PLUGIN_CONTRACT.md">contrato de plugin nativo</a>antes de adicionar ou alterar um plugin.</p>
+        </section>
+
+        <section id="release-builders">
+          <h2>Liberar construtores e artefatos</h2>
+          <p>O fluxo de trabalho de lançamento do GitHub separa as verificações de qualidade dos criadores de embalagens nativas. Os pacotes macOS são desenvolvidos e testados em executores Intel e Apple Silicon. Capa para construtores Linux<code>amd64</code>e<code>arm64</code>e validar<code>.deb</code>,<code>.rpm</code>e instalações de tarball. O FreeBSD é construído de forma cruzada e empacotado para<code>amd64</code>.</p>
+          <p>Os binários de lançamento Go são construídos com opções de trim-path e de vinculador removido. Plug-ins nativos são desenvolvidos para o mesmo sistema operacional e arquitetura. O fluxo de trabalho de lançamento também testa o pacote instalado ou o arquivo extraído, incluindo uma nova configuração de instalação do shell.</p>
+          <p>Para compilações de artefatos locais, especifique explicitamente o sistema operacional, a arquitetura e a versão de destino:</p>
+          <pre><code>make release-artifacts \
+  RELEASE_TARGET_OSES=linux \
+  RELEASE_TARGET_ARCHES="arm64 amd64" \
+  RELEASE_VERSION=v1.2.3</code></pre>
+          <p><code>release-artifacts</code>cria e valida os formatos suportados para esse destino. Os padrões são SO host (<code>auto</code>) e ambos<code>amd64 arm64</code>; A publicação do FreeBSD é limitada a<code>amd64</code>. Artefatos desaparecem<code>dist/release</code>. Para uma única compilação binária/plugin, use<code>make release-build-one RELEASE_GOOS=linux RELEASE_ARCH=arm64 RELEASE_VERSION=v1.2.3</code>.</p>
+          <p><code>make version</code>executa as verificações de versão e cria artefatos sem publicá-los. Em contraste,<code>make release</code>é um fluxo de trabalho de publicação: requer macOS, uma árvore de trabalho limpa e identidade Git configurada, gera notas de lançamento, cria/envia referências de lançamento e observa o fluxo de trabalho do GitHub. Seu canal padrão é beta; selecione estável ou noturno com<code>CHANNEL=stable</code>ou<code>CHANNEL=nightly</code>. As notas de versão geradas exigem<code>ASH_AI_ENDPOINT</code>e<code>ASH_AI_MODEL</code>, a menos que as notas sejam fornecidas com<code>RELEASE_NOTES_INPUT</code>.</p>
+          <p>Leia o<a href="https://github.com/Jonconradt/ash/blob/main/.github/workflows/release.yml">liberar fluxo de trabalho</a>e<a href="https://github.com/Jonconradt/ash/blob/main/docs/release-secrets.md">guia de segredos de lançamento</a>antes de publicar.</p>
+        </section>
+
+        <section id="runtime-logging">
+          <h2>Registro de tempo de execução detalhado</h2>
+          <p><code>ASH_VERBOSE</code>permite o registro de depuração JSON estruturado e imprime um painel de execução antesAshsaídas. Os valores aceitos são<code>1</code>,<code>y</code>,<code>yes</code>,<code>true</code>,<code>on</code>, e<code>debug</code>, sem distinção entre maiúsculas e minúsculas. O painel resume os tempos dos estágios, a contagem de chamadas de ferramentas, os totais de tokens quando disponíveis e o total em tempo real.</p>
+          <pre><code>ASH_VERBOSE=1 ash "investigate this error"
+
+ASH_VERBOSE=1 \
+ASH_LOG_FILE="$HOME/.local/state/ash/debug.jsonl" \
+ASH_LOG_MAX_BYTES=10485760 \
+ash "investigate this error"</code></pre>
+          <p>Quando<code>ASH_LOG_FILE</code>estiver definido, registros de log JSON detalhados serão gravados nesse caminho; o diretório pai é criado conforme necessário.<code>ASH_LOG_MAX_BYTES</code>controla a rotação e o padrão é<code>1048576</code>bytes (1 MiB). Sem um arquivo de log explícito, a saída de depuração usa o gravador de diagnóstico do processo. Mantenha os registros privados e revise-os antes de compartilhá-los.</p>
+          <p>Isso é diferente do Make's<code>V=1</code>: usar<code>V=1</code>para ver a saída do comando build/test e<code>ASH_VERBOSE=1</code>para diagnosticar umAshinvocação de tempo de execução.</p>
+        </section>
+
+        <section id="find-log-source">
+          <h2>Encontre a origem de um registro de log</h2>
+          <p>Cada chamada de registro Ash possui um campo <code>EID</code> exclusivo. Copie o EID do registro JSON e pesquise seu literal na fonte Go para encontrar o site da chamada:</p>
+          <pre><code>rg '"EID", "EpbG2YtZ"' internal/</code></pre>
+          <p>Por exemplo, uma chamada de origem registra a mensagem e o EID juntamente com o contexto estruturado. Os EIDs são identificadores estáveis ​​para locais de registro: não os traduza, renomeie ou reutilize. O registrador de depuração e seu comportamento de rotação são implementados em<a href="https://github.com/Jonconradt/ash/blob/main/internal/app/debuglog.go">interno/app/debuglog.go</a>.</p>
+        </section>
+
+        <section id="vm-testing">
+          <h2>Testar instalações de pacotes nativos com <code>vm.sh</code></h2>
+          <p><code>scripts/vm.sh</code> detecta o sistema operacional host e seleciona um back-end da VM: Tart no Apple Silicon macOS ou QEMU/KVM no x86_64 Linux. Ambos os backends podem testar APT no Ubuntu/Debian e DNF no Fedora/Rocky Linux. Tart no macOS também pode testar o pacote macOS Homebrew; Os hosts Linux não podem executar convidados macOS e, portanto, não podem testar esse caminho.</p>
+          <h3>Pré-requisitos do host macOS</h3>
+          <p>Use um Apple Silicon Mac executando macOS 13 ou posterior, com Tart instalado, acesso de rede à imagem da VM e ao repositório Ash e espaço em disco suficiente para a VM. Instale o Tart com Homebrew se necessário:</p>
+          <pre><code>brew install openai/tools/tart</code></pre>
+          <h3>Pré-requisitos de host Linux</h3>
+          <p>Use um host Linux x86_64 com virtualização de hardware habilitada e uma conta de usuário que possa ler e gravar<code>/dev/kvm</code>(normalmente juntando-se ao<code>kvm</code>grupo e fazendo login novamente). Instale QEMU/KVM, utilitários de imagem em nuvem para<code>cloud-localds</code>, curl, ferramentas de cliente OpenSSH e Python 3. Exemplo de comandos de pacote:</p>
+          <pre><code># Debian or Ubuntu
+sudo apt-get install qemu-system-x86 qemu-utils cloud-image-utils curl openssh-client python3
+
+# Fedora or Rocky Linux
+sudo dnf install qemu-kvm qemu-img cloud-utils curl openssh-clients python3</code></pre>
+          <p>O back-end do Linux lança imagens de nuvem x86_64 Ubuntu, Debian, Fedora ou Rocky com QEMU/KVM e cloud-init. Ele usa rede em modo de usuário QEMU com SSH encaminhado para localhost; nenhuma configuração de rede libvirt é necessária. Ele não executa convidados do macOS, não testa o Homebrew no macOS e atualmente requer um host Linux x86_64. Arch e FreeBSD não são alvos suportados.</p>
+          <h3>Execute um teste de pacote</h3>
+          <p>O modo automatizado é o padrão e remove a VM após o teste. A plataforma padrão segue o host: o macOS seleciona<code>macos</code>, Linux seleciona<code>ubuntu</code>. Escolha explicitamente outra plataforma e modo suportados:</p>
+          <pre><code>scripts/vm.sh --platform macos --mode interactive
+scripts/vm.sh --platform ubuntu --mode automated
+scripts/vm.sh --platform debian --mode interactive
+scripts/vm.sh --platform fedora --mode automated
+scripts/vm.sh --platform rocky --mode interactive</code></pre>
+          <p>O modo interativo deixa a VM instalada em execução para testes manuais. No macOS, o script imprime um comando shell convidado <code>tart exec -it</code>. No Linux, imprime um comando SSH e um comando stop; pare a VM e remova seu estado com:</p>
+          <pre><code>scripts/vm.sh --stop VM_NAME</code></pre>
+          <p>O modo automatizado executa verificações de fumaça de instalação e configuração do shell e, em seguida, interrompe e remove a VM. As imagens base baixadas permanecem em cache. As imagens da torta podem ser alteradas com<code>ASH_TEST_VM_IMAGE</code>; URLs de imagem em nuvem do Linux podem ser substituídos por<code>ASH_TEST_QEMU_IMAGE</code>. As imagens do Linux são armazenadas em cache em<code>${XDG_CACHE_HOME:-~/.cache}/ash/vm-images</code>, e os discos VM interativos e as chaves SSH são mantidos sob<code>${XDG_STATE_HOME:-~/.local/state}/ash/vm</code>. Definir<code>ASH_TEST_VM_CACHE_DIR</code>ou<code>ASH_TEST_VM_STATE_DIR</code>para alterar esses locais.</p>
+          <p>Para permitir que o convidado se conecte ao mesmo serviço de IA que o host, exporte o necessário<code>ASH_AI_*</code>variáveis ​​antes de executar o script, por exemplo<code>ASH_AI_ENDPOINT</code>,<code>ASH_AI_MODEL</code>e, quando necessário,<code>ASH_AI_AUTH_TOKEN</code>. Os valores exportados são encaminhados ao hóspede; variáveis ​​​​de shell não exportadas não são. As VMs interativas retêm essas credenciais no perfil de convidado com modo<code>0600</code>; Os discos VM do Linux não são criptografados, portanto, proteja o diretório de estado e pare/remova a VM quando terminar.</p>
+          <p>Ver<code>scripts/vm.sh --help</code>para os pré-requisitos de back-end atuais, plataformas suportadas e opções.</p>
+        </section>
+
+        <section id="source-guides">
+          <h2>Guias de origem do projeto</h2>
+          <ul>
+            <li><a href="https://github.com/Jonconradt/ash/blob/main/CONTRIBUTING.md">Guia de contribuição</a>— configuração, testes, expectativas de lançamento e notas de CI.</li>
+            <li><a href="https://github.com/Jonconradt/ash/blob/main/ARCHITECTURE.md">Arquitetura</a>— layout do projeto e subsistemas de tempo de execução.</li>
+            <li><a href="https://github.com/Jonconradt/ash/blob/main/README.md">LEIA-ME</a>— referência de produto, instalação, configuração e ambiente.</li>
+            <li><a href="https://github.com/Jonconradt/ash/blob/main/Makefile">Makefile</a>- controlar receitas de destino e variáveis ​​de construção.</li>
+            <li><a href="https://github.com/Jonconradt/ash/tree/main/.github/workflows">Fluxos de trabalho do GitHub</a>— CI, construtores de plataforma e automação de publicação.</li>
+          </ul>
+        </section>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer page-width">
+    <a class="brand" href="./"><span class="brand-mark">&gt;_</span> ash</a>
+    <span>IA prática para o terminal.</span>
+    <a href="docs.html">Documentação</a>
+    <a href="developer.html">Desenvolvedores</a>
+    <a href="https://github.com/Jonconradt/ash">GitHub<span aria-hidden="true">&#8599;</span></a>
+  </footer>
+  <script src="../site.js" data-site-script defer></script>
+</body>
+</html>

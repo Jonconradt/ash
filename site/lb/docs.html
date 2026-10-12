@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ash | Dokumentatioun</title>
-  <meta name="description" content="ash Kommando, Konfiguratioun, Ëmfeld, Dateien a Sécherheetsdokumentatioun.">
+  <title>ash| Dokumentatioun</title>
+  <meta name="description" content="ashKommando, Konfiguratioun, Ëmfeld, Dateien a Sécherheetsdokumentatioun.">
   <meta name="theme-color" content="#f4f0e8">
   <link rel="canonical" href="https://jonconradt.github.io/ash/lb/docs.html">
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
@@ -24,11 +24,12 @@
 </head>
 <body>
   <header class="site-header">
-    <a class="brand" href="./" aria-label="ash doheem"><span class="brand-mark">&gt;_</span>ash</a>
+    <a class="brand" href="./" aria-label="ashdoheem"><span class="brand-mark">&gt;_</span> ash</a>
     <nav aria-label="Primär Navigatioun">
       <a href="./">Doheem</a>
       <a href="./#install">Installéieren</a>
       <a href="faq.html">FAQ</a>
+      <a href="developer.html">Entwéckler</a>
       <a href="https://github.com/Jonconradt/ash">GitHub</a>
       <label class="sr-only" for="site-language">Sprooch</label>
       <select id="site-language" class="language-select" aria-label="Wielt Sprooch">
@@ -49,14 +50,17 @@
 
   <main class="docs-page page-width">
     <header class="docs-header">
-      <p class="eyebrow">Benotzer Kommandoen · ash(1)</p>
-      <h1>ash Dokumentatioun</h1>
+      <p class="eyebrow">Benotzer Kommandoen ·ash(1)</p>
+      <h1>ashDokumentatioun</h1>
       <p>Praktesch Shell Assistent fir Kommando-net fonnt Workflows. Dës Säit ass d'Web Versioun vun der installéierbar<a href="https://github.com/Jonconradt/ash/blob/main/docs/ash.1"><code>ash(1)</code>Mann Säit</a>.</p>
     </header>
 
     <div class="docs-layout">
       <aside class="docs-contents" aria-label="Dokumentatioun Inhalt">
         <strong>Inhalter</strong>
+        <a href="#apt-installation">APT Installatioun</a>
+        <a href="#dnf-installation">DNF Installatioun</a>
+        <a href="#pacman-installation">Pacman Installatioun</a>
         <a href="#synopsis">Synopsis</a>
         <a href="#description">Beschreiwung</a>
         <a href="#mcp">MCP Serveren</a>
@@ -68,6 +72,54 @@
       </aside>
 
       <article class="docs-content">
+        <section id="apt-installation">
+          <h2>Installéiert op Debian oder Ubuntu</h2>
+          <p>De ënnerschriwwene VersionX APT Repository ënnerstëtzt<code>amd64</code>an<code>arm64</code>. Füügt säin ëffentlechen Ënnerschrëftschlëssel a Packagequell derbäi, installéiert dann<code>ash</code>:</p>
+          <pre><code>sudo install -d -m 0755 /etc/apt/keyrings
+curl -fsSL https://www.versionx.ai/apt/gpg.key |
+  sudo gpg --dearmor --batch --yes -o /etc/apt/keyrings/versionx-keyring.gpg
+sudo chmod 0644 /etc/apt/keyrings/versionx-keyring.gpg
+echo "deb [signed-by=/etc/apt/keyrings/versionx-keyring.gpg] https://www.versionx.ai/apt stable main" |
+  sudo tee /etc/apt/sources.list.d/versionx.list
+sudo apt update
+sudo apt install ash</code></pre>
+          <p>Verifizéiert den installéierten Kommando mat<code>ash --version</code>. Package-Manager Installatiounen ginn aktualiséiert mat<code>sudo apt update &amp;&amp; sudo apt upgrade</code>.</p>
+        </section>
+
+        <section id="dnf-installation">
+          <h2>Installéiert op Fedora oder RHEL-kompatibel Linux</h2>
+          <p>De ënnerschriwwene VersionX DNF Repository ënnerstëtzt<code>x86_64</code>an<code>aarch64</code>. Importéiert säin ëffentleche Schlëssel a konfiguréiert de Repository:</p>
+          <pre><code>sudo rpm --import https://www.versionx.ai/rpm/gpg.key
+sudo tee /etc/yum.repos.d/versionx.repo &gt;/dev/null &lt;&lt;'EOF'
+[versionx]
+name=VersionX ash repository
+baseurl=https://www.versionx.ai/rpm/
+enabled=1
+gpgcheck=0
+repo_gpgcheck=1
+gpgkey=https://www.versionx.ai/rpm/gpg.key
+EOF
+sudo dnf install ash</code></pre>
+          <p>Ungezeechent Repository Metadaten verifizéiert RPM Package Kontrollsummen; Package Dateien sinn net individuell RPM-ënnerschriwwen. Update ash mat <code>sudo dnf upgrade ash</code>.</p>
+        </section>
+
+        <section id="pacman-installation">
+          <h2>Installéiert op Arch Linux</h2>
+          <p>De ënnerschriwwene VersionX Pacman Repository ënnerstëtzt<code>x86_64</code>. Vergewëssert Iech datt d'Ënnerschreiwe Schlëssel Fangerofdrock hei ënnendrënner passt<code>32C6 C11D 2F86 BFE4 6EB7 7FFC 5257 FEA6 1368 919F</code>, dann importéiert a vertrauen et lokal:</p>
+          <pre><code>curl -fsSL https://www.versionx.ai/pacman/gpg.key -o /tmp/versionx.gpg
+gpg --show-keys --with-fingerprint /tmp/versionx.gpg
+sudo pacman-key --add /tmp/versionx.gpg
+sudo pacman-key --lsign-key 32C6C11D2F86BFE46EB77FFC5257FEA61368919F
+rm /tmp/versionx.gpg
+sudo tee -a /etc/pacman.conf &gt;/dev/null &lt;&lt;'EOF'
+[versionx]
+Server = https://www.versionx.ai/pacman/$arch
+SigLevel = Required DatabaseRequired
+EOF
+sudo pacman -Syu ash</code></pre>
+          <p>Pacman verifizéiert souwuel Package wéi och Repository Ënnerschrëften. Update ash mat <code>sudo pacman -Syu</code>.</p>
+        </section>
+
         <section id="synopsis">
           <h2>Synopsis</h2>
           <pre><code>ash [text ...]
@@ -80,22 +132,21 @@ ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></pre>
         <section id="description">
           <h2>Beschreiwung</h2>
           <p><code>ash</code>schéckt prompt Text un de konfiguréierten AI Endpunkt an dréckt d'Assistent-Äntwert. Wann keen Positiounstext gëtt,<code>ash</code>liest prompt Text vun net-interaktiven Standardinput.</p>
-          <p>Déi<code>install</code>subcommand füügt e verwalteten Integratiounsblock un fir Startupdateien ze Shell. Bash benotzt<code>~/.bashrc</code>, an zsh benotzt<code>~/.zshrc</code>.</p>
+          <p>Déi<code>install</code>subcommand installéiert geréiert Verméigen. Shell Startupdateien ginn nëmme geännert wann Dir explizit ufrot<code>--shell-integration</code>; Bash benotzt<code>~/.bashrc</code>, zsh benotzt<code>~/.zshrc</code>, a Fësch benotzt<code>$XDG_CONFIG_HOME/fish/config.fish</code>.</p>
           <p>Verbindunge mam AI Provider ginn duerch e lokale Broker gedeelt. Broker Echec fällt zréck op direkt HTTPS.</p>
           <p>D'AI kann systemd benotzen fir Hannergrond Aufgaben ze plangen. Dëst kënne widderhuelend oder eemoleg Aarbechtsplaze sinn. Geplangte Aarbechtsplaze benotze Standard HTTPS direkt.</p>
-          <p>ash hält e Sessiouns-scoped Scratch Workspace ënner<code>~/.ash/scratch/&lt;session-id&gt;/</code>. Stale an Idle Scratch Verzeichnisser ginn automatesch no der konfiguréierter Retentiounsfenster geläscht. D'Geschicht Logbicher sinn ënner gespäichert<code>~/.ash/history/</code>. Al Geschichtdateien ginn automatesch gebotzt no der Retentiounspolitik.</p>
+          <p>ashfolgendermoossen XDG Basis Verzeichnisser: Configuratioun an bestänneg Aarbechtsberäich Fichieren ënner<code>$XDG_CONFIG_HOME/ash</code>(Standard<code>~/.config/ash</code>), Tools a Plugins ënner<code>$XDG_DATA_HOME/ash</code>(Standard<code>~/.local/share/ash</code>), Geschicht a Sessioun kraazt ënner<code>$XDG_STATE_HOME/ash</code>(Standard<code>~/.local/state/ash</code>), an de Cache ënner<code>$XDG_CACHE_HOME/ash</code>(Standard<code>~/.cache/ash</code>). Broker Sockets benotzen<code>$XDG_RUNTIME_DIR/ash</code>mat engem Staatsverzeichnis Réckfall. Explizit XDG Weeër mussen absolut sinn.</p>
           <p>Tool, Skript, Datei, Pipeed, a Kanneroutput sinn net zouverléisseg Donnéeën a däerfen net System oder Benotzerinstruktiounen iwwerschreiden. D'Tool Ausféierung Feature ass keng Sandkëscht wann arbiträr Python oder Shell Ausféierung aktivéiert ass. Par défaut ass Python aktivéiert, also passt op.</p>
         </section>
 
         <section id="mcp">
           <h2>Remote MCP Serveren</h2>
-          <p>MCP (Model Context Protocol) Servere bidden Tools en AI Modell kann uruffen. Ash ënnerstëtzt Remote Streamable HTTP MCP Serveren an hält hir Client Sessiounen an<code>ash-broker</code>iwwer Ash Opruff an der selwechter Réibau.</p>
-          <p>Registréiert e Server andeems Dir seng URL eleng bäidréit<code>~/.ash/.ash_allow</code>, oder lafen<code>ash mcp add &lt;url&gt;</code>vun enger interaktiver Ash Schuel. De Kommando verbënnt a registréiert de Server nëmmen no enger erfollegräicher Verbindung:</p>
-          <pre><code>https://mcpplaygroundonline.com/mcp-complex-server</code></pre>
-          <p>OAuth Autorisatioun mécht am Desktop Browser op wann e GUI verfügbar ass. Wann de Browser net opgemaach ka ginn, dréckt Ash eng kopéierbar Autorisatiouns-URL aus a waart am Terminal. Benotzt<code>ash mcp add &lt;url&gt; --no-browser</code>fir ëmmer dësen Terminalflow ze benotzen. Manuell URL Autorisatioun erfuerdert nach ëmmer e Browser um selwechten Host; et ass keen browserlosen OAuth Flow.</p>
-          <p>URL Linnen ugefaange mat<code>http://</code>oder<code>https://</code>sinn MCP Aschreiwungen, net Shell Kommandoen. Schemae ginn case-onsensibel unerkannt. Ash ofgeleet de lokalen Numm vum Server vun den éischten 8 kleng hexadezimal Zeeche vun SHA-256 iwwer den ofgeschniddenen URL Text. HTTPS ass erfuerderlech ausser fir localhost Entwécklung; URLen mat embedded Umeldungsinformatiounen, Ufro Strings oder Fragmenter ginn ofgeleent. Fir direkt OAuth Verbindungen erlaabt Entdeckung Net-ëffentlech IP Adressen nëmme fir déi exakt registréiert MCP Autoritéit; aner OAuth-Host bleiwen ënner net-ëffentlech-Adress-Blockéierung. E konfiguréierten Egress Proxy ass verantwortlech fir seng Destinatiounsadressen ze filteren. Ännerungen ginn op déi nächst Ash Ufro gelies.</p>
-          <p>MCP Aschreiwungen bleiwen aktivéiert mat<code>ASH_STRICT=1</code>. Zréckgeschéckt Outil Output gëtt ëmmer nach als net zouverlässeg Beweiser behandelt. Registréiert nëmmen Serveren déi Dir vertraut: hir Tools kënnen Handlungen aus Ärem Numm maachen. Fir OAuth-geschützte Serveren, Ash mécht de Browser op wann e GUI verfügbar ass, während de Broker den Callback an Tokens handhabt. Umeldungsinformatiounen benotzen den OS Umeldungsmanager wann verfügbar, oder eng verschlësselte Datei geschützt vun engem Benotzer geliwwert zoufälleg 32-Byte<code>ASH_MCP_CREDENTIAL_KEY</code>. Bestehend<code>~/.ash/mcp.json</code>Dateien ginn net méi gelies; réckelen Server URLen an<code>.ash_allow</code>.</p>
-          <p>Wann d'MCP Initialiséierung feelt, fiert Ash d'Ufro weider ouni Remote MCP Tools. Interaktiv leeft Drécken eng Warnung; net-interaktiv Lafen versoen roueg.<strong>Geplangte Aarbechtsplazen hunn net de per-interaktiven-Shell Broker an dofir kënnen d'Remote MCP Tools net benotzen.</strong>Eng geplangte Prompt, déi vum MCP ofhängt, kann nach lafen, awer kann ouni déi ugefrote MCP-Aktioun oder Daten fäerdeg sinn. Zäitplang keng Ufroen déi MCP erfuerderen.</p>
+          <p>MCP (Model Context Protocol) Servere bidden Tools en AI Modell kann uruffen.Ashënnerstëtzt Remote Streamable HTTP MCP Serveren an hält hir Client Sessiounen an<code>ash-broker</code>iwwerAshOpruff an der selwechter Schuel.</p>
+          <p>Registréiert e vertrauenswürdege Server andeems Dir lafen<code>ash mcp add &lt;url&gt;</code>vun engem interaktivenAshShell, oder andeems se seng URL derbäisetzen<code>$XDG_CONFIG_HOME/ash/.ash_allow</code>(Standard<code>~/.config/ash/.ash_allow</code>). Kee Remote Server ass par défaut aktivéiert.</p>
+          <p>OAuth Autorisatioun mécht am Desktop Browser op wann e GUI verfügbar ass. Wann de Browser net opgemaach ka ginn,Ashdréckt eng kopéierbar Autorisatiouns-URL aus a waart am Terminal. Benotzt<code>ash mcp add &lt;url&gt; --no-browser</code>fir ëmmer dësen Terminalflow ze benotzen. Manuell URL Autorisatioun erfuerdert nach ëmmer e Browser um selwechten Host; et ass keen browserlosen OAuth Flow.</p>
+          <p>URL Linnen ugefaange mat<code>http://</code>oder<code>https://</code>sinn MCP Aschreiwungen, net Shell Kommandoen. Schemae ginn case-onsensibel unerkannt.Ashofgeleet de lokalen Numm vum Server vun den éischten 8 kleng hexadezimal Zeeche vun SHA-256 iwwer den ofgeschniddenen URL Text. HTTPS ass erfuerderlech ausser fir localhost Entwécklung; URLen mat embedded Umeldungsinformatiounen, Ufro Strings oder Fragmenter ginn ofgeleent. Fir direkt OAuth Verbindungen erlaabt Entdeckung Net-ëffentlech IP Adressen nëmme fir déi exakt registréiert MCP Autoritéit; aner OAuth-Host bleiwen ënner net-ëffentlech-Adress-Blockéierung. E konfiguréierten Egress Proxy ass verantwortlech fir seng Destinatiounsadressen ze filteren. Ännerungen ginn op der nächster geliesAshufroen.</p>
+          <p>MCP Aschreiwungen bleiwen aktivéiert mat<code>ASH_STRICT=1</code>. Zréckgeschéckt Outil Output gëtt ëmmer nach als net zouverlässeg Beweiser behandelt. Registréiert nëmmen Serveren déi Dir vertraut: hir Tools kënnen Handlungen aus Ärem Numm maachen. Fir OAuth-geschützte Serveren,Ashmécht de Browser op wann e GUI verfügbar ass, während de Broker den Callback an Tokens handhabt. Umeldungsinformatiounen benotzen den OS Umeldungsmanager wann verfügbar, oder eng verschlësselte Datei geschützt vun engem Benotzer geliwwert zoufälleg 32-Byte<code>ASH_MCP_CREDENTIAL_KEY</code>an<code>$XDG_DATA_HOME/ash/mcp/</code>.</p>
+          <p>Wann d'MCP Initialiséierung feelt,Ashsetzt d'Ufro weider ouni Remote MCP Tools. Interaktiv leeft Drécken eng Warnung; net-interaktiv Lafen versoen roueg.<strong>Geplangte Aarbechtsplazen hunn net de per-interaktiven-Shell Broker an dofir kënnen d'Remote MCP Tools net benotzen.</strong>Eng geplangte Prompt, déi vum MCP ofhängt, kann nach lafen, awer kann ouni déi ugefrote MCP-Aktioun oder Daten fäerdeg sinn. Zäitplang keng Ufroen déi MCP erfuerderen.</p>
           <p>Kuckt de<a href="faq.html">MCP FAQ</a>fir e séieren Iwwerbléck a Setupnotizen.</p>
         </section>
 
@@ -106,8 +157,8 @@ ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></pre>
             <dd>Run eng eenzeg Assistent Ufro.<code>--attach</code>befestegt e Fichier (Bild oder Dokument) un d'Ufro; widderholl. Gréisst-limitéiert vun<code>ASH_ATTACHMENT_MAX_BYTES</code>an am Moment op den Drot geschéckt nëmmen OpenAI-kompatibel Ubidder.</dd>
             <dt><code>ash mcp add &lt;url&gt; [--no-browser]</code></dt>
             <dd>Connectéiert a registréiert e Remote MCP Server an der effektiver<code>.ash_allow</code>. Öffnet OAuth Autorisatioun an engem Desktop Browser wann verfügbar; fällt zréck op eng kopéierbar URL am Terminal.<code>--no-browser</code>benotzt ëmmer den Terminalfloss.</dd>
-            <dt><code>ash install [--shell bash|zsh] [--dry-run]</code></dt>
-            <dd>Installéiert oder update Shell Integratioun. Wéini<code>--shell</code>ausgeliwwert gëtt, gëtt déi aktuell Schuel benotzt wa méiglech.<code>--dry-run</code>Virschau Ännerungen ouni Schreiwen. Wann interaktiv, installéiert och auto-configures<code>AI_ENDPOINT</code>,<code>AI_MODEL</code>,an an<code>AI_AUTH_TOKEN</code>: et léiwer e scho gesate Cloud Provider API Schlëssel (OpenAI, Anthropic, Google Gemini, Azure OpenAI, Mistral, Cohere, Groq, xAI, DeepSeek, Together AI, OpenRouter, oder HuggingFace), dann e lafende lokalen Inferenzserver (Ollama, LM Studio, llama.cpp/MLX/LocalAI, 4 a G-Allweb, Text-, Generatioun, PT-, PT-, Generator, etc. soss freet mat engem nummeréiert Provider Menü. De Modell gëtt aus der Modelllëscht vum Endpunkt gewielt wann et verfügbar ass.</dd>
+            <dt><code>ash install [--shell bash|zsh|fish] [--shell-integration|--disable-shell-integration] [--dry-run]</code></dt>
+            <dd>Installéiert Verméigen ouni Shell Startupdateien als Standard z'änneren.<code>--shell-integration</code>optéiert fir de verwaltete Block derbäi ze ginn / ze aktualiséieren;<code>--disable-shell-integration</code>läscht nëmmen dee Spär a bewahrt ëmginn Benotzerinhalt. Wann interaktiv, installéieren Auto-configures<code>ASH_AI_ENDPOINT</code>,<code>ASH_AI_MODEL</code>,an an<code>ASH_AI_AUTH_TOKEN</code>wann néideg, léiwer eng bestehend Provider Schlëssel oder lokal Ennpunkt virun engem Provider Menü weist.</dd>
             <dt><code>ash snooze [duration|off]</code></dt>
             <dd>Paus automatesch Shell Prompt Veraarbechtung. De Standard ass fënnef Minutten. Dauer benotzen Go Syntax wéi<code>30s</code>,<code>5m</code>, oder<code>1h</code>. Benotzt<code>off</code>fir direkt erëmzefannen.</dd>
             <dt><code>ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></dt>
@@ -118,13 +169,13 @@ ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></pre>
         <section id="environment">
           <h2>Ëmwelt</h2>
           <dl> <!-- Always sort the list alphabetically by the first code block, the environment variable name -->
-            <dt><code>AI_AUTH_TOKEN</code></dt><dd>Optional Bearer Token. Wann agestallt, gëtt et als Träger Authentifikatioun geschéckt an ass fir Cloud Endpunkte erfuerderlech. Privat / LAN Adressen (RFC1918 IPv4, IPv6 ULA) an<code>.local</code>mDNS Hostnumm ginn als net-Wollek behandelt (wéi<code>localhost</code>) ausser<code>ASH_STRICT=1</code>gesat ass.</dd>
-            <dt><code>AI_CACHE</code></dt><dd>Optional Provider-native Cache Toggle. Par défaut aktivéiert wann et ënnerstëtzt gëtt; benotzen<code>off</code>oder<code>false</code>auszeschalten.</dd>
-            <dt><code>AI_ENDPOINT</code></dt><dd>Néideg Basis URL fir den Chat API Endpunkt.</dd>
-            <dt><code>AI_MODEL</code></dt><dd>Néideg Modell Numm un den Endpunkt geschéckt.</dd>
-            <dt><code>AI_PROVIDER</code></dt><dd>Optional Provider Iwwerschreiden:<code>anthropic</code>,<code>bedrock</code>,<code>cohere</code>,<code>gemini</code>,<code>google</code>,<code>ollama</code>, oder<code>openai</code>. Wann net gesat, detektéiert ash de Provider vum Endpunkt.</dd>
-            <dt><code>AI_TIMEOUT</code></dt><dd>Optional Ufro Timeout. Standard:<code>3m</code>.</dd>
-            <dt><code>ASH_ALWAYS_OPENAI_API</code></dt><dd>Optional Testen Toggle. Wann richteg-wëll, routes der<code>ollama</code>Provider duerch den OpenAI-kompatiblen SDK-Adapter anstatt seng handgerullt Implementatioun. Standard: op.</dd>
+            <dt><code>ASH_AI_AUTH_TOKEN</code></dt><dd>Optional Bearer Token. Néideg fir Cloud Endpunkte ausser AWS Bedrock. Privat / LAN Adressen an<code>.local</code>Hostnumm ginn als Net-Cloud behandelt ausser<code>ASH_STRICT=1</code>.</dd>
+            <dt><code>ASH_AI_CACHE</code></dt><dd>Optional Provider-native Cache Toggle. Par défaut aktivéiert wann et ënnerstëtzt gëtt; acceptéiert<code>1</code>,<code>true</code>,<code>yes</code>,<code>on</code>,<code>enabled</code>,<code>0</code>,<code>false</code>,<code>no</code>,<code>off</code>, oder<code>disabled</code>(case-sensibel).</dd>
+            <dt><code>ASH_AI_ENDPOINT</code></dt><dd>Néideg Basis URL fir den Chat API Endpunkt.</dd>
+            <dt><code>ASH_AI_MODEL</code></dt><dd>Néideg Modell Numm un den Endpunkt geschéckt.</dd>
+            <dt><code>ASH_AI_PROVIDER</code></dt><dd>Optional Provider iwwerschreiden. Wann net ausgesat ass,ashdetektéiert de Provider vum Endpunkt.</dd>
+            <dt><code>ASH_AI_TIMEOUT</code></dt><dd>Optional Ufro Timeout. Standard:<code>3m</code>.</dd>
+            <dt><code>ASH_ALWAYS_OPENAI_API</code></dt><dd>Optional Testen Toggle. Wann richteg-wëll, routes der<code>ollama</code>Provider duerch den OpenAI-kompatiblen SDK-Adapter anstatt seng handgerullt Implementatioun. Akzeptéiert déi selwecht boolesch Wäerter wéi<code>ASH_AI_CACHE</code>. Standard: op.</dd>
             <dt><code>ASH_ATTACHMENT_MAX_BYTES</code></dt><dd>Fakultativ maximal Gréisst an Bytes fir eng Datei iwwerginn<code>--attach</code>. Standard:<code>10485760</code>(10 MiB).</dd>
             <dt><code>ASH_HISTORY_MAX</code></dt><dd>Fakultativ maximal Geschicht Messagen pro Schlëssel. Standard:<code>40</code>.</dd>
             <dt><code>ASH_LOG_FILE</code></dt><dd>Optional Debug Log Wee wann verbose Logbuch aktivéiert ass.</dd>
@@ -134,29 +185,27 @@ ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></pre>
             <dt><code>ASH_RELEVANCE_WINDOW</code></dt><dd>Fakultativ rezent Outil Observatioune abegraff an Ausféierung Staat. Standard:<code>4</code>.</dd>
             <dt><code>ASH_RETRY_BASE_DELAY</code></dt><dd>Optional Retry Backoff Base Verzögerung. Standard:<code>250ms</code>.</dd>
             <dt><code>ASH_RETRY_MAX_ATTEMPTS</code></dt><dd>Fakultativ reprobable Ufro Versich. Standard:<code>3</code>.</dd>
-            <dt><code>ASH_SCHEDULED_TASK</code></dt><dd>Interne Scheduler Fändel benotzt vun ash-verwalte Invokatiounen.</dd>
-            <dt><code>ASH_STREAM</code></dt><dd>Optional wiesselen. Wann richteg-ähnlech, streamt d'Äntwert vu Fournisseuren deenen hiren Adapter et ënnerstëtzt (aktuell nëmmen OpenAI). Standard: op.</dd>
+            <dt><code>ASH_SCHEDULED_TASK</code></dt><dd>Interne Scheduler Fändel benotzt vunash-verwalte invocations.</dd>
+            <dt><code>ASH_STREAM</code></dt><dd>Optional wiesselen. Wann richteg-ähnlech, streamt d'Äntwert vu Fournisseuren deenen hiren Adapter et ënnerstëtzt (aktuell nëmmen OpenAI). Akzeptéiert déi selwecht boolesch Wäerter wéi<code>ASH_AI_CACHE</code>. Standard: op.</dd>
             <dt><code>ASH_TASK_MAX</code></dt><dd>Optional Cap op Ausféierungsaufgaben ofgeleet vun enger Ufro. Standard:<code>6</code>.</dd>
             <dt><code>ASH_TASK_STALL_ROUNDS</code></dt><dd>Optional Assistent Stall Ronnen virum Stoppen. Standard:<code>2</code>.</dd>
-            <dt><code>ASH_ALLOW</code></dt><dd>Fakultativ komma-getrennt ausführbar allowlist fir<code>run_unix_command</code>. Soss<code>~/.ash/.ash_allow</code>gëtt benotzt wann präsent; dëser Iwwerschreiden erweidert net intern Ash Stongen.</dd>
-            <dt><code>ASH_DENY</code></dt><dd>Optional komma-getrennt Denylist fir explizit Kommandoen, Tools a Plugins ze blockéieren. Soss<code>~/.ash/.ash_deny</code>gëtt benotzt wann et präsent ass.</dd>
+            <dt><code>ASH_ALLOW</code></dt><dd>Fakultativ komma-getrennt ausführbar allowlist fir<code>run_unix_command</code>. Soss<code>$XDG_CONFIG_HOME/ash/.ash_allow</code>(Standard<code>~/.config/ash/.ash_allow</code>) benotzt gëtt; dëser Iwwerschreiden erweidert net internAshStongen.</dd>
+            <dt><code>ASH_DENY</code></dt><dd>Optional komma-getrennt Denylist fir explizit Kommandoen, Tools a Plugins ze blockéieren. Soss<code>$XDG_CONFIG_HOME/ash/.ash_deny</code>(Standard<code>~/.config/ash/.ash_deny</code>) benotzt gëtt.</dd>
             <dt><code>ASH_TOOL_OUTPUT_MAX</code></dt><dd>Optional maximal erfaasst Tooloutput a Bytes. Standard:<code>8192</code>.</dd>
             <dt><code>ASH_TOOL_TIMEOUT</code></dt><dd>Fakultativ lokal Outil Kommando Timeout. Standard:<code>15s</code>.</dd>
             <dt><code>ASH_VERBOSE</code></dt><dd>Optional Debug Logging an Ausféierung Dashboard. Wäerter wéi<code>1</code>,<code>true</code>,<code>on</code>,an an<code>debug</code>aktivéieren et.</dd>
-            <dt><code>SESSION_ID</code></dt><dd>Sessiounsidentifizéierer fir persistent Geschicht a Logbenennung. Generéiert automatesch fir interaktiv Lafen wann vermësst.</dd>
+            <dt><code>ASH_SESSION_ID</code></dt><dd>AshSessiounsidentifizéierer fir persistent Geschicht a Logbenennung. Generéiert wann net; ongëlteg explizit Wäerter ginn refuséiert. Generesch<code>SESSION_ID</code>gëtt ignoréiert.</dd>
           </dl>
+          <p>Explizit numeresch an Dauer Astellunge ginn validéiert. Ganzer Grenzen muss positiv ausser<code>ASH_MAX_TOOL_ITERS</code>, déi vläicht null sinn. AI / Tool Timeouts musse positiv sinn; Retry Verspéidungen kënnen null sinn awer net negativ. Dauer benotzen Go Syntax wéi<code>30s</code>,<code>5m</code>, oder<code>1h</code>. Mëssformt oder ausserhalb Wäerter produzéieren e Konfiguratiounsfehler anstatt roueg Standarden ze benotzen.</p>
         </section>
 
         <section id="files">
           <h2>Dateien</h2>
           <ul>
-            <li><code>~/.ash/.ash_system</code> &mdash;kanonesche System Prompt.<code>$TOOLS_DIR_LIST</code>,<code>$PLUGINS_DIR_LIST</code>,an an<code>$IF_PYTHON_AVAILABLE</code>sinn intern Ash Auswiesselungen, ni Ëmwelt Verännerlechen.</li>
-            <li><code>~/.ash/.ash_allow</code> &mdash;kanonesche Kommando, Tool a Plugin Erlaabneslëscht. Seng eegestänneg<code>$TOOLS_DIR_LIST</code>an<code>$PLUGINS_DIR_LIST</code>Direktiven erlaben erlaabt regelméisseg verwaltete Scripten an native Plugins; ersetzen mat wuertwiertlech Nimm fir eng restriktiv Politik.</li>
-            <li><code>~/.ash/.ash_deny</code> &mdash;kanonesch denylist Datei fir spezifesch Kommandoen, Tools oder Plugins ze blockéieren.</li>
-            <li><code>~/.ash/plugins/</code> &mdash;gebierteg binäre Plugins Verzeechnes.</li>
-            <li><code>~/.ash/history/</code> &mdash;Gespréich Geschicht Fichieren.</li>
-            <li><code>~/.ash/scratch/</code> &mdash;Sessiouns-scoped Scratch Dateien.</li>
-            <li><code>~/.ash/.ash_snooze_until</code> &mdash;automatesch Prompt Snooze Verfall.</li>
+            <li><code>$XDG_CONFIG_HOME/ash/</code>(Standard<code>~/.config/ash/</code>)&mdash;kanonesch Prompt, Politik a persistent Aarbechtsberäichdateien.</li>
+            <li><code>$XDG_DATA_HOME/ash/</code>(Standard<code>~/.local/share/ash/</code>)&mdash;gebündelt Tools, Plugins, Sproochepäck, a MCP Umeldungsinformatiounen.</li>
+            <li><code>$XDG_STATE_HOME/ash/</code>(Standard<code>~/.local/state/ash/</code>)&mdash;Geschicht, Schrummen, Logbicher, a Schlaang Staat.</li>
+            <li><code>$XDG_CACHE_HOME/ash/</code>(Standard<code>~/.cache/ash/</code>)&mdash;regeneréierbar Cache Dateien.</li>
           </ul>
         </section>
 
@@ -182,7 +231,7 @@ ash install --shell zsh --dry-run</code></pre>
     </div>
   </main>
 
-  <footer class="site-footer page-width"><span class="brand"><span class="brand-mark">&gt;_</span>ash</span><span>Open Source Shell Intelligenz</span><a href="https://github.com/Jonconradt/ash">github.com/Jonconradt/ash</a></footer>
+  <footer class="site-footer page-width"><span class="brand"><span class="brand-mark">&gt;_</span> ash</span><span>Open Source Shell Intelligenz</span><a href="https://github.com/Jonconradt/ash">github.com/Jonconradt/ash</a></footer>
   <script src="../site.js" data-site-script defer></script>
 </body>
 </html>

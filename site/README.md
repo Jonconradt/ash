@@ -8,6 +8,7 @@ releases). This is marketing/docs content only — it is not part of the Go buil
 - `index.html` — landing page.
 - `docs.html` — usage/configuration documentation.
 - `faq.html` — frequently asked questions.
+- `developer.html` — contributor setup, Make targets, release builders, diagnostics, and VM package tests.
 - `languages.json` — language-picker labels, URL paths, and translation-service locale mapping.
 - `generate_locales.py` — generates the locale pages from the English source pages.
 - `site.js` — language switching and install-command copy behavior.

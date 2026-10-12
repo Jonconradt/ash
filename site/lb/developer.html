@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="lb">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ash| Entwéckler Guide</title>
+  <meta name="description" content="Bauen, testen, debuggen, packen a bäidroe firash.">
+  <meta name="theme-color" content="#f4f0e8">
+  <link rel="canonical" href="https://jonconradt.github.io/ash/lb/developer.html">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="alternate" hreflang="en" href="https://jonconradt.github.io/ash/developer.html">
+  <link rel="alternate" hreflang="ar" href="https://jonconradt.github.io/ash/ar/developer.html">
+  <link rel="alternate" hreflang="de" href="https://jonconradt.github.io/ash/de/developer.html">
+  <link rel="alternate" hreflang="es" href="https://jonconradt.github.io/ash/es/developer.html">
+  <link rel="alternate" hreflang="fr" href="https://jonconradt.github.io/ash/fr/developer.html">
+  <link rel="alternate" hreflang="id" href="https://jonconradt.github.io/ash/id/developer.html">
+  <link rel="alternate" hreflang="it" href="https://jonconradt.github.io/ash/it/developer.html">
+  <link rel="alternate" hreflang="lb" href="https://jonconradt.github.io/ash/lb/developer.html">
+  <link rel="alternate" hreflang="pt-BR" href="https://jonconradt.github.io/ash/pt-BR/developer.html">
+  <link rel="alternate" hreflang="zh-CN" href="https://jonconradt.github.io/ash/zh-CN/developer.html">
+  <link rel="alternate" hreflang="zh-TW" href="https://jonconradt.github.io/ash/zh-TW/developer.html">
+  <link rel="alternate" hreflang="x-default" href="https://jonconradt.github.io/ash/developer.html">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="ashdoheem"><span class="brand-mark">&gt;_</span> ash</a>
+    <nav aria-label="Primär Navigatioun">
+      <a href="./">Doheem</a>
+      <a href="./#install">Installéieren</a>
+      <a href="docs.html">Docs</a>
+      <a href="faq.html">FAQ</a>
+      <a href="developer.html" aria-current="page">Entwéckler</a>
+      <a href="https://github.com/Jonconradt/ash">GitHub</a>
+      <label class="sr-only" for="site-language">Sprooch</label>
+      <select id="site-language" class="language-select" aria-label="Wielt Sprooch">
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+        <option value="de">Deutsch</option>
+        <option value="es">Español</option>
+        <option value="fr">Français</option>
+        <option value="id">Bahasa Indonesia</option>
+        <option value="it">Italiano</option>
+        <option value="lb" selected>Lëtzebuergesch</option>
+        <option value="pt-BR">Português (Brasil)</option>
+        <option value="zh-CN">简体中文</option>
+        <option value="zh-TW">繁體中文</option>
+        </select>
+    </nav>
+  </header>
+
+  <main class="docs-page page-width">
+    <header class="docs-header">
+      <p class="eyebrow">Contribute · build · debug</p>
+      <h1>Entwécklerguide</h1>
+      <p>E praktesche Guide fir e Kasse opzestellen, Ziler ze wielen, Verëffentlechungsbuilder ze verstoen, Runtime Logbicher ze diagnostéieren, an native Package Installatiounen an Tart VMs ze testen.</p>
+    </header>
+
+    <div class="docs-layout">
+      <aside class="docs-contents" aria-label="Entwéckler Guide Inhalt">
+        <strong>Inhalter</strong>
+        <a href="#setup">Toolchain Setup</a>
+        <a href="#workflow">Alldeegleche Workflow</a>
+        <a href="#make-targets">Ziler maachen</a>
+        <a href="#plugins">Plugin Builder</a>
+        <a href="#release-builders">Fräisetzung Builder</a>
+        <a href="#runtime-logging">Verbose Logged</a>
+        <a href="#find-log-source">Fannt eng Logquell</a>
+        <a href="#vm-testing">Native Package VM Tester</a>
+        <a href="#source-guides">Quelle Guiden</a>
+      </aside>
+
+      <article class="docs-content">
+        <section id="setup">
+          <h2>Setzt den Entwéckler Toolchain op</h2>
+          <p>De Projet benotzt Go fir de CLI a Broker, plus gebierteg Plugin Toolchains a Site-Qualitéit Tools. Op macOS,<code>make config</code>benotzt Homebrew; op Debian oder Ubuntu benotzt et apt. Et installéiert Go, Node.js/npm, Python,<code>uv</code>, Rust / Cargo, an de Projet's Lint a Sécherheetsinstrumenter. De Go Modul vum Repository spezifizéiert d'Go Versioun, déi vum Build erwaart gëtt.</p>
+          <pre><code>make config</code></pre>
+          <p>Packaging macOS Installateuren benotzt och Apple's Xcode Command Line Tools. Verpakung Linux<code>.deb</code>an<code>.rpm</code>Artefakte brauche Ruby,<code>fpm</code>, an RPM Verpakung Utilities. De Setup-Skript installéiert déi gemeinsam Viraussetzungen, awer plattformspezifesch Verpackungstools kënnen nach ëmmer gebraucht ginn fir Release Builds.</p>
+          <p>Fir éischte Kéier Setup Detailer a Bäitrag Erwaardungen, kuckt<a href="https://github.com/Jonconradt/ash/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>.</p>
+        </section>
+
+        <section id="workflow">
+          <h2>Alldeeglech Entwécklung Workflow</h2>
+          <p>Fir eng normal Code Ännerung, lafen déi fokusséiert Tester beim Iteréieren, lafen dann déi erfuerderlech Lint an Test Gates vum Repository virum Enn:</p>
+          <pre><code>go test ./internal/app -run 'TestName'
+make lint test</code></pre>
+          <p>Déi meescht Maacht Ziler benotzen<code>scripts/dev/run-quiet.sh</code>: erfollegräich Schrëtt Drécken eng präzis<code>ok</code>Linn, wärend gescheitert Schrëtt hir ageholl Ausgang drécken. Präfix engem Zil mat<code>V=1</code>fir säi komplette Output ze streamen wéi se leeft:</p>
+          <pre><code>make V=1 lint
+make V=1 test
+make V=1 verify</code></pre>
+          <p><code>V=1</code>kontrolléiert Make's roueg wrapper. Et ass getrennt vun<code>ASH_VERBOSE</code>, déi Runtime Diagnostik amAshProgramm.</p>
+        </section>
+
+        <section id="make-targets">
+          <h2>Zilreferenz maachen </h2>
+          <dl>
+            <dt><code>make lint</code></dt>
+            <dd>Kontrolléiert Lokaliséierungskataloge, Shell Syntax fir de Site Installateur, Workflow YAML, Python Lint / Format, Markdown, Plugin Lint, a Go Lint.</dd>
+            <dt><code>make test</code></dt>
+            <dd>Baut a testt gebierteg Plugins, leeft dann<code>go test ./...</code>.</dd>
+            <dt><code>make verify-ci</code></dt>
+            <dd>Leeft Lëntgen, Tester a Sécherheetskontrollen - déi méi séier CI Qualitéitspaart.</dd>
+            <dt><code>make verify</code></dt>
+            <dd>Leeft déi voll lokal Qualitéitspaart: Lint, Tester, Race Tester, Ofdeckung, Veterinär, statesch Analyse, Sécherheet, Geheimscannen, Fuzzing, a Benchmarks.</dd>
+            <dt><code>make test-race</code></dt>
+            <dd>Leeft Go Tester mam Renndetektor.</dd>
+            <dt><code>make test-cover</code></dt>
+            <dd>Schreift<code>coverage.out</code>a kontrolléiert den Total géint<code>COVERAGE_MIN</code>(60% par défaut).</dd>
+            <dt><code>make test-fuzz</code></dt>
+            <dd>Leeft Applikatioun Fuzz Tester fir<code>FUZZ_TIME</code>(Standard 10 Sekonnen).</dd>
+            <dt><code>make security</code></dt>
+            <dd>Leeft souwuel<code>gosec</code>an<code>govulncheck</code>.</dd>
+            <dt><code>make build</code></dt>
+            <dd>Leeft Lint an Tester, baut an installéiert gebierteg Plugins, a baut<code>ash</code>pluss<code>ash-broker</code>ënner<code>~/.local/bin</code>.</dd>
+            <dt><code>make install</code></dt>
+            <dd>Fuert Tester, Lëntgen,<code>gosec</code>, a Plugin bauen / installéieren, baut béid Binären, da leeft<code>ash install --shell bash --shell-integration --overwrite</code>. Benotzt et wann Dir wëllt déi lokal Bash Integratioun aktualiséieren.</dd>
+            <dt><code>make plugins-build</code>,<code>plugins-test</code>,<code>plugins-lint</code></dt>
+            <dd>Bauen, testen oder lint all Plugin ënner<code>internal/app/ash_bootstrap/plugins_src</code>.<code>make plugins-clean</code>läscht de lokalen Plugin Build Output.</dd>
+            <dt><code>make site-locales</code></dt>
+            <dd>Generéiert iwwersat Säiten an erfrëscht de Sitemap. Benotzt<code>make site-locales SITE_LOCALES="zh-TW lb_LU"</code>locales auswielen.</dd>
+          </dl>
+          <p><code>make all</code>leeft<code>verify</code>an dann<code>install</code>. Déi komplett Zil Rezepter an overridable Verännerlechen sinn an der<a href="https://github.com/Jonconradt/ash/blob/main/Makefile">Maacht Datei</a>.</p>
+        </section>
+
+        <section id="plugins">
+          <h2>Plugin Builder</h2>
+          <p>Plugins si Standalone ausführbar mat engem Sproochonofhängege Kontrakt. De Plugin Makefiles wielt all Plugin Toolchain; lokal Builds zielen den Host par défaut. Fräisetzung baut Passe<code>PLUGIN_TARGET_GOOS</code>an<code>PLUGIN_TARGET_GOARCH</code>also Rust an aner Net-Go Plugin Binären passen dem Release Artefakt.</p>
+          <p>Benotzt<code>make plugins-build</code>fir se anzebauen<code>bin/plugins</code>,<code>make plugins-test</code>hir Tester ze lafen, an<code>make plugins-install</code>fir se an de Benotzer Plugin Verzeechnes ze kopéieren. Kuckt de<a href="https://github.com/Jonconradt/ash/blob/main/docs/PLUGIN_CONTRACT.md">gebierteg Plugin Kontrakt</a>ier e Plugin derbäigesat oder geännert gëtt.</p>
+        </section>
+
+        <section id="release-builders">
+          <h2>Fräisetzung Builder an artifacts</h2>
+          <p>De GitHub Verëffentlechungsworkflow trennt Qualitéitskontrollen vun gebiertege Verpackungsbauer. macOS Packagen ginn op Intel an Apple Silicon Leefer gebaut a gefëmmt getest. Linux Builder Cover<code>amd64</code>an<code>arm64</code>an validéieren<code>.deb</code>,<code>.rpm</code>, an tarball installéiert. FreeBSD ass cross-built a verpackt fir<code>amd64</code>.</p>
+          <p>Go Verëffentlechungsbinäre gi mat Trim-Wee a gesträifte Linkeroptiounen gebaut. Native Plugins gi fir datselwecht OS an Architektur gebaut. De Verëffentlechungs-Workflow testt och den installéierten Package oder extrahéierten Archiv, och eng frësch Shell-Installatiounskonfiguratioun.</p>
+          <p>Fir lokal Artefakt Builds, spezifizéiert d'Zil OS, d'Architektur an d'Versioun explizit:</p>
+          <pre><code>make release-artifacts \
+  RELEASE_TARGET_OSES=linux \
+  RELEASE_TARGET_ARCHES="arm64 amd64" \
+  RELEASE_VERSION=v1.2.3</code></pre>
+          <p><code>release-artifacts</code>baut a validéiert d'Formater déi fir dat Zil ënnerstëtzt ginn. D'Defaults sinn Host OS (<code>auto</code>) a béid<code>amd64 arm64</code>; FreeBSD Verëffentlechung ass limitéiert op<code>amd64</code>. Artefakte ginn ënner<code>dist/release</code>. Fir eng eenzeg binär / Plugin bauen, benotzen<code>make release-build-one RELEASE_GOOS=linux RELEASE_ARCH=arm64 RELEASE_VERSION=v1.2.3</code>.</p>
+          <p><code>make version</code>leeft d'Verëffentlechungskontrollen a baut Artefakte ouni se ze publizéieren. Am Géigesaz,<code>make release</code>ass e Verëffentlechungs-Workflow: et erfuerdert macOS, e propperen Aarbechtsbaum a konfiguréiert Git Identitéit, generéiert Verëffentlechungsnotizen, erstellt / dréckt Verëffentlechungsreferenzen, a kuckt de GitHub Workflow. Säi Standardkanal ass Beta; wielt stabil oder Nightly mat<code>CHANNEL=stable</code>oder<code>CHANNEL=nightly</code>. Generéiert Verëffentlechungsnotizen erfuerderlech<code>ASH_AI_ENDPOINT</code>an<code>ASH_AI_MODEL</code>, ausser Notizen sinn mat geliwwert<code>RELEASE_NOTES_INPUT</code>.</p>
+          <p>Liest de<a href="https://github.com/Jonconradt/ash/blob/main/.github/workflows/release.yml">Fräisetzung Workflow</a>an<a href="https://github.com/Jonconradt/ash/blob/main/docs/release-secrets.md">Fräisetzung Geheimnisser Guide</a>virun der Verëffentlechung.</p>
+        </section>
+
+        <section id="runtime-logging">
+          <h2>Verbose Runtime Logbuch</h2>
+          <p><code>ASH_VERBOSE</code>aktivéiert strukturéiert JSON Debug Logging a dréckt en Ausféierungsdashboard virAsherausgoen. Akzeptéiert Wäerter sinn<code>1</code>,<code>y</code>,<code>yes</code>,<code>true</code>,<code>on</code>,an an<code>debug</code>, case-onsensibel. D'Dashboard resüméiert d'Bühn Timings, Tool-Call Zuel, Tokentotalen wann verfügbar, a Gesamt Echtzäit.</p>
+          <pre><code>ASH_VERBOSE=1 ash "investigate this error"
+
+ASH_VERBOSE=1 \
+ASH_LOG_FILE="$HOME/.local/state/ash/debug.jsonl" \
+ASH_LOG_MAX_BYTES=10485760 \
+ash "investigate this error"</code></pre>
+          <p>Wéini<code>ASH_LOG_FILE</code>gesat ass, verbose JSON Log records ginn op dee Wee geschriwwe; den Elterenverzeichnis gëtt erstallt wéi néideg.<code>ASH_LOG_MAX_BYTES</code>kontrolléiert Rotatioun an Default op<code>1048576</code>bytes (1 MiB). Ouni eng explizit Logdatei benotzt Debug-Output de Prozessdiagnostesche Schrëftsteller. Halt d'Logbicher privat a iwwerpréift se ier Dir deelt.</p>
+          <p>Dëst ass ënnerscheet vu Make's<code>V=1</code>: benotzen<code>V=1</code>ze gesinn bauen / Test Kommando Ausgang an<code>ASH_VERBOSE=1</code>ze diagnostizéieren anAshRuntime Opruff.</p>
+        </section>
+
+        <section id="find-log-source">
+          <h2>Fannt d'Quell vun engem Logbuch</h2>
+          <p>All Ash Logbuch huet en eenzegaartegt <code>EID</code> Feld. Kopéiert d'EID vum JSON-Rekord a sicht no sengem wuertwiertlechen an der Go Quell fir den Uruff Site ze fannen:</p>
+          <pre><code>rg '"EID", "EpbG2YtZ"' internal/</code></pre>
+          <p>Zum Beispill registréiert e Quellruff de Message an d'EID zesumme mam strukturéierte Kontext. EIDs si stabil Identifizéierer fir Logplazen: iwwersetzen, ëmbenennen oder nei benotzen se net. Den Debug Logger a säi Rotatiounsverhalen ginn an<a href="https://github.com/Jonconradt/ash/blob/main/internal/app/debuglog.go">intern/app/debuglog.go</a>.</p>
+        </section>
+
+        <section id="vm-testing">
+          <h2>Test native Package installéiert mat <code>vm.sh</code></h2>
+          <p><code>scripts/vm.sh</code> erkennt den Host OS a wielt e VM Backend: Tart op Apple Silicon macOS, oder QEMU/KVM op x86_64 Linux. Béid Backends kënnen APT op Ubuntu / Debian an DNF op Fedora / Rocky Linux testen. Tart op macOS kann och de macOS Homebrew Package testen; Linux Hosts kënnen net macOS Gäscht lafen an dofir kënnen dee Wee net testen.</p>
+          <h3>macOS Host Viraussetzungen</h3>
+          <p>Benotzt en Apple Silicon Mac deen macOS 13 oder méi spéit leeft, mat Tart installéiert, Netzzougang zum VM Bild an Ash Repository, a genuch Disk Space fir de VM. Installéiert Tart mat Homebrew wann néideg:</p>
+          <pre><code>brew install openai/tools/tart</code></pre>
+          <h3>Linux Host Viraussetzunge</h3>
+          <p>Benotzt en x86_64 Linux Host mat Hardwarevirtualiséierung aktivéiert an e Benotzerkont dee liesen a schreiwen kann<code>/dev/kvm</code>(allgemeng andeems Dir de<code>kvm</code>Grupp an erëm aloggen). Installéiert QEMU / KVM, Cloud-image-utils fir<code>cloud-localds</code>, Curl, OpenSSH Client Tools a Python 3. Beispill Package Kommandoen:</p>
+          <pre><code># Debian or Ubuntu
+sudo apt-get install qemu-system-x86 qemu-utils cloud-image-utils curl openssh-client python3
+
+# Fedora or Rocky Linux
+sudo dnf install qemu-kvm qemu-img cloud-utils curl openssh-clients python3</code></pre>
+          <p>De Linux Backend lancéiert x86_64 Ubuntu, Debian, Fedora oder Rocky Cloud Biller mat QEMU / KVM a Cloud-init. Et benotzt QEMU Benotzer-Modus Netzwierker mat SSH weidergeleet op localhost; kee libvirt Netzwierk Setup ass néideg. Et leeft net macOS Gäscht, testt net Homebrew op macOS, a erfuerdert de Moment en x86_64 Linux Host. Arch a FreeBSD sinn net ënnerstëtzt Ziler.</p>
+          <h3>Fuert e Package Test</h3>
+          <p>Automatiséierte Modus ass de Standard an läscht de VM nom Test. D'Standardplattform follegt dem Host: macOS wielt<code>macos</code>, Linux wielt<code>ubuntu</code>. Wielt eng aner ënnerstëtzt Plattform a Modus explizit:</p>
+          <pre><code>scripts/vm.sh --platform macos --mode interactive
+scripts/vm.sh --platform ubuntu --mode automated
+scripts/vm.sh --platform debian --mode interactive
+scripts/vm.sh --platform fedora --mode automated
+scripts/vm.sh --platform rocky --mode interactive</code></pre>
+          <p>Interaktive Modus léisst den installéierten VM fir manuell Testen lafen. Op macOS dréckt de Skript e <code>tart exec -it</code> Gaascht-Shell Kommando. Op Linux dréckt en SSH Kommando an e Stop Kommando; Stop de VM a läscht säin Zoustand mat:</p>
+          <pre><code>scripts/vm.sh --stop VM_NAME</code></pre>
+          <p>Automatiséierte Modus fiert d'Installatioun an d'Shell-Setup Rauchkontrollen, stoppt dann an läscht de VM. Erofgelueden Basisbiller bleiwen am cache. Tart Biller kënne geännert ginn mat<code>ASH_TEST_VM_IMAGE</code>; Linux Cloud-Bild URLen kënnen iwwerschriwwe ginn<code>ASH_TEST_QEMU_IMAGE</code>. Linux Biller sinn ënner cache<code>${XDG_CACHE_HOME:-~/.cache}/ash/vm-images</code>, an interaktiv VM Disken an SSH Schlësselen ginn ënner gehal<code>${XDG_STATE_HOME:-~/.local/state}/ash/vm</code>. Setzt<code>ASH_TEST_VM_CACHE_DIR</code>oder<code>ASH_TEST_VM_STATE_DIR</code>dës Plazen z'änneren.</p>
+          <p>Fir de Gaascht mam selwechten AI Service wéi den Host ze verbannen, exportéiert déi néideg<code>ASH_AI_*</code>Variabelen ier Dir de Skript leeft, zum Beispill<code>ASH_AI_ENDPOINT</code>,<code>ASH_AI_MODEL</code>an, wann néideg,<code>ASH_AI_AUTH_TOKEN</code>. Exportéiert Wäerter ginn un de Gaascht weidergeleet; onexportéiert Shell Variablen sinn net. Interaktiv VMs behalen dës Umeldungsinformatiounen am Gaaschtprofil mat Modus<code>0600</code>; Linux VM Disks sinn net verschlësselte, also schützt de Staatsverzeichnis a stoppt / läscht de VM wann et fäerdeg ass.</p>
+          <p>Kuckt<code>scripts/vm.sh --help</code>fir déi aktuell Backend Viraussetzungen, ënnerstëtzt Plattformen, an Optiounen.</p>
+        </section>
+
+        <section id="source-guides">
+          <h2>Projet Quell Guiden <!-- h2--></h2>
+          <ul>
+            <li><a href="https://github.com/Jonconradt/ash/blob/main/CONTRIBUTING.md">Bäitrag Guide</a>- Setup, Tester, Verëffentlechungserwaardungen, an CI Notizen.</li>
+            <li><a href="https://github.com/Jonconradt/ash/blob/main/ARCHITECTURE.md">Architektur</a>- Projet Layout a Runtime Subsystemer.</li>
+            <li><a href="https://github.com/Jonconradt/ash/blob/main/README.md">VIRLIESEN</a>- Produkt, Installatioun, Konfiguratioun an Ëmfeld Referenz.</li>
+            <li><a href="https://github.com/Jonconradt/ash/blob/main/Makefile">Maacht Datei</a>- autoritär Zilrezepter a Verännerlechen bauen.</li>
+            <li><a href="https://github.com/Jonconradt/ash/tree/main/.github/workflows">GitHub Workflows</a>- CI, Plattform Builder, a Verëffentlechungsautomatiséierung.</li>
+          </ul>
+        </section>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer page-width">
+    <a class="brand" href="./"><span class="brand-mark">&gt;_</span> ash</a>
+    <span>Praktesch AI fir den Terminal.</span>
+    <a href="docs.html">Dokumentatioun</a>
+    <a href="developer.html">Entwéckler</a>
+    <a href="https://github.com/Jonconradt/ash">GitHub<span aria-hidden="true">&#8599;</span></a>
+  </footer>
+  <script src="../site.js" data-site-script defer></script>
+</body>
+</html>

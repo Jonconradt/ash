@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ash | اسأل المحطة الخاصة بك</title>
-  <meta name="description" content="ash هو مساعد الذكاء الاصطناعي لـ bash وFish وzsh. اطرح الأسئلة، وافحص الملفات، وقم بأتمتة العمل الطرفي دون مغادرة الصدفة الخاصة بك.">
+  <title>ash| اسأل المحطة الخاصة بك</title>
+  <meta name="description" content="ashهو مساعد الذكاء الاصطناعي لـ bash وFish وzsh. اطرح الأسئلة، وافحص الملفات، وقم بأتمتة العمل الطرفي دون مغادرة الصدفة الخاصة بك.">
   <meta name="theme-color" content="#f4f0e8">
   <link rel="canonical" href="https://jonconradt.github.io/ash/ar/">
   <meta property="og:type" content="website">
@@ -44,14 +44,15 @@
 </head>
 <body>
   <header class="site-header">
-    <a class="brand" href="./" aria-label="ash المنزل"><span class="brand-mark">>_</span> ash</a>
+    <a class="brand" href="./" aria-label="ashبيت"><span class="brand-mark">&gt;_</span> ash</a>
     <nav aria-label="التنقل الأساسي">
-      <a href="#how-it-works">كيفية العمل</a>
-      <a href="#install">تثبيت</a>
+      <a href="#how-it-works">كيف يعمل</a>
+      <a href="#install">ثَبَّتَ</a>
       <a href="docs.html">المستندات</a>
-      <a href="faq.html">الأسئلة الشائعة</a>
-      <a href="https://github.com/Jonconradt/ash">GitHub</a>
-      <label class="sr-only" for="site-language">اللغة</label>
+      <a href="faq.html">التعليمات</a>
+      <a href="developer.html">المطورين</a>
+      <a href="https://github.com/Jonconradt/ash">جيثب</a>
+      <label class="sr-only" for="site-language">لغة</label>
       <select id="site-language" class="language-select" aria-label="اختر اللغة">
         <option value="en">English</option>
         <option value="ar" selected>العربية</option>
@@ -71,22 +72,22 @@
   <main>
     <section class="hero page-width">
       <div class="hero-copy">
-        <p class="eyebrow">صدفتك بعقل ثانٍ</p>
-        <h1>اسأل جهازك الطرفي.<br><em>حافظ على التدفق.</em></h1>
+        <p class="eyebrow">قوقعتك بعقل ثانٍ</p>
+        <h1>اسأل جهازك الطرفي.<br><em>حافظ على تدفق أعمالك.</em></h1>
         <p class="hero-lede">ash يجلب الذكاء الاصطناعي إلى bash وFish وzsh، لذا تحدث الأسئلة والتحقيقات والأتمتة الصغيرة حيث يوجد العمل بالفعل. قم بتوصيل خوادم MCP البعيدة لدمج أدواتها في نفس سير العمل.</p>
         <div class="hero-actions">
-          <a class="button Button-primary" href="#install">تثبيت ash <span aria-hidden="true">↓</span></a>
-          <a class="text-link" href="https://github.com/Jonconradt/ash#configure">اقرأ دليل الإعداد <span aria-hidden="true">→</span></a>
+          <a class="button button-primary" href="#install">ثَبَّتَash <span aria-hidden="true">&#8595;</span></a>
+          <a class="text-link" href="https://github.com/Jonconradt/ash#configure">اقرأ دليل الإعداد<span aria-hidden="true">&#8594;</span></a>
         </div>
         <p class="compatibility"><span class="status-dot"></span> macOS · Linux · FreeBSD · مفتوح المصدر</p>
       </div>
-      <div class="terminal-window" role="img" aria-label="مثال ash الجلسة الطرفية">
+      <div class="terminal-window" role="img" aria-label="مثالashالجلسة النهائية">
         <div class="terminal-bar"><span></span><span></span><span></span><b>bash &mdash; session 04</b></div>
         <div class="terminal-body">
           <p><span class="prompt">$</span> <span class="command">وقت التشغيل</span></p>
           <p class="answer">11:17 حتى 5 أيام، 3:13، 2 مستخدمين، متوسطات التحميل: 1.94 3.05 3.05</p>
           <p><span class="prompt">$</span> <span class="command">تلخيص هذا المشروع</span></p>
-          <p class="answer">ASH هو مساعد ذكاء اصطناعي متكامل في Shell.<br>يمكنه فحص الملفات وتشغيل الأدوات المدرجة في القائمة المسموح بها وجدولة المهام وتأليف لغة python وتنفيذها والاحتفاظ بالملاحظات على نطاق الجلسة لتنفيذ الوكيل الفرعي.</p>
+          <p class="answer">ASH عبارة عن مساعد ذكاء اصطناعي متكامل في Shell.<br>يمكنه فحص الملفات وتشغيل الأدوات المدرجة في القائمة المسموح بها وجدولة المهام وتأليف لغة python وتنفيذها والاحتفاظ بالملاحظات على نطاق الجلسة لتنفيذ الوكيل الفرعي.</p>
           <p><span class="prompt">$</span> <span class="command">أدرج أكبر الملفات هنا</span></p>
           <p class="answer table">1.2M  ./README.md<br>842K   ./ash_test.go<br>312K   ./docs/ash.1</p>
           <p><span class="cursor">█</span></p>
@@ -109,9 +110,9 @@
         <h2>تبقى الوحدة الطرفية<br><em>مركز الجاذبية.</em></h2>
       </div>
       <div class="how-grid">
-        <div class="numbered"><span>01</span><h3>تثبيت تكامل الصدفة</h3><p>ash يعمل مع bash وFish وzsh. تصبح الأوامر غير المعروفة مطالبات دون تغيير عادات الأوامر العادية. غفوة عندما تحتاج إلى استراحة من المعالجة السريعة التلقائية.</p></div>
+        <div class="numbered"><span>01</span><h3>الاشتراك في تكامل الصدفة</h3><p>يعمل ash مع bash وFish وzsh. يسأل المثبت الذي تم التحقق منه قبل إضافة ربط الصدفة المُدار الخاص به؛ تصبح الأوامر غير المعروفة مطالبات بمجرد تمكينها. غفوة عندما تحتاج إلى استراحة من المعالجة السريعة التلقائية.</p></div>
         <div class="numbered"><span>02</span><h3>تحديثات سهلة</h3><p><code>ash update</code> تحافظ على تحديث التثبيت بأحدث إصدار. يتعامل الأمر مع عمليات التحقق من الإصدار والتنزيلات والتحقق تلقائيًا. لا توجد خلفية أو تحديثات مفاجئة.</p></div>
-        <div class="numbered"><span>03</span><h3>البقاء متحكمًا</h3><p>يكون تنفيذ الأداة مقيدًا بقوائم السماح والرفض الصريحة ويتم تشغيلها كمستخدم لديك. عليك أن تقرر ما هو ash المسموح بلمسه. أضف نصوص Python الخاصة بك إلى ~/.ash/tools أو المكونات الإضافية الأصلية إلى ~/.ash/plugins.</p></div>
+        <div class="numbered"><span>03</span><h3>البقاء في السيطرة</h3><p>يتم تقييد تنفيذ الأداة من خلال قوائم السماح والرفض الصريحة ويتم تشغيلها كمستخدم لديك. عليك أن تقرر ماashيسمح للمس. أضف نصوص بايثون الخاصة بك إلى<code>$XDG_DATA_HOME/ash/tools</code>أو المكونات الإضافية الأصلية ل<code>$XDG_DATA_HOME/ash/plugins</code>.</p></div>
       </div>
     </section>
 
@@ -119,18 +120,23 @@
       <div class="page-width install-content">
         <div><p class="eyebrow">ابدأ صغيرًا</p><h2>امنح صدفتك<br><em>بعض الرفقة.</em></h2></div>
         <div class="install-details">
-          <p>يمكن لمستخدمي Linux وmacOS وFreeBSD تثبيت أحدث إصدار في خطوة واحدة. يتحقق المثبت من التنزيل، ويتم التثبيت على <code>~/.local/bin</code>، ويقوم بتكوين تكامل Fish أو zsh أو bash، والعودة إلى bash.</p>
-          <p><code>ash install</code> يقوم بتهيئة موفر الذكاء الاصطناعي تلقائيًا: فهو يكتشف مفتاح API لموفر السحابة الذي تم تعيينه بالفعل أو خادم استدلال محلي قيد التشغيل، وإلا فإنه يعرض قائمة مرقمة لاختيار الموفر والنموذج. أو قم بتعيينها بنفسك:</p>
-          <pre><code>export AI_AUTH_TOKEN='84…89'
-export AI_ENDPOINT='https://ollama.com'
-export AI_MODEL='gemma4:31b-cloud'
+          <p>يمكن لمستخدمي Linux وmacOS وFreeBSD تثبيت الإصدار الأحدث في خطوة واحدة. قم بتثبيت سيجستور<code>cosign</code>أولاً حتى يتمكن المثبت من التحقق من بيان المجموع الاختباري الموقع. يتم تثبيته ل<code>~/.local/bin</code>ويسأل قبل إضافة تكامل Fish أو zsh أو bash Shell.</p>
+          <p>على نظام التشغيل MacOS أو Linux مع<a href="https://brew.sh">البيرة المنزلية</a>، ثَبَّتَashوالمكونات الإضافية المجمعة، ثم قم بتهيئة أصولها المضمنة وإعدادات الموفر وتكامل الصدفة:</p>
+          <pre><code>brew install Jonconradt/ash/ash
+ash install --shell $SHELL --shell-integration</code></pre>
+          <p>يتم تحديث الصيغة تلقائيًا لكل إصدار ثابت. أحكام أمر التثبيتAshالأصول المضمنة، ويقوم بإعداد تكامل Shell لـ Shell الحالي الخاص بك، ويساعد في تكوين موفر الذكاء الاصطناعي الخاص بك.</p>
+          <p>على Debian أو Ubuntu، قم بالتثبيت والتحديثashمع<a href="docs.html#apt-installation">ايه بي تي</a>; على الأنظمة المتوافقة مع Fedora وRHEL، استخدم<a href="docs.html#dnf-installation">DNF</a>; يمكن لمستخدمي Arch Linux استخدامه<a href="docs.html#pacman-installation">بكمن</a>.</p>
+          <p><code>ash install</code>يقوم تلقائيًا بتكوين موفر الذكاء الاصطناعي الخاص بك: فهو يكتشف مفتاح API لموفر السحابة الذي تم تعيينه بالفعل أو خادم استدلال محلي قيد التشغيل، وإلا فإنه يعرض قائمة مرقمة لاختيار موفر ونموذج. أو قم بتعيينها بنفسك:</p>
+          <pre><code>export ASH_AI_AUTH_TOKEN='your-token'
+export ASH_AI_ENDPOINT='https://ollama.com'
+export ASH_AI_MODEL='gemma4:31b-cloud'
 </code></pre>
           <p>يتم دعم Local وOpenAI وAnthropic وGoogle وAzure OpenAI وMistral وCohere وGroq وxAI وDeepSeek وTogether AI وOpenRouter وHuggingFace وAWS Bedrock وأي موفر آخر لديه واجهة برمجة تطبيقات متوافقة مع OpenAI.</p>
           <div class="code-block-wrap">
             <pre class="code-block"><code><span class="code-command">curl -fsSL https://jonconradt.github.io/ash/install.sh | sh</span></code></pre>
-            <button type = "button" class = "copy-button" data-copy-target = ".code-command" aria-label = "نسخ أمر التثبيت" data-copied-label = "Copied!">نسخ</button>
+            <button type="button" class="copy-button" data-copy-target=".code-command" aria-label="نسخ أمر التثبيت" data-copied-label="منسوخ!">نسخ</button>
           </div>
-          <div class="install-links"><a class="button Button-light" href="https://github.com/Jonconradt/ash/releases/latest">عرض الحزم <span aria-hidden="true">↗</span></a><a class="text-link light-link" href="https://github.com/Jonconradt/ash#configure">التكوين الكامل <span aria-hidden="true">→</span></a></div>
+          <div class="install-links"><a class="button button-light" href="https://github.com/Jonconradt/ash/releases/latest">عرض الحزم<span aria-hidden="true">&#8599;</span></a><a class="text-link light-link" href="https://github.com/Jonconradt/ash#configure">التكوين الكامل<span aria-hidden="true">&#8594;</span></a></div>
         </div>
       </div>
     </section>
@@ -140,15 +146,15 @@ export AI_MODEL='gemma4:31b-cloud'
       <h2>مفيد في الوقت الحالي.<br><em>يمكن فهمه بعد ذلك.</em></h2>
       <p>اقرأ المصدر، وافحص البنية، أو شاهد بالضبط ما تم تثبيته.</p>
       <div class="closing-links">
-          <a href="docs.html">اقرأ المستندات <span aria-hidden="true">→</span></a>
-          <a href="https://github.com/Jonconradt/ash">GitHub <span aria-hidden="true">↗</span></a>
-          <a href="https://github.com/Jonconradt/ash/issues/new">الإبلاغ عن مشكلة <span aria-hidden="true">↗</span></a>
-          <a href="https://github.com/Jonconradt/ash/blob/main/SECURITY.md">سياسة الأمان <span aria-hidden="true">↗</span></a>
+          <a href="docs.html">اقرأ المستندات<span aria-hidden="true">&#8594;</span></a>
+          <a href="https://github.com/Jonconradt/ash">جيثب<span aria-hidden="true">&#8599;</span></a>
+          <a href="https://github.com/Jonconradt/ash/issues/new">الإبلاغ عن مشكلة<span aria-hidden="true">&#8599;</span></a>
+          <a href="https://github.com/Jonconradt/ash/blob/main/SECURITY.md">السياسة الأمنية<span aria-hidden="true">&#8599;</span></a>
       </div>
     </section>
   </main>
 
-  <footer class="site-footer page-width"><span class="brand"><span class="brand-mark">>_</span> ash</span><span>ذكاء الصدفة مفتوح المصدر</span><a href="docs.html">الوثائق</a><a href="https://github.com/Jonconradt/ash">github.com/Jonconradt/ash</a></footer>
+  <footer class="site-footer page-width"><span class="brand"><span class="brand-mark">&gt;_</span> ash</span><span>ذكاء الصدفة مفتوح المصدر</span><a href="docs.html">التوثيق</a><a href="https://github.com/Jonconradt/ash">github.com/Jonconradt/ash</a></footer>
 
   <script src="../site.js" data-site-script defer></script>
 </body>

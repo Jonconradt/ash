@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ash| Panduan pengembang</title>
+  <meta name="description" content="Bangun, uji, debug, kemas, dan kontribusikanash.">
+  <meta name="theme-color" content="#f4f0e8">
+  <link rel="canonical" href="https://jonconradt.github.io/ash/id/developer.html">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="alternate" hreflang="en" href="https://jonconradt.github.io/ash/developer.html">
+  <link rel="alternate" hreflang="ar" href="https://jonconradt.github.io/ash/ar/developer.html">
+  <link rel="alternate" hreflang="de" href="https://jonconradt.github.io/ash/de/developer.html">
+  <link rel="alternate" hreflang="es" href="https://jonconradt.github.io/ash/es/developer.html">
+  <link rel="alternate" hreflang="fr" href="https://jonconradt.github.io/ash/fr/developer.html">
+  <link rel="alternate" hreflang="id" href="https://jonconradt.github.io/ash/id/developer.html">
+  <link rel="alternate" hreflang="it" href="https://jonconradt.github.io/ash/it/developer.html">
+  <link rel="alternate" hreflang="lb" href="https://jonconradt.github.io/ash/lb/developer.html">
+  <link rel="alternate" hreflang="pt-BR" href="https://jonconradt.github.io/ash/pt-BR/developer.html">
+  <link rel="alternate" hreflang="zh-CN" href="https://jonconradt.github.io/ash/zh-CN/developer.html">
+  <link rel="alternate" hreflang="zh-TW" href="https://jonconradt.github.io/ash/zh-TW/developer.html">
+  <link rel="alternate" hreflang="x-default" href="https://jonconradt.github.io/ash/developer.html">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="ashrumah"><span class="brand-mark">&gt;_</span> ash</a>
+    <nav aria-label="Navigasi utama">
+      <a href="./">Rumah</a>
+      <a href="./#install">Memasang</a>
+      <a href="docs.html">dokumen</a>
+      <a href="faq.html">Pertanyaan Umum</a>
+      <a href="developer.html" aria-current="page">Pengembang</a>
+      <a href="https://github.com/Jonconradt/ash">GitHub</a>
+      <label class="sr-only" for="site-language">Bahasa</label>
+      <select id="site-language" class="language-select" aria-label="Pilih bahasa">
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+        <option value="de">Deutsch</option>
+        <option value="es">Español</option>
+        <option value="fr">Français</option>
+        <option value="id" selected>Bahasa Indonesia</option>
+        <option value="it">Italiano</option>
+        <option value="lb">Lëtzebuergesch</option>
+        <option value="pt-BR">Português (Brasil)</option>
+        <option value="zh-CN">简体中文</option>
+        <option value="zh-TW">繁體中文</option>
+        </select>
+    </nav>
+  </header>
+
+  <main class="docs-page page-width">
+    <header class="docs-header">
+      <p class="eyebrow">Kontribusi · build · debug</p>
+      <h1>Panduan pengembang</h1>
+      <p>Panduan praktis untuk menyiapkan checkout, memilih Buat target, memahami pembuat rilis, mendiagnosis log runtime, dan menguji instalasi paket asli di VM Tart.</p>
+    </header>
+
+    <div class="docs-layout">
+      <aside class="docs-contents" aria-label="Isi panduan pengembang">
+        <strong>Isi</strong>
+        <a href="#setup">Penyiapan rantai alat</a>
+        <a href="#workflow">Alur kerja sehari-hari</a>
+        <a href="#make-targets">Buatlah target</a>
+        <a href="#plugins">Pembuat plugin</a>
+        <a href="#release-builders">Pembuat rilis</a>
+        <a href="#runtime-logging">Pencatatan verbose</a>
+        <a href="#find-log-source">Menemukan sumber log</a>
+        <a href="#vm-testing">Pengujian VM paket asli</a>
+        <a href="#source-guides">Panduan sumber</a>
+      </aside>
+
+      <article class="docs-content">
+        <section id="setup">
+          <h2>Siapkan rantai alat pengembang</h2>
+          <p>Proyek ini menggunakan Go untuk CLI dan broker, ditambah rantai alat plugin asli dan alat kualitas situs. Di macOS,<code>make config</code>menggunakan minuman rumahan; di Debian atau Ubuntu menggunakan apt. Ini menginstal Go, Node.js/npm, Python,<code>uv</code>, Rust/Cargo, serta serat dan alat keamanan proyek. Modul Go pada repositori menentukan versi Go yang diharapkan oleh build.</p>
+          <pre><code>make config</code></pre>
+          <p>Penginstal macOS pengemasan juga menggunakan Alat Baris Perintah Xcode Apple. Pengemasan Linux<code>.deb</code>Dan<code>.rpm</code>artefak membutuhkan Ruby,<code>fpm</code>, dan utilitas pengemasan RPM. Skrip penyiapan menginstal prasyarat umum, namun alat pengemasan khusus platform mungkin masih diperlukan untuk build rilis.</p>
+          <p>Untuk detail penyiapan pertama kali dan ekspektasi kontribusi, lihat<a href="https://github.com/Jonconradt/ash/blob/main/CONTRIBUTING.md">KONTRIBUSI.md</a>.</p>
+        </section>
+
+        <section id="workflow">
+          <h2>Alur kerja pengembangan sehari-hari</h2>
+          <p>Untuk perubahan kode normal, jalankan pengujian terfokus saat melakukan iterasi, lalu jalankan lint dan gerbang pengujian yang diperlukan repositori sebelum menyelesaikan:</p>
+          <pre><code>go test ./internal/app -run 'TestName'
+make lint test</code></pre>
+          <p>Kebanyakan membuat target digunakan<code>scripts/dev/run-quiet.sh</code>: langkah sukses cetak satu ringkas<code>ok</code>baris, sementara langkah yang gagal mencetak keluaran yang diambil. Awali target dengan<code>V=1</code>untuk mengalirkan keluaran lengkapnya saat dijalankan:</p>
+          <pre><code>make V=1 lint
+make V=1 test
+make V=1 verify</code></pre>
+          <p><code>V=1</code>kontrol Buat pembungkus yang tenang. Itu terpisah dari<code>ASH_VERBOSE</code>, yang mengaktifkan diagnostik runtime diAshprogram.</p>
+        </section>
+
+        <section id="make-targets">
+          <h2>Buat referensi target</h2>
+          <dl>
+            <dt><code>make lint</code></dt>
+            <dd>Memeriksa katalog pelokalan, sintaksis shell untuk penginstal situs, alur kerja YAML, lint/format Python, Markdown, lint plugin, dan Go lint.</dd>
+            <dt><code>make test</code></dt>
+            <dd>Membangun dan menguji plugin asli, lalu menjalankannya<code>go test ./...</code>.</dd>
+            <dt><code>make verify-ci</code></dt>
+            <dd>Menjalankan lint, pengujian, dan pemeriksaan keamanan—gerbang kualitas CI yang lebih cepat.</dd>
+            <dt><code>make verify</code></dt>
+            <dd>Menjalankan gerbang kualitas lokal secara lengkap: lint, pengujian, pengujian balapan, cakupan, dokter hewan, analisis statis, keamanan, pemindaian rahasia, fuzzing, dan tolok ukur.</dd>
+            <dt><code>make test-race</code></dt>
+            <dd>Menjalankan pengujian Go dengan detektor balapan.</dd>
+            <dt><code>make test-cover</code></dt>
+            <dd>Menulis<code>coverage.out</code>dan memeriksa totalnya<code>COVERAGE_MIN</code>(60% secara default).</dd>
+            <dt><code>make test-fuzz</code></dt>
+            <dd>Menjalankan pengujian fuzz aplikasi untuk<code>FUZZ_TIME</code>(10 detik secara default).</dd>
+            <dt><code>make security</code></dt>
+            <dd>Menjalankan keduanya<code>gosec</code>Dan<code>govulncheck</code>.</dd>
+            <dt><code>make build</code></dt>
+            <dd>Menjalankan lint dan menguji, membuat dan menginstal plugin asli, serta build<code>ash</code>plus<code>ash-broker</code>di bawah<code>~/.local/bin</code>.</dd>
+            <dt><code>make install</code></dt>
+            <dd>Menjalankan pengujian, serat,<code>gosec</code>, dan plugin build/install, buat kedua biner, lalu jalankan<code>ash install --shell bash --shell-integration --overwrite</code>. Gunakan saat Anda ingin memperbarui integrasi Bash lokal.</dd>
+            <dt><code>make plugins-build</code>,<code>plugins-test</code>,<code>plugins-lint</code></dt>
+            <dd>Bangun, uji, atau lint setiap plugin di bawah<code>internal/app/ash_bootstrap/plugins_src</code>.<code>make plugins-clean</code>menghapus keluaran pembuatan plugin lokal.</dd>
+            <dt><code>make site-locales</code></dt>
+            <dd>Menghasilkan halaman yang diterjemahkan dan menyegarkan peta situs. Menggunakan<code>make site-locales SITE_LOCALES="zh-TW lb_LU"</code>untuk memilih lokal.</dd>
+          </dl>
+          <p><code>make all</code>berjalan<code>verify</code>kemudian<code>install</code>. Resep target lengkap dan variabel yang dapat diganti ada di<a href="https://github.com/Jonconradt/ash/blob/main/Makefile">file make</a>.</p>
+        </section>
+
+        <section id="plugins">
+          <h2>Pembuat plugin</h2>
+          <p>Plugin adalah executable mandiri dengan kontrak yang tidak bergantung pada bahasa. Plugin Makefiles memilih rantai alat setiap plugin; build lokal menargetkan host secara default. Rilis build lulus<code>PLUGIN_TARGET_GOOS</code>Dan<code>PLUGIN_TARGET_GOARCH</code>jadi Rust dan biner plugin non-Go lainnya cocok dengan artefak rilis.</p>
+          <p>Menggunakan<code>make plugins-build</code>untuk membangunnya<code>bin/plugins</code>,<code>make plugins-test</code>untuk menjalankan tes mereka, dan<code>make plugins-install</code>untuk menyalinnya ke direktori plugin pengguna. Lihat<a href="https://github.com/Jonconradt/ash/blob/main/docs/PLUGIN_CONTRACT.md">kontrak plugin asli</a>sebelum menambahkan atau mengubah plugin.</p>
+        </section>
+
+        <section id="release-builders">
+          <h2>Rilis pembangun dan artefak</h2>
+          <p>Alur kerja rilis GitHub memisahkan pemeriksaan kualitas dari pembuat kemasan asli. Paket macOS dibuat dan diuji pada runner Intel dan Apple Silicon. Sampul pembuat Linux<code>amd64</code>Dan<code>arm64</code>dan memvalidasi<code>.deb</code>,<code>.rpm</code>, dan pemasangan tarball. FreeBSD dibuat secara silang dan dikemas untuk<code>amd64</code>.</p>
+          <p>Biner rilis Go dibuat dengan opsi trim-path dan stripped linker. Plugin asli dibuat untuk OS dan arsitektur yang sama. Alur kerja rilis juga menguji paket yang diinstal atau arsip yang diekstraksi, termasuk konfigurasi instalasi shell baru.</p>
+          <p>Untuk pembuatan artefak lokal, tentukan OS target, arsitektur, dan versi secara eksplisit:</p>
+          <pre><code>make release-artifacts \
+  RELEASE_TARGET_OSES=linux \
+  RELEASE_TARGET_ARCHES="arm64 amd64" \
+  RELEASE_VERSION=v1.2.3</code></pre>
+          <p><code>release-artifacts</code>membangun dan memvalidasi format yang didukung untuk target tersebut. Standarnya adalah OS host (<code>auto</code>) dan keduanya<code>amd64 arm64</code>; Penerbitan FreeBSD terbatas pada<code>amd64</code>. Artefak tenggelam<code>dist/release</code>. Untuk build biner/plugin tunggal, gunakan<code>make release-build-one RELEASE_GOOS=linux RELEASE_ARCH=arm64 RELEASE_VERSION=v1.2.3</code>.</p>
+          <p><code>make version</code>menjalankan pemeriksaan rilis dan membuat artefak tanpa memublikasikannya. Sebaliknya,<code>make release</code>adalah alur kerja penerbitan: memerlukan macOS, pohon kerja yang bersih dan identitas Git yang dikonfigurasi, membuat catatan rilis, membuat/mendorong referensi rilis, dan mengawasi alur kerja GitHub. Saluran defaultnya adalah beta; pilih stabil atau malam dengan<code>CHANNEL=stable</code>atau<code>CHANNEL=nightly</code>. Catatan rilis yang dihasilkan memerlukan<code>ASH_AI_ENDPOINT</code>Dan<code>ASH_AI_MODEL</code>, kecuali catatan disertakan<code>RELEASE_NOTES_INPUT</code>.</p>
+          <p>Baca<a href="https://github.com/Jonconradt/ash/blob/main/.github/workflows/release.yml">rilis alur kerja</a>Dan<a href="https://github.com/Jonconradt/ash/blob/main/docs/release-secrets.md">rilis panduan rahasia</a>sebelum diterbitkan.</p>
+        </section>
+
+        <section id="runtime-logging">
+          <h2>Pencatatan waktu proses yang panjang</h2>
+          <p><code>ASH_VERBOSE</code>mengaktifkan logging debug JSON terstruktur dan mencetak dasbor eksekusi sebelumnyaAshkeluar. Nilai yang diterima adalah<code>1</code>,<code>y</code>,<code>yes</code>,<code>true</code>,<code>on</code>, Dan<code>debug</code>, tidak peka huruf besar-kecil. Dasbor merangkum waktu tahapan, jumlah panggilan alat, total token bila tersedia, dan total waktu nyata.</p>
+          <pre><code>ASH_VERBOSE=1 ash "investigate this error"
+
+ASH_VERBOSE=1 \
+ASH_LOG_FILE="$HOME/.local/state/ash/debug.jsonl" \
+ASH_LOG_MAX_BYTES=10485760 \
+ash "investigate this error"</code></pre>
+          <p>Kapan<code>ASH_LOG_FILE</code>diatur, catatan log JSON verbose ditulis ke jalur itu; direktori induk dibuat sesuai kebutuhan.<code>ASH_LOG_MAX_BYTES</code>mengontrol rotasi dan default ke<code>1048576</code>byte (1 MiB). Tanpa file log eksplisit, keluaran debug menggunakan penulis diagnostik proses. Jaga kerahasiaan log dan tinjau sebelum membagikannya.</p>
+          <p>Hal ini berbeda dengan Make<code>V=1</code>: menggunakan<code>V=1</code>untuk melihat keluaran perintah build/test dan<code>ASH_VERBOSE=1</code>untuk mendiagnosis suatuAshpemanggilan waktu proses.</p>
+        </section>
+
+        <section id="find-log-source">
+          <h2>Temukan sumber catatan log</h2>
+          <p>Setiap panggilan logging Ash memiliki kolom <code>EID</code> yang unik. Salin EID dari data JSON dan cari literalnya di sumber Go untuk menemukan situs panggilan:</p>
+          <pre><code>rg '"EID", "EpbG2YtZ"' internal/</code></pre>
+          <p>Misalnya, panggilan sumber mencatat pesan dan EID bersama dengan konteks terstruktur. EID adalah pengidentifikasi stabil untuk lokasi log: jangan terjemahkan, ganti nama, atau gunakan kembali. Debug logger dan perilaku rotasinya diimplementasikan<a href="https://github.com/Jonconradt/ash/blob/main/internal/app/debuglog.go">internal/aplikasi/debuglog.go</a>.</p>
+        </section>
+
+        <section id="vm-testing">
+          <h2>Uji penginstalan paket asli dengan <code>vm.sh</code></h2>
+          <p><code>scripts/vm.sh</code> mendeteksi OS host dan memilih backend VM: Tart di Apple Silicon macOS, atau QEMU/KVM di x86_64 Linux. Kedua backend dapat menguji APT di Ubuntu/Debian dan DNF di Fedora/Rocky Linux. Tart di macOS juga dapat menguji paket MacOS Homebrew; Host Linux tidak dapat menjalankan macOS guest sehingga tidak dapat menguji jalur tersebut.</p>
+          <h3>persyaratan host macOS</h3>
+          <p>Gunakan Apple Silicon Mac yang menjalankan macOS 13 atau lebih baru, dengan Tart terinstal, akses jaringan ke image VM dan repositori Ash, serta ruang disk yang cukup untuk VM. Instal Tart dengan Homebrew jika diperlukan:</p>
+          <pre><code>brew install openai/tools/tart</code></pre>
+          <h3>Prasyarat host Linux</h3>
+          <p>Gunakan host Linux x86_64 dengan virtualisasi perangkat keras yang diaktifkan dan akun pengguna yang dapat membaca dan menulis<code>/dev/kvm</code>(umumnya dengan bergabung dengan<code>kvm</code>grup dan masuk lagi). Instal QEMU/KVM, cloud-image-utils untuk<code>cloud-localds</code>, curl, alat klien OpenSSH, dan Python 3. Contoh perintah paket:</p>
+          <pre><code># Debian or Ubuntu
+sudo apt-get install qemu-system-x86 qemu-utils cloud-image-utils curl openssh-client python3
+
+# Fedora or Rocky Linux
+sudo dnf install qemu-kvm qemu-img cloud-utils curl openssh-clients python3</code></pre>
+          <p>Backend Linux meluncurkan image cloud x86_64 Ubuntu, Debian, Fedora, atau Rocky dengan QEMU/KVM dan cloud-init. Ia menggunakan jaringan mode pengguna QEMU dengan SSH yang diteruskan ke localhost; tidak diperlukan pengaturan jaringan libvirt. Itu tidak menjalankan tamu macOS, tidak menguji Homebrew di macOS, dan saat ini memerlukan host Linux x86_64. Arch dan FreeBSD bukan target yang didukung.</p>
+          <h3>Jalankan tes paket</h3>
+          <p>Mode otomatis adalah default dan menghapus VM setelah pengujian. Platform default mengikuti host: macOS memilih<code>macos</code>, Linux memilih<code>ubuntu</code>. Pilih platform dan mode lain yang didukung secara eksplisit:</p>
+          <pre><code>scripts/vm.sh --platform macos --mode interactive
+scripts/vm.sh --platform ubuntu --mode automated
+scripts/vm.sh --platform debian --mode interactive
+scripts/vm.sh --platform fedora --mode automated
+scripts/vm.sh --platform rocky --mode interactive</code></pre>
+          <p>Mode interaktif membuat VM yang terinstal tetap berjalan untuk pengujian manual. Di macOS, skrip mencetak perintah shell tamu <code>tart exec -it</code>. Di Linux, ia mencetak perintah SSH dan perintah stop; hentikan VM dan hapus statusnya dengan:</p>
+          <pre><code>scripts/vm.sh --stop VM_NAME</code></pre>
+          <p>Mode otomatis menjalankan pemeriksaan asap instalasi dan pengaturan shell, lalu menghentikan dan menghapus VM. Gambar dasar yang diunduh tetap disimpan dalam cache. Gambar tart dapat diubah dengan<code>ASH_TEST_VM_IMAGE</code>; URL cloud-image Linux dapat diganti dengan<code>ASH_TEST_QEMU_IMAGE</code>. Gambar Linux di-cache di bawah<code>${XDG_CACHE_HOME:-~/.cache}/ash/vm-images</code>, dan disk VM interaktif serta kunci SSH disimpan di bawah<code>${XDG_STATE_HOME:-~/.local/state}/ash/vm</code>. Mengatur<code>ASH_TEST_VM_CACHE_DIR</code>atau<code>ASH_TEST_VM_STATE_DIR</code>untuk mengubah lokasi tersebut.</p>
+          <p>Agar tamu dapat terhubung ke layanan AI yang sama dengan host, ekspor yang diperlukan<code>ASH_AI_*</code>variabel sebelum menjalankan skrip, misalnya<code>ASH_AI_ENDPOINT</code>,<code>ASH_AI_MODEL</code>, dan, bila diperlukan,<code>ASH_AI_AUTH_TOKEN</code>. Nilai yang diekspor diteruskan ke tamu; variabel shell yang tidak diekspor tidak. VM interaktif mempertahankan kredensial ini di profil tamu dengan mode<code>0600</code>; Disk VM Linux tidak dienkripsi, jadi lindungi direktori status dan hentikan/hapus VM setelah selesai.</p>
+          <p>Melihat<code>scripts/vm.sh --help</code>untuk prasyarat backend saat ini, platform yang didukung, dan opsi.</p>
+        </section>
+
+        <section id="source-guides">
+          <h2>Panduan sumber proyek</h2>
+          <ul>
+            <li><a href="https://github.com/Jonconradt/ash/blob/main/CONTRIBUTING.md">Panduan berkontribusi</a>— penyiapan, pengujian, ekspektasi rilis, dan catatan CI.</li>
+            <li><a href="https://github.com/Jonconradt/ash/blob/main/ARCHITECTURE.md">Arsitektur</a>— tata letak proyek dan subsistem runtime.</li>
+            <li><a href="https://github.com/Jonconradt/ash/blob/main/README.md">BACA SAYA</a>— produk, instalasi, konfigurasi, dan referensi lingkungan.</li>
+            <li><a href="https://github.com/Jonconradt/ash/blob/main/Makefile">file make</a>— resep target resmi dan variabel build.</li>
+            <li><a href="https://github.com/Jonconradt/ash/tree/main/.github/workflows">Alur kerja GitHub</a>— CI, pembuat platform, dan otomatisasi penerbitan.</li>
+          </ul>
+        </section>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer page-width">
+    <a class="brand" href="./"><span class="brand-mark">&gt;_</span> ash</a>
+    <span>AI praktis untuk terminal.</span>
+    <a href="docs.html">Dokumentasi</a>
+    <a href="developer.html">Pengembang</a>
+    <a href="https://github.com/Jonconradt/ash">GitHub<span aria-hidden="true">&#8599;</span></a>
+  </footer>
+  <script src="../site.js" data-site-script defer></script>
+</body>
+</html>

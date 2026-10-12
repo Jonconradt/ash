@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ash|开发者指南</title>
+  <meta name="description" content="构建、测试、调试、打包和贡献ash。">
+  <meta name="theme-color" content="#f4f0e8">
+  <link rel="canonical" href="https://jonconradt.github.io/ash/zh-CN/developer.html">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="alternate" hreflang="en" href="https://jonconradt.github.io/ash/developer.html">
+  <link rel="alternate" hreflang="ar" href="https://jonconradt.github.io/ash/ar/developer.html">
+  <link rel="alternate" hreflang="de" href="https://jonconradt.github.io/ash/de/developer.html">
+  <link rel="alternate" hreflang="es" href="https://jonconradt.github.io/ash/es/developer.html">
+  <link rel="alternate" hreflang="fr" href="https://jonconradt.github.io/ash/fr/developer.html">
+  <link rel="alternate" hreflang="id" href="https://jonconradt.github.io/ash/id/developer.html">
+  <link rel="alternate" hreflang="it" href="https://jonconradt.github.io/ash/it/developer.html">
+  <link rel="alternate" hreflang="lb" href="https://jonconradt.github.io/ash/lb/developer.html">
+  <link rel="alternate" hreflang="pt-BR" href="https://jonconradt.github.io/ash/pt-BR/developer.html">
+  <link rel="alternate" hreflang="zh-CN" href="https://jonconradt.github.io/ash/zh-CN/developer.html">
+  <link rel="alternate" hreflang="zh-TW" href="https://jonconradt.github.io/ash/zh-TW/developer.html">
+  <link rel="alternate" hreflang="x-default" href="https://jonconradt.github.io/ash/developer.html">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="ash家"><span class="brand-mark">&gt;_</span> ash</a>
+    <nav aria-label="主要导航">
+      <a href="./">家</a>
+      <a href="./#install">安装</a>
+      <a href="docs.html">文档</a>
+      <a href="faq.html">常问问题</a>
+      <a href="developer.html" aria-current="page">开发商</a>
+      <a href="https://github.com/Jonconradt/ash">GitHub</a>
+      <label class="sr-only" for="site-language">语言</label>
+      <select id="site-language" class="language-select" aria-label="选择语言">
+        <option value="en">English</option>
+        <option value="ar">العربية</option>
+        <option value="de">Deutsch</option>
+        <option value="es">Español</option>
+        <option value="fr">Français</option>
+        <option value="id">Bahasa Indonesia</option>
+        <option value="it">Italiano</option>
+        <option value="lb">Lëtzebuergesch</option>
+        <option value="pt-BR">Português (Brasil)</option>
+        <option value="zh-CN" selected>简体中文</option>
+        <option value="zh-TW">繁體中文</option>
+        </select>
+    </nav>
+  </header>
+
+  <main class="docs-page page-width">
+    <header class="docs-header">
+      <p class="eyebrow">贡献·构建·调试</p>
+      <h1>开发人员指南</h1>
+      <p>有关设置结帐、选择生成目标、了解发布构建器、诊断运行时日志以及在 Tart VM 中测试本机包安装的实用指南。</p>
+    </header>
+
+    <div class="docs-layout">
+      <aside class="docs-contents" aria-label="开发者指南内容">
+        <strong>内容</strong>
+        <a href="#setup">工具链设置</a>
+        <a href="#workflow">日常工作流程</a>
+        <a href="#make-targets">制定目标</a>
+        <a href="#plugins">插件构建器</a>
+        <a href="#release-builders">发布构建者</a>
+        <a href="#runtime-logging">详细日志记录</a>
+        <a href="#find-log-source">寻找日志源</a>
+        <a href="#vm-testing">本机包 VM 测试</a>
+        <a href="#source-guides">来源指南</a>
+      </aside>
+
+      <article class="docs-content">
+        <section id="setup">
+          <h2>设置开发者工具链</h2>
+          <p>该项目使用 Go 作为 CLI 和代理，以及本机插件工具链和站点质量工具。在 macOS 上，<code>make config</code>使用自制软件；在 Debian 或 Ubuntu 上它使用 apt。它安装 Go、Node.js/npm、Python、<code>uv</code>、Rust/Cargo 以及该项目的 lint 和安全工具。存储库的 Go 模块指定构建所需的 Go 版本。</p>
+          <pre><code>make config</code></pre>
+          <p>打包 macOS 安装程序还使用 Apple 的 Xcode 命令行工具。打包Linux<code>.deb</code>和<code>.rpm</code>工件需要 Ruby，<code>fpm</code>和 RPM 打包实用程序。安装脚本安装了常见的先决条件，但发布版本可能仍然需要特定于平台的打包工具。</p>
+          <p>有关首次设置详细信息和贡献期望，请参阅<a href="https://github.com/Jonconradt/ash/blob/main/CONTRIBUTING.md">贡献.md</a>。</p>
+        </section>
+
+        <section id="workflow">
+          <h2>日常开发工作流程</h2>
+          <p>对于正常的代码更改，请在迭代时运行重点测试，然后在完成之前运行存储库所需的 lint 和测试门：</p>
+          <pre><code>go test ./internal/app -run 'TestName'
+make lint test</code></pre>
+          <p>大多数 Make 目标使用<code>scripts/dev/run-quiet.sh</code>：成功的步骤打印一份简明的<code>ok</code>行，而失败的步骤则打印捕获的输出。目标前缀为<code>V=1</code>在运行时流式传输其完整输出：</p>
+          <pre><code>make V=1 lint
+make V=1 test
+make V=1 verify</code></pre>
+          <p><code>V=1</code>控制 Make 的安静包装器。它是独立于<code>ASH_VERBOSE</code>，这使得运行时诊断成为可能Ash程序。</p>
+        </section>
+
+        <section id="make-targets">
+          <h2>制定目标参考</h2>
+          <dl>
+            <dt><code>make lint</code></dt>
+            <dd>检查本地化目录、站点安装程序的 shell 语法、工作流程 YAML、Python lint/格式、Markdown、插件 lint 和 Go lint。</dd>
+            <dt><code>make test</code></dt>
+            <dd>构建并测试本机插件，然后运行<code>go test ./...</code>。</dd>
+            <dt><code>make verify-ci</code></dt>
+            <dd>运行 lint、测试和安全检查——更快的 CI 质量门。</dd>
+            <dt><code>make verify</code></dt>
+            <dd>运行完整的本地质量门：lint、测试、竞赛测试、覆盖、审查、静态分析、安全、秘密扫描、模糊测试和基准测试。</dd>
+            <dt><code>make test-race</code></dt>
+            <dd>使用竞争检测器运行 Go 测试。</dd>
+            <dt><code>make test-cover</code></dt>
+            <dd>写<code>coverage.out</code>并检查总数<code>COVERAGE_MIN</code>（默认为 60%）。</dd>
+            <dt><code>make test-fuzz</code></dt>
+            <dd>运行应用程序模糊测试<code>FUZZ_TIME</code>（默认 10 秒）。</dd>
+            <dt><code>make security</code></dt>
+            <dd>两者都运行<code>gosec</code>和<code>govulncheck</code>。</dd>
+            <dt><code>make build</code></dt>
+            <dd>运行 lint 和测试、构建和安装本机插件以及构建<code>ash</code>加<code>ash-broker</code>在下面<code>~/.local/bin</code>。</dd>
+            <dt><code>make install</code></dt>
+            <dd>运行测试、lint、<code>gosec</code>和插件构建/安装，构建两个二进制文件，然后运行<code>ash install --shell bash --shell-integration --overwrite</code>。当您打算更新本地 Bash 集成时使用它。</dd>
+            <dt><code>make plugins-build</code>,<code>plugins-test</code>,<code>plugins-lint</code></dt>
+            <dd>构建、测试或检查每个插件<code>internal/app/ash_bootstrap/plugins_src</code>。<code>make plugins-clean</code>删除本地插件构建输出。</dd>
+            <dt><code>make site-locales</code></dt>
+            <dd>生成翻译页面并刷新站点地图。使用<code>make site-locales SITE_LOCALES="zh-TW lb_LU"</code>选择区域设置。</dd>
+          </dl>
+          <p><code>make all</code>运行<code>verify</code>进而<code>install</code>。完整的目标配方和可重写变量位于<a href="https://github.com/Jonconradt/ash/blob/main/Makefile">生成文件</a>。</p>
+        </section>
+
+        <section id="plugins">
+          <h2>插件构建器</h2>
+          <p>插件是具有独立于语言的契约的独立可执行文件。插件Makefiles选择每个插件的工具链；默认情况下，本地构建以主机为目标。发布构建通行证<code>PLUGIN_TARGET_GOOS</code>和<code>PLUGIN_TARGET_GOARCH</code>因此 Rust 和其他非 Go 插件二进制文件与发布工件相匹配。</p>
+          <p>使用<code>make plugins-build</code>将它们构建成<code>bin/plugins</code>,<code>make plugins-test</code>运行他们的测试，并且<code>make plugins-install</code>将它们复制到用户插件目录中。请参阅<a href="https://github.com/Jonconradt/ash/blob/main/docs/PLUGIN_CONTRACT.md">原生插件合约</a>在添加或更改插件之前。</p>
+        </section>
+
+        <section id="release-builders">
+          <h2>发布构建器和工件</h2>
+          <p>GitHub 发布工作流程将质量检查与本机打包构建器分开。 macOS 软件包是在 Intel 和 Apple Silicon 运行器上构建并进行冒烟测试的。 Linux 构建者封面<code>amd64</code>和<code>arm64</code>并验证<code>.deb</code>,<code>.rpm</code>和 tarball 安装。 FreeBSD 是交叉构建和打包的<code>amd64</code>。</p>
+          <p>Go 版本的二进制文件是使用修剪路径和剥离的链接器选项构建的。本机插件是为相同的操作系统和架构构建的。发布工作流程还会对已安装的软件包或提取的存档进行冒烟测试，包括新的 shell 安装配置。</p>
+          <p>对于本地工件构建，请明确指定目标操作系统、架构和版本：</p>
+          <pre><code>make release-artifacts \
+  RELEASE_TARGET_OSES=linux \
+  RELEASE_TARGET_ARCHES="arm64 amd64" \
+  RELEASE_VERSION=v1.2.3</code></pre>
+          <p><code>release-artifacts</code>构建并验证该目标支持的格式。默认值是主机操作系统（<code>auto</code>) 以及两者<code>amd64 arm64</code>; FreeBSD 发布仅限于<code>amd64</code>。文物被埋没<code>dist/release</code>。对于单个二进制/插件构建，请使用<code>make release-build-one RELEASE_GOOS=linux RELEASE_ARCH=arm64 RELEASE_VERSION=v1.2.3</code>。</p>
+          <p><code>make version</code>运行发布检查并构建工件而不发布它们。相比之下，<code>make release</code>是一个发布工作流程：它需要 macOS、干净的工作树和配置的 Git 身份、生成发行说明、创建/推送发行参考以及监视 GitHub 工作流程。它的默认渠道是beta；选择稳定或每晚<code>CHANNEL=stable</code>或者<code>CHANNEL=nightly</code>。生成的发行说明需要<code>ASH_AI_ENDPOINT</code>和<code>ASH_AI_MODEL</code>，除非附有注释<code>RELEASE_NOTES_INPUT</code>。</p>
+          <p>阅读<a href="https://github.com/Jonconradt/ash/blob/main/.github/workflows/release.yml">发布工作流程</a>和<a href="https://github.com/Jonconradt/ash/blob/main/docs/release-secrets.md">发布秘密指南</a>在发布之前。</p>
+        </section>
+
+        <section id="runtime-logging">
+          <h2>详细的运行时日志记录</h2>
+          <p><code>ASH_VERBOSE</code>启用结构化 JSON 调试日志记录并在之前打印执行仪表板Ash退出。接受的值为<code>1</code>,<code>y</code>,<code>yes</code>,<code>true</code>,<code>on</code>， 和<code>debug</code>，不区分大小写。仪表板总结了阶段时间、工具调用计数、可用令牌总数以及总实时时间。</p>
+          <pre><code>ASH_VERBOSE=1 ash "investigate this error"
+
+ASH_VERBOSE=1 \
+ASH_LOG_FILE="$HOME/.local/state/ash/debug.jsonl" \
+ASH_LOG_MAX_BYTES=10485760 \
+ash "investigate this error"</code></pre>
+          <p>什么时候<code>ASH_LOG_FILE</code>设置后，详细 JSON 日志记录将写入该路径；父目录是根据需要创建的。<code>ASH_LOG_MAX_BYTES</code>控制旋转并默认为<code>1048576</code>字节 (1 MiB)。如果没有显式日志文件，调试输出将使用进程诊断编写器。将日志保密并在共享之前对其进行审查。</p>
+          <p>这与Make不同<code>V=1</code>： 使用<code>V=1</code>查看构建/测试命令输出和<code>ASH_VERBOSE=1</code>诊断Ash运行时调用。</p>
+        </section>
+
+        <section id="find-log-source">
+          <h2>查找日志记录的来源</h2>
+          <p>每个 Ash 日志记录调用都有一个唯一的 <code>EID</code> 字段。从 JSON 记录中复制 EID 并在 Go 源代码中搜索其文字以找到调用站点：</p>
+          <pre><code>rg '"EID", "EpbG2YtZ"' internal/</code></pre>
+          <p>例如，源调用将消息和 EID 与结构化上下文一起记录。 EID 是日志位置的稳定标识符：请勿翻译、重命名或重复使用它们。调试记录器及其旋转行为是在<a href="https://github.com/Jonconradt/ash/blob/main/internal/app/debuglog.go">内部/应用程序/debuglog.go</a>。</p>
+        </section>
+
+        <section id="vm-testing">
+          <h2>使用 <code>vm.sh</code> 测试本机软件包安装</h2>
+          <p><code>scripts/vm.sh</code> 检测主机操作系统并选择虚拟机后端：Apple Silicon macOS 上的 Tart 或 x86_64 Linux 上的 QEMU/KVM。两个后端都可以在 Ubuntu/Debian 上测试 APT，在 Fedora/Rocky Linux 上测试 DNF。 macOS 上的 Tart 还可以测试 macOS Homebrew 包； Linux 主机无法运行 macOS 来宾，因此无法测试该路径。</p>
+          <h3>macOS 主机先决条件</h3>
+          <p>使用运行 macOS 13 或更高版本的 Apple Silicon Mac，安装了 Tart，可以通过网络访问 VM 映像和 Ash 存储库，并为 VM 提供足够的磁盘空间。如果需要，使用 Homebrew 安装 Tart：</p>
+          <pre><code>brew install openai/tools/tart</code></pre>
+          <h3>Linux 主机先决条件</h3>
+          <p>使用启用硬件虚拟化且具有读写权限的 x86_64 Linux 主机<code>/dev/kvm</code>（通常通过加入<code>kvm</code>组并重新登录）。安装 QEMU/KVM、cloud-image-utils<code>cloud-localds</code>、curl、OpenSSH 客户端工具和 Python 3。示例包命令：</p>
+          <pre><code># Debian or Ubuntu
+sudo apt-get install qemu-system-x86 qemu-utils cloud-image-utils curl openssh-client python3
+
+# Fedora or Rocky Linux
+sudo dnf install qemu-kvm qemu-img cloud-utils curl openssh-clients python3</code></pre>
+          <p>Linux 后端使用 QEMU/KVM 和 cloud-init 启动 x86_64 Ubuntu、Debian、Fedora 或 Rocky 云映像。它使用 QEMU 用户模式网络，并将 SSH 转发到本地主机；不需要 libvirt 网络设置。它不运行 macOS 来宾，不在 macOS 上测试 Homebrew，并且当前需要 x86_64 Linux 主机。 Arch 和 FreeBSD 不是受支持的目标。</p>
+          <h3>运行包测试</h3>
+          <p>自动模式是默认模式，并在测试后删除虚拟机。默认平台跟随主机：macOS 选择<code>macos</code>,Linux选择<code>ubuntu</code>。明确选择另一个支持的平台和模式：</p>
+          <pre><code>scripts/vm.sh --platform macos --mode interactive
+scripts/vm.sh --platform ubuntu --mode automated
+scripts/vm.sh --platform debian --mode interactive
+scripts/vm.sh --platform fedora --mode automated
+scripts/vm.sh --platform rocky --mode interactive</code></pre>
+          <p>交互模式使已安装的虚拟机保持运行以进行手动测试。在 macOS 上，该脚本会打印 <code>tart exec -it</code> guest-shell 命令。在 Linux 上，它打印 SSH 命令和停止命令；停止虚拟机并删除其状态：</p>
+          <pre><code>scripts/vm.sh --stop VM_NAME</code></pre>
+          <p>自动模式运行安装和 shell 设置烟雾检查，然后停止并删除虚拟机。下载的基础镜像仍然被缓存。馅饼图像可以改变<code>ASH_TEST_VM_IMAGE</code>; Linux 云图像 URL 可以被覆盖<code>ASH_TEST_QEMU_IMAGE</code>。 Linux 镜像缓存在<code>${XDG_CACHE_HOME:-~/.cache}/ash/vm-images</code>，交互式 VM 磁盘和 SSH 密钥保存在<code>${XDG_STATE_HOME:-~/.local/state}/ash/vm</code>。放<code>ASH_TEST_VM_CACHE_DIR</code>或者<code>ASH_TEST_VM_STATE_DIR</code>更改这些位置。</p>
+          <p>为了让访客连接到与主机相同的AI服务，请导出所需的<code>ASH_AI_*</code>运行脚本之前的变量，例如<code>ASH_AI_ENDPOINT</code>,<code>ASH_AI_MODEL</code>，并且，当需要时，<code>ASH_AI_AUTH_TOKEN</code>。导出的值转发给客人；未导出的 shell 变量则不然。交互式虚拟机将这些凭据保留在来宾配置文件中的模式<code>0600</code>; Linux VM 磁盘未加密，因此请保护状态目录并在完成后停止/删除 VM。</p>
+          <p>看<code>scripts/vm.sh --help</code>了解当前后端先决条件、支持的平台和选项。</p>
+        </section>
+
+        <section id="source-guides">
+          <h2>项目源码指南</h2>
+          <ul>
+            <li><a href="https://github.com/Jonconradt/ash/blob/main/CONTRIBUTING.md">贡献指南</a>— 设置、测试、发布预期和 CI 注释。</li>
+            <li><a href="https://github.com/Jonconradt/ash/blob/main/ARCHITECTURE.md">建筑学</a>- 项目布局和运行时子系统。</li>
+            <li><a href="https://github.com/Jonconradt/ash/blob/main/README.md">自述文件</a>— 产品、安装、配置和环境参考。</li>
+            <li><a href="https://github.com/Jonconradt/ash/blob/main/Makefile">生成文件</a>— 权威的目标配方和构建变量。</li>
+            <li><a href="https://github.com/Jonconradt/ash/tree/main/.github/workflows">GitHub 工作流程</a>— CI、平台构建器和发布自动化。</li>
+          </ul>
+        </section>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer page-width">
+    <a class="brand" href="./"><span class="brand-mark">&gt;_</span> ash</a>
+    <span>终端的实用人工智能。</span>
+    <a href="docs.html">文档</a>
+    <a href="developer.html">开发商</a>
+    <a href="https://github.com/Jonconradt/ash">GitHub<span aria-hidden="true">&#8599;</span></a>
+  </footer>
+  <script src="../site.js" data-site-script defer></script>
+</body>
+</html>

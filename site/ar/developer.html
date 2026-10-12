@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ash| دليل المطور</title>
+  <meta name="description" content="البناء والاختبار والتصحيح والحزم والمساهمة فيash.">
+  <meta name="theme-color" content="#f4f0e8">
+  <link rel="canonical" href="https://jonconradt.github.io/ash/ar/developer.html">
+  <link rel="icon" href="../favicon.svg" type="image/svg+xml">
+  <link rel="alternate" hreflang="en" href="https://jonconradt.github.io/ash/developer.html">
+  <link rel="alternate" hreflang="ar" href="https://jonconradt.github.io/ash/ar/developer.html">
+  <link rel="alternate" hreflang="de" href="https://jonconradt.github.io/ash/de/developer.html">
+  <link rel="alternate" hreflang="es" href="https://jonconradt.github.io/ash/es/developer.html">
+  <link rel="alternate" hreflang="fr" href="https://jonconradt.github.io/ash/fr/developer.html">
+  <link rel="alternate" hreflang="id" href="https://jonconradt.github.io/ash/id/developer.html">
+  <link rel="alternate" hreflang="it" href="https://jonconradt.github.io/ash/it/developer.html">
+  <link rel="alternate" hreflang="lb" href="https://jonconradt.github.io/ash/lb/developer.html">
+  <link rel="alternate" hreflang="pt-BR" href="https://jonconradt.github.io/ash/pt-BR/developer.html">
+  <link rel="alternate" hreflang="zh-CN" href="https://jonconradt.github.io/ash/zh-CN/developer.html">
+  <link rel="alternate" hreflang="zh-TW" href="https://jonconradt.github.io/ash/zh-TW/developer.html">
+  <link rel="alternate" hreflang="x-default" href="https://jonconradt.github.io/ash/developer.html">
+  <link rel="stylesheet" href="../styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="./" aria-label="ashبيت"><span class="brand-mark">&gt;_</span> ash</a>
+    <nav aria-label="التنقل الأساسي">
+      <a href="./">بيت</a>
+      <a href="./#install">ثَبَّتَ</a>
+      <a href="docs.html">المستندات</a>
+      <a href="faq.html">التعليمات</a>
+      <a href="developer.html" aria-current="page">المطورين</a>
+      <a href="https://github.com/Jonconradt/ash">جيثب</a>
+      <label class="sr-only" for="site-language">لغة</label>
+      <select id="site-language" class="language-select" aria-label="اختر اللغة">
+        <option value="en">English</option>
+        <option value="ar" selected>العربية</option>
+        <option value="de">Deutsch</option>
+        <option value="es">Español</option>
+        <option value="fr">Français</option>
+        <option value="id">Bahasa Indonesia</option>
+        <option value="it">Italiano</option>
+        <option value="lb">Lëtzebuergesch</option>
+        <option value="pt-BR">Português (Brasil)</option>
+        <option value="zh-CN">简体中文</option>
+        <option value="zh-TW">繁體中文</option>
+        </select>
+    </nav>
+  </header>
+
+  <main class="docs-page page-width">
+    <header class="docs-header">
+      <p class="eyebrow">المساهمة · البناء · تصحيح الأخطاء</p>
+      <h1>دليل المطور</h1>
+      <p>دليل عملي لإعداد الخروج، واختيار تحديد الأهداف، وفهم منشئي الإصدارات، وتشخيص سجلات وقت التشغيل، واختبار عمليات تثبيت الحزم الأصلية في أجهزة Tart الافتراضية.</p>
+    </header>
+
+    <div class="docs-layout">
+      <aside class="docs-contents" aria-label="محتويات دليل المطور">
+        <strong>محتويات</strong>
+        <a href="#setup">إعداد سلسلة الأدوات</a>
+        <a href="#workflow">سير العمل اليومي</a>
+        <a href="#make-targets">جعل الأهداف</a>
+        <a href="#plugins">بناة البرنامج المساعد</a>
+        <a href="#release-builders">الافراج عن بناة</a>
+        <a href="#runtime-logging">تسجيل مطول</a>
+        <a href="#find-log-source">العثور على مصدر السجل</a>
+        <a href="#vm-testing">اختبارات VM للحزمة الأصلية</a>
+        <a href="#source-guides">أدلة المصدر</a>
+      </aside>
+
+      <article class="docs-content">
+        <section id="setup">
+          <h2>قم بإعداد سلسلة أدوات المطور</h2>
+          <p>يستخدم المشروع Go لـ CLI والوسيط، بالإضافة إلى سلاسل أدوات المكونات الإضافية الأصلية وأدوات جودة الموقع. على نظام التشغيل ماك،<code>make config</code>يستخدم البيرة. على Debian أو Ubuntu يستخدم apt. يقوم بتثبيت Go وNode.js/npm وPython،<code>uv</code>والصدأ/البضائع والوبر وأدوات الأمان الخاصة بالمشروع. تحدد وحدة Go الخاصة بالمستودع إصدار Go المتوقع بواسطة البناء.</p>
+          <pre><code>make config</code></pre>
+          <p>تستخدم أدوات تثبيت macOS أيضًا أدوات سطر أوامر Xcode من Apple. التعبئة والتغليف لينكس<code>.deb</code>و<code>.rpm</code>التحف تتطلب روبي،<code>fpm</code>، وأدوات التغليف RPM. يقوم البرنامج النصي للإعداد بتثبيت المتطلبات الأساسية الشائعة، ولكن قد تظل هناك حاجة إلى أدوات التعبئة الخاصة بالنظام الأساسي لبناء الإصدار.</p>
+          <p>للحصول على تفاصيل الإعداد لأول مرة وتوقعات المساهمة، راجع<a href="https://github.com/Jonconradt/ash/blob/main/CONTRIBUTING.md">المساهمة.md</a>.</p>
+        </section>
+
+        <section id="workflow">
+          <h2>سير عمل التطوير اليومي</h2>
+          <p>لتغيير الكود العادي، قم بتشغيل الاختبارات المركزة أثناء التكرار، ثم قم بتشغيل الوبر المطلوب للمستودع وبوابات الاختبار قبل الانتهاء:</p>
+          <pre><code>go test ./internal/app -run 'TestName'
+make lint test</code></pre>
+          <p>يتم استخدام معظم الأهداف<code>scripts/dev/run-quiet.sh</code>: الخطوات الناجحة طباعة واحدة مختصرة<code>ok</code>سطر، في حين أن الخطوات الفاشلة تطبع مخرجاتها التي تم التقاطها. بادئة الهدف بـ<code>V=1</code>لدفق الإخراج الكامل أثناء تشغيله:</p>
+          <pre><code>make V=1 lint
+make V=1 test
+make V=1 verify</code></pre>
+          <p><code>V=1</code>يتحكم في غلاف Make الهادئ. إنه منفصل عن<code>ASH_VERBOSE</code>، والذي يتيح تشخيص وقت التشغيل فيAshبرنامج.</p>
+        </section>
+
+        <section id="make-targets">
+          <h2>إنشاء مرجع الهدف</h2>
+          <dl>
+            <dt><code>make lint</code></dt>
+            <dd>التحقق من كتالوجات الترجمة، وبناء جملة Shell لمثبت الموقع، وسير العمل YAML، وPython Lint/format، وMarkdown، وPlugin Lint، وGo lint.</dd>
+            <dt><code>make test</code></dt>
+            <dd>يبني ويختبر المكونات الإضافية الأصلية، ثم يقوم بتشغيلها<code>go test ./...</code>.</dd>
+            <dt><code>make verify-ci</code></dt>
+            <dd>يقوم بتشغيل الوبر والاختبارات وفحوصات الأمان - بوابة جودة CI الأسرع.</dd>
+            <dt><code>make verify</code></dt>
+            <dd>يدير بوابة الجودة المحلية الكاملة: الوبر، والاختبارات، واختبارات السباق، والتغطية، والطبيب البيطري، والتحليل الثابت، والأمن، والمسح السري، والتشويش، والمعايير.</dd>
+            <dt><code>make test-race</code></dt>
+            <dd>يجري اختبارات Go باستخدام كاشف السباق.</dd>
+            <dt><code>make test-cover</code></dt>
+            <dd>يكتب<code>coverage.out</code>ويتحقق من المجموع ضد<code>COVERAGE_MIN</code>(60% بشكل افتراضي).</dd>
+            <dt><code>make test-fuzz</code></dt>
+            <dd>تشغيل اختبارات زغب التطبيق لـ<code>FUZZ_TIME</code>(10 ثواني بشكل افتراضي).</dd>
+            <dt><code>make security</code></dt>
+            <dd>يعمل على حد سواء<code>gosec</code>و<code>govulncheck</code>.</dd>
+            <dt><code>make build</code></dt>
+            <dd>يقوم بتشغيل الوبر والاختبار، ويبني ويثبت المكونات الإضافية الأصلية، ويبني<code>ash</code>زائد<code>ash-broker</code>تحت<code>~/.local/bin</code>.</dd>
+            <dt><code>make install</code></dt>
+            <dd>يدير الاختبارات، والوبر،<code>gosec</code>، وبناء/تثبيت البرنامج المساعد، يبني كلا الثنائيات، ثم يعمل<code>ash install --shell bash --shell-integration --overwrite</code>. استخدمه عندما تنوي تحديث تكامل Bash المحلي.</dd>
+            <dt><code>make plugins-build</code>,<code>plugins-test</code>,<code>plugins-lint</code></dt>
+            <dd>قم ببناء أو اختبار أو فحص كل مكون إضافي تحته<code>internal/app/ash_bootstrap/plugins_src</code>.<code>make plugins-clean</code>يزيل مخرجات بناء البرنامج المساعد المحلي.</dd>
+            <dt><code>make site-locales</code></dt>
+            <dd>يقوم بإنشاء صفحات مترجمة وتحديث خريطة الموقع. يستخدم<code>make site-locales SITE_LOCALES="zh-TW lb_LU"</code>لتحديد اللغات.</dd>
+          </dl>
+          <p><code>make all</code>يدير<code>verify</code>وثم<code>install</code>. الوصفات المستهدفة الكاملة والمتغيرات القابلة للتجاوز موجودة في ملف<a href="https://github.com/Jonconradt/ash/blob/main/Makefile">ملف تعريف</a>.</p>
+        </section>
+
+        <section id="plugins">
+          <h2>بناة البرنامج المساعد</h2>
+          <p>المكونات الإضافية هي ملفات تنفيذية مستقلة بعقد مستقل عن اللغة. يقوم البرنامج المساعد Makefiles بتحديد سلسلة أدوات كل مكون إضافي؛ تستهدف الإصدارات المحلية المضيف افتراضيًا. إصدار يبني تمريرة<code>PLUGIN_TARGET_GOOS</code>و<code>PLUGIN_TARGET_GOARCH</code>لذا فإن Rust والثنائيات الإضافية الأخرى غير التابعة لـ Go تتطابق مع قطعة الإصدار.</p>
+          <p>يستخدم<code>make plugins-build</code>لبناء لهم في<code>bin/plugins</code>,<code>make plugins-test</code>لإجراء اختباراتهم، و<code>make plugins-install</code>لنسخها إلى دليل البرنامج المساعد للمستخدم. انظر<a href="https://github.com/Jonconradt/ash/blob/main/docs/PLUGIN_CONTRACT.md">عقد البرنامج المساعد الأصلي</a>قبل إضافة أو تغيير البرنامج المساعد.</p>
+        </section>
+
+        <section id="release-builders">
+          <h2>الافراج عن بناة والتحف</h2>
+          <p>يفصل سير عمل إصدار GitHub عمليات فحص الجودة عن منشئي الحزم الأصليين. تم تصميم حزم macOS واختبارها على مشغلات Intel وApple Silicon. غلاف منشئي Linux<code>amd64</code>و<code>arm64</code>والتحقق من صحة<code>.deb</code>,<code>.rpm</code>، وتثبيتات tarball. تم تصميم FreeBSD بشكل متقاطع وتعبئته من أجل<code>amd64</code>.</p>
+          <p>تم إنشاء ثنائيات إصدار Go باستخدام مسار القطع وخيارات الرابط المجرد. تم تصميم المكونات الإضافية الأصلية لنفس نظام التشغيل والبنية. يقوم سير عمل الإصدار أيضًا باختبار الحزمة المثبتة أو الأرشيف المستخرج، بما في ذلك تكوين تثبيت shell الجديد.</p>
+          <p>بالنسبة إلى تصميمات القطع الأثرية المحلية، حدد نظام التشغيل المستهدف والبنية والإصدار بشكل صريح:</p>
+          <pre><code>make release-artifacts \
+  RELEASE_TARGET_OSES=linux \
+  RELEASE_TARGET_ARCHES="arm64 amd64" \
+  RELEASE_VERSION=v1.2.3</code></pre>
+          <p><code>release-artifacts</code>يبني ويتحقق من صحة التنسيقات المدعومة لهذا الهدف. الإعدادات الافتراضية هي نظام التشغيل المضيف (<code>auto</code>) وكلاهما<code>amd64 arm64</code>; يقتصر النشر على FreeBSD على<code>amd64</code>. التحف تذهب تحت<code>dist/release</code>. لإنشاء ثنائي/مكون إضافي واحد، استخدم<code>make release-build-one RELEASE_GOOS=linux RELEASE_ARCH=arm64 RELEASE_VERSION=v1.2.3</code>.</p>
+          <p><code>make version</code>يدير عمليات التحقق من الإصدار ويبني القطع الأثرية دون نشرها. في المقابل،<code>make release</code>هو سير عمل نشر: فهو يتطلب نظام التشغيل macOS، وشجرة عمل نظيفة وهوية Git التي تم تكوينها، وينشئ ملاحظات الإصدار، وينشئ/يدفع مراجع الإصدار، ويراقب سير عمل GitHub. قناتها الافتراضية هي النسخة التجريبية. حدد مستقرًا أو ليلاً مع<code>CHANNEL=stable</code>أو<code>CHANNEL=nightly</code>. تتطلب ملاحظات الإصدار التي تم إنشاؤها<code>ASH_AI_ENDPOINT</code>و<code>ASH_AI_MODEL</code>، ما لم يتم توفير الملاحظات مع<code>RELEASE_NOTES_INPUT</code>.</p>
+          <p>اقرأ<a href="https://github.com/Jonconradt/ash/blob/main/.github/workflows/release.yml">الافراج عن سير العمل</a>و<a href="https://github.com/Jonconradt/ash/blob/main/docs/release-secrets.md">دليل أسرار الافراج</a>قبل النشر.</p>
+        </section>
+
+        <section id="runtime-logging">
+          <h2>تسجيل وقت التشغيل مطول</h2>
+          <p><code>ASH_VERBOSE</code>تمكين تسجيل تصحيح أخطاء JSON المنظم وطباعة لوحة معلومات التنفيذ من قبلAshمخارج. القيم المقبولة هي<code>1</code>,<code>y</code>,<code>yes</code>,<code>true</code>,<code>on</code>، و<code>debug</code>، غير حساس لحالة الأحرف. تلخص لوحة المعلومات توقيتات المرحلة وعدد استدعاءات الأدوات وإجماليات الرموز المميزة عند توفرها وإجمالي الوقت الفعلي.</p>
+          <pre><code>ASH_VERBOSE=1 ash "investigate this error"
+
+ASH_VERBOSE=1 \
+ASH_LOG_FILE="$HOME/.local/state/ash/debug.jsonl" \
+ASH_LOG_MAX_BYTES=10485760 \
+ash "investigate this error"</code></pre>
+          <p>متى<code>ASH_LOG_FILE</code>تم تعيينه، تتم كتابة سجلات سجل JSON المطولة على هذا المسار؛ يتم إنشاء الدليل الأصلي حسب الحاجة.<code>ASH_LOG_MAX_BYTES</code>يتحكم في التدوير والإعدادات الافتراضية<code>1048576</code>بايت (1 ميجابايت). بدون ملف سجل صريح، يستخدم إخراج التصحيح كاتب تشخيص العملية. حافظ على خصوصية السجلات وراجعها قبل مشاركتها.</p>
+          <p>وهذا يختلف عن Make<code>V=1</code>: يستخدم<code>V=1</code>لرؤية إخراج أمر البناء/الاختبار و<code>ASH_VERBOSE=1</code>لتشخيصAshاستدعاء وقت التشغيل.</p>
+        </section>
+
+        <section id="find-log-source">
+          <h2>ابحث عن مصدر سجل السجل</h2>
+          <p>كل استدعاء تسجيل Ash يحتوي على حقل <code>EID</code> فريد. انسخ معرف EID من سجل JSON وابحث عن حرفه في مصدر Go للعثور على موقع الاتصال:</p>
+          <pre><code>rg '"EID", "EpbG2YtZ"' internal/</code></pre>
+          <p>على سبيل المثال، يقوم استدعاء المصدر بتسجيل الرسالة ومعرف EID مع السياق المنظم. تعد معرفات EID معرفات ثابتة لمواقع السجل: لا تقم بترجمتها أو إعادة تسميتها أو إعادة استخدامها. يتم تنفيذ مسجل التصحيح وسلوك التدوير الخاص به<a href="https://github.com/Jonconradt/ash/blob/main/internal/app/debuglog.go">Internal/app/debuglog.go</a>.</p>
+        </section>
+
+        <section id="vm-testing">
+          <h2>اختبار عمليات تثبيت الحزمة الأصلية باستخدام <code>vm.sh</code></h2>
+          <p><code>scripts/vm.sh</code> يكتشف نظام التشغيل المضيف ويحدد واجهة VM الخلفية: Tart على Apple Silicon macOS، أو QEMU/KVM على x86_64 Linux. يمكن لكلا الواجهتين الخلفيتين اختبار APT على Ubuntu/Debian وDNF على Fedora/Rocky Linux. يمكن لـ Tart على macOS أيضًا اختبار حزمة macOS Homebrew؛ لا يمكن لمضيفي Linux تشغيل ضيوف macOS، وبالتالي لا يمكنهم اختبار هذا المسار.</p>
+          <h3>المتطلبات الأساسية لمضيف macOS</h3>
+          <p>استخدم جهاز Apple Silicon Mac يعمل بنظام macOS 13 أو أحدث، مع تثبيت Tart، والوصول إلى الشبكة إلى صورة VM ومستودع Ash، ومساحة كافية على القرص لجهاز VM. قم بتثبيت Tart باستخدام Homebrew إذا لزم الأمر:</p>
+          <pre><code>brew install openai/tools/tart</code></pre>
+          <h3>المتطلبات الأساسية لمضيف Linux</h3>
+          <p>استخدم مضيف Linux x86_64 مع تمكين المحاكاة الافتراضية للأجهزة وحساب مستخدم يمكنه القراءة والكتابة<code>/dev/kvm</code>(عادة عن طريق الانضمام إلى<code>kvm</code>المجموعة وتسجيل الدخول مرة أخرى). قم بتثبيت QEMU/KVM وأدوات الصور السحابية لـ<code>cloud-localds</code>وcurl وأدوات عميل OpenSSH وPython 3. أمثلة لأوامر الحزمة:</p>
+          <pre><code># Debian or Ubuntu
+sudo apt-get install qemu-system-x86 qemu-utils cloud-image-utils curl openssh-client python3
+
+# Fedora or Rocky Linux
+sudo dnf install qemu-kvm qemu-img cloud-utils curl openssh-clients python3</code></pre>
+          <p>تقوم الواجهة الخلفية لنظام التشغيل Linux بتشغيل الصور السحابية x86_64 Ubuntu أو Debian أو Fedora أو Rocky باستخدام QEMU/KVM وcloud-init. يستخدم شبكة وضع المستخدم QEMU مع إعادة توجيه SSH إلى المضيف المحلي؛ ليست هناك حاجة إلى إعداد شبكة libvirt. لا يقوم بتشغيل ضيوف macOS، ولا يختبر Homebrew على macOS، ويتطلب حاليًا مضيف Linux x86_64. Arch وFreeBSD ليست أهدافًا مدعومة.</p>
+          <h3>قم بإجراء اختبار الحزمة</h3>
+          <p>الوضع التلقائي هو الوضع الافتراضي ويقوم بإزالة الجهاز الظاهري بعد الاختبار. يتبع النظام الأساسي الافتراضي المضيف: يختاره macOS<code>macos</code>لينكس يختار<code>ubuntu</code>. اختر نظامًا أساسيًا ووضعًا مدعومًا آخر بشكل صريح:</p>
+          <pre><code>scripts/vm.sh --platform macos --mode interactive
+scripts/vm.sh --platform ubuntu --mode automated
+scripts/vm.sh --platform debian --mode interactive
+scripts/vm.sh --platform fedora --mode automated
+scripts/vm.sh --platform rocky --mode interactive</code></pre>
+          <p>يترك الوضع التفاعلي الجهاز الظاهري المثبت قيد التشغيل للاختبار اليدوي. في نظام التشغيل macOS، يقوم البرنامج النصي بطباعة أمر الضيف <code>tart exec -it</code>. في نظام Linux، يقوم بطباعة أمر SSH وأمر إيقاف؛ أوقف الجهاز الافتراضي وأزل حالته باستخدام:</p>
+          <pre><code>scripts/vm.sh --stop VM_NAME</code></pre>
+          <p>يعمل الوضع التلقائي على تشغيل عمليات التثبيت وفحص دخان إعداد الغلاف، ثم يقوم بإيقاف الجهاز الظاهري وإزالته. تظل الصور الأساسية التي تم تنزيلها مخزنة مؤقتًا. يمكن تغيير الصور اللاذعة مع<code>ASH_TEST_VM_IMAGE</code>; يمكن تجاوز عناوين URL للصور السحابية لنظام Linux باستخدام<code>ASH_TEST_QEMU_IMAGE</code>. يتم تخزين صور Linux مؤقتًا ضمن<code>${XDG_CACHE_HOME:-~/.cache}/ash/vm-images</code>، ويتم الاحتفاظ بأقراص VM التفاعلية ومفاتيح SSH بالأسفل<code>${XDG_STATE_HOME:-~/.local/state}/ash/vm</code>. تعيين<code>ASH_TEST_VM_CACHE_DIR</code>أو<code>ASH_TEST_VM_STATE_DIR</code>لتغيير تلك المواقع.</p>
+          <p>للسماح للضيف بالاتصال بنفس خدمة الذكاء الاصطناعي مثل المضيف، قم بتصدير ما هو مطلوب<code>ASH_AI_*</code>المتغيرات قبل تشغيل البرنامج النصي، على سبيل المثال<code>ASH_AI_ENDPOINT</code>,<code>ASH_AI_MODEL</code>، وعند الحاجة،<code>ASH_AI_AUTH_TOKEN</code>. يتم إرسال القيم المصدرة إلى الضيف؛ متغيرات الصدفة غير المصدرة ليست كذلك. تحتفظ أجهزة VM التفاعلية ببيانات الاعتماد هذه في ملف تعريف الضيف باستخدام الوضع<code>0600</code>; أقراص Linux VM غير مشفرة، لذا قم بحماية دليل الحالة وأوقف/أزل VM عند الانتهاء.</p>
+          <p>يرى<code>scripts/vm.sh --help</code>للمتطلبات الأساسية الحالية للواجهة الخلفية والأنظمة الأساسية المدعومة والخيارات.</p>
+        </section>
+
+        <section id="source-guides">
+          <h2>أدلة مصدر المشروع</h2>
+          <ul>
+            <li><a href="https://github.com/Jonconradt/ash/blob/main/CONTRIBUTING.md">دليل المساهمة</a>- الإعداد والاختبارات وتوقعات الإصدار وملاحظات CI.</li>
+            <li><a href="https://github.com/Jonconradt/ash/blob/main/ARCHITECTURE.md">بنيان</a>— تخطيط المشروع والأنظمة الفرعية لوقت التشغيل.</li>
+            <li><a href="https://github.com/Jonconradt/ash/blob/main/README.md">التمهيدي</a>- مرجع المنتج والتثبيت والتكوين والبيئة.</li>
+            <li><a href="https://github.com/Jonconradt/ash/blob/main/Makefile">ملف تعريف</a>- وصفات الهدف الموثوقة وبناء المتغيرات.</li>
+            <li><a href="https://github.com/Jonconradt/ash/tree/main/.github/workflows">سير عمل جيثب</a>— CI، وبناة المنصات، وأتمتة النشر.</li>
+          </ul>
+        </section>
+      </article>
+    </div>
+  </main>
+
+  <footer class="site-footer page-width">
+    <a class="brand" href="./"><span class="brand-mark">&gt;_</span> ash</a>
+    <span>الذكاء الاصطناعي العملي للمحطة.</span>
+    <a href="docs.html">التوثيق</a>
+    <a href="developer.html">المطورين</a>
+    <a href="https://github.com/Jonconradt/ash">جيثب<span aria-hidden="true">&#8599;</span></a>
+  </footer>
+  <script src="../site.js" data-site-script defer></script>
+</body>
+</html>

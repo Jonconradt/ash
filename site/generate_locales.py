@@ -19,7 +19,7 @@ from pathlib import Path
 SITE_DIR = Path(__file__).resolve().parent
 REPO_DIR = SITE_DIR.parent
 BASE_URL = "https://jonconradt.github.io/ash/"
-PAGES = ("index.html", "docs.html", "faq.html")
+PAGES = ("index.html", "docs.html", "faq.html", "developer.html")
 CATALOG_DIR = REPO_DIR / "internal" / "localize" / "languages"
 CACHE_FILE = REPO_DIR / ".site-translation-cache.json"
 CACHE_VERSION = 1
