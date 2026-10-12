@@ -353,4 +353,5 @@ func printUsage(w io.Writer) {
 	_, _ = fmt.Fprintln(w, localize.Text("usage.ash.install"))
 	_, _ = fmt.Fprintln(w, localize.Text("usage.ash.mcp"))
 	_, _ = fmt.Fprintln(w, localize.Text("usage.ash.update"))
+	_, _ = fmt.Fprintln(w, localize.Text("legal.ash_attribution"))
 }

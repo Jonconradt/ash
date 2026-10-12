@@ -5,6 +5,7 @@
     "usage.ash.prompt": "用法：ash [--attach <路徑>]... [--] <文字>",
     "usage.ash.install": "       ash install [--shell bash|zsh|fish] [--shell-integration|--disable-shell-integration] [--dry-run] [--overwrite]",
     "install.dry_run_no_changes": "[試執行] 未變更任何檔案",
+    "legal.ash_attribution": "Ash 專案：https://github.com/Jonconradt/ash | MIT 授權；請參閱 LICENSE 與 THIRD_PARTY_NOTICES.md。",
     "install.assets_only": "Ash 資源已安裝；尚未啟用 Shell 整合。使用 --shell-integration 重新執行以啟用。",
     "install.shell_integration_removed": "已從 %s 移除 ash Shell 整合",
     "install.configure_again_hint": "開啟新終端機並再次執行「ash install」以選擇提供者和模型，或手動設定 ASH_AI_ENDPOINT、ASH_AI_MODEL 和 ASH_AI_AUTH_TOKEN。",

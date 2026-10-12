@@ -331,7 +331,9 @@ plugins, the `ash` man pages, the MIT license, and
 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md). Linux packages install
 binaries under `/usr/bin` and plugins under `/usr/lib/ash/plugins`; macOS
 packages install under `/usr/local`. These package-manager-owned installs are
-not updated by `ash update`. FreeBSD ships as a `.tar.gz` only; install `bash` with
+covered by the MIT license's requirement to retain the copyright and
+permission notice, which identifies and links to the Ash project. They are not
+updated by `ash update`. FreeBSD ships as a `.tar.gz` only; install `bash` with
 `pkg install bash` first. Configure `ASH_AI_ENDPOINT` and `ASH_AI_MODEL` after installation
 as described below.
 

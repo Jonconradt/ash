@@ -98,6 +98,7 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 		switch args[0] {
 		case "-h", "--help":
 			_, _ = fmt.Fprintln(stdout, localize.Text("usage.broker"))
+			_, _ = fmt.Fprintln(stdout, localize.Text("legal.ash_attribution"))
 			return 0
 		case "--version", "version":
 			_, _ = fmt.Fprintln(stdout, version)

@@ -58,6 +58,18 @@ func TestRun(t *testing.T) {
 		_ = os.Chdir(originalCwd)
 	})
 
+	t.Run("help includes project attribution", func(t *testing.T) {
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+		if code := run([]string{"--help"}, &stdout, &stderr); code != 0 {
+			t.Fatalf("help exit code = %d, want 0: %s", code, stderr.String())
+		}
+		if !strings.Contains(stdout.String(), "https://github.com/Jonconradt/ash") ||
+			!strings.Contains(stdout.String(), "THIRD_PARTY_NOTICES.md") {
+			t.Fatalf("help omits project attribution or notice reference: %q", stdout.String())
+		}
+	})
+
 	t.Run("missing args", func(t *testing.T) {
 		origStdinInteractive := stdinIsInteractive
 		t.Cleanup(func() { stdinIsInteractive = origStdinInteractive })

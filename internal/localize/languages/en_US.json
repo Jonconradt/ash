@@ -5,6 +5,7 @@
     "usage.ash.install": "       ash install [--shell bash|zsh|fish] [--shell-integration|--disable-shell-integration] [--dry-run] [--overwrite]",
     "usage.ash.mcp": "       ash mcp add <url> [--no-browser]",
     "usage.ash.update": "       ash update [--version vX.Y.Z] [--yes|--skip-customized]",
+    "legal.ash_attribution": "Ash project: https://github.com/Jonconradt/ash | MIT license; see LICENSE and THIRD_PARTY_NOTICES.md.",
     "usage.ash.broker": "       ash broker --socket <path>",
     "usage.snooze": "usage: ash snooze [duration|off]",
     "usage.mcp.add": "usage: ash mcp add <url> [--no-browser]",

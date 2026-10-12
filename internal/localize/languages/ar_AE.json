@@ -11,6 +11,7 @@
     "log.ash.output_write_failed": "تعذرت كتابة الإخراج: %v",
     "usage.ash.mcp": "       ash mcp add <الرابط> [--no-browser]",
     "usage.ash.update": "       ash update [--version vX.Y.Z] [--yes|--skip-customized]",
+    "legal.ash_attribution": "مشروع Ash: https://github.com/Jonconradt/ash | ترخيص MIT؛ راجع LICENSE وTHIRD_PARTY_NOTICES.md.",
     "usage.ash.broker": "       ash broker --socket <المسار>",
     "usage.snooze": "الاستخدام: ash snooze [المدة|off]",
     "usage.mcp.add": "الاستخدام: ash mcp add <الرابط> [--no-browser]",

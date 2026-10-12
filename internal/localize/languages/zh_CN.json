@@ -11,6 +11,7 @@
     "log.ash.output_write_failed": "写入输出失败：%v",
     "usage.ash.mcp": "       ash mcp add <网址> [--no-browser]",
     "usage.ash.update": "       ash update [--version vX.Y.Z] [--yes|--skip-customized]",
+    "legal.ash_attribution": "Ash 项目：https://github.com/Jonconradt/ash | MIT 许可证；请参阅 LICENSE 和 THIRD_PARTY_NOTICES.md。",
     "usage.ash.broker": "       ash broker --socket <路径>",
     "usage.snooze": "用法：ash snooze [时长|off]",
     "usage.mcp.add": "用法：ash mcp add <网址> [--no-browser]",

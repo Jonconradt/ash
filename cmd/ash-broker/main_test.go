@@ -27,6 +27,17 @@ import (
 	"github.com/Jonconradt/ash/internal/brokerproto"
 )
 
+func TestBrokerHelpIncludesProjectAttribution(t *testing.T) {
+	var stdout, stderr strings.Builder
+	if code := runBroker(context.Background(), []string{"--help"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("help exit code = %d, want 0: %s", code, stderr.String())
+	}
+	if !strings.Contains(stdout.String(), "https://github.com/Jonconradt/ash") ||
+		!strings.Contains(stdout.String(), "THIRD_PARTY_NOTICES.md") {
+		t.Fatalf("help omits project attribution or notice reference: %q", stdout.String())
+	}
+}
+
 func TestRunBrokerRequiresParentPID(t *testing.T) {
 	t.Setenv(brokerTokenEnv, "test-token")
 	var stdout, stderr strings.Builder

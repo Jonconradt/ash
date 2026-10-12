@@ -11,6 +11,7 @@
     "log.ash.output_write_failed": "échec de l'écriture de la sortie : %v",
     "usage.ash.mcp": "       ash mcp add <url> [--no-browser]",
     "usage.ash.update": "       ash update [--version vX.Y.Z] [--yes|--skip-customized]",
+    "legal.ash_attribution": "Projet Ash : https://github.com/Jonconradt/ash | Licence MIT ; voir LICENSE et THIRD_PARTY_NOTICES.md.",
     "usage.ash.broker": "       ash broker --socket <chemin>",
     "usage.snooze": "utilisation : ash snooze [durée|off]",
     "usage.mcp.add": "utilisation : ash mcp add <url> [--no-browser]",

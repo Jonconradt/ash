@@ -11,6 +11,7 @@
     "log.ash.output_write_failed": "gagal menulis keluaran: %v",
     "usage.ash.mcp": "       ash mcp add <url> [--no-browser]",
     "usage.ash.update": "       ash update [--version vX.Y.Z] [--yes|--skip-customized]",
+    "legal.ash_attribution": "Proyek Ash: https://github.com/Jonconradt/ash | Lisensi MIT; lihat LICENSE dan THIRD_PARTY_NOTICES.md.",
     "usage.ash.broker": "       ash broker --socket <jalur>",
     "usage.snooze": "penggunaan: ash snooze [durasi|off]",
     "usage.mcp.add": "penggunaan: ash mcp add <url> [--no-browser]",
