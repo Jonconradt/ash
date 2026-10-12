@@ -65,6 +65,7 @@ LICENSE_INSTALL_PATH_RPM ?= /usr/share/licenses/ash/LICENSE
 LICENSE_INSTALL_PATH_MACOS ?= /usr/local/share/licenses/ash/LICENSE
 TARBALL_MAN_PATH ?= usr/share/man/man1
 RELEASE_NOTES_PATH ?= $(RELEASE_OUTPUT_DIR)/release-notes.md
+RELEASE_NOTES_INPUT ?=
 RELEASE_NOTES_ATTEMPTS ?= 5
 RELEASE_ARTIFACT_BASE ?= $(APP_NAME)-$(RELEASE_VERSION)-$(RELEASE_GOOS)-$(RELEASE_ARCH)
 RELEASE_BINARY_PATH ?= $(RELEASE_OUTPUT_DIR)/$(RELEASE_ARTIFACT_BASE)
@@ -268,7 +269,7 @@ release-check: $(RELEASE_VERIFY_TARGET)
 	fi
 	@git var GIT_AUTHOR_IDENT >/dev/null
 	@git var GIT_COMMITTER_IDENT >/dev/null
-	@if [[ -z "$${ASH_AI_ENDPOINT:-}" || -z "$${ASH_AI_MODEL:-}" ]]; then \
+	@if [[ -z "$(RELEASE_NOTES_INPUT)" && ( -z "$${ASH_AI_ENDPOINT:-}" || -z "$${ASH_AI_MODEL:-}" ) ]]; then \
 		echo "set ASH_AI_ENDPOINT and ASH_AI_MODEL before generating release notes"; \
 		exit 1; \
 	fi
@@ -530,8 +531,17 @@ release-checksums:
 	grep -Eq "^[0-9a-fA-F]{64}[[:space:]]+sbom.spdx.json$$" "$$manifest"
 
 release-notes:
-	@mkdir -p "$(RELEASE_OUTPUT_DIR)"
-	@set -o pipefail; \
+	@if [[ -n "$(RELEASE_NOTES_INPUT)" ]]; then \
+		if [[ ! -s "$(RELEASE_NOTES_INPUT)" ]]; then \
+			echo "release notes input is missing or empty: $(RELEASE_NOTES_INPUT)" >&2; \
+			exit 1; \
+		fi; \
+		mkdir -p "$(RELEASE_OUTPUT_DIR)"; \
+		cp "$(RELEASE_NOTES_INPUT)" "$(RELEASE_NOTES_PATH)"; \
+		echo "using release notes from $(RELEASE_NOTES_INPUT)"; \
+	else \
+		mkdir -p "$(RELEASE_OUTPUT_DIR)"; \
+		set -o pipefail; \
 	attempts="$(RELEASE_NOTES_ATTEMPTS)"; \
 	if ! [[ "$$attempts" =~ ^[1-9][0-9]*$$ ]]; then \
 		echo "RELEASE_NOTES_ATTEMPTS must be a positive integer, got: $$attempts" >&2; \
@@ -581,7 +591,8 @@ release-notes:
 		cat "$$tmp_path" >&2; \
 		echo '--- end generated release notes ---' >&2; \
 	fi; \
-	exit 1
+	exit 1; \
+	fi
 
 release-artifacts:
 	@set -euo pipefail; \

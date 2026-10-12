@@ -256,9 +256,9 @@ fi
 		if err != nil {
 			t.Fatal(err)
 		}
-		want := "publish=true\n"
+		want := "latest_tag=\npublish=true\n"
 		if published != "" {
-			want = "publish=false\n"
+			want = "latest_tag=" + published + "\npublish=false\n"
 		}
 		if string(data) != want {
 			t.Fatalf("published=%q: got %q, want %q", published, data, want)

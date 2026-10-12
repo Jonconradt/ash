@@ -14,23 +14,14 @@ jobs:
     runs-on: macos-14
     env:
       GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
-      ASH_AI_ENDPOINT: ${{ secrets.ASH_AI_ENDPOINT }}
-      ASH_AI_MODEL: ${{ secrets.ASH_AI_MODEL }}
-      ASH_AI_AUTH_TOKEN: ${{ secrets.ASH_AI_AUTH_TOKEN }}
     steps:
       - name: Validate release credentials
         env:
           RELEASE_GITHUB_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
-          ASH_AI_ENDPOINT: ${{ secrets.ASH_AI_ENDPOINT }}
-          ASH_AI_MODEL: ${{ secrets.ASH_AI_MODEL }}
         run: |
           set -euo pipefail
           if [[ -z "$RELEASE_GITHUB_TOKEN" ]]; then
             echo "::error::configure the RELEASE_GITHUB_TOKEN repository secret before enabling nightly releases"
-            exit 1
-          fi
-          if [[ -z "$ASH_AI_ENDPOINT" || -z "$ASH_AI_MODEL" ]]; then
-            echo "::error::configure the ASH_AI_ENDPOINT and ASH_AI_MODEL repository secrets before enabling nightly releases"
             exit 1
           fi
       - name: Checkout default branch and tags
@@ -45,6 +36,7 @@ jobs:
           set -euo pipefail
           latest_tag="$(gh api "repos/${GITHUB_REPOSITORY}/releases" --paginate --slurp |
             jq -r '[.[][] | select(.draft == false and (.tag_name | contains("-nightly.")))][0].tag_name // empty')"
+          echo "latest_tag=$latest_tag" >> "$GITHUB_OUTPUT"
           if [[ -n "$latest_tag" ]] && git diff --quiet "$latest_tag" HEAD -- . \
             ':(exclude)site/apt' ':(exclude)site/rpm' ':(exclude)site/pacman'; then
             echo "publish=false" >> "$GITHUB_OUTPUT"
@@ -82,6 +74,28 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+      - name: Generate release notes from git history
+        if: steps.changes.outputs.publish == 'true'
+        env:
+          LATEST_NIGHTLY_TAG: ${{ steps.changes.outputs.latest_tag }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$LATEST_NIGHTLY_TAG" ]]; then
+            log_range="$LATEST_NIGHTLY_TAG..HEAD"
+          else
+            log_range=HEAD
+          fi
+          notes_path="$RUNNER_TEMP/nightly-release-notes.md"
+          git_summary="$(git log "$log_range" --no-merges --format='- %s' --max-count=10)"
+          if [[ -z "$git_summary" ]]; then
+            git_summary='- No non-merge commits were found.'
+          fi
+          {
+            printf '%s\n\n' '## Features'
+            printf '%s\n\n' '- This nightly includes the latest changes from the default branch.'
+            printf '%s\n\n' '## Fixes & Improvements'
+            printf '%s\n' "$git_summary"
+          } > "$notes_path"
       - name: Publish nightly release
         if: steps.changes.outputs.publish == 'true'
-        run: make release CHANNEL=nightly RELEASE_VERIFY_TARGET=verify-ci
+        run: make release CHANNEL=nightly RELEASE_VERIFY_TARGET=verify-ci RELEASE_NOTES_INPUT="$RUNNER_TEMP/nightly-release-notes.md"
