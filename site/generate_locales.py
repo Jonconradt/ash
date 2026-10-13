@@ -68,6 +68,7 @@ BRAND_PATTERN = re.compile(r"\b(ash|Ash|ASH)\b")
 URL_PATTERN = re.compile(r"\b(?:https?://|www\.)[^\s<]+|\bgithub\.com/[^\s<]+")
 TRANSLATION_CACHE: dict[str, str] = {}
 PAGE_TRANSLATION_HASHES: dict[str, str] = {}
+TRANSLATION_REQUEST_COUNTS: dict[str, int] = {}
 UNSAVED_CACHE_ENTRIES = 0
 
 
@@ -158,6 +159,13 @@ def translate_request(text: str, target: str, force: bool = False) -> str:
         f"q={text}",
     ]
     for attempt in range(6):
+        request_count = TRANSLATION_REQUEST_COUNTS.get(target, 0) + 1
+        TRANSLATION_REQUEST_COUNTS[target] = request_count
+        if request_count == 1 or request_count % 10 == 0:
+            print(
+                f"  {target}: {request_count} translation-service requests started",
+                flush=True,
+            )
         response = subprocess.run(
             command, capture_output=True, text=True, timeout=30, check=False
         )
@@ -168,6 +176,11 @@ def translate_request(text: str, target: str, force: bool = False) -> str:
             status_code = int(status_match.group(1)) if status_match else 0
             if status_code == 429 or status_code >= 500:
                 if attempt < 5:
+                    print(
+                        f"  {target}: retrying translation request "
+                        f"({attempt + 2}/6; HTTP {status_code})",
+                        flush=True,
+                    )
                     time.sleep(min(2**attempt, 30))
                     continue
             raise RuntimeError(
@@ -185,6 +198,11 @@ def translate_request(text: str, target: str, force: bool = False) -> str:
             )
         if not translated:
             if attempt < 5:
+                print(
+                    f"  {target}: translation returned no text; "
+                    f"retrying request ({attempt + 2}/6)",
+                    flush=True,
+                )
                 time.sleep(min(2**attempt, 30))
                 continue
             raise RuntimeError(
@@ -685,17 +703,23 @@ def generate_locale(
     language: dict, sources: dict[str, str], languages: list[dict]
 ) -> None:
     target = language["translationLang"]
-    for page, source in sources.items():
+    for page_index, (page, source) in enumerate(sources.items(), start=1):
         page_key = f"{target}:{language['path']}/{page}"
         source_hash = hashlib.sha256(source.encode("utf-8")).hexdigest()
         output_dir = SITE_DIR / language["path"]
         output_dir.mkdir(parents=True, exist_ok=True)
         output_path = output_dir / page
+        page_name = f"{language['path']}/{page}"
 
         if (
             PAGE_TRANSLATION_HASHES.get(page_key) == source_hash
             and output_path.is_file()
         ):
+            print(
+                f"  [{page_index}/{len(sources)}] {page_name}: "
+                "translation unchanged; reusing page",
+                flush=True,
+            )
             previous_output = output_path.read_text(encoding="utf-8")
             translated = previous_output
             translated = update_picker(translated, languages, language["path"])
@@ -705,6 +729,12 @@ def generate_locale(
                 output_path.write_text(translated, encoding="utf-8")
             continue
 
+        request_count_before = TRANSLATION_REQUEST_COUNTS.get(target, 0)
+        page_started = time.monotonic()
+        print(
+            f"  [{page_index}/{len(sources)}] {page_name}: translating",
+            flush=True,
+        )
         tree = FragmentParser(update_picker(source, languages, "")).root
         translate_tree(tree, target)
         translated = translate_attributes(serialize(tree), target)
@@ -713,7 +743,14 @@ def generate_locale(
         translated = set_locale_urls(translated, language, page, languages)
         output_path.write_text(translated, encoding="utf-8")
         PAGE_TRANSLATION_HASHES[page_key] = source_hash
-    print(f"Generated {language['locale']} ({language['path']}/)")
+        request_count = TRANSLATION_REQUEST_COUNTS.get(target, 0) - request_count_before
+        elapsed = time.monotonic() - page_started
+        print(
+            f"  [{page_index}/{len(sources)}] {page_name}: completed "
+            f"({request_count} translation-service requests, {elapsed:.1f}s)",
+            flush=True,
+        )
+    print(f"Generated {language['locale']} ({language['path']}/)", flush=True)
 
 
 def main() -> None:
@@ -726,6 +763,11 @@ def main() -> None:
     args = parser.parse_args()
 
     load_translation_cache()
+    print(
+        f"Translation cache: {len(TRANSLATION_CACHE):,} text entries and "
+        f"{len(PAGE_TRANSLATION_HASHES):,} page hashes loaded from {CACHE_FILE}",
+        flush=True,
+    )
     languages = load_languages()
     requested = set(args.locale or [])
     available = {
@@ -751,7 +793,16 @@ def main() -> None:
         or requested.intersection({language["locale"], language["path"]})
     ]
 
-    for language in selected:
+    print(
+        f"Generating {len(selected)} locale(s), {len(sources)} page(s) each.",
+        flush=True,
+    )
+    for locale_index, language in enumerate(selected, start=1):
+        print(
+            f"[{locale_index}/{len(selected)}] Starting "
+            f"{language['locale']} ({language['path']}/)",
+            flush=True,
+        )
         generate_locale(language, sources, languages)
         save_translation_cache()
 
@@ -766,6 +817,7 @@ def main() -> None:
                         output.write_text(text, encoding="utf-8")
 
     write_sitemap(languages)
+    print(f"Updated sitemap: {SITE_DIR / 'sitemap.xml'}", flush=True)
 
 
 if __name__ == "__main__":

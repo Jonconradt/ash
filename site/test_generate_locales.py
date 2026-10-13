@@ -1,6 +1,8 @@
+import io
 import json
 import tempfile
 import unittest
+from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
@@ -11,9 +13,11 @@ class GenerateLocaleCacheTests(unittest.TestCase):
     def setUp(self):
         self.translations = generate_locales.TRANSLATION_CACHE.copy()
         self.page_hashes = generate_locales.PAGE_TRANSLATION_HASHES.copy()
+        self.request_counts = generate_locales.TRANSLATION_REQUEST_COUNTS.copy()
         self.unsaved_entries = generate_locales.UNSAVED_CACHE_ENTRIES
         generate_locales.TRANSLATION_CACHE.clear()
         generate_locales.PAGE_TRANSLATION_HASHES.clear()
+        generate_locales.TRANSLATION_REQUEST_COUNTS.clear()
         generate_locales.UNSAVED_CACHE_ENTRIES = 0
 
     def tearDown(self):
@@ -21,6 +25,8 @@ class GenerateLocaleCacheTests(unittest.TestCase):
         generate_locales.TRANSLATION_CACHE.update(self.translations)
         generate_locales.PAGE_TRANSLATION_HASHES.clear()
         generate_locales.PAGE_TRANSLATION_HASHES.update(self.page_hashes)
+        generate_locales.TRANSLATION_REQUEST_COUNTS.clear()
+        generate_locales.TRANSLATION_REQUEST_COUNTS.update(self.request_counts)
         generate_locales.UNSAVED_CACHE_ENTRIES = self.unsaved_entries
 
     def test_reuses_unchanged_pages_and_regenerates_changed_or_missing_pages(self):
@@ -85,6 +91,49 @@ class GenerateLocaleCacheTests(unittest.TestCase):
                 )
                 translate_tree.assert_called_once()
                 self.assertTrue((root / "fr" / "index.html").is_file())
+
+    def test_reports_page_progress_and_reuse(self):
+        source = (
+            '<html><head></head><body><select id="site-language">'
+            "<!-- LANGUAGE_OPTIONS --></select><p>Original</p></body></html>"
+        )
+        language = {
+            "locale": "fr_FR",
+            "translationLang": "fr",
+            "path": "fr",
+            "htmlLang": "fr",
+            "name": "Français",
+        }
+        english = {
+            "locale": "en_US",
+            "translationLang": "en",
+            "path": "",
+            "htmlLang": "en",
+            "name": "English",
+        }
+
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            with (
+                patch.object(generate_locales, "SITE_DIR", root),
+                patch.object(generate_locales, "translate_tree"),
+                redirect_stdout(io.StringIO()) as output,
+            ):
+                generate_locales.generate_locale(
+                    language, {"index.html": source}, [english, language]
+                )
+                self.assertIn("[1/1] fr/index.html: translating", output.getvalue())
+                self.assertIn("completed (0 translation-service requests", output.getvalue())
+
+                output.truncate(0)
+                output.seek(0)
+                generate_locales.generate_locale(
+                    language, {"index.html": source}, [english, language]
+                )
+                self.assertIn(
+                    "[1/1] fr/index.html: translation unchanged; reusing page",
+                    output.getvalue(),
+                )
 
 
 class TranslateGroupMarkupTests(unittest.TestCase):

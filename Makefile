@@ -150,7 +150,7 @@ plugins-install: plugins-build
 		cp -f "$(PLUGINS_BIN_DIR)"/* "$(LOCAL_PLUGINS_DIR)/" 2>/dev/null || true; \
 	fi
 
-build: lint test plugins-build plugins-install
+build: lint test  site-locales plugins-build plugins-install
 	@mkdir -p "$(LOCAL_BIN_DIR)"
 	@go build -o "$(LOCAL_BINARY_PATH)" -ldflags "-X github.com/Jonconradt/ash/internal/app.ashVersion=$(BUILD_VERSION) -X github.com/Jonconradt/ash/internal/app.ashCommit=$(BUILD_COMMIT) -X github.com/Jonconradt/ash/internal/app.ashDevelopmentBuild=true" ./cmd/ash
 	@go build -o "$(LOCAL_BIN_DIR)/ash-broker" ./cmd/ash-broker
