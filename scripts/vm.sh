@@ -3,10 +3,10 @@ set -euo pipefail
 
 # Test Ash's native package installation flow in a disposable VM.
 #
-# Usage: scripts/vm.sh [--platform macos|ubuntu|debian|fedora|rocky]
+# Usage: scripts/vm.sh [--platform macos|ubuntu|debian|fedora|rocky] [--tart-home DIR]
 #        [--channel nightly|beta|release|stable]
 #        [--mode automated|interactive] | --stop VM_NAME
-# Set ASH_TEST_PLATFORM, ASH_TEST_MODE, or the backend's image variable to override defaults.
+# Use --tart-home to redirect Tart's local VM and image cache.
 
 host_os="$(uname -s)"
 case "$host_os" in
@@ -21,6 +21,7 @@ esac
 platform="${ASH_TEST_PLATFORM:-$default_platform}"
 mode="${ASH_TEST_MODE:-automated}"
 channel="beta"
+tart_home_override=""
 stop_name=""
 while (($#)); do
 	case "$1" in
@@ -38,6 +39,14 @@ while (($#)); do
 				exit 2
 			fi
 			mode="$2"
+			shift 2
+			;;
+		--tart-home)
+			if (($# < 2)) || [[ -z "$2" ]]; then
+				echo "--tart-home requires a non-empty directory path." >&2
+				exit 2
+			fi
+			tart_home_override="$2"
 			shift 2
 			;;
 		--channel)
@@ -65,11 +74,13 @@ while (($#)); do
 			;;
 		-h | --help)
 			echo "Test Ash's native package installation flow in a disposable VM."
-			echo "Usage: $0 [--platform macos|ubuntu|debian|fedora|rocky] [--channel nightly|beta|release|stable] [--mode automated|interactive]"
+			echo "Usage: $0 [--platform macos|ubuntu|debian|fedora|rocky] [--tart-home DIR] [--channel nightly|beta|release|stable] [--mode automated|interactive]"
 			echo "       $0 --stop VM_NAME"
 			echo "Defaults follow the host: macOS -> macos; Linux -> ubuntu."
 			echo "The package channel defaults to beta; stable is an alias for release."
 			echo "ASH_TEST_PLATFORM, ASH_TEST_MODE, and backend-specific image variables can override defaults."
+			echo "Tart stores local VMs and image cache under ~/.tart by default."
+			echo "--tart-home sets TART_HOME for Tart commands and requires a macOS host."
 			echo "Linux cloud-image URL override: ASH_TEST_QEMU_IMAGE=<URL>."
 			echo
 			echo "Host backends:"
@@ -97,7 +108,7 @@ while (($#)); do
 			;;
 		*)
 			echo "Unknown argument: $1" >&2
-			echo "Usage: $0 [--platform macos|ubuntu|debian|fedora|rocky] [--channel nightly|beta|release|stable] [--mode automated|interactive]" >&2
+			echo "Usage: $0 [--platform macos|ubuntu|debian|fedora|rocky] [--tart-home DIR] [--channel nightly|beta|release|stable] [--mode automated|interactive]" >&2
 			exit 2
 			;;
 	esac
@@ -151,6 +162,11 @@ fi
 
 if [[ "$mode" != "automated" && "$mode" != "interactive" ]]; then
 	echo "Invalid mode '$mode'; expected automated or interactive." >&2
+	exit 2
+fi
+
+if [[ -n "$tart_home_override" && "$host_os" != "Darwin" ]]; then
+	echo "--tart-home can only be used with the Tart backend on macOS." >&2
 	exit 2
 fi
 
@@ -223,6 +239,10 @@ case "$platform" in
 		exit 2
 		;;
 esac
+
+if [[ -n "$tart_home_override" ]]; then
+	export TART_HOME="$tart_home_override"
+fi
 
 case "$channel" in
 	release)
