@@ -45,8 +45,11 @@ translation-service requests.
 
 The generator caches completed translation requests in the ignored
 `.site-translation-cache.json` file at the repository root, so an interrupted
-run can resume without resending already-translated text. Delete that file to
-discard the cache and request fresh machine translations.
+run can resume without resending already-translated text. It also records a
+source hash per locale and page, reusing the generated page without translating
+it again when its English HTML is unchanged. Changed pages and missing outputs
+are regenerated. Delete that file to discard the cache and request fresh machine
+translations.
 
 To add a locale, first add its app catalog under
 `../internal/localize/languages/`, then add its metadata to `languages.json`

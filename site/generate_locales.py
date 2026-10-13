@@ -67,6 +67,7 @@ LOCALE_OPTIONS_MARKER = "<!-- LANGUAGE_OPTIONS -->"
 BRAND_PATTERN = re.compile(r"\b(ash|Ash|ASH)\b")
 URL_PATTERN = re.compile(r"\b(?:https?://|www\.)[^\s<]+|\bgithub\.com/[^\s<]+")
 TRANSLATION_CACHE: dict[str, str] = {}
+PAGE_TRANSLATION_HASHES: dict[str, str] = {}
 UNSAVED_CACHE_ENTRIES = 0
 
 
@@ -211,7 +212,14 @@ def load_translation_cache() -> None:
         data.get("translations"), dict
     ):
         raise RuntimeError(f"Unsupported translation cache format: {CACHE_FILE}")
+    page_hashes = data.get("page_hashes", {})
+    if not isinstance(page_hashes, dict) or any(
+        not isinstance(key, str) or not isinstance(value, str)
+        for key, value in page_hashes.items()
+    ):
+        raise RuntimeError(f"Invalid page hashes in translation cache: {CACHE_FILE}")
     TRANSLATION_CACHE.update(data["translations"])
+    PAGE_TRANSLATION_HASHES.update(page_hashes)
 
 
 def save_translation_cache() -> None:
@@ -219,7 +227,11 @@ def save_translation_cache() -> None:
     temporary = CACHE_FILE.with_suffix(".json.tmp")
     temporary.write_text(
         json.dumps(
-            {"version": CACHE_VERSION, "translations": TRANSLATION_CACHE},
+            {
+                "version": CACHE_VERSION,
+                "translations": TRANSLATION_CACHE,
+                "page_hashes": PAGE_TRANSLATION_HASHES,
+            },
             ensure_ascii=False,
             sort_keys=True,
         )
@@ -674,15 +686,33 @@ def generate_locale(
 ) -> None:
     target = language["translationLang"]
     for page, source in sources.items():
-        tree = FragmentParser(source).root
+        page_key = f"{target}:{language['path']}/{page}"
+        source_hash = hashlib.sha256(source.encode("utf-8")).hexdigest()
+        output_dir = SITE_DIR / language["path"]
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / page
+
+        if (
+            PAGE_TRANSLATION_HASHES.get(page_key) == source_hash
+            and output_path.is_file()
+        ):
+            previous_output = output_path.read_text(encoding="utf-8")
+            translated = previous_output
+            translated = update_picker(translated, languages, language["path"])
+            translated = set_asset_paths(translated)
+            translated = set_locale_urls(translated, language, page, languages)
+            if translated != previous_output:
+                output_path.write_text(translated, encoding="utf-8")
+            continue
+
+        tree = FragmentParser(update_picker(source, languages, "")).root
         translate_tree(tree, target)
         translated = translate_attributes(serialize(tree), target)
         translated = set_asset_paths(translated)
         translated = update_picker(translated, languages, language["path"])
         translated = set_locale_urls(translated, language, page, languages)
-        output_dir = SITE_DIR / language["path"]
-        output_dir.mkdir(parents=True, exist_ok=True)
-        (output_dir / page).write_text(translated, encoding="utf-8")
+        output_path.write_text(translated, encoding="utf-8")
+        PAGE_TRANSLATION_HASHES[page_key] = source_hash
     print(f"Generated {language['locale']} ({language['path']}/)")
 
 
@@ -710,9 +740,10 @@ def main() -> None:
     sources = {}
     for page in PAGES:
         source = (SITE_DIR / page).read_text(encoding="utf-8")
-        source = update_picker(source, languages, "")
         sources[page] = source
-        (SITE_DIR / page).write_text(source, encoding="utf-8")
+        (SITE_DIR / page).write_text(
+            update_picker(source, languages, ""), encoding="utf-8"
+        )
 
     selected = [
         language for language in languages[1:]
