@@ -148,6 +148,41 @@ MAKE := $(MAKE) -f Makefile -f steps.mk
 	}
 }
 
+func TestReleaseDashboardRunsOnlyOutsideCIByDefault(t *testing.T) {
+	_, dir := releaseFixture(t)
+	marker := filepath.Join(dir, "dashboard-invoked")
+	writeFixture(t, filepath.Join(dir, "bin/gh"), `#!/bin/bash
+printf '%s\n' 'fixture/repo'
+`, 0o755)
+	writeFixture(t, filepath.Join(dir, "scripts/release/release_dashboard.sh"), `#!/bin/bash
+printf '%s\n' "$*" > "$DASHBOARD_MARKER"
+`, 0o755)
+	path := filepath.Join(dir, "bin") + ":" + os.Getenv("PATH")
+
+	ciOutput := runFixture(t, dir, []string{
+		"PATH=" + path,
+		"CI=true",
+		"DASHBOARD_MARKER=" + marker,
+	}, "make", "release-watch", "RELEASE_VERSION=v1.2.0")
+	if !strings.Contains(ciOutput, "release dashboard disabled") {
+		t.Fatalf("CI release watch did not report that the dashboard is disabled: %s", ciOutput)
+	}
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatalf("dashboard ran in CI; marker stat error = %v", err)
+	}
+
+	manualOutput := runFixture(t, dir, []string{
+		"PATH=" + path,
+		"DASHBOARD_MARKER=" + marker,
+	}, "make", "release-watch", "RELEASE_VERSION=v1.2.0")
+	if !strings.Contains(manualOutput, "launching release dashboard") {
+		t.Fatalf("manual release did not launch the dashboard: %s", manualOutput)
+	}
+	if data, err := os.ReadFile(marker); err != nil || !strings.Contains(string(data), "--tag v1.2.0 --repo fixture/repo") {
+		t.Fatalf("manual release dashboard args = %q, %v", data, err)
+	}
+}
+
 func TestReleaseVerificationDefaultsToFullSuite(t *testing.T) {
 	root, err := filepath.Abs("../..")
 	if err != nil {
@@ -328,7 +363,7 @@ func TestRepositoryNightlyRetryVersionMapping(t *testing.T) {
 	}
 }
 
-func TestSiteDeploymentOnlyRunsAfterStableRepositoryUpdate(t *testing.T) {
+func TestSiteDeploymentRunsAfterAnyChangedRepositoryUpdate(t *testing.T) {
 	root, _ := releaseFixture(t)
 	data, err := os.ReadFile(filepath.Join(root, ".github/workflows/site.yml"))
 	if err != nil {
@@ -337,11 +372,11 @@ func TestSiteDeploymentOnlyRunsAfterStableRepositoryUpdate(t *testing.T) {
 	siteWorkflow := string(data)
 	for _, required := range []string{
 		"repository_dispatch:",
-		"types: [stable-release-updated]",
-		"if: startsWith(github.event.client_payload.tag, 'v') && !contains(github.event.client_payload.tag, '-')",
+		"types: [package-repository-updated]",
+		"if: startsWith(github.event.client_payload.tag, 'v')",
 	} {
 		if !strings.Contains(siteWorkflow, required) {
-			t.Errorf("site workflow missing stable-release condition %q", required)
+			t.Errorf("site workflow missing package repository dispatch condition %q", required)
 		}
 	}
 	for _, forbidden := range []string{"\n  push:", "\n  workflow_dispatch:"} {
@@ -355,17 +390,17 @@ func TestSiteDeploymentOnlyRunsAfterStableRepositoryUpdate(t *testing.T) {
 		!strings.Contains(repositoryStep, `echo "changed=true" >> "$GITHUB_OUTPUT"`) {
 		t.Fatal("package repository step does not report whether it updated files")
 	}
-	dispatchStep := workflowStep(t, root, "apt.yml", "Dispatch stable site update")
-	if !strings.Contains(dispatchStep, "event_type=stable-release-updated") ||
+	dispatchStep := workflowStep(t, root, "apt.yml", "Dispatch package repository site update")
+	if !strings.Contains(dispatchStep, "event_type=package-repository-updated") ||
 		!strings.Contains(dispatchStep, `client_payload[tag]=${RELEASE_TAG}`) {
-		t.Fatal("stable repository update does not dispatch the site workflow with the release tag")
+		t.Fatal("package repository update does not dispatch the site workflow with the release tag")
 	}
 	aptData, err := os.ReadFile(filepath.Join(root, ".github/workflows/apt.yml"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(aptData), "if: startsWith(env.RELEASE_TAG, 'v') && !contains(env.RELEASE_TAG, '-') && steps.repository_update.outputs.changed == 'true'") {
-		t.Fatal("site deployment is not gated on a changed stable repository")
+	if !strings.Contains(string(aptData), "if: steps.repository_update.outputs.changed == 'true'") {
+		t.Fatal("site deployment is not gated on a changed package repository")
 	}
 }
 

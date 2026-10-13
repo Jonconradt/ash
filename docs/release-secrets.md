@@ -216,11 +216,11 @@ The pushed annotated tag starts `release.yml`, which verifies and builds all
 platform artifacts, runs smoke tests, signs checksums, and creates the GitHub
 Release using `RELEASE_GITHUB_TOKEN`. The published-release event starts
 `apt.yml`, which signs and commits channel-specific package repositories using
-the same token. After a successful stable package-repository update, `apt.yml`
-dispatches `site.yml`; Pages deploys the default branch. Nightly and Beta
-repository updates do not trigger a Pages deployment, and individual pushes
-to the default branch do not trigger one either. Homebrew updates run within
-`release.yml` using the separate tap token.
+the same token. After any changed package-repository update, `apt.yml`
+dispatches `site.yml`; Pages deploys the default branch so stable, Beta, and
+Nightly package indexes are all published. Unchanged repository updates and
+individual pushes to the default branch do not trigger a Pages deployment.
+Homebrew updates run within `release.yml` using the separate tap token.
 
 Verify workflow outcomes, not just secret names:
 
@@ -232,8 +232,11 @@ gh run list --repo Jonconradt/ash --workflow site.yml
 gh run view RUN_ID --repo Jonconradt/ash --log-failed
 ```
 
-Make's release dashboard waits for the tag-triggered release workflow, including
-Homebrew publication, matching both the local tag name and its commit. Fetch
-the tag before using the dashboard from another checkout. Linux repository publication and Pages deployment are
-separate runs and must also be checked. Token values and scopes, provider/model
-access, and the GPG passphrase cannot be verified through `gh secret list`.
+For local manual releases, Make's release dashboard waits for the tag-triggered
+release workflow, including Homebrew publication, matching both the local tag
+name and its commit. The dashboard is disabled by default when `CI` is set, so
+automated release builds do not emit its interactive output in CI logs. Fetch
+the tag before using the dashboard from another checkout. Linux repository
+publication and Pages deployment are separate runs and must also be checked.
+Token values and scopes, provider/model access, and the GPG passphrase cannot
+be verified through `gh secret list`.

@@ -32,7 +32,8 @@ RELEASE_TARGET_ARCHES ?= amd64 arm64
 RELEASE_TARGET_OSES ?= auto
 RELEASE_GOOS ?= darwin
 RELEASE_FORMAT ?= pkg
-RELEASE_WATCH ?= 1
+# The interactive release dashboard is for local, manual releases, not CI logs.
+RELEASE_WATCH ?= $(if $(CI),0,1)
 RELEASE_WATCH_STRICT ?= 1
 RELEASE_VERIFY_TARGET ?= verify
 CHANNEL ?= beta
@@ -706,15 +707,16 @@ release-publish:
 	echo "pushed tag $(RELEASE_VERSION) to origin"
 
 release-watch:
-	@if [[ "$(RELEASE_WATCH)" != "1" ]]; then \
-		echo "release watch disabled (set RELEASE_WATCH=1 to enable)"; \
+	@set -euo pipefail; \
+	if [[ "$(RELEASE_WATCH)" != "1" ]]; then \
+		echo "release dashboard disabled"; \
 		exit 0; \
-	fi
-	@if ! command -v gh >/dev/null 2>&1; then \
+	fi; \
+	if ! command -v gh >/dev/null 2>&1; then \
 		echo "gh CLI not found; skipping remote release watch"; \
 		exit 0; \
-	fi
-	@repo="$$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null || true)"; \
+	fi; \
+	repo="$$(gh repo view --json nameWithOwner --jq .nameWithOwner 2>/dev/null || true)"; \
 	if [[ -z "$$repo" ]]; then \
 		echo "unable to resolve GitHub repository from gh; skipping remote release watch"; \
 		exit 0; \

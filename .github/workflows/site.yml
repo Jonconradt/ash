@@ -1,7 +1,7 @@
 name: Deploy site
 on:
   repository_dispatch:
-    types: [stable-release-updated]
+    types: [package-repository-updated]
 permissions:
   contents: read
   pages: write
@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: true
 jobs:
   deploy:
-    if: startsWith(github.event.client_payload.tag, 'v') && !contains(github.event.client_payload.tag, '-')
+    if: startsWith(github.event.client_payload.tag, 'v')
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

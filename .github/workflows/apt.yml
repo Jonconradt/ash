@@ -298,12 +298,12 @@ jobs:
           git rebase "origin/${DEFAULT_BRANCH}"
           git push origin "HEAD:${DEFAULT_BRANCH}"
           echo "changed=true" >> "$GITHUB_OUTPUT"
-      - name: Dispatch stable site update
-        if: startsWith(env.RELEASE_TAG, 'v') && !contains(env.RELEASE_TAG, '-') && steps.repository_update.outputs.changed == 'true'
+      - name: Dispatch package repository site update
+        if: steps.repository_update.outputs.changed == 'true'
         env:
           GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           gh api --method POST "repos/${GITHUB_REPOSITORY}/dispatches" \
-            -f event_type=stable-release-updated \
+            -f event_type=package-repository-updated \
             -F "client_payload[tag]=${RELEASE_TAG}"
