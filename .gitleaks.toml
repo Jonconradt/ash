@@ -18,6 +18,6 @@ id = "sumologic-access-token"
 
 [[rules.allowlists]]
 condition = "AND"
-paths = ['''(^|/)\.site-translation-cache\.json$''']
+paths = ['''(^|/)(\.site-translation-cache|\.cache/ash/site-translation-cache)\.json$''']
 regexTarget = "secret"
 regexes = ['''^[a-f0-9]{64}$''']
