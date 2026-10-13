@@ -62,13 +62,6 @@ jobs:
         uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24.x
-      - name: Restore translation cache
-        if: steps.changes.outputs.publish == 'true'
-        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
-        with:
-          path: .cache/ash/site-translation-cache.json
-          key: site-translation-cache-v2-${{ hashFiles('site/generate_locales.py') }}-${{ github.run_id }}
-          restore-keys: site-translation-cache-v2-${{ hashFiles('site/generate_locales.py') }}-
       - name: Configure release tag identity
         if: steps.changes.outputs.publish == 'true'
         run: |

@@ -63,10 +63,11 @@ run rather than trying to attach `V=1` after the fact.
   a failed build: Go's checksum database may already have indexed it. Nightly
   retries on the same UTC day append `.1`, `.2`, and so on; beta retries use
   the next beta counter.
-- Release preparation runs the existing `make site-locales` Google Translate
-  generator in an isolated temporary copy and attaches the generated website
-  as a release artifact. Keep translation failures visible; do not substitute
-  incomplete or stale generated output.
+- Non-nightly release preparation runs the existing `make site-locales` Google
+  Translate generator in an isolated temporary copy and attaches the generated
+  website as a release artifact. Nightly releases skip website translation.
+  Keep translation failures visible for releases that run the generator; do
+  not substitute incomplete or stale generated output.
 - The scheduled nightly workflow requires `RELEASE_GITHUB_TOKEN` with contents
   write and actions read permissions, plus `ASH_AI_ENDPOINT` and `ASH_AI_MODEL`
   secrets for release notes. An optional provider credential may be set with

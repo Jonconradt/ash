@@ -263,12 +263,14 @@ jobs:
         run: |
           find dist/release -mindepth 2 -type f -name '*' -exec mv {} dist/release/ \;
       - name: Restore translation cache
+        if: ${{ !contains(github.ref_name, '-nightly.') }}
         uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # v4.2.4
         with:
           path: .cache/ash/site-translation-cache.json
           key: site-translation-cache-v2-${{ hashFiles('site/generate_locales.py') }}-${{ github.run_id }}
           restore-keys: site-translation-cache-v2-${{ hashFiles('site/generate_locales.py') }}-
       - name: Generate translated website release artifact
+        if: ${{ !contains(github.ref_name, '-nightly.') }}
         run: make release-translate RELEASE_VERSION="${GITHUB_REF_NAME}"
       - name: Add downloadable language catalogs
         run: |

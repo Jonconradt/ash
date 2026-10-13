@@ -137,8 +137,12 @@ MAKE := $(MAKE) -f Makefile -f steps.mk
 					}
 				}
 			}
-			if count != 9 {
-				t.Fatalf("ran %d release steps, want 9\n%s", count, output)
+			wantSteps := 9
+			if channel == "nightly" {
+				wantSteps--
+			}
+			if count != wantSteps {
+				t.Fatalf("ran %d release steps, want %d\n%s", count, wantSteps, output)
 			}
 		})
 	}

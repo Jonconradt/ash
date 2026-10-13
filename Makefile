@@ -245,7 +245,11 @@ release:
 	@$(MAKE) --no-print-directory release-check
 	@$(MAKE) --no-print-directory release-clean
 	@$(MAKE) --no-print-directory release-build
-	@$(MAKE) --no-print-directory release-translate
+	@if [[ "$(CHANNEL)" == "nightly" ]]; then \
+		echo "skipping website translation for nightly release"; \
+	else \
+		$(MAKE) --no-print-directory release-translate; \
+	fi
 	@$(MAKE) --no-print-directory release-pkg
 	@$(MAKE) --no-print-directory release-validate
 	@$(MAKE) --no-print-directory release-notes
