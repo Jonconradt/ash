@@ -81,7 +81,7 @@ while (($#)); do
 			echo "                   Fedora/Rocky: qemu-kvm qemu-img cloud-utils curl openssh-clients python3"
 			echo
 			echo "Platforms:"
-			echo "  macos             Homebrew on macOS Sequoia"
+			echo "  macos             Homebrew on macOS Golden Gate"
 			echo "  ubuntu, debian    APT on Ubuntu 24.04 or Debian Trixie"
 			echo "  fedora, rocky     DNF on Fedora 42 or Rocky Linux 9"
 			echo "  Linux guests use native package managers; Homebrew-on-macOS is Mac-host-only."
@@ -160,8 +160,8 @@ case "$platform" in
 			echo "A Linux host cannot run the macOS guest. Select a Linux platform, or run this on an Apple Silicon Mac." >&2
 			exit 2
 		fi
-		guest_name="macOS Sequoia"
-		vm_image="${ASH_TEST_VM_IMAGE:-${ASH_TEST_MACOS_IMAGE:-ghcr.io/cirruslabs/macos-sequoia-base:latest}}"
+		guest_name="macOS Golden Gate"
+		vm_image="${ASH_TEST_VM_IMAGE:-${ASH_TEST_MACOS_IMAGE:-ghcr.io/cirruslabs/macos-golden-gate-base:latest}}"
 		package_manager="brew"
 		guest_shell="/bin/zsh"
 		vm_image_url=""
@@ -503,7 +503,7 @@ if [[ "$backend" == "qemu" ]]; then
 fi
 
 if [[ "$ai_variable_count" -gt 0 ]]; then
-	echo "Forwarding $ai_variable_count exported ASH_AI* variable(s) to the guest."
+	echo "Forwarding $ai_variable_count exported ASH_AI* variable(s) to the guest configuration."
 	ai_setup_script='
 			set -euo pipefail
 			umask 077
@@ -514,8 +514,9 @@ if [[ "$ai_variable_count" -gt 0 ]]; then
 			else
 				base64 -d >"$encoded_file"
 			fi
-			env_file="$HOME/.ash-host-ai-env.sh"
-			: >"$env_file"
+			config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/ash"
+			mkdir -p "$config_dir"
+			env_file="$config_dir/.ash_env"
 			while IFS= read -r -d "" name && IFS= read -r -d "" value; do
 				if [[ ! "$name" =~ ^ASH_AI[A-Za-z0-9_]*$ ]]; then
 					echo "Skipping invalid shell environment variable name: $name" >&2
@@ -524,14 +525,6 @@ if [[ "$ai_variable_count" -gt 0 ]]; then
 				printf "export %s=%q\n" "$name" "$value" >>"$env_file"
 			done <"$encoded_file"
 			chmod 600 "$env_file"
-			for profile in .profile .bash_profile .zshenv; do
-				profile_path="$HOME/$profile"
-				touch "$profile_path"
-				if ! grep -Fq ".ash-host-ai-env.sh" "$profile_path"; then
-					printf "\nif [ -f \"\$HOME/.ash-host-ai-env.sh\" ]; then . \"\$HOME/.ash-host-ai-env.sh\"; fi\n" >>"$profile_path"
-				fi
-			done
-			chmod 600 "$HOME/.profile" "$HOME/.bash_profile" "$HOME/.zshenv"
 		'
 	if [[ "$backend" == "tart" ]]; then
 		base64 <"$ai_env_file" |
@@ -600,7 +593,7 @@ if [[ "$mode" == "interactive" ]]; then
 		integration_shell="bash"
 	fi
 	guest_exec "$guest_shell" -lc \
-		"ash install --shell $integration_shell --shell-integration </dev/null"
+		"env_file=\"\${XDG_CONFIG_HOME:-\$HOME/.config}/ash/.ash_env\"; if [[ -f \"\$env_file\" ]]; then source \"\$env_file\"; fi; ash install --shell $integration_shell --shell-integration </dev/null"
 	echo "Installation completed; the VM is available for manual testing."
 else
 	echo "Running the site shell-setup step in a temporary guest home..."

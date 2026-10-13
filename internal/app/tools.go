@@ -555,9 +555,8 @@ func (s localToolShim) callUnixCommand(ctx context.Context, args map[string]any)
 		if !pythonExecutionAvailable() {
 			return toolCommandResult{OK: false, Command: commandName, Error: "Python execution is not available", EID: "sLf6Wk8P"}
 		}
-		if interpreter := ashPythonInterpreter(); interpreter != "python3" {
-			return toolCommandRunner(ctx, interpreter, append([]string{script}, argv...), toolTimeout(), toolOutputLimit())
-		}
+		interpreter := ashPythonInterpreter()
+		return toolCommandRunner(ctx, interpreter, append([]string{script}, argv...), toolTimeout(), toolOutputLimit())
 	}
 
 	// Native binary plugins run directly from the user or system plugin directory.

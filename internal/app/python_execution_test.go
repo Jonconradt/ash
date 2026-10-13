@@ -209,3 +209,50 @@ func TestCallUnixCommandBlocksManagedPythonToolWhenStrict(t *testing.T) {
 		t.Fatalf("expected strict mode to block managed Python tool, got %s", result)
 	}
 }
+
+func TestCallUnixCommandRunsManagedPythonToolWithSystemPython(t *testing.T) {
+	originalLookPath := execLookPath
+	originalRunner := toolCommandRunner
+	t.Cleanup(func() {
+		execLookPath = originalLookPath
+		toolCommandRunner = originalRunner
+	})
+	execLookPath = func(string) (string, error) { return "/usr/bin/python3", nil }
+	t.Setenv("ASH_PYTHON", "python3")
+	t.Setenv("ASH_STRICT", "")
+	t.Setenv("XDG_DATA_HOME", "")
+
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	scriptPath := filepath.Join(home, ".local", "share", "ash", "tools", "wikipedia.py")
+	if err := os.MkdirAll(filepath.Dir(scriptPath), 0o700); err != nil {
+		t.Fatalf("mkdir tools: %v", err)
+	}
+	if err := os.WriteFile(scriptPath, []byte("print('ok')\n"), 0o700); err != nil {
+		t.Fatalf("write Python tool: %v", err)
+	}
+
+	var gotName string
+	var gotArgs []string
+	toolCommandRunner = func(_ context.Context, name string, args []string, _ time.Duration, _ int) toolCommandResult {
+		gotName = name
+		gotArgs = append([]string(nil), args...)
+		return toolCommandResult{OK: true, Command: name, ExitCode: 0}
+	}
+
+	result := localToolShim{allowlist: map[string]struct{}{"wikipedia.py": {}}}.CallTool(
+		context.Background(),
+		"run_unix_command",
+		map[string]any{"command": "wikipedia.py", "args": []any{"--query", "pasta"}},
+	)
+	if !strings.Contains(result, `"ok":true`) {
+		t.Fatalf("expected managed Python tool to run, got %s", result)
+	}
+	if gotName != "python3" {
+		t.Fatalf("runner executable = %q, want python3", gotName)
+	}
+	wantArgs := []string{scriptPath, "--query", "pasta"}
+	if strings.Join(gotArgs, "\x00") != strings.Join(wantArgs, "\x00") {
+		t.Fatalf("runner args = %#v, want %#v", gotArgs, wantArgs)
+	}
+}
