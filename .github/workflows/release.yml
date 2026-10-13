@@ -33,6 +33,8 @@ jobs:
       - name: Verify external Go installs from the release tag
         env:
           GONOPROXY: github.com/Jonconradt/ash
+          # Newly pushed tags may not be available in the checksum database yet.
+          GONOSUMDB: github.com/Jonconradt/ash
         run: |
           set -euo pipefail
           install_dir="$(mktemp -d)"

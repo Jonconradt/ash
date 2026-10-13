@@ -56,6 +56,10 @@ run rather than trying to attach `V=1` after the fact.
 - Run `make verify` locally before `make release`. `make release` runs the full
   verification suite by default; hosted release builds use the faster
   `make verify-ci` target.
+- The external Go install check fetches the release tag directly from GitHub
+  with `GONOPROXY` and `GONOSUMDB` scoped to `github.com/Jonconradt/ash`.
+  This avoids proxy and checksum-database availability delays for newly pushed
+  tags; dependencies still use the public proxy and checksum verification.
 - `make release` creates a beta tag; use `make release CHANNEL=stable` for a
   verified stable release branch, or `make release CHANNEL=nightly` for a
   nightly prerelease.
