@@ -87,10 +87,10 @@
           <p>不是原生的。ash支援 macOS、Linux 和 FreeBSD 上的 bash、zsh 和 Fish；沒有 PowerShell 安裝目標。使用 WSL 獲得支援的 Linux 體驗。</p>
 
           <h3>我該如何安裝ash在適用於 Linux 的 Windows 子系統 (WSL) 中？</h3>
-          <p>在 WSL 發行版內依<a href="install.html#linux">Linux 安裝說明</a>，優先其管理器。再<a href="install.html#initialize">設定供應商並選用 Bash 整合</a>。無原生 Windows 安裝程式。</p>
+          <p>遵循<a href="install.html#linux">Linux安裝說明</a>在您的 WSL 发行版中，更喜欢其包管理器。然後<a href="install.html#initialize">配置提供者並可選擇啟用 Bash 集成</a>。沒有本機 Windows 安裝程式。</p>
 
           <h3>我該如何更新ash到最新的發行版本？</h3>
-          <p>Homebrew/APT/DNF/Pacman 用所屬管理器。<code>ash update</code> 僅用於 <code>~/.local/bin</code> 下穩定 Release；驗證 Sigstore 簽署清單與摘要，拒絕失敗簽章。原生 .pkg 和自訂目錄需原安裝程式/手動替換。Release、Beta、Nightly 見<a href="install.html#updates">更新與通道訂閱</a>。</p>
+          <p>使用 Homebrew/APT/DNF/Pacman 安裝的所屬套件管理器。<code>ash update</code>僅適用於穩定版本安裝<code>~/.local/bin</code>;它验证 Sigstore 签名的清单和存档摘要，并拒绝失败的签名。本机 .pkg 和自定义目录安装需要其原始安装程序/手动替换。看<a href="install.html#updates">更新和頻道訂閱</a>適用於發布版、測試版和夜間版。</p>
 
           <h3>我跑了<code>ash install</code>。為什麼這個終端沒有任何變化？</h3>
           <p>預設情況下停用 Shell 整合。要啟用它，請運行<code>ash install --shell bash --shell-integration</code>（或選擇<code>zsh</code>或者<code>fish</code>）；它不會重寫已經運行的 shell 進程。開啟新終端或重新載入選定的啟動檔。跑步<code>ash install --shell bash --disable-shell-integration</code>刪除Ash的託管區塊，同時保留周圍的內容。</p>

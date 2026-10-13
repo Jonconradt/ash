@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ash | التثبيت والإعداد والتحديث والإزالة</title>
-  <meta name="description" content="ثبّت ash على macOS أو Linux أو FreeBSD. اختر مدير الحزم واضبط Ollama أو خطة سحابية مجانية وحدد قناة التحديث وأزل بأمان.">
+  <title>ash| التثبيت والتكوين والتحديث وإلغاء التثبيت</title>
+  <meta name="description" content="ثَبَّتَashعلى نظام التشغيل MacOS أو Linux أو FreeBSD. اختر مدير الحزم، وقم بتكوين Ollama أو طبقة سحابية مجانية، وحدد قناة التحديث، وقم بإلغاء التثبيت بأمان.">
   <meta name="theme-color" content="#f4f0e8">
   <link rel="canonical" href="https://jonconradt.github.io/ash/ar/install.html">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="دليل تثبيت ash">
-  <meta property="og:description" content="من المتطلبات إلى طلبك الأول والتحديث والتنظيف.">
+  <meta property="og:title" content="ash installation guide">
+  <meta property="og:description" content="بدءًا من المتطلبات الأساسية وحتى المطالبة الأولى والتحديثات والتنظيف.">
   <meta property="og:url" content="https://jonconradt.github.io/ash/ar/install.html">
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="alternate" hreflang="en" href="https://jonconradt.github.io/ash/install.html">
@@ -29,15 +29,15 @@
 <body>
   <a class="skip-link" href="#guide">انتقل إلى دليل التثبيت</a>
   <header class="site-header">
-    <a class="brand" href="./" aria-label="الرئيسية لـ ash"><span class="brand-mark">&gt;_</span> ash</a>
-    <nav aria-label="التنقل الرئيسي">
-      <a href="./">الرئيسية</a>
-      <a href="install.html" aria-current="page">التثبيت</a>
-      <a href="docs.html">التوثيق</a>
-      <a href="faq.html">الأسئلة الشائعة</a>
-      <a href="developer.html">المطورون</a>
-      <a href="https://github.com/Jonconradt/ash">GitHub</a>
-      <label class="sr-only" for="site-language">اللغة</label>
+    <a class="brand" href="./" aria-label="ashبيت"><span class="brand-mark">&gt;_</span> ash</a>
+    <nav aria-label="التنقل الأساسي">
+      <a href="./">بيت</a>
+      <a href="install.html" aria-current="page">ثَبَّتَ</a>
+      <a href="docs.html">المستندات</a>
+      <a href="faq.html">التعليمات</a>
+      <a href="developer.html">المطورين</a>
+      <a href="https://github.com/Jonconradt/ash">جيثب</a>
+      <label class="sr-only" for="site-language">لغة</label>
       <select id="site-language" class="language-select" aria-label="اختر اللغة">
         <option value="en">English</option>
         <option value="ar" selected>العربية</option>
@@ -50,68 +50,68 @@
         <option value="pt-BR">Português (Brasil)</option>
         <option value="zh-CN">简体中文</option>
         <option value="zh-TW">繁體中文</option>
-      </select>
+        </select>
     </nav>
   </header>
   <main id="guide" class="docs-page page-width install-guide">
     <header class="docs-header">
-      <p class="eyebrow">ثبّت · اضبط · صُن</p>
-      <h1>طريق واضح إلى<br><em>طلبك الأول.</em></h1>
-      <p>اختر نظامك، وثبّت بمدير حزمه، ثم اتصل بنموذج. ابدأ بقناة Release؛ يمكنك اختيار Beta أو Nightly لاحقًا.</p>
-      <div class="os-choices" aria-label="اختر نظام التشغيل">
-        <a class="method-card" href="#macos"><strong>macOS</strong><span>يُنصح بـ Homebrew</span><small>Apple Silicon وIntel</small></a>
-        <a class="method-card" href="#linux"><strong>Linux</strong><span>APT أو DNF أو Pacman</span><small>المعمارية بحسب المستودع</small></a>
-        <a class="method-card" href="#freebsd"><strong>FreeBSD</strong><span>أرشيف أو سكربت موثّق</span><small>amd64 فقط؛ لا حزمة pkg أصلية لـ ash</small></a>
+      <p class="eyebrow">التثبيت · التكوين · الصيانة</p>
+      <h1>مسار واضح <br><em>المطالبة الأولى.</em></h1>
+      <p>اختر نظام التشغيل لديك، وقم بالتثبيت باستخدام مدير الحزم الخاص به، ثم قم بتوصيل النموذج. ابدأ بالإصدار: يمكنك الاشتراك في الإصدار التجريبي أو Nightly لاحقًا.</p>
+      <div class="os-choices" aria-label="اختر نظام التشغيل الخاص بك">
+        <a class="method-card" href="#macos"><strong>ماك</strong><span>ينصح البيرة المنزلية</span><small>أبل السيليكون وإنتل</small></a>
+        <a class="method-card" href="#linux"><strong>لينكس</strong><span>APT أو DNF أو Pacman</span><small>تعتمد الهندسة المعمارية على المستودع</small></a>
+        <a class="method-card" href="#freebsd"><strong>فري بي إس دي</strong><span>أرشيف أو برنامج نصي تم التحقق منه</span><small>AMD64 فقط؛ لا مواطنashحزمة</small></a>
       </div>
     </header>
     <div class="docs-layout">
       <nav class="docs-contents" aria-label="محتويات التثبيت">
         <strong>في هذه الصفحة</strong>
-        <a href="#prerequisites">قبل البدء</a>
-        <a href="#macos">macOS</a>
-        <a href="#linux">Linux</a>
-        <a href="#freebsd">FreeBSD</a>
+        <a href="#prerequisites">قبل أن تبدأ</a>
+        <a href="#macos">ماك</a>
+        <a href="#linux">لينكس</a>
+        <a href="#freebsd">فري بي إس دي</a>
         <a href="#initialize">التهيئة والتحقق</a>
-        <a href="#ollama">Ollama محلي</a>
-        <a href="#cloud">الخطط السحابية المجانية</a>
-        <a href="#script">التثبيت بالسكربت</a>
+        <a href="#ollama">أولاما المحلية</a>
+        <a href="#cloud">طبقات سحابية مجانية</a>
+        <a href="#script">تركيب البرنامج النصي</a>
         <a href="#verify-download">التحقق من التنزيل</a>
         <a href="#updates">التحديثات والقنوات</a>
-        <a href="#uninstall">الإزالة</a>
-        <a href="#troubleshooting">استكشاف المشكلات</a>
+        <a href="#uninstall">إلغاء التثبيت</a>
+        <a href="#troubleshooting">استكشاف الأخطاء وإصلاحها</a>
       </nav>
-      <article class="docs-content" data-copy-label="نسخ الأوامر" data-copied-label="تم النسخ!" data-copy-error="تعذر النسخ. حدد الأوامر وانسخها يدويًا.">
+      <article class="docs-content" data-copy-label="نسخ الأوامر" data-copied-label="منسوخ!" data-copy-error="لا يمكن النسخ. حدد ونسخ الأوامر يدويا.">
         <section id="prerequisites">
-          <h2>قبل البدء</h2>
+          <h2>قبل أن تبدأ</h2>
           <ol>
-            <li><strong>نظام وصدفة مدعومان:</strong> macOS أو Linux على amd64/x86_64 أو arm64/aarch64، أو FreeBSD على amd64. استخدم Bash أو zsh أو Fish. حزم Arch تدعم x86_64 فقط. لا مثبّت أصليًا لـ Windows/PowerShell.</li>
-            <li><strong>الوصول للتنزيل:</strong> اتصال إنترنت يعمل ووصول HTTPS موثوق إلى GitHub ومستودع الحزم المختار ومزوّد النموذج. حتى الاستدلال المحلي يتطلب تنزيل النموذج أولًا.</li>
-            <li><strong>الصلاحيات:</strong> مجلد منزل قابل للكتابة لملفات المستخدم. حزم Linux النظامية و.pkg على macOS تتطلب صلاحيات مسؤول؛ شغّل Homebrew و<code>ash install</code> كمستخدم عادي.</li>
-            <li><strong>نموذج:</strong> خادم استدلال محلي بنموذج منزّل أو حساب سحابي/مفتاح API. اختر نموذجًا يدعم استدعاء الأدوات، لا نموذج صور/صوت فقط. احتياجات الذاكرة والقرص وGPU محليًا تعتمد عليه.</li>
+            <li><strong>النظام والواجهة المدعومة:</strong> macOS أو Linux على amd64/x86_64 أو Arm64/aarch64، أو FreeBSD على amd64. استخدم Bash أو zsh أو Fish. حزم القوس هي x86_64 فقط. لا يوجد مثبت Windows/PowerShell أصلي.</li>
+            <li><strong>الوصول إلى التنزيل:</strong> اتصال إنترنت فعال ووصول HTTPS موثوق إلى GitHub، ومستودع الحزم المحدد، وموفر النموذج الخاص بك. لا يزال الاستدلال المحلي بحاجة إلى تنزيل نموذج أولي.</li>
+            <li><strong>الأذونات:</strong> دليل رئيسي قابل للكتابة للأصول لكل مستخدم. تحتاج حزم نظام Linux وmacOS .pkg إلى وصول المسؤول؛ قم بتشغيل Homebrew و<code>ash install</code> كمستخدم عادي.</li>
+            <li><strong>النموذج:</strong> إما خادم استدلال محلي مع نموذج تم تنزيله أو حساب سحابي/مفتاح واجهة برمجة التطبيقات. اختر نموذجًا يدعم استدعاء الأدوات، وليس نموذجًا للصور/الصوت فقط. تعتمد احتياجات ذاكرة الوصول العشوائي (RAM) والقرص ووحدة معالجة الرسومات المحلية على هذا النموذج.</li>
           </ol>
-          <p>الحزم الجاهزة لا تحتاج Go أو Rust أو Node.js أو أدوات بناء Xcode. لمدير الحزم متطلبات خاصة محتملة؛ اتبع إعداداته الرسمية أولًا.</p>
+          <p>لا تتطلب حزم ash سابقة الإنشاء أدوات إنشاء Go أو Rust أو Node.js أو Xcode. قد يكون لمدير الحزم متطلباته الخاصة؛ اتبع تعليمات الإعداد الرسمية أولاً.</p>
           <div class="guide-note">
-            <h3>اختياري: أدوات Python المرفقة</h3>
-            <p>الاستخدام الأساسي لا يتطلب Python. الأدوات المرفقة تحتاج Python 3 مع <code>venv</code> و<code>ensurepip</code> وإمكانية تنزيل اعتمادياتها. على Debian/Ubuntu ثبّت <code>python3</code> و<code>python3-venv</code>؛ Python من Homebrew يتضمن venv. على FreeBSD استخدم حزمة pip الموافقة لإصدار Python. أعد <code>ash install</code>. ينشئ الإعداد بيئة معزولة في <code>$XDG_DATA_HOME/ash/venv</code> (الافتراضي <code>~/.local/share/ash/venv</code>)؛ الفشل يعطّل الأدوات لا ash الأساسي.</p>
+            <h3>اختياري: أدوات بايثون المجمعة</h3>
+            <p>أساسيashالاستخدام لا يتطلب بايثون. تحتاج أدوات Python المجمعة إلى Python 3 مع<code>venv</code>و<code>ensurepip</code>بالإضافة إلى الوصول إلى تنزيل تبعياتهم. على نظام Debian/Ubuntu، قم بالتثبيت<code>python3</code>و<code>python3-venv</code>; يتضمن Homebrew Python دعمًا لـ venv. في FreeBSD، استخدم حزمة النقاط المطابقة لإصدار Python الخاص بك. ثم أعد التشغيل<code>ash install</code>. يقوم الإعداد بإنشاء بيئة معزولة ضمن<code>$XDG_DATA_HOME/ash/venv</code>(تقصير<code>~/.local/share/ash/venv</code>); يؤدي الفشل إلى تعطيل هذه الأدوات، وليس الأساسيةash.</p>
           </div>
         </section>
         <section id="macos">
-          <h2>macOS</h2>
-          <h3 id="homebrew">الموصى به: Homebrew</h3>
-          <p>المتطلبات: <a href="https://docs.brew.sh/Installation">Homebrew</a> وبيئة macOS مدعومة وأمر <code>brew</code> يعمل. يختار tap تلقائيًا أرشيف Intel أو Apple Silicon. ثبّت Release دون sudo:</p>
+          <h2>ماك</h2>
+          <h3 id="homebrew">الموصى بها: البيرة المنزلية</h3>
+          <p>المتطلبات الأساسية:<a href="https://docs.brew.sh/Installation">البيرة المنزلية</a>وبيئة macOS المدعومة، وطريقة العمل<code>brew</code>يأمر. يؤدي النقر إلى تحديد أرشيف Intel أو Apple Silicon تلقائيًا. تثبيت الإصدار بدون Sudo:</p>
           <pre><code>brew install Jonconradt/ash/ash
 ash version</code></pre>
-          <p>يدير Homebrew الملفات التنفيذية والإضافات الأصلية وصفحات الدليل وإشعارات الترخيص في بادئته (عادة <code>/opt/homebrew</code> على Apple Silicon أو <code>/usr/local</code> على Intel). يفحص الأرشيف مقابل SHA-256 للصيغة. لا يضبط المزوّد أو ملف بدء الصدفة: تابع إلى <a href="#initialize">تهيئة المستخدم</a>. حدّث بـ <code>brew upgrade ash</code> وأزل Release بـ <code>brew uninstall ash</code>؛ راجع <a href="#updates">صيغ القنوات</a> لـ Beta/Nightly.</p>
-          <h3 id="macos-pkg">بديل: .pkg أصلي</h3>
-          <p>نزّل <code>darwin-arm64.pkg</code> لـ Apple Silicon أو <code>darwin-amd64.pkg</code> لـ Intel من <a href="https://github.com/Jonconradt/ash/releases">إصدار منشور</a>. <a href="#verify-download">تحقق من بيان المجاميع الموقّع</a> قبل فتح المثبّت. تحتاج صلاحيات مسؤول.</p>
-          <div class="guide-note guide-warning"><p><strong>حزمة macOS غير موقّعة وغير موثّقة لدى Apple.</strong> البيان يتحقق مستقلًا من الناشر والمجاميع، لا يقدّم توثيق Apple. لا تعطّل Gatekeeper أو تتجاوز تحذيرًا لمجرد التثبيت؛ فضّل Homebrew إن تطلبت سياسة الأمان ذلك.</p></div>
-          <p>تكتب الحزمة <code>ash</code> و<code>ash-broker</code> في <code>/usr/local/bin</code> والإضافات في <code>/usr/local/lib/ash/plugins</code> والأدلة في <code>/usr/local/share/man</code> والإشعارات في <code>/usr/local/share/licenses/ash</code>. الإيصال هو <code>dev.ash.cli</code>. لا تهيئ المستخدم أو تشترك بالتحديثات: <a href="#initialize">هيّئ</a> بعد التثبيت، واستبدلها بـ .pkg أحدث موثّق للتحديث، واتبع <a href="#manual-macos">الإزالة اليدوية</a> للحذف. لا تثبّتها فوق نسخة يديرها Homebrew.</p>
+          <p>تمتلك شركة Homebrew الثنائيات والمكونات الإضافية الأصلية المجمعة وصفحات الدليل وإشعارات الترخيص في البادئة الخاصة بها (عادةً<code>/opt/homebrew</code>على أبل السيليكون أو<code>/usr/local</code>على إنتل). يقوم بفحص الأرشيف مقابل المجموع الاختباري SHA-256 الخاص بالصيغة. لا يقوم بتكوين الموفر الخاص بك أو تحرير ملف بدء تشغيل Shell الخاص بك: تابع<a href="#initialize">التهيئة لكل مستخدم</a>. يستخدم<code>brew upgrade ash</code>للتحديثات و<code>brew uninstall ash</code>لإزالة الإصدار؛ يرى<a href="#updates">صيغ القناة</a>لبيتا/ليلا.</p>
+          <h3 id="macos-pkg">البديل: الأصلي .pkg</h3>
+          <p>تحميل<code>darwin-arm64.pkg</code>الأصول لشركة Apple Silicon أو<code>darwin-amd64.pkg</code>لشركة إنتل من أ<a href="https://github.com/Jonconradt/ash/releases">الإصدار المنشور</a>.<a href="#verify-download">التحقق من بيان المجموع الاختباري الموقع</a>قبل فتح المثبت. مطلوب وصول المسؤول.</p>
+          <div class="guide-note guide-warning"><p><strong>حزمة macOS غير موقعة وغير موثقة.</strong> يوفر بيان الإصدار تحققًا منفصلاً للناشر/المجموع الاختباري، وليس توثيقًا من Apple. لا تقم بتعطيل برنامج حماية البوابة أو تجاوز تحذير الأمان لمجرد تثبيت ash؛ تفضل Homebrew إذا كانت سياسة الأمان الخاصة بك تتطلب ذلك.</p></div>
+          <p>الحزمة يكتب<code>ash</code>و<code>ash-broker</code>ل<code>/usr/local/bin</code>، الإضافات ل<code>/usr/local/lib/ash/plugins</code>، صفحات الرجل ل<code>/usr/local/share/man</code>، والإشعارات<code>/usr/local/share/licenses/ash</code>. الإيصال هو<code>dev.ash.cli</code>. لا يقوم بتشغيل التهيئة لكل مستخدم أو الاشتراك في التحديثات:<a href="#initialize">تهيئة</a>بعد التثبيت، استبدله بـ .pkg الأحدث الذي تم التحقق منه للتحديث، واستخدم ملف<a href="#manual-macos">إجراء الإزالة اليدوية</a>لإلغاء التثبيت. لا تقم بتثبيته على نسخة مملوكة لشركة Homebrew.</p>
         </section>
         <section id="linux">
-          <h2>Linux</h2>
-          <p>استخدم مدير توزيعتك متى أمكن. تدير الحزم <code>/usr/bin/ash</code> و<code>/usr/bin/ash-broker</code> و<code>/usr/lib/ash/plugins</code> والأدلة تحت <code>/usr/share/man</code> وإشعارات الترخيص. تترك إعدادات المزوّد وخطافات الصدفة لـ <a href="#initialize">تهيئة المستخدم</a>.</p>
-          <h3 id="apt-installation">Debian وUbuntu: APT</h3>
-          <p>المتطلبات: amd64 أو arm64، مسؤول، APT و<code>curl</code> و<code>gpg</code> وشهادات CA. ثبّت أدوات التنزيل/المفاتيح الناقصة من توزيعتك قبل إضافة المستودع. تسمى Release هنا <code>stable</code>:</p>
+          <h2>لينكس</h2>
+          <p>استخدم مدير الحزم الخاص بالتوزيع حيثما أمكن ذلك. هذه الحزم الخاصة<code>/usr/bin/ash</code>,<code>/usr/bin/ash-broker</code>,<code>/usr/lib/ash/plugins</code>، صفحات الرجل تحت<code>/usr/share/man</code>وإشعارات الترخيص. إنهم يتركون إعدادات الموفر وخطافات الصدفة<a href="#initialize">التهيئة لكل مستخدم</a>.</p>
+          <h3 id="apt-installation">ديبيان وأوبونتو: APT</h3>
+          <p>المتطلبات الأساسية: AMD64 أو Arm64، وصول المسؤول، APT،<code>curl</code>,<code>gpg</code>وشهادات CA. قم بتثبيت أدوات التنزيل/المفتاح المفقودة باستخدام التوزيع الخاص بك قبل إضافة المستودع. تم تسمية الإصدار<code>stable</code>:</p>
           <pre><code>sudo apt update
 sudo apt install ca-certificates curl gnupg
 sudo install -d -m 0755 /etc/apt/keyrings
@@ -124,9 +124,9 @@ echo "deb [signed-by=/etc/apt/keyrings/versionx-keyring.gpg] https://www.version
 sudo apt update
 sudo apt install ash
 rm versionx-apt.asc</code></pre>
-          <p>قبل استيراد مفتاح، تحقق من بصمته بمصدر موثوق للناشر. بصمة VersionX هي <code>32C6 C11D 2F86 BFE4 6EB7 7FFC 5257 FEA6 1368 919F</code>. يفحص APT البيانات الوصفية الموقّعة ومجاميع الحزم فيها؛ يقيّد <code>signed-by</code> نطاق المفتاح. حدّث بـ <code>sudo apt update &amp;&amp; sudo apt upgrade ash</code>؛ أزل بـ <code>sudo apt remove ash</code>.</p>
-          <h3 id="dnf-installation">Fedora والأنظمة المتوافقة مع RHEL: DNF</h3>
-          <p>المتطلبات: x86_64 أو aarch64، مسؤول، DNF/RPM و<code>curl</code> و<code>gpg</code> وشهادات CA. ثبّت الأدوات الناقصة من التوزيعة. افحص المفتاح وقارن البصمة أعلاه قبل الاستيراد:</p>
+          <p>قبل استيراد أي مفتاح مستودع، تحقق من بصمة إصبعه مقابل مصدر ناشر موثوق به. بصمة مفتاح VersionX هي<code>32C6 C11D 2F86 BFE4 6EB7 7FFC 5257 FEA6 1368 919F</code>. تتحقق APT من البيانات الوصفية للمستودع الموقع وملخصات الحزمة التي تحتوي عليها؛ يتم تحديد نطاق المفتاح مع<code>signed-by</code>. التحديث مع<code>sudo apt update &amp;&amp; sudo apt upgrade ash</code>; إزالة مع<code>sudo apt remove ash</code>.</p>
+          <h3 id="dnf-installation">الأنظمة المتوافقة مع Fedora وRHEL: DNF</h3>
+          <p>المتطلبات الأساسية: x86_64 أو aarch64، وصول المسؤول، DNF/RPM،<code>curl</code>,<code>gpg</code>وشهادات CA. قم بتثبيت الأدوات المفقودة من التوزيعة الخاصة بك. افحص المفتاح وقارن بصمة الإصبع أعلاه قبل استيرادها:</p>
           <pre><code>curl -fsSL https://www.versionx.ai/rpm/gpg.key -o versionx-rpm.asc
 gpg --show-keys --with-fingerprint versionx-rpm.asc
 sudo rpm --import versionx-rpm.asc
@@ -141,9 +141,9 @@ gpgkey=https://www.versionx.ai/rpm/gpg.key
 EOF
 sudo dnf install ash
 rm versionx-rpm.asc</code></pre>
-          <p>ملفات RPM ليست موقّعة منفردة. يتحقق <code>repo_gpgcheck=1</code> من البيانات الوصفية المغطية لمجاميعها؛ يعكس <code>gpgcheck=0</code> غياب توقيع كل حزمة، لا تعطيل تحقق المستودع. إن تطلبت سياستك محتويات RPM موقّعة فلا يفي بها المستودع. حدّث بـ <code>sudo dnf upgrade ash</code>؛ أزل بـ <code>sudo dnf remove ash</code>.</p>
-          <h3 id="pacman-installation">Arch Linux: Pacman</h3>
-          <p>المتطلبات: x86_64، مسؤول، Pacman بحلقة مفاتيح مهيّأة و<code>curl</code> و<code>gpg</code>. طابق البصمة المعروضة بأعلاه قبل الوثوق. أضف المستودع مرة واحدة لا بكل تحديث:</p>
+          <p>لم يتم توقيع ملفات RPM بشكل فردي.<code>repo_gpgcheck=1</code>التحقق من بيانات تعريف المستودع التي تغطي المجموع الاختباري الخاص بها؛<code>gpgcheck=0</code>يعكس التوقيعات الغائبة لكل حزمة، وليس التحقق من المستودع المعطل. إذا كانت سياستك تتطلب حمولات RPM موقعة، فإن هذا المستودع لا يلبي هذه المتطلبات. التحديث مع<code>sudo dnf upgrade ash</code>; إزالة مع<code>sudo dnf remove ash</code>.</p>
+          <h3 id="pacman-installation">آرتش لينكس: بكمن</h3>
+          <p>المتطلبات الأساسية: x86_64، وصول المسؤول، Pacman مع تهيئة حلقة المفاتيح الخاصة به،<code>curl</code>، و<code>gpg</code>. تحقق من تطابق بصمة المفتاح المعروضة مع البصمة المذكورة أعلاه قبل الوثوق بها. قم بإضافة المستودع مرة واحدة، وليس في كل تحديث:</p>
           <pre><code>curl -fsSL https://www.versionx.ai/pacman/gpg.key -o versionx-pacman.asc
 gpg --show-keys --with-fingerprint versionx-pacman.asc
 sudo pacman-key --add versionx-pacman.asc
@@ -155,211 +155,213 @@ SigLevel = Required DatabaseRequired
 EOF
 sudo pacman -Syu ash
 rm versionx-pacman.asc</code></pre>
-          <p>يتحقق Pacman من توقيعات الحزم وقاعدة البيانات. زامن Arch بـ <code>sudo pacman -Syu</code> دون تحديث جزئي؛ أزل ash بـ <code>sudo pacman -R ash</code>.</p>
-          <h3>طرق Linux الأخرى</h3>
-          <p>تستخدم <a href="https://docs.brew.sh/Homebrew-on-Linux">Homebrew على Linux</a> بالفعل؟ تدعم <a href="#homebrew">تعليمات tap نفسها</a> amd64 وarm64؛ يدير Brew الملفات لا APT/DNF. وإلا استخدم <a href="#script">تثبيت سكربت/أرشيف موثّق</a> أو <a href="https://github.com/Jonconradt/ash/releases">تنزيل .deb/.rpm</a> مناسب. ثبّت .deb موثّقًا بـ <code>sudo apt install ./PACKAGE.deb</code> أو .rpm بـ <code>sudo dnf install ./PACKAGE.rpm</code> (استبدل الأسماء). تبقى الحزمة تحت إدارة مديرها لكنها لا تضيف مستودعًا أو اشتراكًا بالإصدارات المستقبلية. محتوى RPM الحالي غير موقّع؛ اتبع سياسة التوزيعة بدل تعطيل الفحص.</p>
+          <p>يتحقق Pacman من توقيعات الحزمة وقاعدة البيانات. حافظ على مزامنة Arch مع<code>sudo pacman -Syu</code>وليس ترقية جزئية؛ يزيلashمع<code>sudo pacman -R ash</code>.</p>
+          <h3>طرق تثبيت Linux الأخرى</h3>
+          <p>تستخدم بالفعل<a href="https://docs.brew.sh/Homebrew-on-Linux">البيرة المنزلية على لينكس</a>؟ ال<a href="#homebrew">نفس تعليمات الصنبور</a>دعم AMD64 وarm64؛ يمتلك Brew هذه الملفات، وليس APT/DNF. خلاف ذلك، استخدم التحقق منها<a href="#script">تثبيت البرنامج النصي/الأرشيف</a>أو مطابقة<a href="https://github.com/Jonconradt/ash/releases">تحميل .deb/.rpm</a>. قم بتثبيت .deb الذي تم التحقق منه باستخدام<code>sudo apt install ./PACKAGE.deb</code>أو .rpm مع<code>sudo dnf install ./PACKAGE.rpm</code>(استبدل أسماء الملفات). تظل الحزمة المباشرة مملوكة لمدير الحزم، ولكنها لا تضيف مستودعًا أو تشترك تلقائيًا في الإصدارات المستقبلية. حمولة RPM الحالية غير موقعة؛ اتبع سياسة التوزيع الخاصة بك بدلاً من تعطيل التحقق من التوقيع.</p>
         </section>
         <section id="freebsd">
           <h2>FreeBSD</h2>
-          <p>المتطلبات: amd64 وBash (حتى لو كانت الصدفة التفاعلية zsh أو Fish)، أدوات تنزيل/تحقق ومجلد تثبيت قابل للكتابة. ثبّت Bash بمدير FreeBSD الأصلي:</p>
+          <p>المتطلبات الأساسية: amd64، Bash (حتى عندما تكون الصدفة التفاعلية الخاصة بك هي zsh أو Fish)، وأدوات التنزيل/التحقق، ودليل التثبيت القابل للكتابة. قم بتثبيت Bash باستخدام المدير الأصلي لـ FreeBSD:</p>
           <pre><code>sudo pkg install bash</code></pre>
-          <p>يدير <code>pkg</code> في FreeBSD المتطلبات لا ash: لا مستودع ash .pkg أو أرشيف arm64 حاليًا. استخدم <a href="#script">السكربت الموثّق</a>، أو <a href="#verify-download">تحقق من tarball لـ FreeBSD amd64</a>، وفكّه بمجلد مؤقت وثبّت تنفيذية ash ذات الإصدار باسم <code>~/.local/bin/ash</code> بجوار <code>ash-broker</code>. انسخ الإضافات الأصلية إلى <code>$XDG_DATA_HOME/ash/plugins</code> (افتراضيًا <code>~/.local/share/ash/plugins</code>) ثم <a href="#initialize">هيّئ</a>. أنت تدير الملفات؛ لن يزيلها <code>pkg delete</code>. استخدم <a href="#updates">تحديثات Release الذاتية</a> بالموقع الافتراضي أو استبدل القطع الموثّقة يدويًا.</p>
+          <p>فري بي إس دي<code>pkg</code>يدير المتطلبات الأساسية، لاash: لا يوجد حالياashمستودع .pkg ولا يوجد أرشيف لإصدار Arm64. استخدم<a href="#script">البرنامج النصي الذي تم التحقق منه</a>، أو<a href="#verify-download">التحقق من FreeBSD amd64 tarball</a>واستخرجه إلى دليل مؤقت، ثم قم بتثبيت الإصدار الخاص بهashثنائي كما<code>~/.local/bin/ash</code>جنبا إلى جنب<code>ash-broker</code>. انسخ المكونات الإضافية الأصلية إلى<code>$XDG_DATA_HOME/ash/plugins</code>(تقصير<code>~/.local/share/ash/plugins</code>)، ثم<a href="#initialize">تهيئة</a>. أنت تمتلك هذه الملفات؛<code>pkg delete</code>لن يزيلهم. يستخدم<a href="#updates">إطلاق التحديثات الذاتية</a>في الموقع الافتراضي أو استبدال العناصر التي تم التحقق منها يدويًا.</p>
         </section>
         <section id="initialize">
           <h2>التهيئة والتحقق</h2>
-          <p>بعد التنفيذيات شغّل الإعداد تفاعليًا كمستخدم عادي. إعداد الملفات فقط يبقي ملفات البدء دون تغيير:</p>
+          <p>بعد تثبيت الثنائيات، قم بتشغيل الإعداد بشكل تفاعلي كمستخدم عادي. إذا كنت لا تريد تكامل Shell، فيمكنك تثبيت Ash فقط. ربما هذا ليس ما تريد. القيمة الحقيقية لـ ash هي تكامل الصدفة أدناه. يؤدي إعداد الأصول فقط إلى ترك ملفات بدء التشغيل دون تغيير:</p>
           <pre><code>ash install</code></pre>
-          <p>لدمج الأوامر غير الموجودة أيضًا، اختر أمرًا واحدًا مطابقًا لصدفتك:</p>
+          <p>يتضمن التثبيت الذي من المحتمل أن تستخدمه تكامل Shell. سيؤدي هذا إلى تغيير <code>.bashrc</code> (أو ما يعادله لـ Shell الخاص بك) ليشمل Ash. لتمكين تكامل الأوامر غير الموجودة، اختر أمرًا واحدًا بالضبط للصدفة التي تستخدمها:</p>
           <p><strong>Bash</strong></p>
           <pre><code>ash install --shell bash --shell-integration</code></pre>
-          <p><strong>zsh</strong></p>
+          <p><strong>زش</strong></p>
           <pre><code>ash install --shell zsh --shell-integration</code></pre>
-          <p><strong>Fish</strong></p>
+          <p><strong>الأسماك</strong></p>
           <pre><code>ash install --shell fish --shell-integration</code></pre>
-          <p>يستخدم Bash <code>~/.bashrc</code> وzsh <code>~/.zshrc</code> وFish <code>$XDG_CONFIG_HOME/fish/config.fish</code> (الافتراضي <code>~/.config/fish/config.fish</code>). افتح صدفة جديدة؛ الموجودة تحتفظ بالوسيط الجاري. يقدّم الدمج <code>~/.local/bin</code> في PATH: أزل النسخة المحلية القديمة قبل توقع اختيار حزمة النظام.</p>
-          <p>عند غياب الإعدادات يكشف الإعداد مفاتيح موجودة أو خادمًا محليًا جاريًا؛ وإلا يعرض قائمة المزوّدين ويطلب الاعتمادات. اختر نموذجًا متاحًا يدعم الأدوات. الإعدادات الصالحة محفوظة؛ إعادة الإعداد لا تغيّر المزوّد.</p>
-          <p>تحفظ الإعدادات في <code>$XDG_CONFIG_HOME/ash/.ash_env</code> (الافتراضي <code>~/.config/ash/.ash_env</code>، أذونات خاصة). يحملها الدمج المدار. دون دمج يمكن لـ Bash/zsh تحميل الملف في بدء التشغيل؛ على Fish ضبط متغيرات <code>ASH_AI_*</code> بصيغته لا تحميل ملف Bash. احمِ ملفات الرموز ولا تودعها بالمستودع.</p>
-          <p>للتثبيت المحلي بلا دمج أضف المجلد الفعلي إلى PATH. Bash/zsh: <code>export PATH="$HOME/.local/bin:$PATH"</code>. Fish: <code>fish_add_path "$HOME/.local/bin"</code>. احفظ ذلك في بدء الصدفة؛ استبدل بمجلدك المخصص عند الحاجة.</p>
+          <p>يستخدم باش<code>~/.bashrc</code>، يستخدم zsh<code>~/.zshrc</code>، واستخدامات الأسماك<code>$XDG_CONFIG_HOME/fish/config.fish</code>(تقصير<code>~/.config/fish/config.fish</code>). افتح غلافًا جديدًا بعد ذلك؛ تحتفظ الأصداف الموجودة بوسيطها الجاري. التكامل يسبق<code>~/.local/bin</code>إلى PATH: قم بإزالة نسخة مستخدم محلية قديمة قبل توقع تحديد حزمة النظام.</p>
+          <p>إذا كانت إعدادات الموفر مفقودة، فسيكتشف الإعداد مفاتيح الموفر الموجودة أو خادم محلي قيد التشغيل؛ وإلا فإنه يقدم قائمة موفر ويطالب ببيانات الاعتماد. اختر نموذجًا متاحًا قادرًا على استخدام الأدوات. يتم الاحتفاظ بالإعدادات الصالحة الموجودة، لذا فإن إعادة تشغيل برنامج الإعداد ليس أمر تبديل الموفر.</p>
+          <p>يتم تخزين الإعدادات في<code>$XDG_CONFIG_HOME/ash/.ash_env</code>(تقصير<code>~/.config/ash/.ash_env</code>، أذونات الملفات الخاصة). يقوم التكامل المُدار بتحميلها. بدون التكامل، يمكن لمستخدمي Bash/zsh الحصول على هذا الملف في تكوين بدء التشغيل العادي الخاص بهم؛ يجب على مستخدمي الأسماك ضبط المقابل<code>ASH_AI_*</code>المتغيرات باستخدام بناء جملة Fish، وليس مصدر الملف بتنسيق Bash. قم بحماية أي ملف يحتوي على الرموز المميزة ولا ترتكبها أبدًا.</p>
+          <p>بالنسبة للتثبيت المحلي من قبل المستخدم دون التكامل، قم بإضافة الدليل الفعلي الخاص به إلى PATH. باش/زش:<code>export PATH="$HOME/.local/bin:$PATH"</code>. سمكة:<code>fish_add_path "$HOME/.local/bin"</code>. استمر في ذلك باستخدام تكوين بدء تشغيل Shell الخاص بك؛ استبدل دليل التثبيت المخصص الخاص بك عند الاقتضاء.</p>
           <pre><code>command -v ash
 command -v ash-broker
 ash version
 ash "Say hello in one sentence"</code></pre>
-          <p>يجب أن تجد الأوامر الأولى التثبيت المختار. الطلب يحتاج خادمًا جاريًا أو اعتمادات سحابية صالحة؛ تثبيت ash لا يثبّت نموذجًا.</p>
+          <p>يجب أن تتوافق الأوامر الأولى مع التثبيت الذي اخترته. يحتاج الموجه إلى خادم قيد التشغيل أو بيانات اعتماد سحابية صالحة؛ تثبيت ash لا يؤدي إلى تثبيت نموذج.</p>
         </section>
         <section id="ollama">
-          <h2>Ollama محلي: لا حساب سحابي مطلوب</h2>
-          <p>ثبّت Ollama باتباع <a href="https://ollama.com/download">تعليمات النظام الرسمية</a>. شغّل التطبيق/الخدمة أو <code>ollama serve</code> بطرفية أخرى إن لم يكن الخادم جاريًا. دعم ash لـ FreeBSD لا يعني مثبّت Ollama أصليًا: استخدم خادمًا متاحًا بمضيف مدعوم آخر عند الحاجة.</p>
-          <p>نزّل نموذج أدوات يناسب عتادك؛ <code>llama3.1:8b</code> مثال لا حد أدنى. راجع <a href="https://ollama.com/search?c=tools">كتالوج الأدوات الحالي</a> لبدائل:</p>
+          <h2>Ollama المحلي: لا يلزم وجود حساب سحابي</h2>
+          <p>لا تحتاج إلى أن يكون لديك ذكاء اصطناعي محلي لاستخدامهash. ومع ذلك، إذا كنت تريد تشغيل النماذج محليًا دون الاعتماد على موفر السحابة، فيمكنك إعداد خادم Ollama محلي.</p>
+          <p>تقدم شركة Ollama أيضًا خدمة سحابية لتشغيل النماذج عن بُعد، ولكن هذا غير مطلوب للاستخدام المحلي معash. يشتمل الخادم السحابي على طبقة مجانية ونموذج سحابي Gemma 4 31b من Google (<a href="https://ollama.com/library/gemma4:31b-cloud">Gemma4-31b:سحابة</a>) يعمل بشكل جيد جدا معash. هذا هو النموذج الذي يستخدمه المشروع لإنشاء ملاحظات الإصدار وتنفيذ مهام المطورين.</p>
+          <p>قم بتثبيت Ollama باستخدام<a href="https://ollama.com/download">تعليمات نظام التشغيل الرسمية</a>. ابدأ تشغيل تطبيق/خدمة Ollama، أو قم بتشغيله<code>ollama serve</code>في محطة منفصلة إذا لم يكن الخادم قيد التشغيل بالفعل. على فري بي إس دي،ashلا يعني دعم برنامج تثبيت Ollama الأصلي: استخدم خادمًا يمكن الوصول إليه على مضيف آخر مدعوم إذا لزم الأمر.</p>
+          <p>قم بتنزيل نموذج قادر على استخدام الأدوات ويناسب أجهزتك؛<code>llama3.1:8b</code>هو مثال، وليس الحد الأدنى من المتطلبات. تحقق من<a href="https://ollama.com/search?c=tools">كتالوج الأدوات الحالية</a>للبدائل:</p>
           <pre><code>ollama pull llama3.1:8b
 ollama list
 curl -fsS http://localhost:11434/api/tags
 ash install</code></pre>
-          <p>بلا مفاتيح سحابية مضبوطة يمكن كشف الخادم المحلي وعرض النموذج المنزّل. إن ضُبط مزوّد آخر فغيّر نقطة الاتصال/النموذج يدويًا. مثال Bash/zsh:</p>
+          <p>مع عدم تعيين مفاتيح السحابة بالفعل، يمكن لبرنامج الإعداد اكتشاف الخادم المحلي وتقديم النموذج الذي تم تنزيله. إذا تم تكوين موفر آخر بالفعل، فقم بتغيير نقطة النهاية/النموذج يدويًا بدلاً من ذلك. مثال باش/zsh:</p>
           <pre><code>export ASH_AI_ENDPOINT="http://localhost:11434"
 export ASH_AI_MODEL="llama3.1:8b"
 unset ASH_AI_AUTH_TOKEN
 ash "Say hello in one sentence"</code></pre>
-          <p>المكافئ في Fish:</p>
+          <p>معادل السمك:</p>
           <pre><code>set -gx ASH_AI_ENDPOINT http://localhost:11434
 set -gx ASH_AI_MODEL llama3.1:8b
 set -e ASH_AI_AUTH_TOKEN
 ash "Say hello in one sentence"</code></pre>
-          <p>تؤثر التغييرات على الصدفة الحالية فقط. احفظها بملف بيئة ash المحمي أو إعداد الصدفة المناسب، مستبدلًا تجاوزات المزوّد القديمة. Ollama المحلي لا يحتاج رمزًا. أبقِ الخادم على loopback إلا إن أمّنت الوصول عمدًا؛ البعيد يستقبل طلباتك ونتائج الأدوات.</p>
-          <p>اختياري: اضبط <code>OLLAMA_KEEP_ALIVE=30m</code> في بيئة <em>خادم Ollama</em> وأعد تشغيله لإبقاء النماذج محمّلة. يبقيها <code>-1</code> بلا حد لكنه يستهلك الذاكرة بين الطلبات. ضبطه في طرفية عميل ash فقط لا يعيد ضبط خادم جارٍ.</p>
-          <p>الاستدلال المحلي لا يفوتر API لكنه يستهلك العتاد/التخزين/الكهرباء. <a href="https://ollama.com/cloud">Ollama السحابي</a> خدمة منفصلة بمصادقة وحدود خطة، ليست الإعداد المحلي.</p>
+          <p>تؤثر هذه التغييرات على الغلاف الحالي فقط. أبقهم في محميتكashملف البيئة أو تكوين الصدفة المناسب، ليحل محل أي تجاوزات للموفر القديم. لا يحتاج Olmama المحلي إلى رمز مميز. احتفظ بالخادم في حالة استرجاع ما لم تقم بتأمين الوصول عن عمد؛ يتلقى الخادم البعيد مطالباتك ومخرجات الأداة.</p>
+          <p>اختياري: تعيين<code>OLLAMA_KEEP_ALIVE=30m</code>في<em>خادم أولاما</em>البيئة وأعد تشغيل الخادم للحفاظ على دفء النماذج.<code>-1</code>يبقيها محملة إلى أجل غير مسمى ولكنها تستهلك الذاكرة بين الطلبات. ضبط هذا فقط فيashلا تقوم محطة العميل بإعادة تكوين خادم قيد التشغيل بالفعل.</p>
+          <p>لا يحتوي الاستدلال المحلي على فاتورة API للموفر، ولكنه يستخدم أجهزتك/وحدة التخزين/الكهرباء.<a href="https://ollama.com/cloud">سحابة أولاما</a>هي خدمة منفصلة مع حدود المصادقة والخطة؛ إنه ليس نفس هذا الإعداد المحلي.</p>
         </section>
         <section id="cloud">
-          <h2>الخطط السحابية المجانية</h2>
-          <div class="guide-note guide-warning"><p><strong>مجاني لا يعني غير محدود أو خاصًا.</strong> الحسابات والمناطق والحصص والنماذج وسياسات البيانات تختلف وتتغير. الطلبات ونتائج الأدوات ذات الصلة تغادر جهازك. راجع الحدود والشروط؛ لا تفعّل الفوترة المدفوعة دون نية الدفع.</p></div>
-          <p>أنشئ مفتاحًا بالروابط، شغّل <code>ash install</code> تفاعليًا واختر المزوّد. يُطلب الرمز وتُعرض النماذج حيث يدعمها. اختر <em>نموذج نص مجانيًا يستدعي الأدوات</em> متاحًا حاليًا؛ ظهوره لا يضمن المجانية لحسابك.</p>
-          <div class="table-scroll" role="region" aria-label="إعداد المزوّد السحابي" tabindex="0">
+          <h2>طبقات سحابية مجانية</h2>
+          <div class="guide-note guide-warning"><p><strong>المجاني لا يعني أنه غير محدود أو خاص.</strong> تختلف الحسابات والمناطق والحصص والنماذج المؤهلة وسياسات البيانات ويمكن أن تتغير. تغادر المطالبات ومخرجات الأداة ذات الصلة جهازك. مراجعة الحدود والشروط الحالية؛ لا تقم بتمكين الفواتير المدفوعة إلا إذا كنت تنوي الدفع.</p></div>
+          <p>قم بإنشاء مفتاح موفر باستخدام الروابط أدناه، ثم قم بتشغيل <code>ash install</code> بشكل تفاعلي واختر ذلك الموفر. يطالب الإعداد بالرمز المميز ويسرد النماذج المدعومة. اختر نموذجًا نصيًا <em>متاحًا حاليًا مع أداة استدعاء</em>؛ إدراج نموذج لا يضمن أنه مجاني لحسابك.</p>
+          <div class="table-scroll" role="region" aria-label="تكوين مزود السحابة" tabindex="0">
             <table>
-              <caption>الحسابات ونقاط الاتصال وكشف الاعتمادات</caption>
-              <thead><tr><th scope="col">المزوّد</th><th scope="col">نقطة الاتصال والمفتاح المعروف</th><th scope="col">فحوص الخطة المجانية</th></tr></thead>
+              <caption>الحسابات ونقاط النهاية واكتشاف بيانات الاعتماد</caption>
+              <thead><tr><th scope="col">مزود</th><th scope="col">نقطة النهاية والمفتاح المعترف به</th><th scope="col">الشيكات الطبقة الحرة</th></tr></thead>
               <tbody>
-                <tr><th scope="row"><a href="https://aistudio.google.com/app/apikey">Google AI Studio / Gemini</a></th><td><code>https://generativelanguage.googleapis.com/v1beta/openai/</code><br><code>GEMINI_API_KEY</code> أو <code>GOOGLE_API_KEY</code></td><td>راجع <a href="https://ai.google.dev/gemini-api/docs/models">كتالوج النماذج</a> و<a href="https://ai.google.dev/gemini-api/docs/pricing">تسعير الخطة المجانية</a>. قد يحسّن المحتوى المجاني منتجات Google؛ راجع <a href="https://ai.google.dev/gemini-api/terms">الشروط</a>.</td></tr>
-                <tr><th scope="row"><a href="https://console.groq.com/keys">Groq</a></th><td><code>https://api.groq.com/openai/v1</code><br><code>GROQ_API_KEY</code></td><td>اختر نموذج محادثة/أدوات مدعومًا من <a href="https://console.groq.com/docs/models">الكتالوج</a>. راجع <a href="https://console.groq.com/docs/rate-limits">حدود المعدل</a> و<a href="https://console.groq.com/docs/your-data">سياسات البيانات</a>؛ قد تختفي النماذج التجريبية.</td></tr>
-                <tr><th scope="row"><a href="https://openrouter.ai/settings/keys">OpenRouter</a></th><td><code>https://openrouter.ai/api/v1</code><br><code>OPENROUTER_API_KEY</code></td><td>اختر <a href="https://openrouter.ai/models?max_price=0">نموذجًا مجانيًا</a> يدعم الأدوات. اللاحقة <code>:free</code> تعمل فقط مع <a href="https://openrouter.ai/docs/guides/routing/model-variants/free">نسخة مجانية منشورة</a>. راجع <a href="https://openrouter.ai/docs/api/reference/limits">الحدود</a> و<a href="https://openrouter.ai/docs/guides/privacy/logging">إعدادات الخصوصية</a> للمزوّدين اللاحقين.</td></tr>
+                <tr><th scope="row"><a href="https://aistudio.google.com/app/apikey">استوديو جوجل للذكاء الاصطناعي / الجوزاء</a></th><td><code>https://generativelanguage.googleapis.com/v1beta/openai/</code><br><code>GEMINI_API_KEY</code>أو<code>GOOGLE_API_KEY</code></td><td>تحقق من<a href="https://ai.google.dev/gemini-api/docs/models">كتالوج النموذج</a>و<a href="https://ai.google.dev/gemini-api/docs/pricing">تسعير الطبقة الحرة</a>. يمكن استخدام محتوى الطبقة المجانية لتحسين منتجات Google؛ مراجعة<a href="https://ai.google.dev/gemini-api/terms">شروط</a>.</td></tr>
+                <tr><th scope="row"><a href="https://console.groq.com/keys">جروك</a></th><td><code>https://api.groq.com/openai/v1</code><br><code>GROQ_API_KEY</code></td><td>اختر نموذج دردشة/أداة مدعومًا من<a href="https://console.groq.com/docs/models">كتالوج</a>. التحقق من الحساب<a href="https://console.groq.com/docs/rate-limits">حدود المعدل</a>و<a href="https://console.groq.com/docs/your-data">سياسات البيانات</a>; يمكن أن تختفي نماذج المعاينة.</td></tr>
+                <tr><th scope="row"><a href="https://openrouter.ai/settings/keys">OpenRouter</a></th><td><code>https://openrouter.ai/api/v1</code><br><code>OPENROUTER_API_KEY</code></td><td>اختر أداة قادرة<a href="https://openrouter.ai/models?max_price=0">نموذج مجاني</a>. ال<code>:free</code>اللاحقة تعمل فقط للنماذج ذات الامتداد<a href="https://openrouter.ai/docs/guides/routing/model-variants/free">نشرت البديل المجاني</a>. مراجعة<a href="https://openrouter.ai/docs/api/reference/limits">حدود</a>و<a href="https://openrouter.ai/docs/guides/privacy/logging">إعدادات الخصوصية</a>لمقدمي المصب.</td></tr>
               </tbody>
             </table>
           </div>
-          <p>تصدّر مفتاحًا معروفًا بالفعل؟ يكشفه الإعداد؛ مع عدة مفاتيح يطلب اختيارًا. لا تلصق مفاتيح حقيقية بتاريخ الأوامر أو التسجيلات أو المصدر. ملف الإعداد يحتوي سرًا لا خزنة مشفرة.</p>
-          <h3>إعداد يدوي أو تغيير المزوّد</h3>
-          <p>استبدل نقطة الاتصال أدناه بقيمة الجدول و<code>MODEL_ID</code> بنموذج متحقق منه بحسابك. إن صُدّر المفتاح باسم <code>GROQ_API_KEY</code> يعيد مثال Bash/zsh استخدامه دون كتابة السر:</p>
+          <p>هل تقوم بالفعل بتصدير مفتاح موفر معروف؟ يكتشفه برنامج الإعداد؛ في حالة وجود عدة مفاتيح، يطلب منك الاختيار. لا تقم بلصق مفاتيح حقيقية في سجل الأوامر أو التسجيلات أو التعليمات البرمجية المصدر. يحتوي ملف التكوين على سر، وليس قبوًا مشفرًا.</p>
+          <h3>التكوين اليدوي أو تبديل مقدمي الخدمات</h3>
+          <p>استبدل نقطة النهاية أدناه بقيمة الجدول و<code>MODEL_ID</code>مع نموذج تم التحقق منه في حساب المزود الخاص بك. إذا تم تصدير مفتاحك بالفعل كـ<code>GROQ_API_KEY</code>، يعيد مثال Bash/zsh هذا استخدامه دون كتابة السر:</p>
           <pre><code>export ASH_AI_ENDPOINT="https://api.groq.com/openai/v1"
 export ASH_AI_MODEL="MODEL_ID"
 export ASH_AI_AUTH_TOKEN="$GROQ_API_KEY"</code></pre>
-          <p>المكافئ في Fish:</p>
+          <p>معادل السمك:</p>
           <pre><code>set -gx ASH_AI_ENDPOINT https://api.groq.com/openai/v1
 set -gx ASH_AI_MODEL MODEL_ID
 set -gx ASH_AI_AUTH_TOKEN "$GROQ_API_KEY"</code></pre>
-          <p>لـ Gemini/OpenRouter استخدم نقطة الاتصال ومتغير المفتاح الخاصين بهما. احفظ بأمان للصدفات المقبلة. السحابة تحتاج HTTPS ورمزًا؛ HTTP محلي ليس اختصارًا سحابيًا. راجع <a href="docs.html#environment">مرجع البيئة</a> و<a href="faq.html#ai">المزوّدين الآخرين المدعومين</a> للخدمات المدفوعة والتجاوزات المتقدمة.</p>
+          <p>بالنسبة إلى Gemini أو OpenRouter، استخدم نقطة النهاية الخاصة بهم والمتغير الرئيسي المعترف به بدلاً من ذلك. احفظ الإعدادات المختارة بشكل آمن للأصداف المستقبلية. تتطلب نقاط النهاية السحابية HTTPS ورمزًا مميزًا؛ HTTP المحلي ليس اختصارًا لخدمة سحابية. يرى<a href="docs.html#environment">مرجع البيئة</a>و<a href="faq.html#ai">مقدمي الخدمة الآخرين المدعومين</a>للخدمات المدفوعة والتجاوزات المتقدمة.</p>
         </section>
         <section id="script">
-          <h2>التثبيت بالسكربت: بديل لا الخيار الأول</h2>
-          <p>فضّل Homebrew وAPT وDNF وPacman: تتتبع الملفات وتتحقق من التنزيلات بإعداد الثقة وتوفر تحديثًا/إزالة مألوفين. تظل الثقة بالناشر وأفعال التثبيت مطلوبة.</p>
-          <div class="guide-note guide-warning"><p><strong>سكربت الموقع ينفّذ كودًا بصلاحيات حسابك.</strong> موقع/ناشر مخترق أو سكربت متغير قد يقرأ أسرارًا ويعدل ملفات أو يثبّت برامج. HTTPS يحمي النقل لا نية الكود. تمرير URL مباشرة للصدفة ينفّذ قبل الفحص. توقيعات الأرشيف لا توثّق السكربت نفسه. لا تستخدم sudo أو تعطّل التحقق أبدًا.</p></div>
-          <p>المتطلبات: نظام/معمارية مدعومان، <code>$SHELL</code> يحدد Bash/zsh/Fish، <a href="https://docs.sigstore.dev/cosign/system_config/installation/">Sigstore cosign</a> و<code>tar</code> و<code>uname</code> و<code>install</code> وأدوات صدفة قياسية وأمر SHA-256 (<code>sha256sum</code> أو <code>shasum</code> أو <code>sha256</code>) ومنزّل (<code>curl</code> أو <code>wget</code> أو Python). المثال يستخدم curl. FreeBSD يحتاج Bash أيضًا. مجلد المنزل/التثبيت قابل للكتابة.</p>
-          <p>نزّل ملفًا محليًا، افحصه بمحرر ونفّذ فقط إن وثقت بالمصدر والسلوك. الفحص لا يضمن الأمان؛ لا تتبع الخطوات عميانًا:</p>
+          <h2>تثبيت البرنامج النصي: بديل، وليس الخيار الأول</h2>
+          <p>يفضلون Homebrew، أو APT، أو DNF، أو Pacman: فهم يتتبعون الملفات المملوكة، ويتحققون من التنزيلات باستخدام تكوين الثقة الخاص بهم، ويقدمون تحديثات/إزالة مألوفة. ولا تزال تتطلب ثقة الناشرين وإجراءات تثبيت الحزمة.</p>
+          <div class="guide-note guide-warning"><p><strong>يعمل البرنامج النصي لموقع الويب على تشغيل التعليمات البرمجية مع أذونات حسابك.</strong> يمكن لموقع الويب أو الناشر أو البرنامج النصي المتغير قراءة الأسرار أو تغيير الملفات أو تثبيت برامج أخرى. يحمي HTTPS النقل، وليس نوايا هذا الرمز. يؤدي توصيل عنوان URL مباشرةً إلى الصدفة إلى تنفيذه قبل أن تتمكن من مراجعته. لا تؤدي عمليات التحقق من توقيع أرشيف البرنامج النصي إلى مصادقة البرنامج النصي نفسه. لا تقم مطلقًا بتشغيله باستخدام Sudo أو تعطيل التحقق منه.</p></div>
+          <p>المتطلبات الأساسية: نظام تشغيل/بنية مدعومة،<code>$SHELL</code>تحديد Bash/zsh/Fish،<a href="https://docs.sigstore.dev/cosign/system_config/installation/">سيجستور cosign</a>,<code>tar</code>,<code>uname</code>,<code>install</code>، أدوات مساعدة Shell القياسية، أمر SHA-256 (<code>sha256sum</code>,<code>shasum</code>، أو<code>sha256</code>)، وأداة التنزيل (<code>curl</code>,<code>wget</code>أو بايثون). يستخدم المثال الضفيرة. يحتاج FreeBSD أيضًا إلى Bash. يجب أن يكون دليل التثبيت/المنزل الخاص بك قابلاً للكتابة.</p>
+          <p>قم بالتنزيل إلى ملف محلي، وافحصه باستخدام أحد المحررين، وقم بالتنفيذ فقط إذا كنت تثق في مصدره وسلوكه. التفتيش ليس ضمانا للسلامة؛ لا تقم بتشغيل هذه الخطوات بشكل أعمى:</p>
           <pre><code>curl -fsSL https://jonconradt.github.io/ash/install.sh -o ash-install.sh
 less ash-install.sh</code></pre>
-          <p>بعد الفحص شغّل النسخة المحفوظة كمستخدم عادي:</p>
+          <p>بعد الفحص، قم بتشغيل النسخة المحفوظة كمستخدم عادي:</p>
           <pre><code>sh ./ash-install.sh
 rm ./ash-install.sh</code></pre>
-          <p>ينزّل <code>install.sh</code> آخر Release ويتحقق من بيان Sigstore الموقّع وملخص الأرشيف ويثبّت <code>ash</code>/<code>ash-broker</code> في <code>~/.local/bin</code>. الإضافات في <code>$XDG_DATA_HOME/ash/plugins</code>. يُجري إعداد المستخدم ويسأل قبل دمج الصدفة. بلا طرفية تفاعلية قد تتخطى أسئلة المزوّد/الدمج: شغّل <code>ash install</code> تفاعليًا بعده.</p>
-          <p>اضبط <code>ASH_INSTALL_DIR</code> قبل السكربت لاختيار وجهة أخرى. أضفها بنفسك لـ PATH. <strong>التحديث الذاتي مدعوم تحت <code>~/.local/bin</code> فقط</strong>؛ الوجهات الخاصة تتطلب استبدالًا يدويًا. لا محدد Beta/Nightly بالسكربت.</p>
+          <p><code>install.sh</code>يقوم بتنزيل أحدث إصدار، ويتحقق من بيان المجموع الاختباري الموقّع من Sigstore وملخص الأرشيف، ثم التثبيت<code>ash</code>/<code>ash-broker</code>في<code>~/.local/bin</code>. المكونات الإضافية الأصلية تندرج تحت<code>$XDG_DATA_HOME/ash/plugins</code>. يتم تشغيله الإعداد لكل مستخدم ويسأل قبل تمكين تكامل Shell. بدون محطة تفاعلية، قد يتم تخطي مطالبات الموفر/التكامل: تشغيل<code>ash install</code>بشكل تفاعلي بعد ذلك.</p>
+          <p>يمكنك ضبط<code>ASH_INSTALL_DIR</code>قبل تشغيل البرنامج النصي لاختيار وجهة أخرى. أضف تلك الوجهة إلى PATH بنفسك.<strong>التحديث الذاتي مدعوم فقط تحت<code>~/.local/bin</code></strong>; تتطلب الوجهات المخصصة استبدالًا يدويًا. لا يحتوي البرنامج النصي على محدد Beta/Nightly.</p>
         </section>
         <section id="verify-download">
-          <h2>التحقق من حزمة أو أرشيف مباشر</h2>
-          <p>المتطلبات: cosign وأداة SHA-256. نزّل الحزمة/الأرشيف و<code>SHA256SUMS</code> و<code>SHA256SUMS.sigstore.json</code> من الإصدار نفسه. اعمل بمجلد جديد. استبدل <code>vX.Y.Z</code> بالوسم الدقيق مع لاحقة ما قبل الإصدار إن وجدت:</p>
+          <h2>التحقق من الحزمة المباشرة أو الأرشيف</h2>
+          <p>المتطلبات الأساسية: التوقيع المشترك والأداة المساعدة SHA-256. من نفس الإصدار المنشور، قم بتنزيل الحزمة/الأرشيف الخاص بك،<code>SHA256SUMS</code>، و<code>SHA256SUMS.sigstore.json</code>. العمل في دليل جديد. يستبدل<code>vX.Y.Z</code>مع العلامة الدقيقة، بما في ذلك لاحقة الإصدار التجريبي إن أمكن:</p>
           <pre><code>cosign verify-blob SHA256SUMS \
   --bundle SHA256SUMS.sigstore.json \
   --certificate-identity "https://github.com/Jonconradt/ash/.github/workflows/release.yml@refs/tags/vX.Y.Z" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com"</code></pre>
-          <p>بعد النجاح فقط احسب الملخص بـ <code>shasum -a 256 PACKAGE</code> على macOS أو <code>sha256sum PACKAGE</code> على Linux أو <code>sha256 -q PACKAGE</code> على FreeBSD. استبدل <code>PACKAGE</code> باسم الملف وطابقه تمامًا بإدخاله في البيان المتحقق. توقف عند غياب الإدخال أو الاختلاف. مجموع غير موقّع بجوار الملف لا يعادل بيانات ناشر موثّقة.</p>
+          <p>فقط بعد أن ينجح ذلك، قم بحساب ملخص ملفك باستخدام<code>shasum -a 256 PACKAGE</code>على نظام التشغيل MacOS،<code>sha256sum PACKAGE</code>على لينكس، أو<code>sha256 -q PACKAGE</code>على فري بي إس دي. يستبدل<code>PACKAGE</code>باستخدام اسم الملف الذي تم تنزيله ومقارنته تمامًا بإدخال اسم الملف هذا في البيان الذي تم التحقق منه. توقف عند الإدخال المفقود أو أي عدم تطابق. لا يعد المجموع الاختباري غير الموقع الذي تم تنزيله بجانب الملف مكافئًا للبيانات التعريفية للناشر الذي تم التحقق منه.</p>
         </section>
         <section id="updates">
           <h2>التحديثات والقنوات الثلاث</h2>
           <ul>
-            <li><strong>Release (موصى به):</strong> إصدارات مستقرة مثل <code>vX.Y.Z</code>؛ يسميها إعداد المستودع <code>stable</code>.</li>
-            <li><strong>Beta:</strong> اختبارات ما قبل الإصدار، الوسم <code>vX.Y.Z-beta.N</code>؛ توقع تغييرات وتراجعات.</li>
-            <li><strong>Nightly:</strong> تغييرات حديثة للفرع الافتراضي، الوسم <code>vX.Y.Z-nightly.YYYYMMDD.N</code>؛ أعلى خطر تراجع. البناء مجدول لكنه قد يُتخطى دون تغييرات أو عند فشل النشر.</li>
+            <li><strong>الإصدار (مستحسن):</strong>الإصدارات المنشورة المستقرة مثل<code>vX.Y.Z</code>; تكوين المستودع يستدعي هذا<code>stable</code>.</li>
+            <li><strong>بيتا:</strong>اختبار ما قبل النشر، الموسومة<code>vX.Y.Z-beta.N</code>; توقع التغييرات والانتكاسات.</li>
+            <li><strong>ليلا:</strong>التغييرات الأخيرة للفرع الافتراضي، الموسومة<code>vX.Y.Z-nightly.YYYYMMDD.N</code>; أعلى خطر الانحدار. تتم جدولة الإصدارات ولكن قد يتم تخطيها عندما لا يتغير أي شيء أو يفشل النشر.</li>
           </ul>
-          <p>يحدّث الإصدار المنشور صيغة Homebrew أو مستودع Linux الموقّع الموافق. تتلقاه بأمر تحديث المدير المسؤول أو سياسة نظامك. النشر والمستودعات والموقع قد تتأخر بعضها عن بعض؛ تحقق من التوفر قبل تغيير القناة. لا يثبّت ash تحديثات تنفيذية خلفية بصمت.</p>
-          <div class="table-scroll" role="region" aria-label="اشتراكات قنوات التحديث" tabindex="0">
+          <p>يقوم الإصدار المنشور بتحديث صيغة Homebrew المقابلة أو مستودع Linux الموقع. يمكنك استلامه عند تشغيل أمر ترقية المدير المالك (أو عند تنفيذ سياسة تحديث نظام التشغيل الخاصة بك). يمكن أن يتأخر النشر وتحديثات المستودع ونشر موقع الويب عن بعضهما البعض؛ تحقق من التوفر قبل تغيير القنوات. لا يقوم ash بتثبيت التحديثات الثنائية في الخلفية بصمت.</p>
+          <div class="table-scroll" role="region" aria-label="تحديث اشتراكات القناة" tabindex="0">
             <table>
-              <caption>اشترك بطريقة تثبيتك المسؤولة</caption>
-              <thead><tr><th scope="col">الطريقة</th><th scope="col">Release</th><th scope="col">Beta</th><th scope="col">Nightly</th></tr></thead>
+              <caption>اشترك باستخدام طريقة التثبيت التي تمتلكها</caption>
+              <thead><tr><th scope="col">طريقة</th><th scope="col">يطلق</th><th scope="col">بيتا</th><th scope="col">ليلا</th></tr></thead>
               <tbody>
-                <tr><th scope="row">صيغة Homebrew</th><td><code>Jonconradt/ash/ash</code></td><td><code>Jonconradt/ash/ash-beta</code></td><td><code>Jonconradt/ash/ash-nightly</code></td></tr>
-                <tr><th scope="row">توزيعة APT</th><td><code>stable</code></td><td><code>beta</code></td><td><code>nightly</code></td></tr>
-                <tr><th scope="row">baseurl في DNF</th><td><code>https://www.versionx.ai/rpm/</code></td><td><code>https://www.versionx.ai/rpm/beta/</code></td><td><code>https://www.versionx.ai/rpm/nightly/</code></td></tr>
-                <tr><th scope="row">Server في Pacman</th><td><code>https://www.versionx.ai/pacman/$arch</code></td><td><code>https://www.versionx.ai/pacman/beta/$arch</code></td><td><code>https://www.versionx.ai/pacman/nightly/$arch</code></td></tr>
-                <tr><th scope="row">سكربت / ash update</th><td>Release فقط</td><td>لا اشتراك</td><td>لا اشتراك</td></tr>
-                <tr><th scope="row">حزمة مباشرة / tarball</th><td colspan="3">بلا اشتراك تلقائي: اختر وسمًا منشورًا واستبدل ملفًا موثّقًا يدويًا.</td></tr>
+                <tr><th scope="row">صيغة البيرة</th><td><code>Jonconradt/ash/ash</code></td><td><code>Jonconradt/ash/ash-beta</code></td><td><code>Jonconradt/ash/ash-nightly</code></td></tr>
+                <tr><th scope="row">توزيع أبت</th><td><code>stable</code></td><td><code>beta</code></td><td><code>nightly</code></td></tr>
+                <tr><th scope="row">DNF باسيرل</th><td><code>https://www.versionx.ai/rpm/</code></td><td><code>https://www.versionx.ai/rpm/beta/</code></td><td><code>https://www.versionx.ai/rpm/nightly/</code></td></tr>
+                <tr><th scope="row">خادم بكمن</th><td><code>https://www.versionx.ai/pacman/$arch</code></td><td><code>https://www.versionx.ai/pacman/beta/$arch</code></td><td><code>https://www.versionx.ai/pacman/nightly/$arch</code></td></tr>
+                <tr><th scope="row">السيناريو /ashتحديث</th><td>الإصدار فقط</td><td>لا يوجد اشتراك</td><td>لا يوجد اشتراك</td></tr>
+                <tr><th scope="row">الحزمة المباشرة/القطران</th><td colspan="3">لا يوجد اشتراك تلقائي: اختر علامة منشورة واستبدل العنصر الذي تم التحقق منه يدويًا.</td></tr>
               </tbody>
             </table>
           </div>
           <h3>Homebrew: تثبيت الصيغ أو تبديلها</h3>
-          <p>لتثبيت Beta/Nightly جديد استخدم الاسم الكامل أعلاه في <code>brew install</code>. عند التبديل أزل الصيغة الحالية أولًا: الثلاث توفر التنفيذيات نفسها. مثال Release إلى Beta:</p>
+          <p>للحصول على تثبيت تجريبي/ليلي جديد، استخدم اسم الصيغة الكاملة المطابق أعلاه في <code>brew install</code>. عند التبديل، قم أولاً بإلغاء تثبيت الصيغة المثبتة حاليًا: توفر الثلاثة جميعها نفس الثنائيات. على سبيل المثال، الإصدار إلى الإصدار التجريبي:</p>
           <pre><code>brew uninstall ash
 brew install Jonconradt/ash/ash-beta
 brew update
 brew upgrade ash-beta</code></pre>
-          <p>استخدم <code>ash-nightly</code> لـ Nightly أو <code>ash</code> لـ Release بالتثبيت/التحديث. أزل الصيغة الفعلية للقناة القديمة، لا <code>ash</code> دائمًا. تُحفظ الإعدادات؛ افتح صدفة جديدة.</p>
-          <h3>Linux: اختيار قناة مستودع واحدة</h3>
-          <p><strong>APT:</strong> اتبع <a href="#apt-installation">إعداد APT</a> بتوزيعة واحدة من الجدول. للتبديل عدّل <code>/etc/apt/sources.list.d/versionx.list</code> مستبدلًا <code>stable</code> بـ <code>beta</code> أو <code>nightly</code> (أو عُد لـ <code>stable</code>) ثم:</p>
+          <p>يستخدم<code>ash-nightly</code>ليلا أو<code>ash</code>للإصدار في أوامر التثبيت/الترقية. قم بإلغاء تثبيت الصيغة الفعلية للقناة القديمة، ليس دائمًا<code>ash</code>. يتم الاحتفاظ بإعدادات المستخدم. فتح قذيفة جديدة بعد التبديل.</p>
+          <h3>Linux: حدد قناة مستودع واحدة</h3>
+          <p><strong>أبت:</strong>استخدم<a href="#apt-installation">إعداد أبت</a>مع توزيع واحد بالضبط من الجدول. لتبديل تثبيت موجود، قم بتحريره<code>/etc/apt/sources.list.d/versionx.list</code>، استبدال<code>stable</code>مع<code>beta</code>أو<code>nightly</code>(أو العودة إلى<code>stable</code>)، ثم:</p>
           <pre><code>sudo apt update
 sudo apt install --allow-downgrades ash</code></pre>
-          <p><strong>DNF:</strong> اتبع <a href="#dnf-installation">إعداد DNF</a> بـ baseurl المختارة. بالتثبيت الموجود استبدل <code>baseurl</code> في <code>/etc/yum.repos.d/versionx.repo</code> محافظًا على التوقيع، ثم:</p>
+          <p><strong>عدم التسليم:</strong>استخدم<a href="#dnf-installation">إعداد DNF</a>مع baseurl المحدد. بالنسبة للتثبيت الموجود، استبدل<code>baseurl</code>في<code>/etc/yum.repos.d/versionx.repo</code>، مع الاحتفاظ بإعدادات التوقيع الخاصة به، ثم:</p>
           <pre><code>sudo dnf --refresh distro-sync ash</code></pre>
-          <p><strong>Pacman:</strong> اتبع <a href="#pacman-installation">إعداد Pacman</a> بـ URL Server المختار. أبقِ القسم <code>[versionx]</code>: كل قناة تنشر قاعدة <code>versionx.db</code>. غيّر Server فيه لا تضف قاعدة باسم آخر. للتبديل بما فيه الرجوع:</p>
+          <p><strong>بكمن:</strong>استخدم<a href="#pacman-installation">إعداد بكمن</a>باستخدام عنوان URL للخادم المحدد. احتفظ باسم القسم<code>[versionx]</code>: كل ​​قناة تنشر قاعدة بيانات اسمها<code>versionx.db</code>. قم بتغيير الخادم في هذا القسم بدلاً من إضافة قاعدة بيانات بأسماء مختلفة. للتبديل، بما في ذلك الرجوع إلى إصدار سابق:</p>
           <pre><code>sudo pacman -Syuu ash</code></pre>
-          <p>راجع المعاملة: العودة لـ Release قد تخفض ash، و<code>u</code> المزدوج بـ Pacman قد يخفض حزمًا أخرى. انسخ الإعداد احتياطيًا أولًا. بعدها استخدم التحديثات العادية من أقسام النظام؛ لا تترك مصادر قنوات ash متعددة فعّالة.</p>
-          <h3>تحديثات Release المحلية للمستخدم</h3>
+          <p>راجع المعاملة المقترحة: العودة إلى الإصدار قد يؤدي إلى خفض مستوى ash، ويمكن لـ Pacman المزدوج <code>u</code> أن يؤدي إلى خفض مستوى الحزم الأخرى أيضًا. قم بعمل نسخة احتياطية من التكوين قبل التبديل. بعد ذلك، استخدم أوامر ترقية APT/DNF/Pacman العادية من أقسام نظام التشغيل؛ لا تترك العديد من مصادر قناة ash ممكّنة.</p>
+          <h3>تحديثات الإصدار المحلي للمستخدم</h3>
           <pre><code>ash update</code></pre>
-          <p>يتحقق ويثبّت المستقر فقط إن كانت تنفيذية ash النشطة تحت <code>~/.local/bin</code>. يحدّث الملفات/الإضافات أيضًا مع خيارات للمخصصة. يختار <code>ash update --version vX.Y.Z</code> وسمًا مستقرًا لا قناة؛ ليس أمر خفض إصدار. لا خيار <code>--channel</code>. تثبيت المدير و.pkg والوجهات الخاصة تحتاج مديرها/مثبّتها. FreeBSD Beta/Nightly يستخدم أرشيفات موثّقة يدويًا لا اشتراك المحدث الذاتي. افتح صدفة جديدة.</p>
+          <p>يعمل هذا على التحقق من الإصدار الثابت وتثبيته فقط عندما يكون نشطًاashالقابل للتنفيذ تحت<code>~/.local/bin</code>. كما يقوم أيضًا بتحديث الأصول/المكونات الإضافية المجمعة، مع خيارات للملفات المخصصة.<code>ash update --version vX.Y.Z</code>تحديد علامة ثابتة، وليس قناة؛ إنه ليس أمر الرجوع إلى إصدار أقدم. لا يوجد<code>--channel</code>خيار. يجب أن تستخدم عمليات تثبيت مدير الحزم وعمليات تثبيت macOS .pkg ووجهات البرامج النصية المخصصة المدير/المثبت الخاص بها بدلاً من ذلك. يستخدم FreeBSD Beta/Nightly الأرشيفات التي تم التحقق منها يدويًا، وليس اشتراك التحديث الذاتي. افتح غلافًا جديدًا بعد التحديث.</p>
         </section>
         <section id="uninstall">
-          <h2>الإزالة دون حذف ملفات غير مرتبطة</h2>
-          <h3>1. عطّل دمج الصدفة أولًا</h3>
-          <p>قبل حذف التنفيذيات نفّذ الأمر لكل صدفة فعّلت دمجها:</p>
+          <h2>إلغاء التثبيت دون إزالة الملفات غير ذات الصلة</h2>
+          <h3>1. قم بتعطيل تكامل Shell أولاً</h3>
+          <p>قبل إزالة الثنائيات، قم بتشغيل الأمر لكل Shell حيث قمت بتمكين التكامل:</p>
           <p><strong>Bash</strong></p>
           <pre><code>ash install --shell bash --disable-shell-integration</code></pre>
-          <p><strong>zsh</strong></p>
+          <p><strong>زش</strong></p>
           <pre><code>ash install --shell zsh --disable-shell-integration</code></pre>
-          <p><strong>Fish</strong></p>
+          <p><strong>الأسماك</strong></p>
           <pre><code>ash install --shell fish --disable-shell-integration</code></pre>
-          <p>إن غاب ash عدّل ملف البدء من <a href="#initialize">التهيئة</a> واحذف فقط الكتلة بين <code># &gt;&gt;&gt; ash install &gt;&gt;&gt;</code> و<code># &lt;&lt;&lt; ash install &lt;&lt;&lt;</code>. احذف أسطر PATH/بيئة ash المضافة يدويًا لا إعدادات غير مرتبطة. أغلق صدفات ash لإنهاء وسطاءها.</p>
-          <h3>2. دع مدير الحزم المسؤول يحذف ملفاته</h3>
-          <p><strong>Homebrew (Release)</strong></p>
+          <p>لوashمفقود بالفعل، قم بتحرير ملف بدء التشغيل ذي الصلة من<a href="#initialize">التهيئة</a>وإزالة الكتلة فقط بينهما<code># &gt;&gt;&gt; ash install &gt;&gt;&gt;</code>و<code># &lt;&lt;&lt; ash install &lt;&lt;&lt;</code>. إزالة أيash- خطوط PATH/البيئة المحددة التي قمت بإضافتها يدويًا، وليس تكوين Shell غير ذي صلة. يغلقash- تمكين القذائف بعد ذلك حتى يخرج الوسطاء المملوكون لها.</p>
+          <h3>2. اسمح لمدير الحزم المالك بإزالة ملفاته</h3>
+          <p><strong>البيرة (الإصدار)</strong></p>
           <pre><code>brew uninstall ash</code></pre>
           <p><strong>APT</strong></p>
           <pre><code>sudo apt remove ash</code></pre>
-          <p><strong>DNF</strong></p>
+          <p><strong>عدم المعرفة</strong></p>
           <pre><code>sudo dnf remove ash</code></pre>
-          <p><strong>Pacman</strong></p>
+          <p><strong>بكمن</strong></p>
           <pre><code>sudo pacman -R ash</code></pre>
-          <p>اختر طريقتك فقط؛ لـ Homebrew Beta/Nightly استخدم <code>ash-beta</code>/<code>ash-nightly</code>. APT/DNF/Pacman يزيل الملفات التنفيذية والإضافات والأدلة المملوكة لا إعدادات/تاريخ المنزل. لا تحذف ملفات الحزم يدويًا.</p>
-          <p>تنظيف مستودع اختياري: احذف مصدر ash <code>/etc/apt/sources.list.d/versionx.list</code> ومفتاحه الخاص <code>/etc/apt/keyrings/versionx-keyring.gpg</code> أو مستودع <code>/etc/yum.repos.d/versionx.repo</code> أو قسم ash <code>[versionx]</code> من <code>/etc/pacman.conf</code>. تأكد أن لا حزم أخرى تستخدمها. أزل مفتاح RPM/Pacman بعد تأكيد البصمة وعدم اعتماد غيره؛ لا تحذف حلقة مفاتيح التوزيعة المشتركة.</p>
-          <h3 id="manual-macos">3أ. إزالة .pkg macOS يدويًا</h3>
-          <p>يسجل macOS Installer إيصالًا بلا مزيل ash. تأكد أنه .pkg لا Homebrew وافحص المحتوى الدقيق:</p>
+          <p>اختر طريقة التثبيت الخاصة بك فقط؛ للاستخدام المنزلي Homebrew Beta/الليلي<code>ash-beta</code>/<code>ash-nightly</code>. تقوم APT/DNF/Pacman بإزالة الثنائيات والمكونات الإضافية وصفحات الدليل المملوكة للحزمة، وليس تكوين/سجل الدليل الرئيسي الخاص بك. لا تقم بحذف الملفات المملوكة للحزمة يدويًا.</p>
+          <p>تنظيف المستودع الاختياري: قم بإزالةashالملف المصدر<code>/etc/apt/sources.list.d/versionx.list</code>والمخصص لها<code>/etc/apt/keyrings/versionx-keyring.gpg</code>، أوashملف المستودع<code>/etc/yum.repos.d/versionx.repo</code>، أوash <code>[versionx]</code>قسم من<code>/etc/pacman.conf</code>. تأكد أولاً من عدم استخدام أي حزم أخرى لها. قم بإزالة مفتاح ثقة RPM/Pacman المستورد فقط بعد التأكد من بصمة إصبعه وعدم اعتماد أي شيء آخر عليه؛ لا تقم أبدًا بحذف حلقة المفاتيح المشتركة للتوزيع.</p>
+          <h3 id="manual-macos">3 أ. إزالة macOS .pkg يدويًا</h3>
+          <p>يسجل macOS Installer إيصالًا ولكن ليس لديهashإلغاء التثبيت. تأكد من أن هذا تثبيت .pkg، وليس Homebrew، وافحص حمولته بدقة:</p>
           <pre><code>pkgutil --pkg-info dev.ash.cli
 pkgutil --files dev.ash.cli</code></pre>
-          <p>بالإيصال كجرد احذف فقط ملفات ash: <code>/usr/local/bin/ash</code> و<code>/usr/local/bin/ash-broker</code> وملفات <code>/usr/local/lib/ash/plugins</code> و<code>/usr/local/share/man/man1/ash.1</code> وصفحات <code>ash.1</code> المترجمة المسردة وإشعارات <code>/usr/local/share/licenses/ash</code>. تحتاج مسؤولًا. إن استبدلها مثبّت آخر افحص الملكية ولا تحذف نسخته. احذف مجلدات ash الفارغة فقط لا المشتركة <code>/usr/local</code> و<code>bin</code> أو الأدلة.</p>
-          <p>بعد الملفات يمكنك حذف الإيصال اختياريًا:</p>
+          <p>باستخدام هذا الإيصال كمخزون، قم بإزالة إيصاله فقطash-الملفات المملوكة:<code>/usr/local/bin/ash</code>,<code>/usr/local/bin/ash-broker</code>، الملفات الموجودة في<code>/usr/local/lib/ash/plugins</code>,<code>/usr/local/share/man/man1/ash.1</code>، المترجمة المدرجة<code>ash.1</code>الصفحات والإشعارات في<code>/usr/local/share/licenses/ash</code>. هناك حاجة إلى امتيازات المسؤول. تحقق من الملكية إذا قام مثبت آخر باستبدال هذه الملفات لاحقًا؛ لا تقم بإزالة نسخته. إزالة فارغةash- الدلائل فقط، غير مشتركة<code>/usr/local</code>,<code>bin</code>، أو أدلة الرجل.</p>
+          <p>بعد إزالة الحمولة، قم بإزالة الإيصال بشكل اختياري:</p>
           <pre><code>sudo pkgutil --forget dev.ash.cli</code></pre>
-          <p><strong>نسيان الإيصال لا يحذف أي ملفات مثبتة.</strong> احتفظ به حتى اكتمال فحص المحتوى.</p>
-          <h3 id="manual-linux">3ب. إزالة الأرشيف المحلي / Linux / FreeBSD يدويًا</h3>
-          <p>حدد النسخة النشطة بـ <code>command -v ash</code> و<code>command -v ash-broker</code>. بالسكربت الافتراضي بعد تعطيل الخطافات احذف هذين الملفين فقط:</p>
+          <p><strong>لا يؤدي نسيان الإيصال إلى إزالة أي ملفات مثبتة.</strong>احتفظ بها حتى تنتهي من فحص الحمولة.</p>
+          <h3 id="manual-linux">3ب. إزالة أرشيف المستخدم المحلي / Linux / FreeBSD يدويًا</h3>
+          <p>حدد موقع النسخة النشطة باستخدام<code>command -v ash</code>و<code>command -v ash-broker</code>. لتثبيت البرنامج النصي الافتراضي، بعد تعطيل الخطافات، قم بإزالة هذين الملفين المحددين:</p>
           <pre><code>rm "$HOME/.local/bin/ash" "$HOME/.local/bin/ash-broker"</code></pre>
-          <p>لـ <code>ASH_INSTALL_DIR</code> أو الأرشيف اليدوي احذف مسارات ash/الوسيط الفعلية فقط. أزل الإضافات/الأدلة/الإشعارات بجردك الأصلي؛ إضافات السكربت ببيانات المستخدم. تحت <code>/usr/bin</code> افحص الملكية أولًا بـ <code>dpkg -S /usr/bin/ash</code> أو <code>rpm -qf /usr/bin/ash</code> أو <code>pacman -Qo /usr/bin/ash</code>. أزل النسخة المدارة بمديرها حتى لو نزّلت منفردة.</p>
-          <h3>4. اختياري: حذف إعدادات وأدوات وتاريخ محلي</h3>
-          <div class="guide-note guide-warning"><p><strong>انسخ ما تريد حفظه احتياطيًا.</strong> الخطوة المنفصلة قد تحذف الإعدادات/الرموز والأدوات/الإضافات المخصصة والتاريخ وملفات العمل. إزالة التنفيذيات لا تعني الموافقة على محوها.</p></div>
+          <p>ل<code>ASH_INSTALL_DIR</code>أو أرشيفًا مستخرجًا يدويًا، قم بإزالة الملفات المثبتة فعليًا فقطash/ مسارات الوسيط. إزالة المكونات الإضافية للأرشيف/صفحات الدليل/الإشعارات التي قمت بتثبيتها باستخدام مخزون الملفات الأصلي الخاص بك؛ المكونات الإضافية للبرنامج النصي موجودة فيashدليل بيانات المستخدم. إذا كانت الملفات تحت<code>/usr/bin</code>، تحقق من الملكية أولاً باستخدام<code>dpkg -S /usr/bin/ash</code>,<code>rpm -qf /usr/bin/ash</code>، أو<code>pacman -Qo /usr/bin/ash</code>حسب الاقتضاء. يجب إزالة النسخة المملوكة للحزمة من خلال هذا المدير، حتى لو تم تثبيتها من تنزيل مستقل.</p>
+          <h3>4. اختياري: محو الإعدادات والأدوات والمحفوظات المحلية</h3>
+          <div class="guide-note guide-warning"><p><strong>قم بعمل نسخة احتياطية لأي شيء تريد الاحتفاظ به.</strong> يمكن لهذه الخطوة المنفصلة مسح إعدادات الموفر/الرموز المميزة، والأدوات/المكونات الإضافية المخصصة، وسجل المحادثات، والملفات المؤقتة. لا يعني إلغاء تثبيت الثنائيات الموافقة على مسحها.</p></div>
           <ul>
-            <li>الإعداد: <code>$XDG_CONFIG_HOME/ash</code>، الافتراضي <code>~/.config/ash</code>.</li>
-            <li>البيانات والإضافات وبيئة Python: <code>$XDG_DATA_HOME/ash</code>، الافتراضي <code>~/.local/share/ash</code>.</li>
-            <li>التاريخ والحالة: <code>$XDG_STATE_HOME/ash</code>، الافتراضي <code>~/.local/state/ash</code>.</li>
-            <li>الذاكرة المؤقتة: <code>$XDG_CACHE_HOME/ash</code>، الافتراضي <code>~/.cache/ash</code>.</li>
-            <li>تشغيل الوسيط: <code>$XDG_RUNTIME_DIR/ash</code>، أو <code>$XDG_STATE_HOME/ash/runtime</code> عند غياب جذر تشغيل.</li>
+            <li>إعدادات:<code>$XDG_CONFIG_HOME/ash</code>، تقصير<code>~/.config/ash</code>.</li>
+            <li>البيانات والمكونات الإضافية وبيئة بايثون:<code>$XDG_DATA_HOME/ash</code>، تقصير<code>~/.local/share/ash</code>.</li>
+            <li>التاريخ والدولة:<code>$XDG_STATE_HOME/ash</code>، تقصير<code>~/.local/state/ash</code>.</li>
+            <li>مخبأ:<code>$XDG_CACHE_HOME/ash</code>، تقصير<code>~/.cache/ash</code>.</li>
+            <li>وقت تشغيل الوسيط:<code>$XDG_RUNTIME_DIR/ash</code>، أو<code>$XDG_STATE_HOME/ash/runtime</code>عندما لا يتوفر جذر وقت التشغيل.</li>
           </ul>
-          <p>افحص تجاوزات XDG المطلقة الفعلية قبل حذف مجلدات ash الفرعية فقط؛ لا تحذف جذر XDG أو المنزل. بعد إغلاق كل صدفات ash احذف بقايا التشغيل إن لزم. قد تبقى اعتمادات MCP OAuth بمدير النظام: احذف إدخالات ash وألغ الوصول عند مزوّد MCP. ألغ مفاتيح AI غير المستخدمة من حساباتها؛ حذف ملف لا يلغي مفتاحًا. لا تزل Ollama/النماذج أو Python أو الاعتماديات المشتركة مع ash.</p>
+          <p>افحص تجاوزات XDG المطلقة الفعلية قبل حذف هذه الدلائل الفرعية ash فقط؛ لا تقم أبدًا بحذف جذر XDG أو الدليل الرئيسي الخاص بك. بعد إغلاق كافة الأصداف الممكّنة لـ ash، قم بإزالة ملفات وقت التشغيل ash المتبقية إذا لزم الأمر. قد تظل بيانات اعتماد MCP OAuth أيضًا في مدير بيانات اعتماد نظام التشغيل: قم بإزالة الإدخالات الخاصة بـ ash هناك وإبطال الوصول لدى موفر MCP. إبطال مفاتيح الذكاء الاصطناعي غير المستخدمة في حسابات المزودين الخاصة بهم؛ لا يؤدي حذف ملف محلي إلى إلغاء المفتاح. لا تقم بإلغاء تثبيت Ollama/models، أو Python، أو التبعيات المشتركة كجزء من إزالة ash.</p>
         </section>
         <section id="troubleshooting">
-          <h2>حل المشكلات سريعًا</h2>
+          <h2>استكشاف الأخطاء وإصلاحها بسرعة</h2>
           <dl>
-            <dt>أمر مفقود أو إصدار خاطئ</dt><dd>افحص PATH و<code>command -v ash</code>/<code>command -v ash-broker</code>. نسخة قديمة في <code>~/.local/bin</code> قد تحجب حزمة. استخدم مسؤولًا/قناة واحدة وافتح صدفة جديدة.</dd>
-            <dt>لم تظهر قائمة المزوّدين</dt><dd>شغّل <code>ash install</code> تفاعليًا. تُحفظ الإعدادات الصالحة؛ استخدم <a href="#cloud">الإعداد اليدوي</a> للتبديل. بلا دمج صدّر الإعدادات لبيئة CLI.</dd>
-            <dt>نموذج مفقود أو اتصال مرفوض</dt><dd>لـ Ollama تأكد من الخادم ووجود النموذج في <code>ollama list</code>. للسحابة افحص نقطة الاتصال والأهلية وHTTPS والرمز والحصة؛ لا تشارك سجلات برموز.</dd>
-            <dt>المستودع أو القناة غير متاح</dt><dd>افحص المعمارية والإصدار/المستودع المنشور. النشر قد يتأخر؛ لا تعطّل التوقيع للتجاوز.</dd>
-            <dt>فشل إعداد أدوات Python</dt><dd>ثبّت Python مع venv/ensurepip واسمح بتنزيل الاعتماديات ثم أعد <code>ash install</code>. يبقى ash الأساسي صالحًا بلا الأدوات.</dd>
+            <dt>لم يتم العثور على الأمر أو إصدار خاطئ</dt><dd>تحقق من PATH و<code>command -v ash</code>/<code>command -v ash-broker</code>. قديم<code>~/.local/bin</code>يمكن للنسخة تظليل الحزمة. استخدم مالك/قناة واحدة في كل مرة وافتح غلافًا جديدًا.</dd>
+            <dt>لم تظهر قائمة الموفر</dt><dd>يجري<code>ash install</code>من محطة تفاعلية. يتم الاحتفاظ بالإعدادات الصالحة الموجودة؛ يستخدم<a href="#cloud">التكوين اليدوي</a>لتبديل مقدمي الخدمة. بدون التكامل، تأكد من تصدير الإعدادات إلى بيئة واجهة سطر الأوامر (CLI).</dd>
+            <dt>لم يتم رفض أي نموذج أو اتصال</dt><dd>بالنسبة إلى Olma، تأكد من أن الخادم الخاص به قيد التشغيل و<code>ollama list</code>يتضمن النموذج الذي اخترته. بالنسبة للخدمات السحابية، تحقق من نقطة النهاية وأهلية النموذج وHTTPS والرمز المميز وحصة الحساب؛ لا تشارك مطلقًا السجلات التي تحمل الرمز المميز.</dd>
+            <dt>المستودع أو القناة غير متاحة</dt><dd>تحقق من البنية والإصدار/المستودع المنشور. يمكن أن يتأخر النشر؛ لا تقم بتعطيل التحقق من التوقيع للتغلب على مستودع غير متوفر.</dd>
+            <dt>فشل إعداد أداة بايثون</dt><dd>قم بتثبيت Python باستخدام venv/ensurepip واسمح بتنزيلات التبعية، ثم أعد التشغيل<code>ash install</code>. أساسيashتظل قابلة للاستخدام بدون هذه الأدوات.</dd>
           </dl>
-          <p>تفاصيل أكثر؟ راجع <a href="docs.html">مرجع الأوامر</a> أو <a href="faq.html">الأسئلة الشائعة</a> أو <a href="https://github.com/Jonconradt/ash/issues">أبلغ عن مشكلة</a> دون اعتمادات.</p>
+          <p>هل تحتاج إلى مزيد من التفاصيل؟ يرى<a href="docs.html">مرجع الأمر</a>,<a href="faq.html">التعليمات</a>، أو<a href="https://github.com/Jonconradt/ash/issues">الإبلاغ عن مشكلة</a>بدون أوراق اعتماد.</p>
         </section>
       </article>
     </div>
   </main>
-  <footer class="site-footer page-width"><span class="brand"><span class="brand-mark">&gt;_</span> ash</span><a href="docs.html">التوثيق</a><a href="https://github.com/Jonconradt/ash">GitHub</a></footer>
+  <footer class="site-footer page-width"><span class="brand"><span class="brand-mark">&gt;_</span> ash</span><a href="docs.html">التوثيق</a><a href="https://github.com/Jonconradt/ash">جيثب</a></footer>
   <script src="../site.js" data-site-script defer></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -27,7 +27,7 @@
     <a class="brand" href="./" aria-label="ashبيت"><span class="brand-mark">&gt;_</span> ash</a>
     <nav aria-label="التنقل الأساسي">
       <a href="./">بيت</a>
-      <a href="install.html">التثبيت</a>
+      <a href="install.html">ثَبَّتَ</a>
       <a href="docs.html">المستندات</a>
       <a href="faq.html">التعليمات</a>
       <a href="developer.html" aria-current="page">المطورين</a>
@@ -177,15 +177,15 @@ sudo apt-get install qemu-system-x86 qemu-utils cloud-image-utils curl openssh-c
 sudo dnf install qemu-kvm qemu-img cloud-utils curl openssh-clients python3</code></pre>
           <p>تقوم الواجهة الخلفية لنظام التشغيل Linux بتشغيل الصور السحابية x86_64 Ubuntu أو Debian أو Fedora أو Rocky باستخدام QEMU/KVM وcloud-init. يستخدم شبكة وضع المستخدم QEMU مع إعادة توجيه SSH إلى المضيف المحلي؛ ليست هناك حاجة إلى إعداد شبكة libvirt. لا يقوم بتشغيل ضيوف macOS، ولا يختبر Homebrew على macOS، ويتطلب حاليًا مضيف Linux x86_64. Arch وFreeBSD ليست أهدافًا مدعومة.</p>
           <h3>قم بإجراء اختبار الحزمة</h3>
-          <p>الوضع التلقائي هو الوضع الافتراضي، ويحذف الجهاز الظاهري بعد الاختبار. تتبع المنصة الافتراضية نظام التشغيل المضيف: يختار macOS المنصة <code>macos</code>، ويختار Linux المنصة <code>ubuntu</code>. اختر منصة ووضعًا آخرين من المنصات المدعومة باستخدام الخيارات صراحةً. قناة الحزمة الافتراضية هي <code>beta</code>؛ حدّد <code>--channel nightly</code> أو <code>--channel beta</code> أو <code>--channel release</code> لاختيار قناة. ويُعد <code>--channel stable</code> اسمًا بديلًا لـ <code>release</code>.</p>
+          <p>الوضع التلقائي هو الوضع الافتراضي ويقوم بإزالة الجهاز الظاهري بعد الاختبار. يتبع النظام الأساسي الافتراضي المضيف: يختاره macOS<code>macos</code>لينكس يختار<code>ubuntu</code>. اختر نظامًا أساسيًا ووضعًا مدعومًا آخر بشكل صريح. قناة الحزمة الافتراضية هي<code>beta</code>; يستخدم<code>--channel nightly</code>,<code>--channel beta</code>، أو<code>--channel release</code>لاختيار واحد.<code>--channel stable</code>هو اسم مستعار ل<code>release</code>.</p>
           <pre><code>scripts/vm.sh --platform macos --mode interactive
 scripts/vm.sh --platform ubuntu --channel nightly --mode automated
 scripts/vm.sh --platform debian --mode interactive
 scripts/vm.sh --platform fedora --mode automated
 scripts/vm.sh --platform rocky --mode interactive</code></pre>
-          <p>يُبقي الوضع التفاعلي الجهاز الظاهري بعد تثبيت الحزمة قيد التشغيل للاختبار اليدوي. في macOS، نفّذ في الطرفية الأمر الذي يطبعه البرنامج النصي <code>tart exec -it</code> لفتح صدفة داخل الجهاز الضيف. الخروج من الصدفة لا يوقف الجهاز الظاهري؛ أوقف تشغيل نظام الضيف أو أوقف الجهاز من المضيف. لإيقاف جهاز Tart افتراضي محتفظ به وحذفه، استخدم:</p>
+          <p>يترك الوضع التفاعلي الجهاز الظاهري المثبت قيد التشغيل للاختبار اليدوي. على نظام التشغيل macOS، قم بتشغيل الأمر <code>tart exec -it</code> المطبوع في الوحدة الطرفية لفتح shell الضيف. يؤدي الخروج من تلك الصدفة إلى ترك الجهاز الظاهري قيد التشغيل؛ إغلاق الضيف أو إيقافه عن المضيف. لإيقاف جهاز Tart VM المحتجز وحذفه، استخدم:</p>
           <pre><code>tart stop VM_NAME &amp;&amp; tart delete VM_NAME</code></pre>
-          <p>في Linux، يطبع البرنامج النصي أمر SSH وأمرًا لإيقاف الجهاز؛ أوقف الجهاز الظاهري واحذف ملفاته باستخدام:</p>
+          <p>في Linux، يقوم البرنامج النصي بطباعة أمر SSH وأمر إيقاف؛ أوقف الجهاز الافتراضي وأزل حالته باستخدام:</p>
           <pre><code>scripts/vm.sh --stop VM_NAME</code></pre>
           <p>يعمل الوضع التلقائي على تشغيل عمليات التثبيت وفحص دخان إعداد الغلاف، ثم يقوم بإيقاف الجهاز الظاهري وإزالته. تظل الصور الأساسية التي تم تنزيلها مخزنة مؤقتًا. يمكن تغيير الصور اللاذعة مع<code>ASH_TEST_VM_IMAGE</code>; يمكن تجاوز عناوين URL للصور السحابية لنظام Linux باستخدام<code>ASH_TEST_QEMU_IMAGE</code>. يتم تخزين صور Linux مؤقتًا ضمن<code>${XDG_CACHE_HOME:-~/.cache}/ash/vm-images</code>، ويتم الاحتفاظ بأقراص VM التفاعلية ومفاتيح SSH بالأسفل<code>${XDG_STATE_HOME:-~/.local/state}/ash/vm</code>. تعيين<code>ASH_TEST_VM_CACHE_DIR</code>أو<code>ASH_TEST_VM_STATE_DIR</code>لتغيير تلك المواقع.</p>
           <p>للسماح للضيف بالاتصال بنفس خدمة الذكاء الاصطناعي مثل المضيف، قم بتصدير ما هو مطلوب<code>ASH_AI_*</code>المتغيرات قبل تشغيل البرنامج النصي، على سبيل المثال<code>ASH_AI_ENDPOINT</code>,<code>ASH_AI_MODEL</code>، وعند الحاجة،<code>ASH_AI_AUTH_TOKEN</code>. يتم إرسال القيم المصدرة إلى الضيف؛ متغيرات الصدفة غير المصدرة ليست كذلك. تحتفظ أجهزة VM التفاعلية ببيانات الاعتماد هذه في ملف تعريف الضيف باستخدام الوضع<code>0600</code>; أقراص Linux VM غير مشفرة، لذا قم بحماية دليل الحالة وأوقف/أزل VM عند الانتهاء.</p>

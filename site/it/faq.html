@@ -25,7 +25,7 @@
     <a class="brand" href="./" aria-label="ashcasa"><span class="brand-mark">&gt;_</span> ash</a>
     <nav aria-label="Navigazione primaria">
       <a href="index.html#how-it-works">Come funziona</a>
-      <a href="install.html">Installa</a>
+      <a href="install.html">Installare</a>
       <a href="docs.html">Documenti</a>
       <a href="faq.html" aria-current="page">Domande frequenti</a>
       <a href="developer.html">Sviluppatori</a>
@@ -87,10 +87,10 @@
           <p>Non nativamente.ashsupporta bash, zsh e Fish su macOS, Linux e FreeBSD; non esiste una destinazione di installazione di PowerShell. Utilizza WSL per l'esperienza Linux supportata.</p>
 
           <h3>Come si installaashnel sottosistema Windows per Linux (WSL)?</h3>
-          <p>Segui le <a href="install.html#linux">istruzioni Linux</a> nella distribuzione WSL, preferendo il suo gestore. Poi <a href="install.html#initialize">configura un fornitore e facoltativamente integra Bash</a>. Nessun installer Windows nativo.</p>
+          <p>Segui il<a href="install.html#linux">Istruzioni per l'installazione di Linux</a>all'interno della distribuzione WSL, preferendo il relativo gestore di pacchetti. Poi<a href="install.html#initialize">configurare un provider e facoltativamente abilitare l'integrazione Bash</a>. Non esiste un programma di installazione nativo di Windows.</p>
 
           <h3>Come faccio ad aggiornareashall'ultima versione rilasciata?</h3>
-          <p>Usa il gestore responsabile per Homebrew/APT/DNF/Pacman. <code>ash update</code> serve solo a Release stabile in <code>~/.local/bin</code>; verifica manifesto firmato Sigstore e digest archivio e rifiuta firme fallite. .pkg e directory personalizzate richiedono installer originale/sostituzione manuale. Vedi <a href="install.html#updates">aggiornamenti e iscrizioni ai canali</a> per Release, Beta, Nightly.</p>
+          <p>Utilizzare il gestore pacchetti proprietario per le installazioni Homebrew/APT/DNF/Pacman.<code>ash update</code>è solo per le installazioni della versione stabile in<code>~/.local/bin</code>; verifica il manifest firmato Sigstore e il digest dell'archivio e rifiuta una firma non riuscita. Le installazioni native di .pkg e di directory personalizzate richiedono la sostituzione del programma di installazione/manuale originale. Vedere<a href="install.html#updates">aggiornamenti e iscrizioni ai canali</a>per versione, beta e notturna.</p>
 
           <h3>Ho corso<code>ash install</code>. Perché non cambia nulla in questo terminale?</h3>
           <p>L'integrazione della shell è disabilitata per impostazione predefinita. Per abilitarlo, esegui<code>ash install --shell bash --shell-integration</code>(o seleziona<code>zsh</code>O<code>fish</code>); non riscrive il processo di shell già in esecuzione. Apri un nuovo terminale o ricarica il file di avvio selezionato. Correre<code>ash install --shell bash --disable-shell-integration</code>rimuovereAshblocco gestito preservando il contenuto circostante.</p>

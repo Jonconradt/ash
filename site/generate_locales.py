@@ -400,6 +400,14 @@ def needs_text_fallback(node: Node) -> bool:
     return False
 
 
+def markup_signature(nodes: list[Node]) -> tuple[tuple[object, ...], ...]:
+    return tuple(
+        (node.tag, node.start, node.end, markup_signature(node.children))
+        for node in nodes
+        if node.tag is not None
+    )
+
+
 def translate_group(
     nodes: list[Node], target: str, retry: int = 0
 ) -> list[Node]:
@@ -432,15 +440,16 @@ def translate_group(
     source = "".join(serialize(node) for node in protected_nodes)
     translated = parse_fragment(translate_request(source, target, force=retry > 0))
     translated_blocks = [node for node in translated if is_block(node)]
-    if len(translated_blocks) != len(nodes):
+    if (
+        len(translated_blocks) != len(nodes)
+        or markup_signature(protected_nodes) != markup_signature(translated_blocks)
+    ):
         if len(nodes) == 1:
             if retry < 2:
                 return translate_group(nodes, target, retry + 1)
-            raise RuntimeError(
-                f"Translation changed HTML structure for target {target}: "
-                f"source={source[:300]!r}, translated="
-                f"{''.join(serialize(node) for node in translated)[:300]!r}"
-            )
+            fallback = copy.deepcopy(nodes[0])
+            translate_text_nodes(fallback, target)
+            return [fallback]
         midpoint = len(nodes) // 2
         return translate_group(nodes[:midpoint], target) + translate_group(
             nodes[midpoint:], target

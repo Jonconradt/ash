@@ -177,13 +177,15 @@ sudo apt-get install qemu-system-x86 qemu-utils cloud-image-utils curl openssh-c
 sudo dnf install qemu-kvm qemu-img cloud-utils curl openssh-clients python3</code></pre>
           <p>De Linux Backend lancéiert x86_64 Ubuntu, Debian, Fedora oder Rocky Cloud Biller mat QEMU / KVM a Cloud-init. Et benotzt QEMU Benotzer-Modus Netzwierker mat SSH weidergeleet op localhost; kee libvirt Netzwierk Setup ass néideg. Et leeft net macOS Gäscht, testt net Homebrew op macOS, a erfuerdert de Moment en x86_64 Linux Host. Arch a FreeBSD sinn net ënnerstëtzt Ziler.</p>
           <h3>Fuert e Package Test</h3>
-          <p>Automatiséierte Modus ass de Standard an läscht de VM nom Test. D'Standardplattform follegt dem Host: macOS wielt<code>macos</code>, Linux wielt<code>ubuntu</code>. Wielt eng aner ënnerstëtzt Plattform a Modus explizit:</p>
+          <p>Automatiséierte Modus ass de Standard an läscht de VM nom Test. D'Standardplattform follegt dem Host: macOS wielt<code>macos</code>, Linux wielt<code>ubuntu</code>. Wielt eng aner ënnerstëtzt Plattform a Modus explizit. De Package Kanal ass Standard op<code>beta</code>; benotzen<code>--channel nightly</code>,<code>--channel beta</code>, oder<code>--channel release</code>fir een ze wielen.<code>--channel stable</code>ass en Alias ​​​​fir<code>release</code>.</p>
           <pre><code>scripts/vm.sh --platform macos --mode interactive
-scripts/vm.sh --platform ubuntu --mode automated
+scripts/vm.sh --platform ubuntu --channel nightly --mode automated
 scripts/vm.sh --platform debian --mode interactive
 scripts/vm.sh --platform fedora --mode automated
 scripts/vm.sh --platform rocky --mode interactive</code></pre>
-          <p>Interaktive Modus léisst den installéierten VM fir manuell Testen lafen. Op macOS dréckt de Skript e <code>tart exec -it</code> Gaascht-Shell Kommando. Op Linux dréckt en SSH Kommando an e Stop Kommando; Stop de VM a läscht säin Zoustand mat:</p>
+          <p>Interaktive Modus léisst den installéierten VM fir manuell Testen lafen. Op macOS, fuert de gedréckte <code>tart exec -it</code> Kommando an engem Terminal fir eng Gaascht Shell opzemaachen. Ausgaang vun dëser Shell léisst de VM lafen; de Gaascht zoumaachen oder et vum Host stoppen. Fir en erhale Tart VM ze stoppen an ze läschen, benotzt:</p>
+          <pre><code>tart stop VM_NAME &amp;&amp; tart delete VM_NAME</code></pre>
+          <p>Op Linux dréckt de Skript en SSH Kommando an e Stop Kommando; Stop de VM a läscht säin Zoustand mat:</p>
           <pre><code>scripts/vm.sh --stop VM_NAME</code></pre>
           <p>Automatiséierte Modus fiert d'Installatioun an d'Shell-Setup Rauchkontrollen, stoppt dann an läscht de VM. Erofgelueden Basisbiller bleiwen am cache. Tart Biller kënne geännert ginn mat<code>ASH_TEST_VM_IMAGE</code>; Linux Cloud-Bild URLen kënnen iwwerschriwwe ginn<code>ASH_TEST_QEMU_IMAGE</code>. Linux Biller sinn ënner cache<code>${XDG_CACHE_HOME:-~/.cache}/ash/vm-images</code>, an interaktiv VM Disken an SSH Schlësselen ginn ënner gehal<code>${XDG_STATE_HOME:-~/.local/state}/ash/vm</code>. Setzt<code>ASH_TEST_VM_CACHE_DIR</code>oder<code>ASH_TEST_VM_STATE_DIR</code>dës Plazen z'änneren.</p>
           <p>Fir de Gaascht mam selwechten AI Service wéi den Host ze verbannen, exportéiert déi néideg<code>ASH_AI_*</code>Variabelen ier Dir de Skript leeft, zum Beispill<code>ASH_AI_ENDPOINT</code>,<code>ASH_AI_MODEL</code>an, wann néideg,<code>ASH_AI_AUTH_TOKEN</code>. Exportéiert Wäerter ginn un de Gaascht weidergeleet; onexportéiert Shell Variablen sinn net. Interaktiv VMs behalen dës Umeldungsinformatiounen am Gaaschtprofil mat Modus<code>0600</code>; Linux VM Disks sinn net verschlësselte, also schützt de Staatsverzeichnis a stoppt / läscht de VM wann et fäerdeg ass.</p>
@@ -191,7 +193,7 @@ scripts/vm.sh --platform rocky --mode interactive</code></pre>
         </section>
 
         <section id="source-guides">
-          <h2>Projet Quell Guiden <!-- h2--></h2>
+          <h2>Projet Quell Guiden</h2>
           <ul>
             <li><a href="https://github.com/Jonconradt/ash/blob/main/CONTRIBUTING.md">Bäitrag Guide</a>- Setup, Tester, Verëffentlechungserwaardungen, an CI Notizen.</li>
             <li><a href="https://github.com/Jonconradt/ash/blob/main/ARCHITECTURE.md">Architektur</a>- Projet Layout a Runtime Subsystemer.</li>

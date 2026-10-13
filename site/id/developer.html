@@ -27,7 +27,7 @@
     <a class="brand" href="./" aria-label="ashrumah"><span class="brand-mark">&gt;_</span> ash</a>
     <nav aria-label="Navigasi utama">
       <a href="./">Rumah</a>
-      <a href="install.html">Pasang</a>
+      <a href="install.html">Memasang</a>
       <a href="docs.html">dokumen</a>
       <a href="faq.html">Pertanyaan Umum</a>
       <a href="developer.html" aria-current="page">Pengembang</a>
@@ -177,13 +177,15 @@ sudo apt-get install qemu-system-x86 qemu-utils cloud-image-utils curl openssh-c
 sudo dnf install qemu-kvm qemu-img cloud-utils curl openssh-clients python3</code></pre>
           <p>Backend Linux meluncurkan image cloud x86_64 Ubuntu, Debian, Fedora, atau Rocky dengan QEMU/KVM dan cloud-init. Ia menggunakan jaringan mode pengguna QEMU dengan SSH yang diteruskan ke localhost; tidak diperlukan pengaturan jaringan libvirt. Itu tidak menjalankan tamu macOS, tidak menguji Homebrew di macOS, dan saat ini memerlukan host Linux x86_64. Arch dan FreeBSD bukan target yang didukung.</p>
           <h3>Jalankan tes paket</h3>
-          <p>Mode otomatis adalah default dan menghapus VM setelah pengujian. Platform default mengikuti host: macOS memilih<code>macos</code>, Linux memilih<code>ubuntu</code>. Pilih platform dan mode lain yang didukung secara eksplisit:</p>
+          <p>Mode otomatis adalah default dan menghapus VM setelah pengujian. Platform default mengikuti host: macOS memilih<code>macos</code>, Linux memilih<code>ubuntu</code>. Pilih platform dan mode lain yang didukung secara eksplisit. Saluran paket defaultnya adalah<code>beta</code>; menggunakan<code>--channel nightly</code>,<code>--channel beta</code>, atau<code>--channel release</code>untuk memilih satu.<code>--channel stable</code>adalah alias untuk<code>release</code>.</p>
           <pre><code>scripts/vm.sh --platform macos --mode interactive
-scripts/vm.sh --platform ubuntu --mode automated
+scripts/vm.sh --platform ubuntu --channel nightly --mode automated
 scripts/vm.sh --platform debian --mode interactive
 scripts/vm.sh --platform fedora --mode automated
 scripts/vm.sh --platform rocky --mode interactive</code></pre>
-          <p>Mode interaktif membuat VM yang terinstal tetap berjalan untuk pengujian manual. Di macOS, skrip mencetak perintah shell tamu <code>tart exec -it</code>. Di Linux, ia mencetak perintah SSH dan perintah stop; hentikan VM dan hapus statusnya dengan:</p>
+          <p>Mode interaktif membuat VM yang terinstal tetap berjalan untuk pengujian manual. Di macOS, jalankan perintah <code>tart exec -it</code> yang dicetak di terminal untuk membuka shell tamu. Keluar dari shell itu membuat VM tetap berjalan; mematikan tamu atau menghentikannya dari tuan rumah. Untuk menghentikan dan menghapus VM Tart yang disimpan, gunakan:</p>
+          <pre><code>tart stop VM_NAME &amp;&amp; tart delete VM_NAME</code></pre>
+          <p>Di Linux, skrip mencetak perintah SSH dan perintah stop; hentikan VM dan hapus statusnya dengan:</p>
           <pre><code>scripts/vm.sh --stop VM_NAME</code></pre>
           <p>Mode otomatis menjalankan pemeriksaan asap instalasi dan pengaturan shell, lalu menghentikan dan menghapus VM. Gambar dasar yang diunduh tetap disimpan dalam cache. Gambar tart dapat diubah dengan<code>ASH_TEST_VM_IMAGE</code>; URL cloud-image Linux dapat diganti dengan<code>ASH_TEST_QEMU_IMAGE</code>. Gambar Linux di-cache di bawah<code>${XDG_CACHE_HOME:-~/.cache}/ash/vm-images</code>, dan disk VM interaktif serta kunci SSH disimpan di bawah<code>${XDG_STATE_HOME:-~/.local/state}/ash/vm</code>. Mengatur<code>ASH_TEST_VM_CACHE_DIR</code>atau<code>ASH_TEST_VM_STATE_DIR</code>untuk mengubah lokasi tersebut.</p>
           <p>Agar tamu dapat terhubung ke layanan AI yang sama dengan host, ekspor yang diperlukan<code>ASH_AI_*</code>variabel sebelum menjalankan skrip, misalnya<code>ASH_AI_ENDPOINT</code>,<code>ASH_AI_MODEL</code>, dan, bila diperlukan,<code>ASH_AI_AUTH_TOKEN</code>. Nilai yang diekspor diteruskan ke tamu; variabel shell yang tidak diekspor tidak. VM interaktif mempertahankan kredensial ini di profil tamu dengan mode<code>0600</code>; Disk VM Linux tidak dienkripsi, jadi lindungi direktori status dan hentikan/hapus VM setelah selesai.</p>

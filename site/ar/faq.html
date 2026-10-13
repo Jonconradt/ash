@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ar">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -25,7 +25,7 @@
     <a class="brand" href="./" aria-label="ashبيت"><span class="brand-mark">&gt;_</span> ash</a>
     <nav aria-label="التنقل الأساسي">
       <a href="index.html#how-it-works">كيف يعمل</a>
-      <a href="install.html">التثبيت</a>
+      <a href="install.html">ثَبَّتَ</a>
       <a href="docs.html">المستندات</a>
       <a href="faq.html" aria-current="page">التعليمات</a>
       <a href="developer.html">المطورين</a>
@@ -87,10 +87,10 @@
           <p>ليس أصليا.ashيدعم bash وzsh وFish على أنظمة التشغيل macOS وLinux وFreeBSD؛ لا يوجد هدف تثبيت PowerShell. استخدم WSL لتجربة Linux المدعومة.</p>
 
           <h3>كيف أقوم بالتثبيتashفي نظام Windows الفرعي لنظام Linux (WSL)؟</h3>
-          <p>اتبع <a href="install.html#linux">تعليمات تثبيت Linux</a> داخل توزيعة WSL، مفضّلًا مدير حزمها. ثم <a href="install.html#initialize">اضبط المزوّد وفعّل دمج Bash اختياريًا</a>. لا مثبّت Windows أصليًا.</p>
+          <p>اتبع<a href="install.html#linux">تعليمات تثبيت لينكس</a>داخل توزيع WSL الخاص بك، مفضلاً مدير الحزم الخاص به. ثم<a href="install.html#initialize">قم بتكوين موفر وتمكين تكامل Bash اختياريًا</a>. لا يوجد مثبت Windows أصلي.</p>
 
           <h3>كيف أقوم بالتحديثashإلى أحدث نسخة الإصدار؟</h3>
-          <p>استخدم مدير الحزم المسؤول لتثبيت Homebrew/APT/DNF/Pacman. <code>ash update</code> مخصص لـ Release المستقر تحت <code>~/.local/bin</code>؛ يتحقق من بيان Sigstore الموقّع وملخص الأرشيف ويرفض التوقيع الفاشل. .pkg الأصلي والمجلد المخصص يتطلبان المثبّت الأصلي/استبدالًا يدويًا. راجع <a href="install.html#updates">التحديثات واشتراكات القنوات</a> لـ Release وBeta وNightly.</p>
+          <p>استخدم مدير الحزم الخاص بتثبيتات Homebrew/APT/DNF/Pacman.<code>ash update</code>مخصص فقط لعمليات تثبيت الإصدار المستقر ضمن<code>~/.local/bin</code>; فهو يتحقق من ملخص البيان والأرشيف الموقّع من Sigstore، ويرفض التوقيع الفاشل. تحتاج عمليات تثبيت .pkg الأصلية والدليل المخصص إلى المثبت الأصلي/الاستبدال اليدوي. يرى<a href="install.html#updates">التحديثات واشتراكات القناة</a>للإصدار والبيتا والليلة.</p>
 
           <h3>ركضت<code>ash install</code>. لماذا لا يتغير شيء في هذه المحطة؟</h3>
           <p>يتم تعطيل تكامل Shell بشكل افتراضي. لتمكينه، قم بتشغيل<code>ash install --shell bash --shell-integration</code>(أو حدد<code>zsh</code>أو<code>fish</code>); ولا يعيد كتابة عملية الصدفة الجارية بالفعل. افتح محطة جديدة أو أعد تحميل ملف بدء التشغيل المحدد. يجري<code>ash install --shell bash --disable-shell-integration</code>لإزالةAshالكتلة المُدارة مع الحفاظ على المحتوى المحيط.</p>

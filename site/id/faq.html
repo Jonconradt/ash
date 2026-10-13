@@ -25,7 +25,7 @@
     <a class="brand" href="./" aria-label="ashrumah"><span class="brand-mark">&gt;_</span> ash</a>
     <nav aria-label="Navigasi utama">
       <a href="index.html#how-it-works">Bagaimana cara kerjanya</a>
-      <a href="install.html">Pasang</a>
+      <a href="install.html">Memasang</a>
       <a href="docs.html">dokumen</a>
       <a href="faq.html" aria-current="page">Pertanyaan Umum</a>
       <a href="developer.html">Pengembang</a>
@@ -87,10 +87,10 @@
           <p>Tidak secara asli.ashmendukung bash, zsh, dan Fish di macOS, Linux, dan FreeBSD; tidak ada target pemasangan PowerShell. Gunakan WSL untuk pengalaman Linux yang didukung.</p>
 
           <h3>Bagaimana cara menginstalashdi Subsistem Windows untuk Linux (WSL)?</h3>
-          <p>Ikuti <a href="install.html#linux">petunjuk Linux</a> dalam distribusi WSL, utamakan pengelolanya. Lalu <a href="install.html#initialize">atur penyedia dan opsional aktifkan integrasi Bash</a>. Tidak ada pemasang Windows native.</p>
+          <p>Ikuti<a href="install.html#linux">Petunjuk instalasi Linux</a>di dalam distribusi WSL Anda, lebih memilih manajer paketnya. Kemudian<a href="install.html#initialize">konfigurasikan penyedia dan secara opsional aktifkan integrasi Bash</a>. Tidak ada penginstal Windows asli.</p>
 
           <h3>Bagaimana cara memperbaruiashke versi rilis terbaru?</h3>
-          <p>Gunakan pengelola pemilik untuk Homebrew/APT/DNF/Pacman. <code>ash update</code> hanya untuk Release stabil di <code>~/.local/bin</code>; memverifikasi manifes Sigstore serta digest arsip, menolak tanda tangan gagal. .pkg native dan direktori khusus perlu pemasang asli/penggantian manual. Lihat <a href="install.html#updates">pembaruan dan langganan kanal</a> Release, Beta, Nightly.</p>
+          <p>Gunakan manajer paket pemilik untuk instalasi Homebrew/APT/DNF/Pacman.<code>ash update</code>hanya untuk instalasi Rilis stabil di bawah<code>~/.local/bin</code>; itu memverifikasi manifes yang ditandatangani Sigstore dan intisari arsip, dan menolak tanda tangan yang gagal. Pemasangan .pkg asli dan direktori khusus memerlukan penginstal asli/pengganti manual. Melihat<a href="install.html#updates">pembaruan dan langganan saluran</a>untuk Rilis, Beta, dan Nightly.</p>
 
           <h3>saya berlari<code>ash install</code>. Mengapa tidak ada perubahan di terminal ini?</h3>
           <p>Integrasi shell dinonaktifkan secara default. Untuk mengaktifkannya, jalankan<code>ash install --shell bash --shell-integration</code>(atau pilih<code>zsh</code>atau<code>fish</code>); itu tidak menulis ulang proses shell yang sudah berjalan. Buka terminal baru atau muat ulang file startup yang dipilih. Berlari<code>ash install --shell bash --disable-shell-integration</code>untuk menghapusAshblok yang dikelola sambil mempertahankan konten di sekitarnya.</p>

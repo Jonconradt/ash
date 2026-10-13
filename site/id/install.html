@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ash | Memasang, mengonfigurasi, memperbarui, dan menghapus</title>
-  <meta name="description" content="Pasang ash di macOS, Linux, FreeBSD. Pilih pengelola paket, atur Ollama atau cloud gratis, pilih kanal pembaruan, dan hapus dengan aman.">
+  <title>ash| Instal, konfigurasikan, perbarui, dan hapus instalan</title>
+  <meta name="description" content="Memasangashdi macOS, Linux, atau FreeBSD. Pilih manajer paket, konfigurasikan Ollama atau tingkat cloud gratis, pilih saluran pembaruan, dan hapus instalasi dengan aman.">
   <meta name="theme-color" content="#f4f0e8">
   <link rel="canonical" href="https://jonconradt.github.io/ash/id/install.html">
   <meta property="og:type" content="website">
-  <meta property="og:title" content="Panduan pemasangan ash">
-  <meta property="og:description" content="Dari prasyarat hingga permintaan pertama, pembaruan, dan pembersihan.">
+  <meta property="og:title" content="ash installation guide">
+  <meta property="og:description" content="Dari prasyarat hingga permintaan pertama Anda, pembaruan, dan pembersihan.">
   <meta property="og:url" content="https://jonconradt.github.io/ash/id/install.html">
   <link rel="icon" href="../favicon.svg" type="image/svg+xml">
   <link rel="alternate" hreflang="en" href="https://jonconradt.github.io/ash/install.html">
@@ -27,14 +27,14 @@
   <link rel="stylesheet" href="../styles.css">
 </head>
 <body>
-  <a class="skip-link" href="#guide">Lewati ke panduan pemasangan</a>
+  <a class="skip-link" href="#guide">Lewati ke panduan instalasi</a>
   <header class="site-header">
-    <a class="brand" href="./" aria-label="Beranda ash"><span class="brand-mark">&gt;_</span> ash</a>
+    <a class="brand" href="./" aria-label="ashrumah"><span class="brand-mark">&gt;_</span> ash</a>
     <nav aria-label="Navigasi utama">
-      <a href="./">Beranda</a>
-      <a href="install.html" aria-current="page">Pasang</a>
-      <a href="docs.html">Dokumentasi</a>
-      <a href="faq.html">Tanya jawab</a>
+      <a href="./">Rumah</a>
+      <a href="install.html" aria-current="page">Memasang</a>
+      <a href="docs.html">dokumen</a>
+      <a href="faq.html">Pertanyaan Umum</a>
       <a href="developer.html">Pengembang</a>
       <a href="https://github.com/Jonconradt/ash">GitHub</a>
       <label class="sr-only" for="site-language">Bahasa</label>
@@ -50,68 +50,68 @@
         <option value="pt-BR">Português (Brasil)</option>
         <option value="zh-CN">简体中文</option>
         <option value="zh-TW">繁體中文</option>
-      </select>
+        </select>
     </nav>
   </header>
   <main id="guide" class="docs-page page-width install-guide">
     <header class="docs-header">
-      <p class="eyebrow">Pasang · konfigurasi · rawat</p>
-      <h1>Jalur jelas menuju<br><em>permintaan pertama Anda.</em></h1>
-      <p>Pilih OS, pasang dengan pengelola paketnya, lalu hubungkan model. Mulai dengan Release; Beta atau Nightly dapat dipilih nanti.</p>
-      <div class="os-choices" aria-label="Pilih sistem operasi">
-        <a class="method-card" href="#macos"><strong>macOS</strong><span>Homebrew disarankan</span><small>Apple Silicon dan Intel</small></a>
-        <a class="method-card" href="#linux"><strong>Linux</strong><span>APT, DNF, atau Pacman</span><small>Arsitektur bergantung repositori</small></a>
-        <a class="method-card" href="#freebsd"><strong>FreeBSD</strong><span>Arsip atau skrip terverifikasi</span><small>Hanya amd64; tanpa pkg ash native</small></a>
+      <p class="eyebrow">Instal · konfigurasikan · pertahankan</p>
+      <h1>Jalur yang jelas ke<br><em>prompt pertama Anda.</em></h1>
+      <p>Pilih OS Anda, instal dengan manajer paketnya, lalu sambungkan model. Mulai dengan Rilis: Anda dapat ikut serta dalam Beta atau Nightly nanti.</p>
+      <div class="os-choices" aria-label="Pilih sistem operasi Anda">
+        <a class="method-card" href="#macos"><strong>macOS</strong><span>Minuman rumahan direkomendasikan</span><small>Apple Silikon dan Intel</small></a>
+        <a class="method-card" href="#linux"><strong>Linux</strong><span>APT, DNF, atau Pacman</span><small>Arsitektur bergantung pada repositori</small></a>
+        <a class="method-card" href="#freebsd"><strong>FreeBSD</strong><span>Arsip atau skrip terverifikasi</span><small>hanya amd64; tidak ada penduduk asliashpkg</small></a>
       </div>
     </header>
     <div class="docs-layout">
-      <nav class="docs-contents" aria-label="Isi pemasangan">
+      <nav class="docs-contents" aria-label="Isi instalasi">
         <strong>Di halaman ini</strong>
-        <a href="#prerequisites">Sebelum memulai</a>
+        <a href="#prerequisites">Sebelum Anda mulai</a>
         <a href="#macos">macOS</a>
         <a href="#linux">Linux</a>
         <a href="#freebsd">FreeBSD</a>
-        <a href="#initialize">Inisialisasi dan periksa</a>
+        <a href="#initialize">Inisialisasi dan verifikasi</a>
         <a href="#ollama">Ollama lokal</a>
-        <a href="#cloud">Paket cloud gratis</a>
-        <a href="#script">Pemasangan skrip</a>
+        <a href="#cloud">Tingkat cloud gratis</a>
+        <a href="#script">Instalasi skrip</a>
         <a href="#verify-download">Verifikasi unduhan</a>
-        <a href="#updates">Pembaruan dan kanal</a>
-        <a href="#uninstall">Hapus pemasangan</a>
+        <a href="#updates">Pembaruan dan saluran</a>
+        <a href="#uninstall">Copot pemasangan</a>
         <a href="#troubleshooting">Pemecahan masalah</a>
       </nav>
-      <article class="docs-content" data-copy-label="Salin perintah" data-copied-label="Tersalin!" data-copy-error="Gagal menyalin. Pilih dan salin perintah secara manual.">
+      <article class="docs-content" data-copy-label="Salin perintah" data-copied-label="Disalin!" data-copy-error="Tidak dapat menyalin. Pilih dan salin perintah secara manual.">
         <section id="prerequisites">
-          <h2>Sebelum memulai</h2>
+          <h2>Sebelum Anda memulai</h2>
           <ol>
-            <li><strong>Sistem dan shell didukung:</strong> macOS/Linux pada amd64/x86_64 atau arm64/aarch64, atau FreeBSD pada amd64. Gunakan Bash, zsh, atau Fish. Paket Arch hanya x86_64. Tidak ada pemasang Windows/PowerShell native.</li>
-            <li><strong>Akses unduhan:</strong> koneksi Internet berfungsi dan akses HTTPS tepercaya ke GitHub, repositori terpilih, serta penyedia model. Inferensi lokal tetap memerlukan unduhan model awal.</li>
-            <li><strong>Izin:</strong> direktori rumah dapat ditulis untuk aset pengguna. Paket sistem Linux dan .pkg macOS membutuhkan administrator; jalankan Homebrew dan <code>ash install</code> sebagai pengguna biasa.</li>
-            <li><strong>Model:</strong> server inferensi lokal dengan model terunduh atau akun cloud/kunci API. Pilih model dengan pemanggilan alat, bukan khusus gambar/audio. Kebutuhan RAM, disk, GPU lokal bergantung model.</li>
+            <li><strong>Sistem dan shell yang didukung:</strong> macOS atau Linux di amd64/x86_64 atau arm64/aarch64, atau FreeBSD di amd64. Gunakan Bash, zsh, atau Fish. Paket Arch hanya x86_64. Tidak ada penginstal Windows/PowerShell asli.</li>
+            <li><strong>Akses unduhan:</strong> koneksi internet yang berfungsi dan akses HTTPS tepercaya ke GitHub, repositori paket yang dipilih, dan penyedia model Anda. Inferensi lokal masih memerlukan pengunduhan model awal.</li>
+            <li><strong>Izin:</strong> direktori beranda yang dapat ditulis untuk aset per pengguna. Paket sistem Linux dan macOS .pkg memerlukan akses administrator; jalankan Homebrew dan <code>ash install</code> sebagai pengguna normal Anda.</li>
+            <li><strong>Model:</strong> server inferensi lokal dengan model yang diunduh atau akun cloud/kunci API. Pilih model yang mendukung pemanggilan alat, bukan model gambar/audio saja. Kebutuhan RAM, disk, dan GPU lokal bergantung pada model tersebut.</li>
           </ol>
-          <p>Paket ash siap pakai tidak memerlukan Go, Rust, Node.js, atau alat build Xcode. Pengelola paket mungkin punya prasyarat sendiri; ikuti petunjuk resminya dahulu.</p>
+          <p>Paket ash bawaan tidak memerlukan alat pembuatan Go, Rust, Node.js, atau Xcode. Manajer paket mungkin memiliki prasyaratnya sendiri; ikuti petunjuk penyiapan resminya terlebih dahulu.</p>
           <div class="guide-note">
-            <h3>Opsional: alat Python bawaan</h3>
-            <p>Penggunaan dasar tidak membutuhkan Python. Alat bawaan perlu Python 3 dengan <code>venv</code> dan <code>ensurepip</code> serta akses unduhan dependensi. Pada Debian/Ubuntu pasang <code>python3</code> dan <code>python3-venv</code>; Python Homebrew mencakup venv. Pada FreeBSD gunakan paket pip sesuai versi Python. Ulangi <code>ash install</code>. Penyiapan membuat lingkungan terisolasi di <code>$XDG_DATA_HOME/ash/venv</code> (default <code>~/.local/share/ash/venv</code>); kegagalan menonaktifkan alat itu, bukan ash dasar.</p>
+            <h3>Opsional: paket alat Python</h3>
+            <p>Dasarashpenggunaan tidak memerlukan Python. Alat Python yang dibundel memerlukan Python 3 dengan<code>venv</code>Dan<code>ensurepip</code>, ditambah akses untuk mengunduh dependensinya. Di Debian/Ubuntu, instal<code>python3</code>Dan<code>python3-venv</code>; Homebrew Python menyertakan dukungan venv. Di FreeBSD, gunakan paket pip yang cocok dengan versi Python Anda. Kemudian jalankan kembali<code>ash install</code>. Pengaturan menciptakan lingkungan yang terisolasi di bawah<code>$XDG_DATA_HOME/ash/venv</code>(bawaan<code>~/.local/share/ash/venv</code>); kegagalan menonaktifkan alat-alat itu, bukan alat dasarash.</p>
           </div>
         </section>
         <section id="macos">
           <h2>macOS</h2>
-          <h3 id="homebrew">Disarankan: Homebrew</h3>
-          <p>Prasyarat: <a href="https://docs.brew.sh/Installation">Homebrew</a>, lingkungan macOS didukung, dan perintah <code>brew</code> berfungsi. Tap otomatis memilih arsip Intel/Apple Silicon. Pasang Release tanpa sudo:</p>
+          <h3 id="homebrew">Direkomendasikan: Minuman rumahan</h3>
+          <p>Prasyarat:<a href="https://docs.brew.sh/Installation">minuman rumahan</a>, lingkungan macOS yang didukungnya, dan lingkungan yang berfungsi<code>brew</code>memerintah. Ketukan memilih arsip Intel atau Apple Silicon secara otomatis. Instal Rilis tanpa Sudo:</p>
           <pre><code>brew install Jonconradt/ash/ash
 ash version</code></pre>
-          <p>Homebrew mengelola biner, plugin native, halaman manual, dan pemberitahuan lisensi dalam prefiksnya (biasanya <code>/opt/homebrew</code> pada Apple Silicon atau <code>/usr/local</code> pada Intel). Arsip diperiksa terhadap SHA-256 formula. Tidak mengatur penyedia atau startup shell: lanjutkan <a href="#initialize">inisialisasi per pengguna</a>. Perbarui dengan <code>brew upgrade ash</code>, hapus Release dengan <code>brew uninstall ash</code>; lihat <a href="#updates">formula kanal</a> untuk Beta/Nightly.</p>
-          <h3 id="macos-pkg">Alternatif: .pkg native</h3>
-          <p>Unduh <code>darwin-arm64.pkg</code> untuk Apple Silicon atau <code>darwin-amd64.pkg</code> untuk Intel dari <a href="https://github.com/Jonconradt/ash/releases">rilis terpublikasi</a>. <a href="#verify-download">Verifikasi manifes checksum bertanda tangan</a> sebelum membuka pemasang. Memerlukan administrator.</p>
-          <div class="guide-note guide-warning"><p><strong>Paket macOS tidak ditandatangani atau dinotarisasi.</strong> Manifes memberi verifikasi penerbit/checksum terpisah, bukan notarisasi Apple. Jangan nonaktifkan Gatekeeper atau lewati peringatan demi memasang ash; gunakan Homebrew jika kebijakan keamanan mengharuskan.</p></div>
-          <p>Paket menulis <code>ash</code> dan <code>ash-broker</code> ke <code>/usr/local/bin</code>, plugin ke <code>/usr/local/lib/ash/plugins</code>, manual ke <code>/usr/local/share/man</code>, pemberitahuan ke <code>/usr/local/share/licenses/ash</code>. Tanda terimanya <code>dev.ash.cli</code>. Tidak menginisialisasi pengguna atau berlangganan pembaruan: <a href="#initialize">inisialisasi</a> setelah pemasangan, ganti dengan .pkg terbaru terverifikasi untuk pembaruan, dan gunakan <a href="#manual-macos">penghapusan manual</a> untuk melepas. Jangan timpa salinan milik Homebrew.</p>
+          <p>Homebrew memiliki binari, paket plugin asli, halaman manual, dan pemberitahuan lisensi di awalannya (biasanya<code>/opt/homebrew</code>di Apple Silicon atau<code>/usr/local</code>pada Intel). Ia memeriksa arsip terhadap checksum formula SHA-256. Itu tidak mengkonfigurasi penyedia Anda atau mengedit file startup shell Anda: lanjutkan<a href="#initialize">inisialisasi per pengguna</a>. Menggunakan<code>brew upgrade ash</code>untuk pembaruan dan<code>brew uninstall ash</code>untuk menghapus Rilis; melihat<a href="#updates">rumus saluran</a>untuk Beta/Malam.</p>
+          <h3 id="macos-pkg">Alternatif: .pkg asli</h3>
+          <p>Unduh<code>darwin-arm64.pkg</code>aset untuk Apple Silicon atau<code>darwin-amd64.pkg</code>untuk Intel dari a<a href="https://github.com/Jonconradt/ash/releases">rilis yang diterbitkan</a>.<a href="#verify-download">Verifikasi manifes checksum yang ditandatangani</a>sebelum membuka penginstal. Akses administrator diperlukan.</p>
+          <div class="guide-note guide-warning"><p><strong>Paket macOS tidak ditandatangani dan tidak dinotariskan.</strong> Manifes rilis menyediakan verifikasi penerbit/checksum terpisah, bukan notaris Apple. Jangan nonaktifkan Gatekeeper atau lewati peringatan keamanan hanya untuk menginstal ash; pilih Homebrew jika kebijakan keamanan Anda mewajibkannya.</p></div>
+          <p>Paket itu menulis<code>ash</code>Dan<code>ash-broker</code>ke<code>/usr/local/bin</code>, plugin ke<code>/usr/local/lib/ash/plugins</code>, halaman manual ke<code>/usr/local/share/man</code>, dan pemberitahuan ke<code>/usr/local/share/licenses/ash</code>. Tanda terimanya adalah<code>dev.ash.cli</code>. Itu tidak menjalankan inisialisasi per pengguna atau berlangganan pembaruan:<a href="#initialize">inisialisasi</a>setelah instalasi, ganti dengan .pkg baru yang terverifikasi untuk memperbarui, dan gunakan<a href="#manual-macos">prosedur penghapusan manual</a>untuk mencopot pemasangan. Jangan menginstalnya melalui salinan milik Homebrew.</p>
         </section>
         <section id="linux">
           <h2>Linux</h2>
-          <p>Gunakan pengelola distribusi bila memungkinkan. Paket ini mengelola <code>/usr/bin/ash</code>, <code>/usr/bin/ash-broker</code>, <code>/usr/lib/ash/plugins</code>, manual di <code>/usr/share/man</code>, dan pemberitahuan lisensi. Pengaturan penyedia dan hook shell diserahkan ke <a href="#initialize">inisialisasi per pengguna</a>.</p>
+          <p>Gunakan manajer paket distribusi Anda jika memungkinkan. Paket-paket ini milik sendiri<code>/usr/bin/ash</code>,<code>/usr/bin/ash-broker</code>,<code>/usr/lib/ash/plugins</code>, halaman manual di bawah<code>/usr/share/man</code>, dan pemberitahuan lisensi. Mereka membiarkan pengaturan penyedia dan kait shell<a href="#initialize">inisialisasi per pengguna</a>.</p>
           <h3 id="apt-installation">Debian dan Ubuntu: APT</h3>
-          <p>Prasyarat: amd64/arm64, administrator, APT, <code>curl</code>, <code>gpg</code>, sertifikat CA. Pasang alat unduhan/kunci yang belum ada melalui distribusi sebelum repositori. Release dinamai <code>stable</code>:</p>
+          <p>Prasyarat: amd64 atau arm64, akses administrator, APT,<code>curl</code>,<code>gpg</code>, dan sertifikat CA. Instal alat unduhan/kunci yang hilang menggunakan distribusi Anda sebelum menambahkan repositori. Rilis diberi nama<code>stable</code>:</p>
           <pre><code>sudo apt update
 sudo apt install ca-certificates curl gnupg
 sudo install -d -m 0755 /etc/apt/keyrings
@@ -124,9 +124,9 @@ echo "deb [signed-by=/etc/apt/keyrings/versionx-keyring.gpg] https://www.version
 sudo apt update
 sudo apt install ash
 rm versionx-apt.asc</code></pre>
-          <p>Sebelum mengimpor kunci, cocokkan sidik jari dengan sumber penerbit tepercaya. Sidik jari VersionX adalah <code>32C6 C11D 2F86 BFE4 6EB7 7FFC 5257 FEA6 1368 919F</code>. APT memeriksa metadata repositori bertanda tangan dan digest paket di dalamnya; <code>signed-by</code> membatasi cakupan kunci. Perbarui: <code>sudo apt update &amp;&amp; sudo apt upgrade ash</code>; hapus: <code>sudo apt remove ash</code>.</p>
-          <h3 id="dnf-installation">Fedora dan sistem kompatibel RHEL: DNF</h3>
-          <p>Prasyarat: x86_64/aarch64, administrator, DNF/RPM, <code>curl</code>, <code>gpg</code>, sertifikat CA. Pasang alat yang kurang melalui distribusi. Periksa kunci dan cocokkan sidik jari di atas sebelum impor:</p>
+          <p>Sebelum mengimpor kunci repositori apa pun, verifikasi sidik jarinya terhadap sumber penerbit tepercaya. Sidik jari kunci VersionX adalah<code>32C6 C11D 2F86 BFE4 6EB7 7FFC 5257 FEA6 1368 919F</code>. APT memeriksa metadata repositori yang ditandatangani dan intisari paket yang dikandungnya; kuncinya dicakup dengan<code>signed-by</code>. Perbarui dengan<code>sudo apt update &amp;&amp; sudo apt upgrade ash</code>; hapus dengan<code>sudo apt remove ash</code>.</p>
+          <h3 id="dnf-installation">Sistem yang kompatibel dengan Fedora dan RHEL: DNF</h3>
+          <p>Prasyarat: x86_64 atau aarch64, akses administrator, DNF/RPM,<code>curl</code>,<code>gpg</code>, dan sertifikat CA. Instal alat yang hilang dari distribusi Anda. Periksa kunci dan bandingkan sidik jari di atas sebelum mengimpornya:</p>
           <pre><code>curl -fsSL https://www.versionx.ai/rpm/gpg.key -o versionx-rpm.asc
 gpg --show-keys --with-fingerprint versionx-rpm.asc
 sudo rpm --import versionx-rpm.asc
@@ -141,9 +141,9 @@ gpgkey=https://www.versionx.ai/rpm/gpg.key
 EOF
 sudo dnf install ash
 rm versionx-rpm.asc</code></pre>
-          <p>RPM tidak ditandatangani satu per satu. <code>repo_gpgcheck=1</code> memverifikasi metadata yang mencakup checksum; <code>gpgcheck=0</code> mencerminkan tidak adanya tanda tangan per paket, bukan mematikan verifikasi repositori. Bila kebijakan mewajibkan muatan RPM bertanda tangan, repositori ini tidak memenuhi. Perbarui: <code>sudo dnf upgrade ash</code>; hapus: <code>sudo dnf remove ash</code>.</p>
-          <h3 id="pacman-installation">Arch Linux: Pacman</h3>
-          <p>Prasyarat: x86_64, administrator, Pacman dengan keyring diinisialisasi, <code>curl</code>, <code>gpg</code>. Cocokkan sidik jari yang tampil dengan di atas sebelum mempercayai. Tambahkan repositori sekali, bukan setiap pembaruan:</p>
+          <p>File RPM tidak ditandatangani secara individual.<code>repo_gpgcheck=1</code>memverifikasi metadata repositori yang mencakup checksumnya;<code>gpgcheck=0</code>mencerminkan tidak adanya tanda tangan per paket, bukan verifikasi repositori yang dinonaktifkan. Jika kebijakan Anda memerlukan payload RPM yang ditandatangani, repositori ini tidak memenuhinya. Perbarui dengan<code>sudo dnf upgrade ash</code>; hapus dengan<code>sudo dnf remove ash</code>.</p>
+          <h3 id="pacman-installation">Lengkungan Linux: Pacman</h3>
+          <p>Prasyarat: x86_64, akses administrator, Pacman dengan keyringnya diinisialisasi,<code>curl</code>, Dan<code>gpg</code>. Verifikasi sidik jari kunci yang ditampilkan cocok dengan yang di atas sebelum mempercayainya. Tambahkan repositori satu kali, bukan pada setiap pembaruan:</p>
           <pre><code>curl -fsSL https://www.versionx.ai/pacman/gpg.key -o versionx-pacman.asc
 gpg --show-keys --with-fingerprint versionx-pacman.asc
 sudo pacman-key --add versionx-pacman.asc
@@ -155,164 +155,166 @@ SigLevel = Required DatabaseRequired
 EOF
 sudo pacman -Syu ash
 rm versionx-pacman.asc</code></pre>
-          <p>Pacman memverifikasi tanda tangan paket dan basis data. Sinkronkan Arch dengan <code>sudo pacman -Syu</code>, bukan pembaruan parsial; hapus ash dengan <code>sudo pacman -R ash</code>.</p>
-          <h3>Metode Linux lainnya</h3>
-          <p>Sudah memakai <a href="https://docs.brew.sh/Homebrew-on-Linux">Homebrew di Linux</a>? <a href="#homebrew">Petunjuk tap yang sama</a> mendukung amd64/arm64; Brew mengelola berkas, bukan APT/DNF. Jika tidak, gunakan <a href="#script">skrip/arsip terverifikasi</a> atau <a href="https://github.com/Jonconradt/ash/releases">unduhan .deb/.rpm</a> sesuai. Pasang .deb terverifikasi dengan <code>sudo apt install ./PACKAGE.deb</code>, .rpm dengan <code>sudo dnf install ./PACKAGE.rpm</code> (ganti nama berkas). Paket langsung tetap dikelola, tetapi tidak menambahkan repositori atau langganan rilis berikutnya. RPM saat ini tidak bertanda tangan; patuhi kebijakan distribusi, jangan matikan pemeriksaan.</p>
+          <p>Pacman memverifikasi tanda tangan paket dan database. Jaga agar Arch tetap tersinkronisasi dengan<code>sudo pacman -Syu</code>, bukan peningkatan sebagian; menghapusashdengan<code>sudo pacman -R ash</code>.</p>
+          <h3>Metode instalasi Linux lainnya</h3>
+          <p>Sudah menggunakan<a href="https://docs.brew.sh/Homebrew-on-Linux">Minuman rumahan di Linux</a>? Itu<a href="#homebrew">instruksi ketuk yang sama</a>mendukung amd64 dan arm64; Brew memiliki file-file ini, bukan APT/DNF. Jika tidak, gunakan yang terverifikasi<a href="#script">instalasi skrip/arsip</a>atau yang serasi<a href="https://github.com/Jonconradt/ash/releases">unduhan .deb/.rpm</a>. Instal .deb terverifikasi dengan<code>sudo apt install ./PACKAGE.deb</code>, atau .rpm dengan<code>sudo dnf install ./PACKAGE.rpm</code>(ganti nama file). Paket langsung tetap menjadi milik manajer paket, namun tidak menambahkan repositori atau secara otomatis berlangganan rilis mendatang. Muatan RPM saat ini tidak ditandatangani; ikuti kebijakan distribusi Anda daripada menonaktifkan pemeriksaan tanda tangan.</p>
         </section>
         <section id="freebsd">
           <h2>FreeBSD</h2>
-          <p>Prasyarat: amd64, Bash (walau shell interaktif zsh/Fish), alat unduh/verifikasi, direktori pemasangan dapat ditulis. Pasang Bash melalui pengelola native FreeBSD:</p>
+          <p>Prasyarat: amd64, Bash (meskipun shell interaktif Anda adalah zsh atau Fish), alat pengunduhan/verifikasi, dan direktori instalasi yang dapat ditulis. Instal Bash menggunakan manajer asli FreeBSD:</p>
           <pre><code>sudo pkg install bash</code></pre>
-          <p><code>pkg</code> FreeBSD mengelola prasyarat, bukan ash: belum ada repositori ash .pkg atau arsip arm64. Gunakan <a href="#script">skrip terverifikasi</a>, atau <a href="#verify-download">verifikasi tarball FreeBSD amd64</a>, ekstrak ke direktori sementara dan pasang biner ash berversi sebagai <code>~/.local/bin/ash</code> di samping <code>ash-broker</code>. Salin plugin native ke <code>$XDG_DATA_HOME/ash/plugins</code> (default <code>~/.local/share/ash/plugins</code>), lalu <a href="#initialize">inisialisasi</a>. Anda mengelola berkas ini; <code>pkg delete</code> tidak menghapusnya. Gunakan <a href="#updates">pembaruan mandiri Release</a> di lokasi default atau ganti artefak terverifikasi manual.</p>
+          <p>FreeBSD<code>pkg</code>mengelola prasyarat, bukanash: saat ini tidak adaashRepositori .pkg dan tidak ada arsip rilis arm64. Gunakan<a href="#script">skrip terverifikasi</a>, atau<a href="#verify-download">verifikasi tarball amd64 FreeBSD</a>, ekstrak ke direktori sementara, dan instal versinyaashbiner sebagai<code>~/.local/bin/ash</code>di samping<code>ash-broker</code>. Salin plugin aslinya ke<code>$XDG_DATA_HOME/ash/plugins</code>(bawaan<code>~/.local/share/ash/plugins</code>), Kemudian<a href="#initialize">inisialisasi</a>. Anda pemilik file-file ini;<code>pkg delete</code>tidak akan menghapusnya. Menggunakan<a href="#updates">Rilis pembaruan mandiri</a>di lokasi default atau ganti artefak terverifikasi secara manual.</p>
         </section>
         <section id="initialize">
-          <h2>Inisialisasi dan periksa</h2>
-          <p>Setelah biner terpasang, jalankan penyiapan interaktif sebagai pengguna biasa. Penyiapan hanya aset membiarkan startup tetap:</p>
+          <h2>Inisialisasi dan verifikasi</h2>
+          <p>Setelah memasang binari, jalankan penyiapan secara interaktif sebagai pengguna biasa. Jika Anda tidak ingin integrasi shell, Anda hanya dapat menginstal Ash. Ini mungkin bukan yang Anda inginkan. Nilai sebenarnya dari ash adalah integrasi shell di bawah ini. Penyiapan khusus aset membuat file startup Anda tidak berubah:</p>
           <pre><code>ash install</code></pre>
-          <p>Untuk integrasi perintah tidak ditemukan, pilih tepat satu perintah sesuai shell:</p>
+          <p>Instalasi yang mungkin ingin Anda gunakan melibatkan integrasi shell. Ini akan mengubah <code>.bashrc</code> Anda (atau setara dengan shell Anda) untuk menyertakan Ash. Untuk mengaktifkan integrasi command-not-found, pilih satu perintah untuk shell yang Anda gunakan:</p>
           <p><strong>Bash</strong></p>
           <pre><code>ash install --shell bash --shell-integration</code></pre>
           <p><strong>zsh</strong></p>
           <pre><code>ash install --shell zsh --shell-integration</code></pre>
-          <p><strong>Fish</strong></p>
+          <p><strong>Ikan</strong></p>
           <pre><code>ash install --shell fish --shell-integration</code></pre>
-          <p>Bash memakai <code>~/.bashrc</code>, zsh <code>~/.zshrc</code>, Fish <code>$XDG_CONFIG_HOME/fish/config.fish</code> (default <code>~/.config/fish/config.fish</code>). Buka shell baru; shell lama mempertahankan broker aktif. Integrasi menambahkan <code>~/.local/bin</code> di depan PATH: hapus salinan lokal lama sebelum mengharapkan paket sistem terpilih.</p>
-          <p>Jika pengaturan belum ada, penyiapan mendeteksi kunci atau server lokal aktif; jika tidak, menawarkan menu penyedia dan meminta kredensial. Pilih model tersedia dengan alat. Pengaturan valid dipertahankan; mengulang penyiapan tidak mengganti penyedia.</p>
-          <p>Pengaturan di <code>$XDG_CONFIG_HOME/ash/.ash_env</code> (default <code>~/.config/ash/.ash_env</code>, izin privat). Integrasi terkelola memuatnya. Tanpa integrasi, Bash/zsh dapat memuat berkas di startup biasa; Fish harus menetapkan variabel <code>ASH_AI_*</code> dalam sintaks Fish, bukan memuat format Bash. Lindungi berkas token dan jangan commit.</p>
-          <p>Tanpa integrasi, tambahkan direktori pemasangan lokal sebenarnya ke PATH. Bash/zsh: <code>export PATH="$HOME/.local/bin:$PATH"</code>. Fish: <code>fish_add_path "$HOME/.local/bin"</code>. Simpan dalam startup shell; ganti dengan direktori khusus bila perlu.</p>
+          <p>Bash menggunakan<code>~/.bashrc</code>, zsh menggunakan<code>~/.zshrc</code>, dan penggunaan Ikan<code>$XDG_CONFIG_HOME/fish/config.fish</code>(bawaan<code>~/.config/fish/config.fish</code>). Buka shell baru sesudahnya; shell yang ada mempertahankan broker yang sedang berjalan. Integrasi mendahului<code>~/.local/bin</code>ke PATH: hapus salinan lokal pengguna lama sebelum mengharapkan paket sistem dipilih.</p>
+          <p>Jika pengaturan penyedia tidak ada, pengaturan mendeteksi kunci penyedia yang ada atau server lokal yang sedang berjalan; jika tidak, ia menawarkan menu penyedia dan meminta kredensial. Pilih model berkemampuan alat yang tersedia. Pengaturan valid yang ada dipertahankan, jadi menjalankan kembali pengaturan bukanlah perintah peralihan penyedia.</p>
+          <p>Pengaturan disimpan di<code>$XDG_CONFIG_HOME/ash/.ash_env</code>(bawaan<code>~/.config/ash/.ash_env</code>, izin file pribadi). Integrasi terkelola memuatnya. Tanpa integrasi, pengguna Bash/zsh dapat mengambil file tersebut dalam konfigurasi startup normal mereka; Pengguna ikan harus mengatur yang sesuai<code>ASH_AI_*</code>variabel menggunakan sintaksis Fish, bukan sumber file format Bash. Lindungi file apa pun yang berisi token dan jangan pernah mengkomitnya.</p>
+          <p>Untuk instalasi pengguna lokal tanpa integrasi, tambahkan direktori sebenarnya ke PATH. pesta/zsh:<code>export PATH="$HOME/.local/bin:$PATH"</code>. Ikan:<code>fish_add_path "$HOME/.local/bin"</code>. Pertahankan ini menggunakan konfigurasi startup shell Anda; gantikan direktori instalasi khusus Anda bila memungkinkan.</p>
           <pre><code>command -v ash
 command -v ash-broker
 ash version
 ash "Say hello in one sentence"</code></pre>
-          <p>Perintah awal harus menunjuk pemasangan terpilih. Permintaan memerlukan server aktif atau kredensial cloud valid; memasang ash tidak memasang model.</p>
+          <p>Perintah pertama harus sesuai dengan instalasi yang Anda pilih. Prompt memerlukan server yang berjalan atau kredensial cloud yang valid; menginstal ash tidak menginstal model.</p>
         </section>
         <section id="ollama">
-          <h2>Ollama lokal: tanpa akun cloud</h2>
-          <p>Pasang Ollama mengikuti <a href="https://ollama.com/download">petunjuk OS resmi</a>. Mulai aplikasi/layanan atau jalankan <code>ollama serve</code> di terminal lain jika server belum aktif. Dukungan FreeBSD ash tidak berarti pemasang Ollama native: gunakan server terjangkau pada host lain yang didukung bila perlu.</p>
-          <p>Unduh model dengan alat sesuai hardware; <code>llama3.1:8b</code> adalah contoh, bukan minimum. Lihat <a href="https://ollama.com/search?c=tools">katalog alat terkini</a> untuk pilihan lain:</p>
+          <h2>Ollama Lokal: tidak diperlukan akun cloud</h2>
+          <p>Anda tidak perlu memiliki AI lokal untuk menggunakannyaash. Namun, jika Anda ingin menjalankan model secara lokal tanpa bergantung pada penyedia cloud, Anda dapat menyiapkan server Ollama lokal.</p>
+          <p>Ollama juga menawarkan layanan cloud untuk menjalankan model dari jarak jauh, tetapi itu tidak diperlukan untuk penggunaan lokalash. Server cloud mencakup tingkat gratis dan model cloud Gemma 4 31b Google (<a href="https://ollama.com/library/gemma4:31b-cloud">gemma4-31b:awan</a>) bekerja sangat baik denganash. Ini adalah model yang digunakan oleh proyek untuk menghasilkan catatan rilis dan melakukan tugas devops.</p>
+          <p>Instal Ollama menggunakan<a href="https://ollama.com/download">instruksi OS resmi</a>. Mulai aplikasi/layanan Ollama, atau jalankan<code>ollama serve</code>di terminal terpisah jika server belum berjalan. Di FreeBSD,ashDukungan tidak berarti penginstal Ollama asli: gunakan server yang dapat dijangkau pada host lain yang didukung jika diperlukan.</p>
+          <p>Unduh model berkemampuan alat yang sesuai dengan perangkat keras Anda;<code>llama3.1:8b</code>adalah contoh, bukan persyaratan minimum. Periksa<a href="https://ollama.com/search?c=tools">katalog alat terkini</a>untuk alternatif:</p>
           <pre><code>ollama pull llama3.1:8b
 ollama list
 curl -fsS http://localhost:11434/api/tags
 ash install</code></pre>
-          <p>Tanpa kunci cloud sudah ditetapkan, server lokal dapat dideteksi dan model terunduh ditawarkan. Jika penyedia lain sudah dikonfigurasi, ubah endpoint/model manual. Contoh Bash/zsh:</p>
+          <p>Jika kunci cloud belum disetel, penyiapan dapat mendeteksi server lokal dan menawarkan model yang diunduh. Jika penyedia lain sudah dikonfigurasi, ubah titik akhir/model secara manual. Contoh Bash/zsh:</p>
           <pre><code>export ASH_AI_ENDPOINT="http://localhost:11434"
 export ASH_AI_MODEL="llama3.1:8b"
 unset ASH_AI_AUTH_TOKEN
 ash "Say hello in one sentence"</code></pre>
-          <p>Padanan Fish:</p>
+          <p>Setara dengan ikan:</p>
           <pre><code>set -gx ASH_AI_ENDPOINT http://localhost:11434
 set -gx ASH_AI_MODEL llama3.1:8b
 set -e ASH_AI_AUTH_TOKEN
 ash "Say hello in one sentence"</code></pre>
-          <p>Perubahan hanya berlaku di shell saat ini. Simpan di berkas lingkungan ash terlindungi atau konfigurasi shell sesuai, mengganti pengaturan penyedia lama. Ollama lokal tidak perlu token. Biarkan server pada loopback kecuali akses diamankan sengaja; server remote menerima permintaan dan keluaran alat.</p>
-          <p>Opsional: tetapkan <code>OLLAMA_KEEP_ALIVE=30m</code> di lingkungan <em>server Ollama</em> lalu mulai ulang agar model tetap termuat. <code>-1</code> mempertahankan selamanya tetapi memakai memori di antara permintaan. Menetapkan hanya di terminal klien ash tidak mengatur ulang server aktif.</p>
-          <p>Inferensi lokal tidak menagih API, tetapi memakai hardware/penyimpanan/listrik. <a href="https://ollama.com/cloud">Ollama cloud</a> adalah layanan terpisah dengan autentikasi dan batas paket, bukan penyiapan lokal ini.</p>
+          <p>Perubahan ini hanya mempengaruhi shell saat ini. Pertahankan mereka dalam perlindungan Andaashfile lingkungan atau konfigurasi shell yang sesuai, menggantikan penggantian penyedia lama. Ollama lokal tidak memerlukan token. Pertahankan server dalam keadaan loopback kecuali Anda dengan sengaja mengamankan akses; server jarak jauh menerima perintah dan keluaran alat Anda.</p>
+          <p>Opsional: atur<code>OLLAMA_KEEP_ALIVE=30m</code>di<em>Server Ollama</em>lingkungan dan mulai ulang server untuk menjaga model tetap hangat.<code>-1</code>membuatnya tetap dimuat tanpa batas waktu tetapi menghabiskan memori di antara permintaan. Pengaturan ini hanya diashterminal klien tidak mengkonfigurasi ulang server yang sudah berjalan.</p>
+          <p>Inferensi lokal tidak memiliki tagihan API penyedia, tetapi menggunakan perangkat keras/penyimpanan/listrik Anda.<a href="https://ollama.com/cloud">Awan Ollama</a>adalah layanan terpisah dengan batas otentikasi dan paket; ini tidak sama dengan pengaturan lokal ini.</p>
         </section>
         <section id="cloud">
-          <h2>Paket cloud gratis</h2>
-          <div class="guide-note guide-warning"><p><strong>Gratis bukan berarti tanpa batas atau privat.</strong> Akun, wilayah, kuota, model, kebijakan data berbeda dan berubah. Permintaan dan keluaran relevan keluar dari mesin. Tinjau batas/syarat terkini; aktifkan penagihan berbayar hanya jika berniat membayar.</p></div>
-          <p>Buat kunci lewat tautan, jalankan <code>ash install</code> interaktif dan pilih penyedia. Token diminta, model didaftar bila didukung. Pilih <em>model teks gratis dengan pemanggilan alat</em> yang tersedia; tercantum tidak menjamin gratis bagi akun Anda.</p>
+          <h2>Tingkat cloud gratis</h2>
+          <div class="guide-note guide-warning"><p><strong>Gratis bukan berarti tidak terbatas atau bersifat pribadi.</strong> Akun, wilayah, kuota, model yang memenuhi syarat, dan kebijakan data berbeda-beda dan dapat berubah. Perintah dan keluaran alat yang relevan tinggalkan mesin Anda. Tinjau batasan dan ketentuan saat ini; jangan aktifkan penagihan berbayar kecuali Anda bermaksud membayar.</p></div>
+          <p>Buat kunci penyedia menggunakan tautan di bawah, lalu jalankan <code>ash install</code> secara interaktif dan pilih penyedia tersebut. Pengaturan meminta token dan mencantumkan model jika didukung. Pilih <em>model teks tingkat gratis dengan pemanggilan alat</em> yang tersedia saat ini; mencantumkan model tidak menjamin model tersebut gratis untuk akun Anda.</p>
           <div class="table-scroll" role="region" aria-label="Konfigurasi penyedia cloud" tabindex="0">
             <table>
-              <caption>Akun, endpoint, dan deteksi kredensial</caption>
-              <thead><tr><th scope="col">Penyedia</th><th scope="col">Endpoint dan kunci dikenali</th><th scope="col">Pemeriksaan paket gratis</th></tr></thead>
+              <caption>Akun, titik akhir, dan deteksi kredensial</caption>
+              <thead><tr><th scope="col">Penyedia</th><th scope="col">Titik akhir dan kunci yang dikenali</th><th scope="col">Pemeriksaan tingkat gratis</th></tr></thead>
               <tbody>
-                <tr><th scope="row"><a href="https://aistudio.google.com/app/apikey">Google AI Studio / Gemini</a></th><td><code>https://generativelanguage.googleapis.com/v1beta/openai/</code><br><code>GEMINI_API_KEY</code> atau <code>GOOGLE_API_KEY</code></td><td>Periksa <a href="https://ai.google.dev/gemini-api/docs/models">katalog model</a> dan <a href="https://ai.google.dev/gemini-api/docs/pricing">harga paket gratis</a>. Konten gratis mungkin dipakai meningkatkan produk Google; tinjau <a href="https://ai.google.dev/gemini-api/terms">syarat</a>.</td></tr>
-                <tr><th scope="row"><a href="https://console.groq.com/keys">Groq</a></th><td><code>https://api.groq.com/openai/v1</code><br><code>GROQ_API_KEY</code></td><td>Pilih model percakapan/alat didukung dari <a href="https://console.groq.com/docs/models">katalog</a>. Periksa <a href="https://console.groq.com/docs/rate-limits">batas laju</a> akun dan <a href="https://console.groq.com/docs/your-data">kebijakan data</a>; model pratinjau dapat hilang.</td></tr>
-                <tr><th scope="row"><a href="https://openrouter.ai/settings/keys">OpenRouter</a></th><td><code>https://openrouter.ai/api/v1</code><br><code>OPENROUTER_API_KEY</code></td><td>Pilih <a href="https://openrouter.ai/models?max_price=0">model gratis</a> dengan alat. Akhiran <code>:free</code> hanya berlaku untuk <a href="https://openrouter.ai/docs/guides/routing/model-variants/free">varian gratis terpublikasi</a>. Tinjau <a href="https://openrouter.ai/docs/api/reference/limits">batas</a> dan <a href="https://openrouter.ai/docs/guides/privacy/logging">privasi</a> penyedia hilir.</td></tr>
+                <tr><th scope="row"><a href="https://aistudio.google.com/app/apikey">Google AI Studio/Gemini</a></th><td><code>https://generativelanguage.googleapis.com/v1beta/openai/</code><br><code>GEMINI_API_KEY</code>atau<code>GOOGLE_API_KEY</code></td><td>Periksa<a href="https://ai.google.dev/gemini-api/docs/models">katalog model</a>Dan<a href="https://ai.google.dev/gemini-api/docs/pricing">penetapan harga tingkat gratis</a>. Konten tingkat gratis dapat digunakan untuk menyempurnakan produk Google; meninjau<a href="https://ai.google.dev/gemini-api/terms">ketentuan</a>.</td></tr>
+                <tr><th scope="row"><a href="https://console.groq.com/keys">Bagus</a></th><td><code>https://api.groq.com/openai/v1</code><br><code>GROQ_API_KEY</code></td><td>Pilih model obrolan/alat yang didukung dari<a href="https://console.groq.com/docs/models">katalog</a>. Periksa akun<a href="https://console.groq.com/docs/rate-limits">batasan tarif</a>Dan<a href="https://console.groq.com/docs/your-data">kebijakan data</a>; model pratinjau bisa hilang.</td></tr>
+                <tr><th scope="row"><a href="https://openrouter.ai/settings/keys">BukaRouter</a></th><td><code>https://openrouter.ai/api/v1</code><br><code>OPENROUTER_API_KEY</code></td><td>Pilih alat yang mampu<a href="https://openrouter.ai/models?max_price=0">model bebas</a>. Itu<code>:free</code>akhiran hanya berfungsi untuk model dengan a<a href="https://openrouter.ai/docs/guides/routing/model-variants/free">varian gratis yang diterbitkan</a>. Tinjauan<a href="https://openrouter.ai/docs/api/reference/limits">batas</a>Dan<a href="https://openrouter.ai/docs/guides/privacy/logging">pengaturan privasi</a>untuk penyedia hilir.</td></tr>
               </tbody>
             </table>
           </div>
-          <p>Sudah mengekspor kunci dikenali? Penyiapan mendeteksi; bila beberapa, meminta pilihan. Jangan tempel kunci asli ke riwayat, rekaman, atau kode. Berkas konfigurasi memuat rahasia, bukan brankas terenkripsi.</p>
-          <h3>Konfigurasi manual atau mengganti penyedia</h3>
-          <p>Ganti endpoint berikut dengan tabel dan <code>MODEL_ID</code> dengan model terverifikasi di akun. Bila kunci sudah diekspor sebagai <code>GROQ_API_KEY</code>, contoh Bash/zsh memakai ulang tanpa mengetik rahasia:</p>
+          <p>Sudah mengekspor kunci penyedia yang dikenali? Setup mendeteksinya; jika ada beberapa kunci, Anda diminta untuk memilih. Jangan tempelkan kunci asli ke dalam riwayat perintah, rekaman, atau kode sumber. File konfigurasi berisi rahasia, bukan brankas terenkripsi.</p>
+          <h3>Konfigurasi manual atau penyedia switching</h3>
+          <p>Ganti titik akhir di bawah ini dengan nilai tabel dan<code>MODEL_ID</code>dengan model yang diverifikasi di akun penyedia Anda. Jika kunci Anda sudah diekspor sebagai<code>GROQ_API_KEY</code>, contoh Bash/zsh ini menggunakannya kembali tanpa mengetikkan rahasianya:</p>
           <pre><code>export ASH_AI_ENDPOINT="https://api.groq.com/openai/v1"
 export ASH_AI_MODEL="MODEL_ID"
 export ASH_AI_AUTH_TOKEN="$GROQ_API_KEY"</code></pre>
-          <p>Padanan Fish:</p>
+          <p>Setara dengan ikan:</p>
           <pre><code>set -gx ASH_AI_ENDPOINT https://api.groq.com/openai/v1
 set -gx ASH_AI_MODEL MODEL_ID
 set -gx ASH_AI_AUTH_TOKEN "$GROQ_API_KEY"</code></pre>
-          <p>Untuk Gemini/OpenRouter gunakan endpoint dan variabel kunci masing-masing. Simpan aman untuk shell berikutnya. Cloud perlu HTTPS dan token; HTTP lokal bukan jalan pintas cloud. Lihat <a href="docs.html#environment">referensi lingkungan</a> dan <a href="faq.html#ai">penyedia lain didukung</a> untuk layanan berbayar dan pengaturan lanjutan.</p>
+          <p>Untuk Gemini atau OpenRouter, gunakan titik akhir dan variabel kunci yang dikenali. Simpan pengaturan yang dipilih dengan aman untuk shell berikutnya. Titik akhir cloud memerlukan HTTPS dan token; HTTP lokal bukanlah jalan pintas untuk layanan cloud. Melihat<a href="docs.html#environment">referensi lingkungan</a>Dan<a href="faq.html#ai">penyedia lain yang didukung</a>untuk layanan berbayar dan penggantian lanjutan.</p>
         </section>
         <section id="script">
           <h2>Pemasangan skrip: alternatif, bukan pilihan pertama</h2>
-          <p>Utamakan Homebrew, APT, DNF, Pacman: melacak berkas, memverifikasi unduhan sesuai kepercayaannya dan menawarkan pembaruan/penghapusan familiar. Tetap perlu mempercayai penerbit dan tindakan pemasangan.</p>
-          <div class="guide-note guide-warning"><p><strong>Skrip situs menjalankan kode dengan izin akun Anda.</strong> Situs/penerbit diretas atau skrip berubah dapat membaca rahasia, mengubah berkas, memasang software lain. HTTPS melindungi transport, bukan niat kode. Mengalirkan URL langsung ke shell mengeksekusi sebelum ditinjau. Tanda tangan arsip tidak mengautentikasi skrip sendiri. Jangan jalankan dengan sudo atau matikan verifikasinya.</p></div>
-          <p>Prasyarat: OS/arsitektur didukung, <code>$SHELL</code> menunjukkan Bash/zsh/Fish, <a href="https://docs.sigstore.dev/cosign/system_config/installation/">Sigstore cosign</a>, <code>tar</code>, <code>uname</code>, <code>install</code>, utilitas shell standar, perintah SHA-256 (<code>sha256sum</code>, <code>shasum</code>, atau <code>sha256</code>), downloader (<code>curl</code>, <code>wget</code>, atau Python). Contoh memakai curl. FreeBSD perlu Bash juga. Direktori rumah/pemasangan harus dapat ditulis.</p>
-          <p>Unduh ke berkas lokal, tinjau dengan editor, jalankan hanya jika percaya sumber dan perilakunya. Tinjauan tidak menjamin aman; jangan ikuti langkah secara buta:</p>
+          <p>Lebih memilih Homebrew, APT, DNF, atau Pacman: mereka melacak file yang dimiliki, memverifikasi unduhan menggunakan konfigurasi kepercayaannya, dan memberikan pembaruan/penghapusan yang sudah dikenal. Hal ini tetap memerlukan penerbit yang dapat dipercaya dan tindakan pemasangan paket.</p>
+          <div class="guide-note guide-warning"><p><strong>Skrip situs web menjalankan kode dengan izin akun Anda.</strong> Situs web yang disusupi, penerbit, atau skrip yang diubah dapat membaca rahasia, mengubah file, atau memasang perangkat lunak lain. HTTPS melindungi transportasi, bukan maksud dari kode itu. Mengirimkan URL langsung ke shell akan mengeksekusinya sebelum Anda dapat meninjaunya. Pemeriksaan tanda tangan arsip skrip tidak mengautentikasi skrip itu sendiri. Jangan pernah menjalankannya dengan sudo atau menonaktifkan verifikasinya.</p></div>
+          <p>Prasyarat: OS/arsitektur yang didukung,<code>$SHELL</code>mengidentifikasi Bash/zsh/Fish,<a href="https://docs.sigstore.dev/cosign/system_config/installation/">tanda tangan toko tanda tangan</a>,<code>tar</code>,<code>uname</code>,<code>install</code>, utilitas shell standar, perintah SHA-256 (<code>sha256sum</code>,<code>shasum</code>, atau<code>sha256</code>), dan pengunduh (<code>curl</code>,<code>wget</code>, atau Piton). Contohnya menggunakan curl. FreeBSD juga membutuhkan Bash. Direktori home/instalasi Anda harus dapat ditulis.</p>
+          <p>Unduh ke file lokal, periksa dengan editor, dan jalankan hanya jika Anda memercayai sumber dan perilakunya. Inspeksi bukanlah jaminan keselamatan; jangan menjalankan langkah-langkah ini secara membabi buta:</p>
           <pre><code>curl -fsSL https://jonconradt.github.io/ash/install.sh -o ash-install.sh
 less ash-install.sh</code></pre>
-          <p>Setelah ditinjau, jalankan salinan sebagai pengguna biasa:</p>
+          <p>Setelah pemeriksaan, jalankan salinan yang disimpan sebagai pengguna biasa:</p>
           <pre><code>sh ./ash-install.sh
 rm ./ash-install.sh</code></pre>
-          <p><code>install.sh</code> mengunduh Release terbaru, memverifikasi manifes bertanda tangan Sigstore dan digest arsip, memasang <code>ash</code>/<code>ash-broker</code> di <code>~/.local/bin</code>. Plugin native di <code>$XDG_DATA_HOME/ash/plugins</code>. Menyiapkan pengguna dan bertanya sebelum integrasi shell. Tanpa terminal interaktif pertanyaan dapat dilewati: jalankan <code>ash install</code> interaktif sesudahnya.</p>
-          <p>Tetapkan <code>ASH_INSTALL_DIR</code> sebelum skrip untuk lokasi lain. Tambahkan sendiri ke PATH. <strong>Pembaruan mandiri hanya mendukung <code>~/.local/bin</code></strong>; lokasi khusus perlu penggantian manual. Tidak ada pemilih Beta/Nightly.</p>
+          <p><code>install.sh</code>mengunduh Rilis terbaru, memverifikasi manifes checksum dan intisari arsip yang ditandatangani Sigstore, dan memasang<code>ash</code>/<code>ash-broker</code>di dalam<code>~/.local/bin</code>. Plugin asli berada di bawah<code>$XDG_DATA_HOME/ash/plugins</code>. Ini menjalankan pengaturan per pengguna dan bertanya sebelum mengaktifkan integrasi shell. Tanpa terminal interaktif, perintah penyedia/integrasi mungkin dilewati: jalankan<code>ash install</code>secara interaktif setelahnya.</p>
+          <p>Anda dapat mengatur<code>ASH_INSTALL_DIR</code>sebelum menjalankan skrip untuk memilih tujuan lain. Tambahkan sendiri tujuan itu ke PATH.<strong>Pembaruan mandiri hanya didukung di bawah<code>~/.local/bin</code></strong>; tujuan khusus memerlukan penggantian manual. Skrip tidak memiliki pemilih Beta/Malam.</p>
         </section>
         <section id="verify-download">
           <h2>Verifikasi paket atau arsip langsung</h2>
-          <p>Prasyarat: cosign dan utilitas SHA-256. Unduh paket/arsip, <code>SHA256SUMS</code>, <code>SHA256SUMS.sigstore.json</code> dari rilis sama. Gunakan direktori baru. Ganti <code>vX.Y.Z</code> dengan tag tepat termasuk akhiran prarilis bila ada:</p>
+          <p>Prasyarat: cosign dan utilitas SHA-256. Dari rilis terbitan yang sama, unduh paket/arsip Anda,<code>SHA256SUMS</code>, Dan<code>SHA256SUMS.sigstore.json</code>. Bekerja di direktori baru. Mengganti<code>vX.Y.Z</code>dengan tag persisnya, termasuk akhiran prarilis jika ada:</p>
           <pre><code>cosign verify-blob SHA256SUMS \
   --bundle SHA256SUMS.sigstore.json \
   --certificate-identity "https://github.com/Jonconradt/ash/.github/workflows/release.yml@refs/tags/vX.Y.Z" \
   --certificate-oidc-issuer "https://token.actions.githubusercontent.com"</code></pre>
-          <p>Hanya setelah berhasil hitung digest dengan <code>shasum -a 256 PACKAGE</code> di macOS, <code>sha256sum PACKAGE</code> di Linux, <code>sha256 -q PACKAGE</code> di FreeBSD. Ganti <code>PACKAGE</code> dengan nama unduhan dan cocokkan persis dengan entrinya dalam manifes terverifikasi. Berhenti bila hilang atau berbeda. Checksum tanpa tanda tangan di samping berkas bukan metadata penerbit terverifikasi.</p>
+          <p>Baru setelah itu berhasil, hitung intisari file Anda dengan<code>shasum -a 256 PACKAGE</code>di macOS,<code>sha256sum PACKAGE</code>di Linux, atau<code>sha256 -q PACKAGE</code>di FreeBSD. Mengganti<code>PACKAGE</code>dengan nama file yang diunduh dan bandingkan persis dengan entri nama file tersebut di manifes terverifikasi. Berhenti pada entri yang hilang atau ketidakcocokan apa pun. Checksum tak bertanda tangan yang diunduh di samping file tidak setara dengan metadata penerbit terverifikasi.</p>
         </section>
         <section id="updates">
-          <h2>Pembaruan dan tiga kanal</h2>
+          <h2>Pembaruan dan tiga saluran</h2>
           <ul>
-            <li><strong>Release (disarankan):</strong> versi stabil seperti <code>vX.Y.Z</code>; konfigurasi repositori menyebut <code>stable</code>.</li>
-            <li><strong>Beta:</strong> pengujian prarilis, tag <code>vX.Y.Z-beta.N</code>; antisipasi perubahan dan regresi.</li>
-            <li><strong>Nightly:</strong> perubahan baru cabang default, tag <code>vX.Y.Z-nightly.YYYYMMDD.N</code>; risiko regresi tertinggi. Build terjadwal bisa dilewati tanpa perubahan atau saat publikasi gagal.</li>
+            <li><strong>Rilis (disarankan):</strong>versi terbitan stabil seperti<code>vX.Y.Z</code>; konfigurasi repositori memanggil ini<code>stable</code>.</li>
+            <li><strong>Beta:</strong>pengujian prarilis, diberi tag<code>vX.Y.Z-beta.N</code>; mengharapkan perubahan dan kemunduran.</li>
+            <li><strong>Malam:</strong>perubahan cabang default terkini, diberi tag<code>vX.Y.Z-nightly.YYYYMMDD.N</code>; risiko regresi tertinggi. Pembuatan dijadwalkan tetapi dapat dilewati jika tidak ada perubahan atau penerbitan gagal.</li>
           </ul>
-          <p>Rilis terpublikasi memperbarui formula Homebrew atau repositori Linux bertanda tangan terkait. Diterima saat menjalankan upgrade pengelola pemilik atau kebijakan OS. Publikasi, repositori, situs bisa tertinggal satu sama lain; periksa sebelum pindah kanal. ash tidak diam-diam memasang pembaruan biner latar belakang.</p>
-          <div class="table-scroll" role="region" aria-label="Langganan kanal pembaruan" tabindex="0">
+          <p>Rilis yang diterbitkan memperbarui formula Homebrew yang sesuai atau repositori Linux yang ditandatangani. Anda menerimanya ketika Anda menjalankan perintah pemutakhiran manajer pemilik (atau kebijakan pembaruan OS Anda sendiri yang menjalankannya). Publikasi, pembaruan repositori, dan penerapan situs web dapat berjalan lambat satu sama lain; periksa ketersediaan sebelum mengganti saluran. ash tidak menginstal pembaruan biner latar belakang secara diam-diam.</p>
+          <div class="table-scroll" role="region" aria-label="Perbarui langganan saluran" tabindex="0">
             <table>
-              <caption>Berlangganan melalui metode pemasangan Anda</caption>
-              <thead><tr><th scope="col">Metode</th><th scope="col">Release</th><th scope="col">Beta</th><th scope="col">Nightly</th></tr></thead>
+              <caption>Berlangganan menggunakan metode instalasi yang Anda miliki</caption>
+              <thead><tr><th scope="col">Metode</th><th scope="col">Rilis</th><th scope="col">Beta</th><th scope="col">Malam</th></tr></thead>
               <tbody>
-                <tr><th scope="row">Formula Homebrew</th><td><code>Jonconradt/ash/ash</code></td><td><code>Jonconradt/ash/ash-beta</code></td><td><code>Jonconradt/ash/ash-nightly</code></td></tr>
+                <tr><th scope="row">Rumus buatan sendiri</th><td><code>Jonconradt/ash/ash</code></td><td><code>Jonconradt/ash/ash-beta</code></td><td><code>Jonconradt/ash/ash-nightly</code></td></tr>
                 <tr><th scope="row">Distribusi APT</th><td><code>stable</code></td><td><code>beta</code></td><td><code>nightly</code></td></tr>
-                <tr><th scope="row">baseurl DNF</th><td><code>https://www.versionx.ai/rpm/</code></td><td><code>https://www.versionx.ai/rpm/beta/</code></td><td><code>https://www.versionx.ai/rpm/nightly/</code></td></tr>
+                <tr><th scope="row">DNF baseurl</th><td><code>https://www.versionx.ai/rpm/</code></td><td><code>https://www.versionx.ai/rpm/beta/</code></td><td><code>https://www.versionx.ai/rpm/nightly/</code></td></tr>
                 <tr><th scope="row">Server Pacman</th><td><code>https://www.versionx.ai/pacman/$arch</code></td><td><code>https://www.versionx.ai/pacman/beta/$arch</code></td><td><code>https://www.versionx.ai/pacman/nightly/$arch</code></td></tr>
-                <tr><th scope="row">Skrip / ash update</th><td>Hanya Release</td><td>Tanpa langganan</td><td>Tanpa langganan</td></tr>
-                <tr><th scope="row">Paket langsung / tarball</th><td colspan="3">Tanpa langganan otomatis: pilih tag terpublikasi dan ganti artefak terverifikasi manual.</td></tr>
+                <tr><th scope="row">Pembaruan skrip / ash</th><td>Hanya rilis</td><td>Tanpa langganan</td><td>Tanpa langganan</td></tr>
+                <tr><th scope="row">Paket langsung/tarball</th><td colspan="3">Tidak ada langganan otomatis: pilih tag yang dipublikasikan dan ganti artefak terverifikasi secara manual.</td></tr>
               </tbody>
             </table>
           </div>
-          <h3>Homebrew: memasang atau mengganti formula</h3>
-          <p>Untuk pemasangan Beta/Nightly baru, gunakan nama formula lengkap di atas dalam <code>brew install</code>. Saat pindah, hapus formula lama dahulu: ketiganya memberi biner sama. Contoh Release ke Beta:</p>
+          <h3>Homebrew: menginstal atau mengganti formula</h3>
+          <p>Untuk instalasi Beta/Nightly baru, gunakan nama formula lengkap yang sesuai di atas di <code>brew install</code>. Saat beralih, hapus dulu formula yang saat ini diinstal: ketiganya menyediakan binari yang sama. Contoh, Rilis ke Beta:</p>
           <pre><code>brew uninstall ash
 brew install Jonconradt/ash/ash-beta
 brew update
 brew upgrade ash-beta</code></pre>
-          <p>Gunakan <code>ash-nightly</code> untuk Nightly atau <code>ash</code> untuk Release dalam pemasangan/upgrade. Hapus formula kanal lama sebenarnya, tidak selalu <code>ash</code>. Pengaturan pengguna tetap; buka shell baru sesudahnya.</p>
-          <h3>Linux: pilih satu kanal repositori</h3>
-          <p><strong>APT:</strong> gunakan <a href="#apt-installation">penyiapan APT</a> dengan tepat satu distribusi tabel. Untuk pindah ubah <code>/etc/apt/sources.list.d/versionx.list</code>, ganti <code>stable</code> dengan <code>beta</code> atau <code>nightly</code> (atau kembali <code>stable</code>), lalu:</p>
+          <p>Menggunakan<code>ash-nightly</code>untuk Nightly atau<code>ash</code>untuk Rilis dalam perintah instal/peningkatan. Copot pemasangan formula saluran lama yang sebenarnya, tidak selalu<code>ash</code>. Pengaturan pengguna dipertahankan; buka shell baru setelah beralih.</p>
+          <h3>Linux: pilih satu saluran repositori</h3>
+          <p><strong>TEPAT:</strong>gunakan<a href="#apt-installation">pengaturan APT</a>dengan tepat satu distribusi dari tabel. Untuk mengganti instalasi yang sudah ada, edit<code>/etc/apt/sources.list.d/versionx.list</code>, menggantikan<code>stable</code>dengan<code>beta</code>atau<code>nightly</code>(atau kembali ke<code>stable</code>), Kemudian:</p>
           <pre><code>sudo apt update
 sudo apt install --allow-downgrades ash</code></pre>
-          <p><strong>DNF:</strong> gunakan <a href="#dnf-installation">penyiapan DNF</a> dengan baseurl dipilih. Pada pemasangan lama ganti <code>baseurl</code> di <code>/etc/yum.repos.d/versionx.repo</code>, pertahankan pengaturan tanda tangan, lalu:</p>
+          <p><strong>DNF:</strong>gunakan<a href="#dnf-installation">pengaturan DNF</a>dengan baseurl yang dipilih. Untuk instalasi yang sudah ada, ganti<code>baseurl</code>di dalam<code>/etc/yum.repos.d/versionx.repo</code>, mempertahankan pengaturan tanda tangannya, lalu:</p>
           <pre><code>sudo dnf --refresh distro-sync ash</code></pre>
-          <p><strong>Pacman:</strong> gunakan <a href="#pacman-installation">penyiapan Pacman</a> dengan URL Server dipilih. Pertahankan bagian <code>[versionx]</code>: setiap kanal menerbitkan database <code>versionx.db</code>. Ganti Server di bagian itu, bukan menambah database berbeda nama. Untuk pindah, termasuk downgrade:</p>
+          <p><strong>Pacman:</strong>gunakan<a href="#pacman-installation">Pengaturan Pacman</a>dengan URL Server yang dipilih. Simpan nama bagiannya<code>[versionx]</code>: setiap saluran menerbitkan database bernama<code>versionx.db</code>. Ubah Server di satu bagian itu daripada menambahkan database dengan nama berbeda. Untuk beralih, termasuk downgrade:</p>
           <pre><code>sudo pacman -Syuu ash</code></pre>
-          <p>Tinjau transaksi: kembali Release dapat menurunkan ash, dan <code>u</code> ganda Pacman juga paket lain. Cadangkan konfigurasi dahulu. Lalu gunakan upgrade normal APT/DNF/Pacman pada bagian OS; jangan aktifkan banyak sumber kanal ash.</p>
-          <h3>Pembaruan Release lokal pengguna</h3>
+          <p>Tinjau transaksi yang diusulkan: kembali ke Rilis dapat menurunkan versi ash, dan dobel Pacman <code>u</code> dapat menurunkan versi paket lainnya juga. Cadangkan konfigurasi sebelum beralih. Setelah itu gunakan perintah pemutakhiran APT/DNF/Pacman normal dari bagian OS; jangan biarkan beberapa sumber saluran ash aktif.</p>
+          <h3>Pembaruan Rilis Lokal Pengguna</h3>
           <pre><code>ash update</code></pre>
-          <p>Memverifikasi dan memasang stabil hanya jika ash aktif di <code>~/.local/bin</code>. Aset/plugin diperbarui juga, dengan pilihan untuk berkas khusus. <code>ash update --version vX.Y.Z</code> memilih tag stabil, bukan kanal; bukan perintah downgrade. Tidak ada <code>--channel</code>. Paket terkelola, .pkg, tujuan skrip khusus harus memakai pengelola/pemasangnya. FreeBSD Beta/Nightly memakai arsip terverifikasi manual, bukan langganan updater. Buka shell baru sesudahnya.</p>
+          <p>Ini memverifikasi dan menginstal rilis stabil hanya ketika aktifashyang dapat dieksekusi berada di bawah<code>~/.local/bin</code>. Itu juga memperbarui aset/plugin yang dibundel, dengan pilihan untuk file yang disesuaikan.<code>ash update --version vX.Y.Z</code>memilih tag stabil, bukan saluran; ini bukan perintah penurunan versi. Tidak ada<code>--channel</code>pilihan. Penginstalan pengelola paket, penginstalan macOS .pkg, dan tujuan skrip khusus harus menggunakan pengelola/penginstal miliknya sendiri. FreeBSD Beta/Nightly menggunakan arsip terverifikasi manual, bukan langganan pembaruan mandiri. Buka shell baru setelah memperbarui.</p>
         </section>
         <section id="uninstall">
-          <h2>Menghapus tanpa berkas tak terkait</h2>
-          <h3>1. Nonaktifkan integrasi shell dahulu</h3>
-          <p>Sebelum biner dihapus, jalankan perintah untuk setiap shell dengan integrasi:</p>
+          <h2>Copot pemasangan tanpa menghapus file yang tidak terkait</h2>
+          <h3>1. Nonaktifkan integrasi shell terlebih dahulu</h3>
+          <p>Sebelum menghapus biner, jalankan perintah untuk setiap shell tempat Anda mengaktifkan integrasi:</p>
           <p><strong>Bash</strong></p>
           <pre><code>ash install --shell bash --disable-shell-integration</code></pre>
           <p><strong>zsh</strong></p>
           <pre><code>ash install --shell zsh --disable-shell-integration</code></pre>
-          <p><strong>Fish</strong></p>
+          <p><strong>Ikan</strong></p>
           <pre><code>ash install --shell fish --disable-shell-integration</code></pre>
-          <p>Jika ash sudah hilang, ubah startup dari <a href="#initialize">inisialisasi</a> dan hapus hanya blok antara <code># &gt;&gt;&gt; ash install &gt;&gt;&gt;</code> dan <code># &lt;&lt;&lt; ash install &lt;&lt;&lt;</code>. Hapus baris PATH/lingkungan ash yang ditambah manual, bukan konfigurasi lain. Tutup shell ash agar brokernya keluar.</p>
-          <h3>2. Biarkan pengelola pemilik menghapus berkasnya</h3>
-          <p><strong>Homebrew (Release)</strong></p>
+          <p>Jikaashsudah hilang, edit file startup yang relevan dari<a href="#initialize">inisialisasi</a>dan hapus hanya blok di antaranya<code># &gt;&gt;&gt; ash install &gt;&gt;&gt;</code>Dan<code># &lt;&lt;&lt; ash install &lt;&lt;&lt;</code>. Hapus apa punash-baris PATH/lingkungan khusus yang Anda tambahkan secara manual, bukan konfigurasi shell yang tidak terkait. Menutupash-mengaktifkan shell setelahnya sehingga broker milik shell mereka keluar.</p>
+          <h3>2. Biarkan manajer paket pemilik menghapus filenya</h3>
+          <p><strong>Minuman Rumahan (Rilis)</strong></p>
           <pre><code>brew uninstall ash</code></pre>
           <p><strong>APT</strong></p>
           <pre><code>sudo apt remove ash</code></pre>
@@ -320,41 +322,41 @@ sudo apt install --allow-downgrades ash</code></pre>
           <pre><code>sudo dnf remove ash</code></pre>
           <p><strong>Pacman</strong></p>
           <pre><code>sudo pacman -R ash</code></pre>
-          <p>Pilih hanya metode Anda; Homebrew Beta/Nightly gunakan <code>ash-beta</code>/<code>ash-nightly</code>. APT/DNF/Pacman menghapus biner, plugin, manual sendiri, bukan konfigurasi/riwayat rumah. Jangan hapus berkas paket manual.</p>
-          <p>Pembersihan opsional: hapus sumber ash <code>/etc/apt/sources.list.d/versionx.list</code> dan kunci khusus <code>/etc/apt/keyrings/versionx-keyring.gpg</code>, repositori <code>/etc/yum.repos.d/versionx.repo</code>, atau bagian ash <code>[versionx]</code> dari <code>/etc/pacman.conf</code>. Pastikan paket lain tidak memakainya. Hapus kunci RPM/Pacman setelah sidik jari dan tiadanya ketergantungan dipastikan; jangan hapus keyring bersama distribusi.</p>
-          <h3 id="manual-macos">3a. Penghapusan .pkg macOS manual</h3>
-          <p>macOS Installer mencatat tanda terima tetapi tidak punya penghapus ash. Pastikan .pkg, bukan Homebrew, dan periksa muatan tepatnya:</p>
+          <p>Pilih hanya metode instalasi Anda; untuk Homebrew Beta/penggunaan malam hari<code>ash-beta</code>/<code>ash-nightly</code>. APT/DNF/Pacman menghapus binari, plugin, dan halaman manual milik paket, bukan konfigurasi/riwayat direktori home Anda. Jangan menghapus file milik paket secara manual.</p>
+          <p>Pembersihan repositori opsional: hapusashberkas sumber<code>/etc/apt/sources.list.d/versionx.list</code>dan berdedikasi<code>/etc/apt/keyrings/versionx-keyring.gpg</code>, atau ituashberkas repositori<code>/etc/yum.repos.d/versionx.repo</code>, atau ituash <code>[versionx]</code>bagian dari<code>/etc/pacman.conf</code>. Pertama periksa apakah tidak ada paket lain yang menggunakannya. Hapus kunci kepercayaan RPM/Pacman yang diimpor hanya setelah mengonfirmasi sidik jarinya dan tidak ada orang lain yang bergantung padanya; jangan pernah menghapus keyring bersama suatu distribusi.</p>
+          <h3 id="manual-macos">3a. Penghapusan macOS .pkg secara manual</h3>
+          <p>Penginstal macOS mencatat tanda terima tetapi tidak memilikinyaashuninstaller. Konfirmasikan bahwa ini adalah instalasi .pkg, bukan Homebrew, dan periksa muatan sebenarnya:</p>
           <pre><code>pkgutil --pkg-info dev.ash.cli
 pkgutil --files dev.ash.cli</code></pre>
-          <p>Dengan tanda terima sebagai inventaris, hapus hanya milik ash: <code>/usr/local/bin/ash</code>, <code>/usr/local/bin/ash-broker</code>, berkas di <code>/usr/local/lib/ash/plugins</code>, <code>/usr/local/share/man/man1/ash.1</code>, halaman terlokalisasi <code>ash.1</code> tercantum, pemberitahuan di <code>/usr/local/share/licenses/ash</code>. Perlu administrator. Periksa pemilik jika pemasang lain telah mengganti; jangan hapus salinannya. Hapus direktori kosong khusus ash, bukan bersama <code>/usr/local</code>, <code>bin</code>, manual.</p>
-          <p>Setelah muatan dihapus, opsional hapus tanda terima:</p>
+          <p>Dengan menggunakan tanda terima itu sebagai inventaris, hapus hanya tanda terimanyaashfile milik:<code>/usr/local/bin/ash</code>,<code>/usr/local/bin/ash-broker</code>, file di<code>/usr/local/lib/ash/plugins</code>,<code>/usr/local/share/man/man1/ash.1</code>, yang terdaftar dilokalkan<code>ash.1</code>halaman, dan pemberitahuan di<code>/usr/local/share/licenses/ash</code>. Hak istimewa administrator diperlukan. Periksa kepemilikan apakah penginstal lain kemudian mengganti file-file ini; jangan hapus salinannya. Hapus kosongash-hanya direktori, tidak dibagikan<code>/usr/local</code>,<code>bin</code>, atau direktori man.</p>
+          <p>Setelah menghapus payload, hapus tanda terima secara opsional:</p>
           <pre><code>sudo pkgutil --forget dev.ash.cli</code></pre>
-          <p><strong>Melupakan tanda terima tidak menghapus berkas terpasang.</strong> Simpan hingga pemeriksaan selesai.</p>
-          <h3 id="manual-linux">3b. Penghapusan arsip lokal / Linux / FreeBSD manual</h3>
-          <p>Temukan salinan aktif dengan <code>command -v ash</code> dan <code>command -v ash-broker</code>. Pada skrip default, setelah hook mati, hapus tepat dua berkas:</p>
+          <p><strong>Melupakan tanda terima tidak akan menghapus file apa pun yang diinstal.</strong>Pertahankan sampai Anda selesai memeriksa muatannya.</p>
+          <h3 id="manual-linux">3b. Penghapusan arsip pengguna-lokal / Linux / FreeBSD secara manual</h3>
+          <p>Temukan salinan aktif dengan<code>command -v ash</code>Dan<code>command -v ash-broker</code>. Untuk instalasi skrip default, setelah menonaktifkan kait, hapus dua file spesifik tersebut:</p>
           <pre><code>rm "$HOME/.local/bin/ash" "$HOME/.local/bin/ash-broker"</code></pre>
-          <p>Untuk <code>ASH_INSTALL_DIR</code> atau arsip manual hapus hanya jalur ash/broker nyata. Hapus plugin/manual/pemberitahuan menurut inventaris asli; plugin skrip di data pengguna ash. Di <code>/usr/bin</code> periksa pemilik dahulu dengan <code>dpkg -S /usr/bin/ash</code>, <code>rpm -qf /usr/bin/ash</code>, atau <code>pacman -Qo /usr/bin/ash</code>. Salinan terkelola wajib dihapus lewat pengelola meski unduhan mandiri.</p>
-          <h3>4. Opsional: hapus pengaturan, alat, riwayat lokal</h3>
-          <div class="guide-note guide-warning"><p><strong>Cadangkan yang ingin disimpan.</strong> Langkah terpisah ini bisa menghapus pengaturan/token, alat/plugin khusus, percakapan, berkas kerja. Menghapus biner bukan persetujuan untuk itu.</p></div>
+          <p>Untuk<code>ASH_INSTALL_DIR</code>atau arsip yang diekstraksi secara manual, hapus hanya arsip yang diinstal sebenarnyaash/jalur perantara. Hapus plugin arsip/halaman manual/pemberitahuan yang Anda instal menggunakan inventaris file asli Anda; plugin skrip ada diashdirektori data pengguna. Jika file berada di bawah<code>/usr/bin</code>, periksa kepemilikannya terlebih dahulu dengan<code>dpkg -S /usr/bin/ash</code>,<code>rpm -qf /usr/bin/ash</code>, atau<code>pacman -Qo /usr/bin/ash</code>sebagaimana mestinya. Salinan milik paket harus dihapus melalui pengelola tersebut, meskipun diinstal dari unduhan mandiri.</p>
+          <h3>4. Opsional: hapus pengaturan lokal, alat, dan riwayat</h3>
+          <div class="guide-note guide-warning"><p><strong>Cadangkan apa pun yang ingin Anda simpan.</strong> Langkah terpisah ini dapat menghapus setelan/token penyedia, alat/plugin khusus, riwayat percakapan, dan file awal. Mencopot pemasangan biner tidak berarti menyetujui penghapusannya.</p></div>
           <ul>
-            <li>Konfigurasi: <code>$XDG_CONFIG_HOME/ash</code>, default <code>~/.config/ash</code>.</li>
-            <li>Data, plugin, lingkungan Python: <code>$XDG_DATA_HOME/ash</code>, default <code>~/.local/share/ash</code>.</li>
-            <li>Riwayat dan status: <code>$XDG_STATE_HOME/ash</code>, default <code>~/.local/state/ash</code>.</li>
-            <li>Cache: <code>$XDG_CACHE_HOME/ash</code>, default <code>~/.cache/ash</code>.</li>
-            <li>Runtime broker: <code>$XDG_RUNTIME_DIR/ash</code>, atau <code>$XDG_STATE_HOME/ash/runtime</code> jika akar runtime tidak tersedia.</li>
+            <li>Konfigurasi:<code>$XDG_CONFIG_HOME/ash</code>, bawaan<code>~/.config/ash</code>.</li>
+            <li>Data, plugin, dan lingkungan Python:<code>$XDG_DATA_HOME/ash</code>, bawaan<code>~/.local/share/ash</code>.</li>
+            <li>Sejarah dan negara:<code>$XDG_STATE_HOME/ash</code>, bawaan<code>~/.local/state/ash</code>.</li>
+            <li>Cache:<code>$XDG_CACHE_HOME/ash</code>, bawaan<code>~/.cache/ash</code>.</li>
+            <li>Waktu kerja broker:<code>$XDG_RUNTIME_DIR/ash</code>, atau<code>$XDG_STATE_HOME/ash/runtime</code>ketika tidak ada root runtime yang tersedia.</li>
           </ul>
-          <p>Periksa override XDG absolut nyata sebelum menghapus hanya subdirektori ash; jangan akar XDG atau rumah. Setelah semua shell ash ditutup, hapus sisa runtime bila perlu. Kredensial MCP OAuth dapat tertinggal di pengelola OS: hapus entri ash dan cabut akses pada penyedia MCP. Cabut kunci AI tak terpakai di akun penyedia; menghapus berkas tidak mencabut kunci. Jangan hapus Ollama/model, Python, atau dependensi bersama saat melepas ash.</p>
+          <p>Periksa penggantian XDG absolut Anda yang sebenarnya sebelum menghapus hanya subdirektori ash ini; jangan pernah menghapus root XDG atau direktori home Anda. Setelah semua shell yang mendukung ash ditutup, hapus file runtime ash yang tersisa jika diperlukan. Kredensial OAuth MCP juga mungkin tetap ada di pengelola kredensial OS: hapus entri khusus ash di sana dan cabut akses di penyedia MCP. Cabut kunci AI yang tidak digunakan di akun penyedia mereka; menghapus file lokal tidak mencabut kunci. Jangan mencopot pemasangan Ollama/models, Python, atau dependensi bersama sebagai bagian dari penghapusan ash.</p>
         </section>
         <section id="troubleshooting">
-          <h2>Pemecahan masalah singkat</h2>
+          <h2>Pemecahan masalah cepat</h2>
           <dl>
-            <dt>Perintah hilang atau versi salah</dt><dd>Periksa PATH dan <code>command -v ash</code>/<code>command -v ash-broker</code>. Salinan lama di <code>~/.local/bin</code> dapat menutupi paket. Gunakan satu pemilik/kanal dan buka shell baru.</dd>
-            <dt>Menu penyedia tidak tampil</dt><dd>Jalankan <code>ash install</code> interaktif. Pengaturan valid tetap; gunakan <a href="#cloud">konfigurasi manual</a> untuk pindah. Tanpa integrasi pastikan pengaturan diekspor ke lingkungan CLI.</dd>
-            <dt>Tidak ada model atau koneksi ditolak</dt><dd>Untuk Ollama pastikan server aktif dan model ada di <code>ollama list</code>. Cloud: periksa endpoint, kelayakan, HTTPS, token, kuota; jangan bagikan log bertoken.</dd>
-            <dt>Repositori atau kanal tak tersedia</dt><dd>Periksa arsitektur serta rilis/repositori terpublikasi. Publikasi dapat terlambat; jangan matikan verifikasi tanda tangan untuk mengatasi.</dd>
-            <dt>Penyiapan Python gagal</dt><dd>Pasang Python dengan venv/ensurepip, izinkan unduhan dependensi, ulangi <code>ash install</code>. ash dasar tetap dapat dipakai tanpa alat itu.</dd>
+            <dt>Perintah tidak ditemukan atau versi salah</dt><dd>Periksa PATH dan<code>command -v ash</code>/<code>command -v ash-broker</code>. Sebuah tua<code>~/.local/bin</code>copy dapat membayangi sebuah paket. Gunakan satu pemilik/saluran pada satu waktu dan buka shell baru.</dd>
+            <dt>Menu penyedia tidak muncul</dt><dd>Berlari<code>ash install</code>dari terminal interaktif. Pengaturan valid yang ada dipertahankan; menggunakan<a href="#cloud">konfigurasi manual</a>untuk berpindah penyedia. Tanpa integrasi, pastikan pengaturan diekspor ke lingkungan CLI.</dd>
+            <dt>Tidak ada model atau koneksi yang ditolak</dt><dd>Untuk Ollama, konfirmasikan servernya sedang berjalan dan<code>ollama list</code>termasuk model pilihan Anda. Untuk layanan cloud, periksa titik akhir, kelayakan model, HTTPS, token, dan kuota akun; jangan pernah membagikan log yang mengandung token.</dd>
+            <dt>Repositori atau saluran tidak tersedia</dt><dd>Periksa arsitektur dan rilis/repositori yang diterbitkan. Publikasi bisa tertunda; jangan nonaktifkan verifikasi tanda tangan untuk mengatasi repositori yang tidak tersedia.</dd>
+            <dt>Penyiapan alat Python gagal</dt><dd>Instal Python dengan venv/ensurepip dan izinkan pengunduhan ketergantungan, lalu jalankan kembali<code>ash install</code>. Dasarashtetap dapat digunakan tanpa alat ini.</dd>
           </dl>
-          <p>Perlu rincian? Lihat <a href="docs.html">referensi perintah</a>, <a href="faq.html">tanya jawab</a>, atau <a href="https://github.com/Jonconradt/ash/issues">laporkan masalah</a> tanpa kredensial.</p>
+          <p>Perlu lebih detail? Melihat<a href="docs.html">referensi perintah</a>,<a href="faq.html">Pertanyaan Umum</a>, atau<a href="https://github.com/Jonconradt/ash/issues">melaporkan suatu masalah</a>tanpa kredensial.</p>
         </section>
       </article>
     </div>

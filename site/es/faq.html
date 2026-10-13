@@ -87,10 +87,10 @@
           <p>No de forma nativa.ashadmite bash, zsh y Fish en macOS, Linux y FreeBSD; no hay ningún destino de instalación de PowerShell. Utilice WSL para la experiencia Linux compatible.</p>
 
           <h3>¿Cómo instalo?ashen el Subsistema de Windows para Linux (WSL)?</h3>
-          <p>Sigue las <a href="install.html#linux">instrucciones Linux</a> dentro de tu distribución WSL, prefiriendo su gestor. Luego <a href="install.html#initialize">configura proveedor y activa opcionalmente integración Bash</a>. No hay instalador Windows nativo.</p>
+          <p>Sigue el<a href="install.html#linux">Instrucciones de instalación de Linux</a>dentro de su distribución WSL, prefiriendo su administrador de paquetes. Entonces<a href="install.html#initialize">configurar un proveedor y, opcionalmente, habilitar la integración de Bash</a>. No existe un instalador nativo de Windows.</p>
 
           <h3>¿Cómo actualizo?asha la última versión de lanzamiento?</h3>
-          <p>Usa el gestor responsable para Homebrew/APT/DNF/Pacman. <code>ash update</code> solo sirve para Release estable en <code>~/.local/bin</code>; verifica manifiesto firmado Sigstore y resumen del archivo y rechaza firmas fallidas. .pkg y directorios personalizados requieren su instalador/reemplazo manual. Consulta <a href="install.html#updates">actualizaciones y suscripciones</a> para Release, Beta y Nightly.</p>
+          <p>Utilice el administrador de paquetes propietario para instalaciones Homebrew/APT/DNF/Pacman.<code>ash update</code>es solo para instalaciones de versión estable bajo<code>~/.local/bin</code>; verifica el manifiesto firmado por Sigstore y el resumen del archivo, y rechaza una firma fallida. Las instalaciones nativas .pkg y de directorio personalizado necesitan el reemplazo del manual/instalador original. Ver<a href="install.html#updates">actualizaciones y suscripciones a canales</a>para lanzamiento, beta y nocturno.</p>
 
           <h3>yo corrí<code>ash install</code>. ¿Por qué no cambia nada en este terminal?</h3>
           <p>La integración de Shell está deshabilitada de forma predeterminada. Para habilitarlo, ejecute<code>ash install --shell bash --shell-integration</code>(o seleccione<code>zsh</code>o<code>fish</code>); no reescribe el proceso de shell que ya se está ejecutando. Abra una nueva terminal o vuelva a cargar el archivo de inicio seleccionado. Correr<code>ash install --shell bash --disable-shell-integration</code>quitarAshbloque administrado mientras se preserva el contenido circundante.</p>

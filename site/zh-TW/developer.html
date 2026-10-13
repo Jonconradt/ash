@@ -177,13 +177,15 @@ sudo apt-get install qemu-system-x86 qemu-utils cloud-image-utils curl openssh-c
 sudo dnf install qemu-kvm qemu-img cloud-utils curl openssh-clients python3</code></pre>
           <p>Linux 後端使用 QEMU/KVM 和 cloud-init 啟動 x86_64 Ubuntu、Debian、Fedora 或 Rocky 雲端映像。它使用 QEMU 用戶模式網絡，並將 SSH 轉發到本地主機；不需要 libvirt 網路設定。它不運行 macOS 來賓，不在 macOS 上測試 Homebrew，目前需要 x86_64 Linux 主機。 Arch 和 FreeBSD 不是支援的目標。</p>
           <h3>運行包測試</h3>
-          <p>自動模式是預設模式，並在測試後刪除虛擬機器。預設平台跟隨主機：macOS 選擇<code>macos</code>,Linux選擇<code>ubuntu</code>。明確選擇另一個支援的平台和模式：</p>
+          <p>自動模式是預設模式，並在測試後刪除虛擬機器。預設平台跟隨主機：macOS 選擇<code>macos</code>,Linux選擇<code>ubuntu</code>。明確選擇另一個支援的平台和模式。套餐通路預設為<code>beta</code>;使用<code>--channel nightly</code>,<code>--channel beta</code>， 或者<code>--channel release</code>選擇一個。<code>--channel stable</code>是一個別名<code>release</code>。</p>
           <pre><code>scripts/vm.sh --platform macos --mode interactive
-scripts/vm.sh --platform ubuntu --mode automated
+scripts/vm.sh --platform ubuntu --channel nightly --mode automated
 scripts/vm.sh --platform debian --mode interactive
 scripts/vm.sh --platform fedora --mode automated
 scripts/vm.sh --platform rocky --mode interactive</code></pre>
-          <p>互動模式可使已安裝的虛擬機器保持運作以進行手動測試。在 macOS 上，該腳本會列印 <code>tart exec -it</code> guest-shell 指令。在 Linux 上，它會列印 SSH 命令和停止命令；停止虛擬機器並刪除其狀態：</p>
+          <p>互動模式可使已安裝的虛擬機器保持運作以進行手動測試。在 macOS 上，在終端機中執行列印的 <code>tart exec -it</code> 命令以開啟來賓 shell。退出該 shell 會使虛擬機器繼續運作；關閉來賓或從主機停止它。若要停止並刪除保留的 Tart VM，請使用：</p>
+          <pre><code>tart stop VM_NAME &amp;&amp; tart delete VM_NAME</code></pre>
+          <p>在 Linux 上，該腳本列印 SSH 命令和停止命令；停止虛擬機器並刪除其狀態：</p>
           <pre><code>scripts/vm.sh --stop VM_NAME</code></pre>
           <p>自動模式執行安裝和 shell 設定煙霧檢查，然後停止並刪除虛擬機器。下載的基礎鏡像仍然被快取。派圖可以改變<code>ASH_TEST_VM_IMAGE</code>; Linux 雲端影像 URL 可以覆蓋<code>ASH_TEST_QEMU_IMAGE</code>。 Linux 鏡像快取在<code>${XDG_CACHE_HOME:-~/.cache}/ash/vm-images</code>，互動式 VM 磁碟和 SSH 金鑰保存在<code>${XDG_STATE_HOME:-~/.local/state}/ash/vm</code>。放<code>ASH_TEST_VM_CACHE_DIR</code>或者<code>ASH_TEST_VM_STATE_DIR</code>更改這些位置。</p>
           <p>為了讓訪客連接到與主機相同的AI服務，請匯出所需的<code>ASH_AI_*</code>運行腳本之前的變量，例如<code>ASH_AI_ENDPOINT</code>,<code>ASH_AI_MODEL</code>，並且，當需要時，<code>ASH_AI_AUTH_TOKEN</code>。導出的值轉送給客人；未匯出的 shell 變數則不然。互動式虛擬機器將這些憑證保留在來賓設定檔中的模式<code>0600</code>; Linux VM 磁碟未加密，因此請保護狀態目錄並在完成後停止/刪除 VM。</p>

@@ -27,7 +27,7 @@
     <a class="brand" href="./" aria-label="ashcasa"><span class="brand-mark">&gt;_</span> ash</a>
     <nav aria-label="Navigazione primaria">
       <a href="./">Casa</a>
-      <a href="install.html">Installa</a>
+      <a href="install.html">Installare</a>
       <a href="docs.html">Documenti</a>
       <a href="faq.html">Domande frequenti</a>
       <a href="developer.html" aria-current="page">Sviluppatori</a>
@@ -177,13 +177,15 @@ sudo apt-get install qemu-system-x86 qemu-utils cloud-image-utils curl openssh-c
 sudo dnf install qemu-kvm qemu-img cloud-utils curl openssh-clients python3</code></pre>
           <p>Il backend Linux avvia immagini cloud x86_64 Ubuntu, Debian, Fedora o Rocky con QEMU/KVM e cloud-init. Utilizza la rete in modalità utente QEMU con SSH inoltrato a localhost; non è necessaria alcuna configurazione di rete libvirt. Non esegue guest macOS, non testa Homebrew su macOS e attualmente richiede un host Linux x86_64. Arch e FreeBSD non sono target supportati.</p>
           <h3>Esegui un test del pacchetto</h3>
-          <p>La modalità automatizzata è l'impostazione predefinita e rimuove la VM dopo il test. La piattaforma predefinita segue l'host: seleziona macOS<code>macos</code>, Linux seleziona<code>ubuntu</code>. Scegli esplicitamente un'altra piattaforma e modalità supportate:</p>
+          <p>La modalità automatizzata è l'impostazione predefinita e rimuove la VM dopo il test. La piattaforma predefinita segue l'host: seleziona macOS<code>macos</code>, Linux seleziona<code>ubuntu</code>. Scegli esplicitamente un'altra piattaforma e modalità supportate. Per impostazione predefinita, il canale del pacchetto è<code>beta</code>; utilizzo<code>--channel nightly</code>,<code>--channel beta</code>, O<code>--channel release</code>per selezionarne uno.<code>--channel stable</code>è un alias per<code>release</code>.</p>
           <pre><code>scripts/vm.sh --platform macos --mode interactive
-scripts/vm.sh --platform ubuntu --mode automated
+scripts/vm.sh --platform ubuntu --channel nightly --mode automated
 scripts/vm.sh --platform debian --mode interactive
 scripts/vm.sh --platform fedora --mode automated
 scripts/vm.sh --platform rocky --mode interactive</code></pre>
-          <p>La modalità interattiva lascia la VM installata in esecuzione per il test manuale. Su macOS, lo script stampa un comando della shell guest <code>tart exec -it</code>. Su Linux, stampa un comando SSH e un comando stop; arresta la VM e rimuovi il suo stato con:</p>
+          <p>La modalità interattiva lascia la VM installata in esecuzione per il test manuale. Su macOS, esegui il comando stampato <code>tart exec -it</code> in un terminale per aprire una shell guest. L'uscita da quella shell lascia la VM in esecuzione; spegnere l'ospite o interromperlo dall'host. Per arrestare ed eliminare una VM Tart conservata, utilizzare:</p>
+          <pre><code>tart stop VM_NAME &amp;&amp; tart delete VM_NAME</code></pre>
+          <p>Su Linux, lo script stampa un comando SSH e un comando di arresto; arresta la VM e rimuovi il suo stato con:</p>
           <pre><code>scripts/vm.sh --stop VM_NAME</code></pre>
           <p>La modalità automatizzata esegue controlli di fumo di installazione e configurazione della shell, quindi arresta e rimuove la VM. Le immagini di base scaricate rimangono memorizzate nella cache. Le immagini crostate possono essere modificate con<code>ASH_TEST_VM_IMAGE</code>; Gli URL delle immagini cloud Linux possono essere sovrascritti con<code>ASH_TEST_QEMU_IMAGE</code>. Le immagini Linux sono memorizzate nella cache in<code>${XDG_CACHE_HOME:-~/.cache}/ash/vm-images</code>e i dischi VM interattivi e le chiavi SSH vengono mantenuti<code>${XDG_STATE_HOME:-~/.local/state}/ash/vm</code>. Impostato<code>ASH_TEST_VM_CACHE_DIR</code>O<code>ASH_TEST_VM_STATE_DIR</code>per cambiare quelle posizioni.</p>
           <p>Per consentire all'ospite di connettersi allo stesso servizio AI dell'host, esporta il file necessario<code>ASH_AI_*</code>variabili prima di eseguire lo script, ad esempio<code>ASH_AI_ENDPOINT</code>,<code>ASH_AI_MODEL</code>e, quando necessario,<code>ASH_AI_AUTH_TOKEN</code>. I valori esportati vengono inoltrati al guest; le variabili di shell non esportate non lo sono. Le macchine virtuali interattive conservano queste credenziali nel profilo guest con modalità<code>0600</code>; I dischi delle VM Linux non sono crittografati, quindi proteggi la directory di stato e arresta/rimuovi la VM al termine.</p>
