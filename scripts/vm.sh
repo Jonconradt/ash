@@ -4,6 +4,7 @@ set -euo pipefail
 # Test Ash's native package installation flow in a disposable VM.
 #
 # Usage: scripts/vm.sh [--platform macos|ubuntu|debian|fedora|rocky]
+#        [--channel nightly|beta|release|stable]
 #        [--mode automated|interactive] | --stop VM_NAME
 # Set ASH_TEST_PLATFORM, ASH_TEST_MODE, or the backend's image variable to override defaults.
 
@@ -19,6 +20,7 @@ esac
 
 platform="${ASH_TEST_PLATFORM:-$default_platform}"
 mode="${ASH_TEST_MODE:-automated}"
+channel="beta"
 stop_name=""
 while (($#)); do
 	case "$1" in
@@ -38,6 +40,21 @@ while (($#)); do
 			mode="$2"
 			shift 2
 			;;
+		--channel)
+			if (($# < 2)); then
+				echo "--channel requires nightly, beta, release, or stable." >&2
+				exit 2
+			fi
+			case "$2" in
+				nightly | beta | release) channel="$2" ;;
+				stable) channel="release" ;;
+				*)
+					echo "Invalid channel '$2'; expected nightly, beta, release, or stable." >&2
+					exit 2
+					;;
+			esac
+			shift 2
+			;;
 		--stop)
 			if (($# < 2)); then
 				echo "--stop requires the VM name printed by interactive mode." >&2
@@ -48,9 +65,10 @@ while (($#)); do
 			;;
 		-h | --help)
 			echo "Test Ash's native package installation flow in a disposable VM."
-			echo "Usage: $0 [--platform macos|ubuntu|debian|fedora|rocky] [--mode automated|interactive]"
+			echo "Usage: $0 [--platform macos|ubuntu|debian|fedora|rocky] [--channel nightly|beta|release|stable] [--mode automated|interactive]"
 			echo "       $0 --stop VM_NAME"
 			echo "Defaults follow the host: macOS -> macos; Linux -> ubuntu."
+			echo "The package channel defaults to beta; stable is an alias for release."
 			echo "ASH_TEST_PLATFORM, ASH_TEST_MODE, and backend-specific image variables can override defaults."
 			echo "Linux cloud-image URL override: ASH_TEST_QEMU_IMAGE=<URL>."
 			echo
@@ -79,7 +97,7 @@ while (($#)); do
 			;;
 		*)
 			echo "Unknown argument: $1" >&2
-			echo "Usage: $0 [--platform macos|ubuntu|debian|fedora|rocky] [--mode automated|interactive]" >&2
+			echo "Usage: $0 [--platform macos|ubuntu|debian|fedora|rocky] [--channel nightly|beta|release|stable] [--mode automated|interactive]" >&2
 			exit 2
 			;;
 	esac
@@ -203,6 +221,24 @@ case "$platform" in
 	*)
 		echo "Unsupported platform '$platform'; expected macos, ubuntu, debian, fedora, or rocky." >&2
 		exit 2
+		;;
+esac
+
+case "$channel" in
+	release)
+		brew_formula="ash"
+		apt_distribution="stable"
+		rpm_repository_url="https://www.versionx.ai/rpm/"
+		;;
+	beta)
+		brew_formula="ash-beta"
+		apt_distribution="beta"
+		rpm_repository_url="https://www.versionx.ai/rpm/beta/"
+		;;
+	nightly)
+		brew_formula="ash-nightly"
+		apt_distribution="nightly"
+		rpm_repository_url="https://www.versionx.ai/rpm/nightly/"
 		;;
 esac
 
@@ -499,7 +535,7 @@ if [[ "$ai_variable_count" -gt 0 ]]; then
 		'
 	if [[ "$backend" == "tart" ]]; then
 		base64 <"$ai_env_file" |
-			tart exec --interactive "$vm_name" /bin/bash -c "$ai_setup_script"
+			tart exec -i "$vm_name" /bin/bash -c "$ai_setup_script"
 	else
 		printf -v remote_command '%q ' /bin/bash -c "$ai_setup_script"
 		base64 <"$ai_env_file" |
@@ -514,12 +550,12 @@ case "$package_manager" in
 		echo "Checking Homebrew in the guest..."
 		guest_exec "$guest_shell" -lc \
 			'if ! command -v brew >/dev/null 2>&1; then NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"; fi; brew --version'
-		echo "Installing and testing Ash from the Homebrew tap..."
+		echo "Installing and testing Ash $channel from the Homebrew tap..."
 		guest_exec "$guest_shell" -lc \
-			'brew install Jonconradt/ash/ash && brew test Jonconradt/ash/ash && ash version'
+			"brew install Jonconradt/ash/$brew_formula && brew test Jonconradt/ash/$brew_formula && ash version"
 		;;
 	apt)
-		echo "Installing Ash from the signed APT repository..."
+		echo "Installing Ash $channel from the signed APT repository..."
 		guest_exec "$guest_shell" -lc '
 			set -euo pipefail
 			sudo apt-get update
@@ -528,15 +564,15 @@ case "$package_manager" in
 			curl -fsSL https://www.versionx.ai/apt/gpg.key |
 				sudo gpg --dearmor --batch --yes -o /etc/apt/keyrings/versionx-keyring.gpg
 			sudo chmod 0644 /etc/apt/keyrings/versionx-keyring.gpg
-			echo "deb [signed-by=/etc/apt/keyrings/versionx-keyring.gpg] https://www.versionx.ai/apt stable main" |
+			printf "deb [signed-by=/etc/apt/keyrings/versionx-keyring.gpg] https://www.versionx.ai/apt %s main\n" "$1" |
 				sudo tee /etc/apt/sources.list.d/versionx.list >/dev/null
 			sudo apt-get update
 			sudo apt-get install -y ash
 			ash --version
-		'
+		' ash-vm "$apt_distribution"
 		;;
 	dnf)
-		echo "Installing Ash from the signed-metadata DNF repository..."
+		echo "Installing Ash $channel from the signed-metadata DNF repository..."
 		guest_exec "$guest_shell" -lc '
 			set -euo pipefail
 			sudo dnf install -y curl
@@ -544,7 +580,7 @@ case "$package_manager" in
 			sudo tee /etc/yum.repos.d/versionx.repo >/dev/null <<EOF
 [versionx]
 name=VersionX ash repository
-baseurl=https://www.versionx.ai/rpm/
+baseurl=$1
 enabled=1
 gpgcheck=0
 repo_gpgcheck=1
@@ -552,7 +588,7 @@ gpgkey=https://www.versionx.ai/rpm/gpg.key
 EOF
 			sudo dnf install -y ash
 			ash --version
-		'
+		' ash-vm "$rpm_repository_url"
 		;;
 esac
 
@@ -578,6 +614,6 @@ else
 		syntax_check="bash -n"
 	fi
 	guest_exec "$guest_shell" -lc \
-		"home=\$(mktemp -d) && HOME=\"\$home\" ash install --shell $integration_shell --shell-integration </dev/null && test -s \"\$home/.config/ash/$integration_file\" && $syntax_check \"\$home/.config/ash/$integration_file\"; status=\$?; if [[ -n \"\${home:-}\" ]]; then rm -rf \"\$home\"; fi; exit \"\$status\""
+		"home=\$(mktemp -d) && HOME=\"\$home\" ash install --shell $integration_shell --shell-integration </dev/null && test -s \"\$home/.config/ash/$integration_file\" && $syntax_check \"\$home/.config/ash/$integration_file\"; exit_code=\$?; if [[ -n \"\${home:-}\" ]]; then rm -rf \"\$home\"; fi; exit \"\$exit_code\""
 	echo "Native package installation smoke test passed."
 fi

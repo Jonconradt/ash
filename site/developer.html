@@ -165,13 +165,15 @@ sudo apt-get install qemu-system-x86 qemu-utils cloud-image-utils curl openssh-c
 sudo dnf install qemu-kvm qemu-img cloud-utils curl openssh-clients python3</code></pre>
           <p>The Linux backend launches x86_64 Ubuntu, Debian, Fedora, or Rocky cloud images with QEMU/KVM and cloud-init. It uses QEMU user-mode networking with SSH forwarded to localhost; no libvirt network setup is needed. It does not run macOS guests, does not test Homebrew on macOS, and currently requires an x86_64 Linux host. Arch and FreeBSD are not supported targets.</p>
           <h3>Run a package test</h3>
-          <p>Automated mode is the default and removes the VM after the test. The default platform follows the host: macOS selects <code>macos</code>, Linux selects <code>ubuntu</code>. Choose another supported platform and mode explicitly:</p>
+          <p>Automated mode is the default and removes the VM after the test. The default platform follows the host: macOS selects <code>macos</code>, Linux selects <code>ubuntu</code>. Choose another supported platform and mode explicitly. The package channel defaults to <code>beta</code>; use <code>--channel nightly</code>, <code>--channel beta</code>, or <code>--channel release</code> to select one. <code>--channel stable</code> is an alias for <code>release</code>.</p>
           <pre><code>scripts/vm.sh --platform macos --mode interactive
-scripts/vm.sh --platform ubuntu --mode automated
+scripts/vm.sh --platform ubuntu --channel nightly --mode automated
 scripts/vm.sh --platform debian --mode interactive
 scripts/vm.sh --platform fedora --mode automated
 scripts/vm.sh --platform rocky --mode interactive</code></pre>
-          <p>Interactive mode leaves the installed VM running for manual testing. On macOS, the script prints a <code>tart exec -it</code> guest-shell command. On Linux, it prints an SSH command and a stop command; stop the VM and remove its state with:</p>
+          <p>Interactive mode leaves the installed VM running for manual testing. On macOS, run the printed <code>tart exec -it</code> command in a terminal to open a guest shell. Exiting that shell leaves the VM running; shut down the guest or stop it from the host. To stop and delete a retained Tart VM, use:</p>
+          <pre><code>tart stop VM_NAME &amp;&amp; tart delete VM_NAME</code></pre>
+          <p>On Linux, the script prints an SSH command and a stop command; stop the VM and remove its state with:</p>
           <pre><code>scripts/vm.sh --stop VM_NAME</code></pre>
           <p>Automated mode runs installation and shell-setup smoke checks, then stops and removes the VM. Downloaded base images remain cached. Tart images can be changed with <code>ASH_TEST_VM_IMAGE</code>; Linux cloud-image URLs can be overridden with <code>ASH_TEST_QEMU_IMAGE</code>. Linux images are cached under <code>${XDG_CACHE_HOME:-~/.cache}/ash/vm-images</code>, and interactive VM disks and SSH keys are kept under <code>${XDG_STATE_HOME:-~/.local/state}/ash/vm</code>. Set <code>ASH_TEST_VM_CACHE_DIR</code> or <code>ASH_TEST_VM_STATE_DIR</code> to change those locations.</p>
           <p>To let the guest connect to the same AI service as the host, export the needed <code>ASH_AI_*</code> variables before running the script, for example <code>ASH_AI_ENDPOINT</code>, <code>ASH_AI_MODEL</code>, and, when needed, <code>ASH_AI_AUTH_TOKEN</code>. Exported values are forwarded to the guest; unexported shell variables are not. Interactive VMs retain these credentials in the guest profile with mode <code>0600</code>; Linux VM disks are not encrypted, so protect the state directory and stop/remove the VM when finished.</p>
