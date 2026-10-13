@@ -12,3 +12,12 @@ condition = "AND"
 paths = ['''(^|/)(\.site-translation-cache|\.cache/ash/site-translation-cache)\.json$''']
 regexTarget = "match"
 regexes = ['''", "[a-f0-9]{64}"$''']
+
+[[rules]]
+id = "sumologic-access-token"
+
+[[rules.allowlists]]
+condition = "AND"
+paths = ['''(^|/)\.site-translation-cache\.json$''']
+regexTarget = "secret"
+regexes = ['''^[a-f0-9]{64}$''']
