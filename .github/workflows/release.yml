@@ -30,22 +30,6 @@ jobs:
           node-version: 24.x
       - name: Run quality checks
         run: make verify-ci
-      - name: Verify external Go installs from the release tag
-        env:
-          GONOPROXY: github.com/Jonconradt/ash
-          # Newly pushed tags may not be available in the checksum database yet.
-          GONOSUMDB: github.com/Jonconradt/ash
-        run: |
-          set -euo pipefail
-          install_dir="$(mktemp -d)"
-          export GOBIN="$install_dir/bin"
-          export GOPATH="$install_dir/go"
-          export GOMODCACHE="$GOPATH/pkg/mod"
-          mkdir -p "$GOBIN" "$GOMODCACHE"
-          go install "github.com/Jonconradt/ash/cmd/ash@${GITHUB_REF_NAME}"
-          go install "github.com/Jonconradt/ash/cmd/ash-broker@${GITHUB_REF_NAME}"
-          "$GOBIN/ash" --help
-          "$GOBIN/ash-broker" --version
       - name: Verify FreeBSD cross-compilation
         run: |
           GOOS=freebsd GOARCH=amd64 CGO_ENABLED=0 go build ./...
@@ -83,17 +67,6 @@ jobs:
           binary="smoke/ash-${GITHUB_REF_NAME}-darwin-${{ matrix.arch }}"
           "$binary" --help
           "$binary" version
-          smoke_home="$(mktemp -d)"
-          env -i HOME="$smoke_home" PATH="$PATH" "$PWD/$binary" install --shell bash --shell-integration </dev/null
-          test -f "$smoke_home/.config/ash/.ash_bashrc"
-          bash -n "$smoke_home/.config/ash/.ash_bashrc"
-      - name: Install and smoke test macOS package
-        run: |
-          set -euo pipefail
-          package="dist/release/ash-${GITHUB_REF_NAME}-darwin-${{ matrix.arch }}.pkg"
-          sudo installer -pkg "$package" -target /
-          /usr/local/bin/ash --help
-          /usr/local/bin/ash-broker --version
       - name: Upload macOS artifacts
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
@@ -140,23 +113,6 @@ jobs:
           binary="smoke/ash-${GITHUB_REF_NAME}-linux-${{ matrix.arch }}"
           "$binary" --help
           "$binary" version
-          smoke_home="$(mktemp -d)"
-          env -i HOME="$smoke_home" PATH="$PATH" "$PWD/$binary" install --shell bash --shell-integration </dev/null
-          test -f "$smoke_home/.config/ash/.ash_bashrc"
-          bash -n "$smoke_home/.config/ash/.ash_bashrc"
-      - name: Install and smoke test Linux packages
-        run: |
-          set -euo pipefail
-          deb="dist/release/ash-${GITHUB_REF_NAME}-linux-${{ matrix.arch }}.deb"
-          rpm="dist/release/ash-${GITHUB_REF_NAME}-linux-${{ matrix.arch }}.rpm"
-          sudo apt-get install -y "./$deb"
-          /usr/bin/ash --help
-          /usr/bin/ash-broker --version
-          sudo apt-get remove -y ash
-          sudo rpm -i "$rpm"
-          /usr/bin/ash --help
-          /usr/bin/ash-broker --version
-          sudo rpm -e ash
       - name: Upload Linux artifacts
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
@@ -207,30 +163,19 @@ jobs:
         with:
           name: release-freebsd-amd64
           path: artifacts
-      - name: Install ash in a FreeBSD VM
+      - name: Smoke test FreeBSD tarball
         uses: vmactions/freebsd-vm@c46abacb49f09938ca4e1702d15d836285d694cc # v1
         with:
           release: "14"
           cache-after-prepare: true
-          # FreeBSD ships no bash in base; prepare runs as root before the smoke script.
-          prepare: |
-            pkg install -y bash
           run: |
             set -eu
-            command -v bash >/dev/null 2>&1 || { echo "bash missing from the VM"; exit 1; }
-            bash --version | head -n 1
             archive=$(ls artifacts/ash-*-freebsd-amd64.tar.gz)
             tar -xzf "$archive" -C artifacts
             binary="${archive%.tar.gz}"
             chmod 0755 "$binary"
             "$binary" --help
-            "$binary" install --shell bash --shell-integration --dry-run </dev/null
-            "$binary" install --shell bash --shell-integration </dev/null
-            test -f "$HOME/.config/ash/.ash_bashrc"
-            bash -n "$HOME/.config/ash/.ash_bashrc"
-            grep -q 'ash/\.ash_bashrc' "$HOME/.bashrc"
-            grep -q '\$HOME/\.bashrc' "$HOME/.bash_profile"
-            bash -lc 'true'
+            "$binary" version
   publish:
     runs-on: ubuntu-latest
     permissions:

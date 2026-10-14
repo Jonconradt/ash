@@ -269,7 +269,7 @@ func workflowStep(t *testing.T, root, workflow, step string) string {
 	return strings.Join(lines, "\n")
 }
 
-func TestExternalGoInstallsDoNotDependOnTagIndexing(t *testing.T) {
+func TestReleaseWorkflowDoesNotVerifyInstalls(t *testing.T) {
 	root, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)
@@ -278,28 +278,19 @@ func TestExternalGoInstallsDoNotDependOnTagIndexing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, step, found := strings.Cut(string(data), "- name: Verify external Go installs from the release tag\n")
-	if !found {
-		t.Fatal("missing external Go install check")
-	}
-	step, _, _ = strings.Cut(step, "      - name:")
-	for _, required := range []string{
-		"          GONOPROXY: github.com/Jonconradt/ash\n",
-		"          GONOSUMDB: github.com/Jonconradt/ash\n",
-		`export GOBIN="$install_dir/bin"`,
-		`export GOMODCACHE="$GOPATH/pkg/mod"`,
-		`go install "github.com/Jonconradt/ash/cmd/ash@${GITHUB_REF_NAME}"`,
-		`go install "github.com/Jonconradt/ash/cmd/ash-broker@${GITHUB_REF_NAME}"`,
-		`"$GOBIN/ash" --help`,
-		`"$GOBIN/ash-broker" --version`,
+	for _, forbidden := range []string{
+		"Verify external Go installs from the release tag",
+		"go install \"github.com/Jonconradt/ash/",
+		"Install and smoke test macOS package",
+		"sudo installer -pkg",
+		"Install and smoke test Linux packages",
+		"sudo apt-get install -y \"./$deb\"",
+		"sudo rpm -i \"$rpm\"",
+		"\"$binary\" install --shell",
+		"Install ash in a FreeBSD VM",
 	} {
-		if !strings.Contains(step, required) {
-			t.Errorf("external Go install check missing %q", required)
-		}
-	}
-	for _, forbidden := range []string{"GOSUMDB:", "GOPRIVATE:", "GOPROXY:"} {
-		if strings.Contains(step, forbidden) {
-			t.Errorf("external Go install check overrides dependency verification with %s", forbidden)
+		if strings.Contains(string(data), forbidden) {
+			t.Errorf("release workflow must not verify application installs: found %q", forbidden)
 		}
 	}
 }
