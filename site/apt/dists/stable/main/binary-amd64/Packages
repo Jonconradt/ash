@@ -1,0 +1,17 @@
+Package: ash
+Version: 0.28.0
+Architecture: amd64
+Maintainer: <runner@runnervmmprz5>
+Installed-Size: 60512
+Filename: pool/stable/main/ash_0.28.0_amd64.deb
+Size: 21440838
+MD5sum: bbf803169d7d2afca7da93287eccb4b9
+SHA1: 47b0be534dec2e1e4e99706dce14bf559721b26a
+SHA256: 133db9f9e5f2bcb9edbddef179403b8e2a68880018834b73a9ff0c52f115331d
+Section: default
+Priority: optional
+Homepage: https://github.com
+Description: ash shell assistant
+License: unknown
+Vendor: none
+

@@ -1,0 +1,32 @@
+Architectures: amd64 arm64
+Codename: stable
+Components: main
+Date: Wed, 14 Oct 2026 13:59:33 +0000
+Description: Official APT repository for ash
+Label: VersionX APT Repository
+Origin: VersionX
+Suite: stable
+MD5Sum:
+ 944777ce43fb29e0b338ca2678189dfe              206 Release
+ a5f8d780f26bfc5218b4975dcb84d069              459 main/binary-amd64/Packages
+ 605553400bec061049165b43959aa22b              355 main/binary-amd64/Packages.gz
+ ad1869cb86ef5c24f486122af33dbb2b              459 main/binary-arm64/Packages
+ e893649975584df7ceeee48001fcb85c              353 main/binary-arm64/Packages.gz
+SHA1:
+ 5eedb5e18658628745ab08181c65846eaa80cfaa              206 Release
+ c3994acfd26c4df0b336f191362b47fc5f4c335d              459 main/binary-amd64/Packages
+ 2b97fa2c02a18b7deed0b3935d9dafa656b61aaf              355 main/binary-amd64/Packages.gz
+ 8072a47a9d2ccaff3bf1ec0bdfae67cda2812d41              459 main/binary-arm64/Packages
+ 6fa955a7f6010db9535f2fa918e53266b3dc0f0d              353 main/binary-arm64/Packages.gz
+SHA256:
+ e8498e48a5c09d59b6f2921eeddd88442d852f77e3e05f0af2954dde0417dd56              206 Release
+ f896276fc3b9dfd2453a2f2456e64b8a1ab2c64c1d1eb8e63ca04f7ef2f8f607              459 main/binary-amd64/Packages
+ 440147630fd9b3a86c2f65240d9e790611b44715cfa5ac7f5bba8b1b8cd46151              355 main/binary-amd64/Packages.gz
+ 5abdb826b6e79b8173bbeef4bfe24a47434e699c0f1835ed9746f013638c38c8              459 main/binary-arm64/Packages
+ af927332cff515a4959a701ebc2c1b16a0a8aa960d2560977a4d0f49992d8244              353 main/binary-arm64/Packages.gz
+SHA512:
+ 942232c96b7c9eafb80fc2d6c3a52868e3ecb33f3af40eb7b5ce880fe87db9ec9e5b5416287c91fab0d9d1a0e405ad85cf5e3aa4948bd7dd030648f3ec92ca23              206 Release
+ 9cb2c927a5d5d6510c0c9c67241d0672632f76b482778ef94610932c58f84c94834e4320f0b27d2b7b6adfd3bd796089988978b07592c98d98d1f6ec16c50ce9              459 main/binary-amd64/Packages
+ e226c68b519d49398acfc1793f88178237d64e06ba2b28ce5edd654b1afdb477dd1b7aef6779df74efb93c28324de67a03152af19fba1356c832e56b8d0ab1af              355 main/binary-amd64/Packages.gz
+ 30000a0ab1d981be06758ec385fe93d719e37de667c0de0b3415c1f7d8af081a6c399c5abb9337db2f8f3a4033f1fdb1116a01e057d4a9ced3ad4e346d05fa96              459 main/binary-arm64/Packages
+ dacb67f9bcff61b13dd02f60711b72805d08f63846f9bf480f8e373a23efdd890e9ab38b2a7dd4fc8242476010fa982448b789dd7540fe152198790a7fc1056f              353 main/binary-arm64/Packages.gz

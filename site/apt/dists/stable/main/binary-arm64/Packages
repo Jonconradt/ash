@@ -1,0 +1,17 @@
+Package: ash
+Version: 0.28.0
+Architecture: arm64
+Maintainer: <runner@runnervmidgih>
+Installed-Size: 56905
+Filename: pool/stable/main/ash_0.28.0_arm64.deb
+Size: 19481520
+MD5sum: 733ab7d5d02bfdb461f2fca00c029b2f
+SHA1: 4dcb8fdce7fbd6b91ec42a40cc7bcc3a5e634d26
+SHA256: 28a29603ad244f640ca63ff46f98c936799bfafb1953ecd4f7aeef73432bc1c6
+Section: default
+Priority: optional
+Homepage: https://github.com
+Description: ash shell assistant
+License: unknown
+Vendor: none
+
