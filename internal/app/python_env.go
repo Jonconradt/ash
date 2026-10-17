@@ -82,6 +82,14 @@ func managedPythonScript(name string) (string, bool) {
 	return scriptPath, true
 }
 
+func managedPythonInvocation(name string, args []string) ([]string, bool) {
+	scriptPath, ok := managedPythonScript(name)
+	if !ok {
+		return nil, false
+	}
+	return append([]string{ashPythonInterpreter(), scriptPath}, args...), true
+}
+
 // provisionManagedPythonEnv creates the managed virtualenv and installs bundled tool
 // dependencies. Failures are reported but never abort the install: a user without
 // python3, without the venv module, or without network access must still get a working shell.

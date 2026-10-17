@@ -687,7 +687,8 @@ When enabled, `ash` logs structured diagnostics with Go's standard-library `log/
 
 `ash` publishes these tools to the configured provider on each request:
 
-- `run_unix_command`: executes one allowlisted Unix executable with direct argv (no shell)
+- `run_unix_command`: executes one allowlisted Unix executable with direct argv (no shell); managed Python tools run through Ash's selected interpreter
+- `run_unix_pipeline`: connects allowlisted commands without a shell; managed Python tools are also supported as pipeline stages
 - `run_python3`: when a runnable Python interpreter is available and `ASH_STRICT` is off, executes either `python3 -c <code>` or a `.py` file in the current managed scratch session with optional argv
 - `run_sub_agent`: delegates one focused task to a child ash process, subject to `ASH_MAX_AGENTS`
 - `schedule_future_prompt`: schedules one prompt run via a user `launchd` LaunchAgent
