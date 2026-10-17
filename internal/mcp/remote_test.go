@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -199,7 +200,7 @@ func TestPersistedTokenSourceCoordinatesConcurrentRefresh(t *testing.T) {
 
 	newSource := func() oauth2.TokenSource {
 		tokenSource := record.Config.TokenSource(context.Background(), &record.Token)
-		return newPersistedTokenSource(tokenSource, record, store, key, context.Background())
+		return newPersistedTokenSource(tokenSource, record, store, key, context.Background(), nil)
 	}
 	sources := []oauth2.TokenSource{newSource(), newSource()}
 	results := make(chan *oauth2.Token, len(sources))
@@ -1351,10 +1352,32 @@ func TestRemoteOAuthTransportFallsBackAcrossResolvedAddresses(t *testing.T) {
 	}
 }
 
+func TestOAuthAuthorizationLogExplainsRejectedRefreshToken(t *testing.T) {
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewJSONHandler(&logs, nil))
+	previousLogger := slog.Default()
+	slog.SetDefault(logger)
+	t.Cleanup(func() { slog.SetDefault(previousLogger) })
+	session := &remoteSession{
+		config:            RemoteServer{Name: "oauth-test"},
+		hasPersistedOAuth: true,
+	}
+	session.recordOAuthRefreshFailure(&oauth2.RetrieveError{ErrorCode: "invalid_grant"})
+	session.logOAuthAuthorizationRequired()
+
+	got := logs.String()
+	if !strings.Contains(got, `"msg":"MCP server requested OAuth authorization"`) ||
+		!strings.Contains(got, `"reason":"refresh_token_rejected"`) ||
+		!strings.Contains(got, `"oauth_error_code":"invalid_grant"`) {
+		t.Fatalf("OAuth authorization log = %q, want authorization event and rejected refresh-token reason", got)
+	}
+}
+
 func TestRemoteManagerOAuthAuthorizationCodeFlow(t *testing.T) {
 	var mu sync.Mutex
 	var codeChallenge string
 	var tokenRefreshes int
+	var rejectRefresh atomic.Bool
 	oauthMux := http.NewServeMux()
 	oauthMux.HandleFunc("/.well-known/oauth-authorization-server", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -1410,6 +1433,11 @@ func TestRemoteManagerOAuthAuthorizationCodeFlow(t *testing.T) {
 			}
 		} else if r.Form.Get("grant_type") == "refresh_token" {
 			tokenRefreshes++
+			if rejectRefresh.Load() {
+				w.WriteHeader(http.StatusBadRequest)
+				_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid_grant"})
+				return
+			}
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"access_token":  fmt.Sprintf("token-%d", tokenRefreshes+1),
@@ -1575,6 +1603,23 @@ func TestRemoteManagerOAuthAuthorizationCodeFlow(t *testing.T) {
 	status, err = restartedManager.Start(ctx, RemoteServer{Name: "oauth-test", URL: remoteURL})
 	if err != nil || status.State != "connected" || status.AuthURL != "" {
 		t.Fatalf("Start() after manager restart = %+v, %v; want connected without authorization", status, err)
+	}
+
+	restartedManager.Close()
+	rejectRefresh.Store(true)
+	var authorizationLogs bytes.Buffer
+	previousLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&authorizationLogs, nil)))
+	t.Cleanup(func() { slog.SetDefault(previousLogger) })
+	reauthManager := NewRemoteManager(ctx, store)
+	defer reauthManager.Close()
+	status, err = reauthManager.Start(ctx, RemoteServer{Name: "oauth-test", URL: remoteURL})
+	if err != nil || status.State != "authorizing" || status.AuthURL == "" {
+		t.Fatalf("Start() after refresh rejection = %+v, %v; want OAuth authorization", status, err)
+	}
+	if !strings.Contains(authorizationLogs.String(), `"reason":"refresh_token_rejected"`) ||
+		!strings.Contains(authorizationLogs.String(), `"oauth_error_code":"invalid_grant"`) {
+		t.Fatalf("OAuth reauthorization log = %q, want rejected refresh-token reason", authorizationLogs.String())
 	}
 }
 

@@ -29,6 +29,7 @@ import (
 	"time"
 
 	"github.com/Jonconradt/ash/internal/brokerproto"
+	"github.com/Jonconradt/ash/internal/localize"
 	"github.com/Jonconradt/ash/internal/workspace"
 	"github.com/modelcontextprotocol/go-sdk/auth"
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
@@ -149,29 +150,31 @@ type persistedOAuth struct {
 }
 
 type remoteSession struct {
-	mu               sync.Mutex
-	config           RemoteServer
-	ctx              context.Context
-	cancel           context.CancelFunc
-	status           RemoteStatus
-	client           *mcp.ClientSession
-	authURL          chan string
-	callback         chan authorizationCallback
-	toolRefreshQueue chan struct{}
-	authActive       atomic.Bool
-	expectedState    string
-	listener         net.Listener
-	done             chan struct{}
-	closeOnce        sync.Once
-	closed           bool
-	tools            []RemoteTool
-	toolsExpiry      time.Time
-	toolsValid       bool
-	toolsGen         uint64
-	refresh          *toolRefresh
-	retryAt          time.Time
-	retryDelay       time.Duration
-	workers          sync.WaitGroup
+	mu                   sync.Mutex
+	config               RemoteServer
+	ctx                  context.Context
+	cancel               context.CancelFunc
+	status               RemoteStatus
+	client               *mcp.ClientSession
+	authURL              chan string
+	callback             chan authorizationCallback
+	toolRefreshQueue     chan struct{}
+	authActive           atomic.Bool
+	expectedState        string
+	listener             net.Listener
+	done                 chan struct{}
+	closeOnce            sync.Once
+	closed               bool
+	hasPersistedOAuth    bool
+	refreshTokenRejected bool
+	tools                []RemoteTool
+	toolsExpiry          time.Time
+	toolsValid           bool
+	toolsGen             uint64
+	refresh              *toolRefresh
+	retryAt              time.Time
+	retryDelay           time.Duration
+	workers              sync.WaitGroup
 }
 
 type toolRefresh struct {
@@ -1163,6 +1166,7 @@ func (m *RemoteManager) connect(managerCtx context.Context, session *remoteSessi
 		if err != nil || parsedAuthURL.Query().Get("state") == "" {
 			return nil, errors.New("OAuth authorization URL does not contain state")
 		}
+		session.logOAuthAuthorizationRequired()
 		session.mu.Lock()
 		session.expectedState = parsedAuthURL.Query().Get("state")
 		session.mu.Unlock()
@@ -1214,11 +1218,21 @@ func (m *RemoteManager) connect(managerCtx context.Context, session *remoteSessi
 		if err := savePersistedOAuth(m.credential, credentialKey, record); err != nil {
 			return nil, fmt.Errorf("persisting OAuth credentials: %w", err)
 		}
-		return newPersistedTokenSource(config.TokenSource(ctx, token), record, m.credential, credentialKey, ctx), nil
+		session.mu.Lock()
+		session.hasPersistedOAuth = true
+		session.mu.Unlock()
+		return newPersistedTokenSource(config.TokenSource(ctx, token), record, m.credential, credentialKey, ctx, func(err error) {
+			session.recordOAuthRefreshFailure(err)
+		}), nil
 	}
 	if record, loadErr := loadPersistedOAuth(m.credential, credentialKey); loadErr == nil {
+		session.mu.Lock()
+		session.hasPersistedOAuth = true
+		session.mu.Unlock()
 		tokenSource := record.Config.TokenSource(refreshContext, &record.Token)
-		oauthConfig.InitialTokenSource = newPersistedTokenSource(tokenSource, record, m.credential, credentialKey, refreshContext)
+		oauthConfig.InitialTokenSource = newPersistedTokenSource(tokenSource, record, m.credential, credentialKey, refreshContext, func(err error) {
+			session.recordOAuthRefreshFailure(err)
+		})
 	} else if !errors.Is(loadErr, errCredentialNotFound) {
 		if errors.Is(loadErr, errInvalidPersistedOAuth) {
 			m.setStatus(session, RemoteStatus{State: "error", Error: "stored MCP credentials are invalid"})
@@ -1392,6 +1406,7 @@ type persistedTokenSource struct {
 	storage CredentialStorage
 	key     string
 	ctx     context.Context
+	onError func(error)
 }
 
 var errInvalidPersistedOAuth = errors.New("stored MCP credentials are invalid")
@@ -1416,15 +1431,17 @@ func savePersistedOAuth(storage CredentialStorage, key string, record persistedO
 	return storage.Set(key, payload)
 }
 
-func newPersistedTokenSource(source oauth2.TokenSource, record persistedOAuth, storage CredentialStorage, key string, ctx context.Context) oauth2.TokenSource {
-	return &persistedTokenSource{source: source, record: record, storage: storage, key: key, ctx: ctx}
+func newPersistedTokenSource(source oauth2.TokenSource, record persistedOAuth, storage CredentialStorage, key string, ctx context.Context, onError func(error)) oauth2.TokenSource {
+	return &persistedTokenSource{source: source, record: record, storage: storage, key: key, ctx: ctx, onError: onError}
 }
 
 func (s *persistedTokenSource) Token() (token *oauth2.Token, resultErr error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.record.Token.Valid() {
-		return s.source.Token()
+		token, err := s.source.Token()
+		s.reportError(err)
+		return token, err
 	}
 	if locker, ok := s.storage.(credentialRefreshLocker); ok {
 		unlock, err := locker.LockRefresh(s.key)
@@ -1448,6 +1465,7 @@ func (s *persistedTokenSource) Token() (token *oauth2.Token, resultErr error) {
 	}
 	token, err = s.source.Token()
 	if err != nil {
+		s.reportError(err)
 		return nil, err
 	}
 	if !sameOAuthToken(*token, s.record.Token) {
@@ -1459,6 +1477,41 @@ func (s *persistedTokenSource) Token() (token *oauth2.Token, resultErr error) {
 		s.record = updated
 	}
 	return token, nil
+}
+
+func (s *persistedTokenSource) reportError(err error) {
+	if err != nil && s.onError != nil {
+		s.onError(err)
+	}
+}
+
+func (s *remoteSession) recordOAuthRefreshFailure(err error) {
+	var retrieveErr *oauth2.RetrieveError
+	if !errors.As(err, &retrieveErr) || retrieveErr.ErrorCode != "invalid_grant" {
+		return
+	}
+	s.mu.Lock()
+	s.refreshTokenRejected = true
+	s.mu.Unlock()
+}
+
+func (s *remoteSession) logOAuthAuthorizationRequired() {
+	s.mu.Lock()
+	reason := "server_challenge"
+	if !s.hasPersistedOAuth {
+		reason = "no_stored_credentials"
+	}
+	if s.refreshTokenRejected {
+		reason = "refresh_token_rejected"
+	}
+	attrs := []any{"server", s.config.Name, "reason", reason}
+	if s.refreshTokenRejected {
+		attrs = append(attrs, "oauth_error_code", "invalid_grant")
+	}
+	s.refreshTokenRejected = false
+	s.mu.Unlock()
+	slog.Warn(localize.Text("log.mcp.oauth_authorization_required"), append(attrs, "EID", "2D4PixST")...,
+	)
 }
 
 func sameOAuthToken(a, b oauth2.Token) bool {

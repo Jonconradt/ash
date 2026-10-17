@@ -114,6 +114,9 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 		}
 	}
 	logger := newBrokerLogger(stderr)
+	previousLogger := slog.Default()
+	slog.SetDefault(logger)
+	defer slog.SetDefault(previousLogger)
 	if err := workspace.ValidateBaseDirs(); err != nil {
 		logger.Error(err.Error())
 		return 2

@@ -153,6 +153,7 @@
     "log.broker.mcp_discovery_failed": "Aufwärmen der MCP-Tool-Erkennung fehlgeschlagen",
     "log.broker.mcp_startup_complete": "Aufwärmen des MCP-Servers beim Start abgeschlossen",
     "log.broker.mcp_startup_deferred": "Aufwärmen des MCP-Servers beim Start aufgeschoben",
+    "log.mcp.oauth_authorization_required": "MCP-Server fordert eine OAuth-Autorisierung an",
     "log.ash.stdin_read_failed": "stdin-Eingabeaufforderung konnte nicht gelesen werden: %v",
     "log.ash.history_path_failed": "Pfad zum Verlauf konnte nicht ermittelt werden: %v",
     "log.ash.history_load_failed": "Verlauf konnte nicht geladen werden: %v",

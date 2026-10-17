@@ -153,6 +153,7 @@
     "log.broker.mcp_discovery_failed": "falló el calentamiento del descubrimiento de herramientas MCP",
     "log.broker.mcp_startup_complete": "se completó el calentamiento de inicio del servidor MCP",
     "log.broker.mcp_startup_deferred": "se aplazó el calentamiento de inicio del servidor MCP",
+    "log.mcp.oauth_authorization_required": "El servidor MCP solicitó autorización OAuth",
     "log.ash.stdin_read_failed": "no se pudo leer la solicitud de la entrada estándar: %v",
     "log.ash.history_path_failed": "no se pudo resolver la ruta del historial: %v",
     "log.ash.history_load_failed": "no se pudo cargar el historial: %v",
