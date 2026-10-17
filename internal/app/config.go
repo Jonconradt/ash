@@ -4,6 +4,7 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -324,19 +325,31 @@ func parseAIEndpoint(value string) (baseURL string, host string, scheme string, 
 }
 
 // isCloudAIHost reports whether the condition is true. Private/LAN addresses
-// (RFC1918 IPv4, IPv6 ULA), .local mDNS hostnames, and bare single-label
-// hostnames (e.g. "brain", resolved via mDNS/NetBIOS/hosts file rather than
-// public DNS) are treated as non-cloud unless ASH_STRICT is enabled, in which
-// case only localhost/loopback are exempt.
+// (RFC1918 IPv4, IPv6 ULA), .local mDNS hostnames, bare single-label hostnames,
+// and hostnames that resolve exclusively to private/loopback addresses are
+// treated as non-cloud unless ASH_STRICT is enabled, in which case only
+// localhost/loopback are exempt.
 func isCloudAIHost(host string) bool {
+	lookup := func(ctx context.Context, hostname string) ([]net.IP, error) {
+		return net.DefaultResolver.LookupIP(ctx, "ip", hostname)
+	}
+	return isCloudAIHostWithLookup(host, lookup)
+}
+
+func isCloudAIHostWithLookup(host string, lookup func(context.Context, string) ([]net.IP, error)) bool {
 	h := strings.TrimSpace(strings.ToLower(host))
 	if h == "localhost" {
 		return false
 	}
 	ip := net.ParseIP(h)
 	if ip == nil {
-		if !strictSecurityModeEnabled() && (strings.HasSuffix(h, ".local") || !strings.Contains(h, ".")) {
-			return false
+		if !strictSecurityModeEnabled() {
+			if strings.HasSuffix(h, ".local") || !strings.Contains(h, ".") {
+				return false
+			}
+			if hostnameResolvesOnlyToPrivateIPs(h, lookup) {
+				return false
+			}
 		}
 		return true
 	}
@@ -345,6 +358,22 @@ func isCloudAIHost(host string) bool {
 	}
 	if !strictSecurityModeEnabled() && ip.IsPrivate() {
 		return false
+	}
+	return true
+}
+
+func hostnameResolvesOnlyToPrivateIPs(host string, lookup func(context.Context, string) ([]net.IP, error)) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	ips, err := lookup(ctx, host)
+	if err != nil || len(ips) == 0 {
+		return false
+	}
+	for _, ip := range ips {
+		if ip == nil || (!ip.IsPrivate() && !ip.IsLoopback()) {
+			return false
+		}
 	}
 	return true
 }

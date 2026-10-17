@@ -471,7 +471,7 @@ Common `ASH_AI_ENDPOINT` values:
 
 Notes:
 
-- Cloud endpoints are inferred when the host is not `localhost`, `127.0.0.1`, a private/LAN address (RFC1918 IPv4, IPv6 ULA), or a `.local` mDNS hostname. Set `ASH_STRICT=1` to treat only `localhost`/loopback as non-cloud (private/LAN hosts then require `https` and `ASH_AI_AUTH_TOKEN` like any other cloud endpoint).
+- Cloud endpoints are inferred when the host is not `localhost`, `127.0.0.1`, a private/LAN address (RFC1918 IPv4, IPv6 ULA), a `.local` mDNS hostname, or a hostname that resolves exclusively to private/loopback addresses. Set `ASH_STRICT=1` to treat only `localhost`/loopback as non-cloud (private/LAN hosts then require `https` and `ASH_AI_AUTH_TOKEN` like any other cloud endpoint).
 - Cloud endpoints must use `https`; all except AWS Bedrock require `ASH_AI_AUTH_TOKEN`, which is sent as bearer auth.
 - Provider detection is automatic by endpoint host/path; use `ASH_AI_PROVIDER` only when you need to override.
 - `ASH_AI_CACHE` defaults to enabled. Use `ASH_AI_CACHE=off` to disable provider-native caching.

@@ -4,6 +4,9 @@
 package app
 
 import (
+	"context"
+	"errors"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -248,6 +251,74 @@ func TestParseAIConfigFromEnvOllamaOpenAIAPIDefault(t *testing.T) {
 	}
 	if !cfg.OllamaOpenAIAPI {
 		t.Fatal("expected OllamaOpenAIAPI=true by default")
+	}
+}
+
+func TestParseAIConfigAllowsHTTPForCustomLocalEndpoint(t *testing.T) {
+	t.Setenv("ASH_STRICT", "")
+	t.Setenv("ASH_AI_ENDPOINT", "http://ai.local/")
+	t.Setenv("ASH_AI_MODEL", "custom-model")
+	t.Setenv("ASH_AI_PROVIDER", "openai")
+	t.Setenv("ASH_AI_AUTH_TOKEN", "")
+	t.Setenv(ashEnvAlwaysOpenAIAPI, "0")
+
+	cfg, err := parseAIConfigFromEnv()
+	if err != nil {
+		t.Fatalf("parseAIConfigFromEnv rejected a local HTTP endpoint: %v", err)
+	}
+	if cfg.BaseURL != "http://ai.local" {
+		t.Fatalf("BaseURL = %q, want http://ai.local", cfg.BaseURL)
+	}
+	if cfg.Provider != providerOpenAI {
+		t.Fatalf("Provider = %q, want %q", cfg.Provider, providerOpenAI)
+	}
+}
+
+func TestIsCloudAIHostUsesDNSForPrivateFQDNs(t *testing.T) {
+	t.Setenv("ASH_STRICT", "")
+
+	tests := []struct {
+		name string
+		ips  []net.IP
+		err  error
+		want bool
+	}{
+		{
+			name: "private IPv4",
+			ips:  []net.IP{net.ParseIP("192.168.1.20")},
+		},
+		{
+			name: "private IPv6",
+			ips:  []net.IP{net.ParseIP("fd12:3456:789a::1")},
+		},
+		{
+			name: "loopback",
+			ips:  []net.IP{net.ParseIP("127.0.0.1")},
+		},
+		{
+			name: "mixed private and public",
+			ips:  []net.IP{net.ParseIP("192.168.1.20"), net.ParseIP("203.0.113.10")},
+			want: true,
+		},
+		{
+			name: "lookup failure",
+			err:  errors.New("lookup failed"),
+			want: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			lookup := func(_ context.Context, host string) ([]net.IP, error) {
+				if host != "ai.example.test" {
+					t.Fatalf("lookup host = %q, want ai.example.test", host)
+				}
+				return tt.ips, tt.err
+			}
+			if got := isCloudAIHostWithLookup("ai.example.test", lookup); got != tt.want {
+				t.Fatalf("isCloudAIHostWithLookup() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }
 
@@ -675,6 +746,12 @@ func TestIsCloudAIHostLANExemption(t *testing.T) {
 
 	t.Run("strict: LAN hosts require https/token like any other cloud host", func(t *testing.T) {
 		t.Setenv("ASH_STRICT", "true")
+		privateLookup := func(context.Context, string) ([]net.IP, error) {
+			return []net.IP{net.ParseIP("192.168.1.20")}, nil
+		}
+		if !isCloudAIHostWithLookup("ai.example.test", privateLookup) {
+			t.Fatalf("FQDN resolving to a private address should be classified as cloud under ASH_STRICT")
+		}
 		for _, host := range lanHosts {
 			if !isCloudAIHost(host) {
 				t.Fatalf("expected %q to be classified as cloud under ASH_STRICT", host)
