@@ -1361,6 +1361,7 @@ func TestOAuthAuthorizationLogExplainsRejectedRefreshToken(t *testing.T) {
 	session := &remoteSession{
 		config:            RemoteServer{Name: "oauth-test"},
 		hasPersistedOAuth: true,
+		hasRefreshToken:   true,
 	}
 	session.recordOAuthRefreshFailure(&oauth2.RetrieveError{ErrorCode: "invalid_grant"})
 	session.logOAuthAuthorizationRequired()
@@ -1370,6 +1371,23 @@ func TestOAuthAuthorizationLogExplainsRejectedRefreshToken(t *testing.T) {
 		!strings.Contains(got, `"reason":"refresh_token_rejected"`) ||
 		!strings.Contains(got, `"oauth_error_code":"invalid_grant"`) {
 		t.Fatalf("OAuth authorization log = %q, want authorization event and rejected refresh-token reason", got)
+	}
+}
+
+func TestOAuthAuthorizationLogIdentifiesMissingRefreshToken(t *testing.T) {
+	var logs bytes.Buffer
+	previousLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(previousLogger) })
+
+	session := &remoteSession{
+		config:            RemoteServer{Name: "oauth-test"},
+		hasPersistedOAuth: true,
+	}
+	session.logOAuthAuthorizationRequired()
+
+	if !strings.Contains(logs.String(), `"reason":"stored_credentials_without_refresh_token"`) {
+		t.Fatalf("OAuth authorization log = %q, want missing refresh-token reason", logs.String())
 	}
 }
 

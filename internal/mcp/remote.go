@@ -166,6 +166,7 @@ type remoteSession struct {
 	closeOnce            sync.Once
 	closed               bool
 	hasPersistedOAuth    bool
+	hasRefreshToken      bool
 	refreshTokenRejected bool
 	tools                []RemoteTool
 	toolsExpiry          time.Time
@@ -1220,6 +1221,7 @@ func (m *RemoteManager) connect(managerCtx context.Context, session *remoteSessi
 		}
 		session.mu.Lock()
 		session.hasPersistedOAuth = true
+		session.hasRefreshToken = token.RefreshToken != ""
 		session.mu.Unlock()
 		return newPersistedTokenSource(config.TokenSource(ctx, token), record, m.credential, credentialKey, ctx, func(err error) {
 			session.recordOAuthRefreshFailure(err)
@@ -1228,6 +1230,7 @@ func (m *RemoteManager) connect(managerCtx context.Context, session *remoteSessi
 	if record, loadErr := loadPersistedOAuth(m.credential, credentialKey); loadErr == nil {
 		session.mu.Lock()
 		session.hasPersistedOAuth = true
+		session.hasRefreshToken = record.Token.RefreshToken != ""
 		session.mu.Unlock()
 		tokenSource := record.Config.TokenSource(refreshContext, &record.Token)
 		oauthConfig.InitialTokenSource = newPersistedTokenSource(tokenSource, record, m.credential, credentialKey, refreshContext, func(err error) {
@@ -1500,6 +1503,8 @@ func (s *remoteSession) logOAuthAuthorizationRequired() {
 	reason := "server_challenge"
 	if !s.hasPersistedOAuth {
 		reason = "no_stored_credentials"
+	} else if !s.hasRefreshToken {
+		reason = "stored_credentials_without_refresh_token"
 	}
 	if s.refreshTokenRejected {
 		reason = "refresh_token_rejected"
