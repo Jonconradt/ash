@@ -1568,6 +1568,14 @@ func TestRemoteManagerOAuthAuthorizationCodeFlow(t *testing.T) {
 	if err != nil || !strings.Contains(string(stored), `"access_token":"token-`) {
 		t.Fatalf("refreshed OAuth credentials = %s, err = %v", stored, err)
 	}
+
+	manager.Close()
+	restartedManager := NewRemoteManager(ctx, store)
+	defer restartedManager.Close()
+	status, err = restartedManager.Start(ctx, RemoteServer{Name: "oauth-test", URL: remoteURL})
+	if err != nil || status.State != "connected" || status.AuthURL != "" {
+		t.Fatalf("Start() after manager restart = %+v, %v; want connected without authorization", status, err)
+	}
 }
 
 func TestRemoteMCPPlaygroundSmoke(t *testing.T) {
