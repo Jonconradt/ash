@@ -10,6 +10,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -645,6 +647,51 @@ func TestRunToolLoopVerboseLogsToolInvocation(t *testing.T) {
 	}
 	if !strings.Contains(logs, `"message":"Tool invocation result"`) {
 		t.Fatalf("expected tool result debug log, got %q", logs)
+	}
+}
+
+func TestExecutionSummaryToolNameDistinguishesNativePlugins(t *testing.T) {
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("XDG_DATA_HOME", filepath.Join(home, "data"))
+	pluginPath := filepath.Join(home, "data", "ash", "plugins", "what_time_is_it")
+	if err := os.MkdirAll(filepath.Dir(pluginPath), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(pluginPath, []byte("plugin"), 0o700); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, test := range []struct {
+		name     string
+		toolName string
+		args     map[string]any
+		want     string
+	}{
+		{
+			name:     "native plugin through unix command wrapper",
+			toolName: "run_unix_command",
+			args:     map[string]any{"command": "what_time_is_it"},
+			want:     "plugin:what_time_is_it",
+		},
+		{
+			name:     "ordinary unix command",
+			toolName: "run_unix_command",
+			args:     map[string]any{"command": "date"},
+			want:     "run_unix_command",
+		},
+		{
+			name:     "other tool",
+			toolName: "run_python3",
+			args:     map[string]any{"code": "print('hi')"},
+			want:     "run_python3",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			if got := executionSummaryToolName(test.toolName, test.args); got != test.want {
+				t.Fatalf("executionSummaryToolName() = %q, want %q", got, test.want)
+			}
+		})
 	}
 }
 
