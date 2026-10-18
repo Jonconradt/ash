@@ -37,7 +37,10 @@ RELEASE_WATCH ?= $(if $(CI),0,1)
 RELEASE_WATCH_STRICT ?= 1
 RELEASE_VERIFY_TARGET ?= verify
 CHANNEL ?= beta
-BUILD_VERSION ?= $(if $(LATEST_RELEASE_TAG),$(LATEST_RELEASE_TAG),dev)
+# Local builds report the nearest reachable tag, including prereleases.
+ifeq ($(origin BUILD_VERSION),undefined)
+BUILD_VERSION := $(shell git describe --tags --abbrev=0 2>/dev/null || printf 'dev')
+endif
 # Resolved once at parse time; recursive expansion would re-run git after release-publish tags HEAD.
 ifeq ($(origin BUILD_COMMIT),undefined)
 BUILD_COMMIT := $(shell git rev-parse HEAD 2>/dev/null || printf 'unknown')
