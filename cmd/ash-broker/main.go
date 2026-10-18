@@ -48,6 +48,7 @@ const (
 	mcpWarmupTimeout        = 15 * time.Second
 	aiWarmupTimeout         = 5 * time.Second
 	aiWarmupMaxResponseBody = 64 * 1024
+	brokerLogDirectory      = "brokers"
 )
 
 var version = "dev"
@@ -188,6 +189,24 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 		logger.Error(localize.Format("log.broker.home_failed", []any{err}), "EID", "Fh4TzP9b")
 		return 1
 	}
+	brokerLog, err := openBrokerLog(home, sessionID)
+	if err != nil {
+		slog.Warn(localize.Format("log.broker.log_file_open_failed", []any{err}), "error", err, "EID", "2R2gNHhb")
+	} else {
+		stderrLogger := logger
+		writers := make([]io.Writer, 0, 2)
+		if stderr != nil {
+			writers = append(writers, stderr)
+		}
+		writers = append(writers, brokerLog)
+		logger = newBrokerLogger(io.MultiWriter(writers...))
+		slog.SetDefault(logger)
+		defer func() {
+			if err := brokerLog.Close(); err != nil {
+				stderrLogger.Warn(localize.Format("log.broker.log_file_close_failed", []any{err}), "error", err, "EID", "zGIS2QmN")
+			}
+		}()
+	}
 	scratchRoot := filepath.Join(workspace.StateRoot(home), "scratch")
 	scratchLock, err := scratchlife.Acquire(scratchRoot, sessionID)
 	if err != nil {
@@ -304,6 +323,53 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 	}
 	cancelBroker()
 	return 0
+}
+
+func openBrokerLog(home, sessionID string) (*os.File, error) {
+	if err := scratchlife.ValidateSessionID(sessionID); err != nil {
+		return nil, fmt.Errorf("invalid broker log session ID: %w", err)
+	}
+	statePath := workspace.StateRoot(home)
+	if err := os.MkdirAll(statePath, 0o700); err != nil {
+		return nil, fmt.Errorf("creating broker state directory: %w", err)
+	}
+	stateRoot, err := os.OpenRoot(statePath)
+	if err != nil {
+		return nil, fmt.Errorf("opening broker state directory: %w", err)
+	}
+	defer func() { _ = stateRoot.Close() }()
+	logDirectory := filepath.Join("logs", brokerLogDirectory)
+	if err := stateRoot.MkdirAll(logDirectory, 0o700); err != nil {
+		return nil, fmt.Errorf("creating broker log directory: %w", err)
+	}
+	logRoot, err := stateRoot.OpenRoot(logDirectory)
+	if err != nil {
+		return nil, fmt.Errorf("opening broker log directory: %w", err)
+	}
+	defer func() { _ = logRoot.Close() }()
+	// A private directory needs owner execute permission; gosec G302 only
+	// accepts file-style 0600 permissions and misflags this required 0700.
+	// #nosec G302
+	if err := logRoot.Chmod(".", 0o700); err != nil {
+		return nil, fmt.Errorf("securing broker log directory: %w", err)
+	}
+	name := sessionID + ".log"
+	if info, err := logRoot.Lstat(name); err == nil {
+		if !info.Mode().IsRegular() || info.Mode()&os.ModeSymlink != 0 {
+			return nil, errors.New("broker log file must be a regular file")
+		}
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return nil, fmt.Errorf("checking broker log file: %w", err)
+	}
+	file, err := logRoot.OpenFile(name, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
+	if err != nil {
+		return nil, fmt.Errorf("opening broker log file: %w", err)
+	}
+	if err := file.Chmod(0o600); err != nil {
+		_ = file.Close()
+		return nil, fmt.Errorf("securing broker log file: %w", err)
+	}
+	return file, nil
 }
 
 func aiWarmupEnabled() (bool, error) {

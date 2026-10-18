@@ -15,6 +15,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"mime"
 	"net"
 	"net/http"
 	"net/netip"
@@ -145,8 +146,9 @@ type RemoteStatus struct {
 }
 
 type persistedOAuth struct {
-	Config oauth2.Config `json:"config"`
-	Token  oauth2.Token  `json:"token"`
+	Config   oauth2.Config `json:"config"`
+	Token    oauth2.Token  `json:"token"`
+	Resource string        `json:"resource,omitempty"`
 }
 
 type remoteSession struct {
@@ -432,6 +434,87 @@ func (t *remoteOAuthTransport) RoundTrip(request *http.Request) (*http.Response,
 	}
 	ctx := context.WithValue(request.Context(), oauthDialPolicyKey{}, policy)
 	return t.base.RoundTrip(request.WithContext(ctx))
+}
+
+// oauthResourceTransport preserves RFC 8707 resource binding for oauth2's refresh
+// requests, which otherwise omit the resource sent by the SDK during exchange.
+type oauthResourceTransport struct {
+	base        http.RoundTripper
+	resourceMu  sync.RWMutex
+	resourceURI string
+}
+
+func (t *oauthResourceTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	prepared, err := t.withRefreshResource(request)
+	if err != nil {
+		_ = request.Body.Close()
+		return nil, err
+	}
+	return t.base.RoundTrip(prepared)
+}
+
+func (t *oauthResourceTransport) withRefreshResource(request *http.Request) (*http.Request, error) {
+	if request.Method != http.MethodPost || request.Body == nil {
+		return request, nil
+	}
+	contentType := request.Header.Get("Content-Type")
+	if contentType == "" {
+		return request, nil
+	}
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		return nil, fmt.Errorf("parsing OAuth request content type: %w", err)
+	}
+	if mediaType != "application/x-www-form-urlencoded" {
+		return request, nil
+	}
+	body, err := io.ReadAll(request.Body)
+	if err != nil {
+		_ = request.Body.Close()
+		return nil, fmt.Errorf("reading OAuth request form: %w", err)
+	}
+	if err := request.Body.Close(); err != nil {
+		return nil, fmt.Errorf("closing OAuth request form: %w", err)
+	}
+	form, err := url.ParseQuery(string(body))
+	if err != nil {
+		return nil, fmt.Errorf("parsing OAuth request form: %w", err)
+	}
+	switch form.Get("grant_type") {
+	case "authorization_code":
+		t.setResourceURI(form.Get("resource"))
+	case "refresh_token":
+		resource := t.getResourceURI()
+		if resource == "" {
+			return nil, errors.New("OAuth refresh request has no resource URI")
+		}
+		form.Set("resource", resource)
+		body = []byte(form.Encode())
+	}
+
+	request = request.Clone(request.Context())
+	request.Body = io.NopCloser(bytes.NewReader(body))
+	request.GetBody = func() (io.ReadCloser, error) {
+		return io.NopCloser(bytes.NewReader(body)), nil
+	}
+	request.ContentLength = int64(len(body))
+	request.Header.Del("Content-Length")
+	return request, nil
+}
+
+func (t *oauthResourceTransport) setResourceURI(resource string) {
+	if resource == "" {
+		return
+	}
+	t.resourceMu.Lock()
+	t.resourceURI = resource
+	t.resourceMu.Unlock()
+}
+
+func (t *oauthResourceTransport) getResourceURI() string {
+	t.resourceMu.RLock()
+	defer t.resourceMu.RUnlock()
+	return t.resourceURI
 }
 
 func (t *remoteOAuthTransport) CloseIdleConnections() {
@@ -1154,12 +1237,20 @@ func (m *RemoteManager) connect(managerCtx context.Context, session *remoteSessi
 			return http.ErrUseLastResponse
 		},
 	}
+	resourceTransport := &oauthResourceTransport{base: oauthTransport, resourceURI: session.config.URL}
 	oauthHTTPClient := &http.Client{
-		Transport: oauthTransport,
+		Transport: resourceTransport,
 		Timeout:   30 * time.Second,
 		CheckRedirect: func(*http.Request, []*http.Request) error {
 			return http.ErrUseLastResponse
 		},
+	}
+	setOAuthResource := func(record persistedOAuth) {
+		resource := record.Resource
+		if resource == "" {
+			resource = session.config.URL
+		}
+		resourceTransport.setResourceURI(resource)
 	}
 	var oauthHandler *auth.AuthorizationCodeHandler
 	authorizationFetcher := func(ctx context.Context, args *auth.AuthorizationArgs) (*auth.AuthorizationResult, error) {
@@ -1215,7 +1306,8 @@ func (m *RemoteManager) connect(managerCtx context.Context, session *remoteSessi
 	credentialKey := credentialID(session.config)
 	refreshContext := context.WithValue(managerCtx, oauth2.HTTPClient, oauthHTTPClient)
 	oauthConfig.NewTokenSource = func(ctx context.Context, config *oauth2.Config, token *oauth2.Token) (oauth2.TokenSource, error) {
-		record := persistedOAuth{Config: *config, Token: *token}
+		record := persistedOAuth{Config: *config, Token: *token, Resource: resourceTransport.getResourceURI()}
+		setOAuthResource(record)
 		if err := savePersistedOAuth(m.credential, credentialKey, record); err != nil {
 			return nil, fmt.Errorf("persisting OAuth credentials: %w", err)
 		}
@@ -1225,9 +1317,10 @@ func (m *RemoteManager) connect(managerCtx context.Context, session *remoteSessi
 		session.mu.Unlock()
 		return newPersistedTokenSource(config.TokenSource(ctx, token), record, m.credential, credentialKey, ctx, func(err error) {
 			session.recordOAuthRefreshFailure(err)
-		}), nil
+		}, setOAuthResource), nil
 	}
 	if record, loadErr := loadPersistedOAuth(m.credential, credentialKey); loadErr == nil {
+		setOAuthResource(record)
 		session.mu.Lock()
 		session.hasPersistedOAuth = true
 		session.hasRefreshToken = record.Token.RefreshToken != ""
@@ -1235,7 +1328,7 @@ func (m *RemoteManager) connect(managerCtx context.Context, session *remoteSessi
 		tokenSource := record.Config.TokenSource(refreshContext, &record.Token)
 		oauthConfig.InitialTokenSource = newPersistedTokenSource(tokenSource, record, m.credential, credentialKey, refreshContext, func(err error) {
 			session.recordOAuthRefreshFailure(err)
-		})
+		}, setOAuthResource)
 	} else if !errors.Is(loadErr, errCredentialNotFound) {
 		if errors.Is(loadErr, errInvalidPersistedOAuth) {
 			m.setStatus(session, RemoteStatus{State: "error", Error: "stored MCP credentials are invalid"})
@@ -1403,13 +1496,14 @@ func credentialID(server RemoteServer) string {
 }
 
 type persistedTokenSource struct {
-	mu      sync.Mutex
-	source  oauth2.TokenSource
-	record  persistedOAuth
-	storage CredentialStorage
-	key     string
-	ctx     context.Context
-	onError func(error)
+	mu              sync.Mutex
+	source          oauth2.TokenSource
+	record          persistedOAuth
+	storage         CredentialStorage
+	key             string
+	ctx             context.Context
+	onError         func(error)
+	onRecordChanged func(persistedOAuth)
 }
 
 var errInvalidPersistedOAuth = errors.New("stored MCP credentials are invalid")
@@ -1434,8 +1528,16 @@ func savePersistedOAuth(storage CredentialStorage, key string, record persistedO
 	return storage.Set(key, payload)
 }
 
-func newPersistedTokenSource(source oauth2.TokenSource, record persistedOAuth, storage CredentialStorage, key string, ctx context.Context, onError func(error)) oauth2.TokenSource {
-	return &persistedTokenSource{source: source, record: record, storage: storage, key: key, ctx: ctx, onError: onError}
+func newPersistedTokenSource(source oauth2.TokenSource, record persistedOAuth, storage CredentialStorage, key string, ctx context.Context, onError func(error), onRecordChanged func(persistedOAuth)) oauth2.TokenSource {
+	return &persistedTokenSource{
+		source:          source,
+		record:          record,
+		storage:         storage,
+		key:             key,
+		ctx:             ctx,
+		onError:         onError,
+		onRecordChanged: onRecordChanged,
+	}
 }
 
 func (s *persistedTokenSource) Token() (token *oauth2.Token, resultErr error) {
@@ -1462,8 +1564,11 @@ func (s *persistedTokenSource) Token() (token *oauth2.Token, resultErr error) {
 	if err != nil {
 		return nil, fmt.Errorf("reloading MCP credentials before refresh: %w", err)
 	}
-	if !sameOAuthToken(latest.Token, s.record.Token) {
+	if !sameOAuthToken(latest.Token, s.record.Token) || latest.Resource != s.record.Resource {
 		s.record = latest
+		if s.onRecordChanged != nil {
+			s.onRecordChanged(latest)
+		}
 		s.source = s.record.Config.TokenSource(s.ctx, &s.record.Token)
 	}
 	token, err = s.source.Token()

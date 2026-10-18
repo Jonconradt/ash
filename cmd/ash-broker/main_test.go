@@ -126,6 +126,14 @@ func TestBrokerSocketReadyWhileMCPStartupIsBlocked(t *testing.T) {
 	if _, err := os.Stat(sessionLock); err != nil {
 		t.Fatalf("broker socket became ready without its scratch lock: %v", err)
 	}
+	brokerLogPath := filepath.Join(home, ".local", "state", "ash", "logs", brokerLogDirectory, "startup-test.log")
+	brokerLogInfo, err := os.Stat(brokerLogPath)
+	if err != nil {
+		t.Fatalf("broker socket became ready without its persistent log: %v", err)
+	}
+	if got := brokerLogInfo.Mode().Perm(); got != 0o600 {
+		t.Fatalf("broker log permissions = %o, want 600", got)
+	}
 	select {
 	case <-mcpStarted:
 	case <-waitCtx.Done():

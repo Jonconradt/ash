@@ -200,7 +200,7 @@ func TestPersistedTokenSourceCoordinatesConcurrentRefresh(t *testing.T) {
 
 	newSource := func() oauth2.TokenSource {
 		tokenSource := record.Config.TokenSource(context.Background(), &record.Token)
-		return newPersistedTokenSource(tokenSource, record, store, key, context.Background(), nil)
+		return newPersistedTokenSource(tokenSource, record, store, key, context.Background(), nil, nil)
 	}
 	sources := []oauth2.TokenSource{newSource(), newSource()}
 	results := make(chan *oauth2.Token, len(sources))
@@ -1391,10 +1391,168 @@ func TestOAuthAuthorizationLogIdentifiesMissingRefreshToken(t *testing.T) {
 	}
 }
 
+func TestOAuthResourceTransport(t *testing.T) {
+	const resource = "https://example.com/MCP/a%2Fb/"
+	tests := []struct {
+		name        string
+		method      string
+		contentType string
+		body        string
+	}{
+		{"refresh", http.MethodPost, "application/x-www-form-urlencoded", "grant_type=refresh_token&refresh_token=test-token&scope=mcp%3Aread"},
+		{"refresh with stale resource", http.MethodPost, "application/x-www-form-urlencoded; charset=utf-8", "grant_type=refresh_token&refresh_token=test-token&resource=https%3A%2F%2Fwrong.example"},
+		{"code exchange", http.MethodPost, "application/x-www-form-urlencoded", "grant_type=authorization_code&code=test-code&resource=" + url.QueryEscape(resource)},
+		{"JSON registration", http.MethodPost, "application/json", `{"client_name":"Ash"}`},
+		{"no content type", http.MethodPost, "", "unchanged"},
+		{"GET metadata", http.MethodGet, "", ""},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			transport := &oauthResourceTransport{resourceURI: resource}
+			request, err := http.NewRequestWithContext(context.Background(), test.method, "https://auth.example/token?tenant=one", strings.NewReader(test.body))
+			if err != nil {
+				t.Fatal(err)
+			}
+			request.Header.Set("Content-Type", test.contentType)
+			request.Header.Set("Authorization", "Basic test-client")
+			prepared, err := transport.withRefreshResource(request)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = prepared.Body.Close() }()
+			body, err := io.ReadAll(prepared.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.HasPrefix(test.name, "refresh") {
+				form, err := url.ParseQuery(string(body))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if form.Get("resource") != resource || form.Get("refresh_token") != "test-token" ||
+					form.Get("grant_type") != "refresh_token" {
+					t.Fatal("refresh request did not preserve its parameters and exact resource URI")
+				}
+				if test.name == "refresh" && form.Get("scope") != "mcp:read" {
+					t.Fatal("refresh scope was lost")
+				}
+				if prepared.ContentLength != int64(len(body)) {
+					t.Fatalf("ContentLength = %d, want %d", prepared.ContentLength, len(body))
+				}
+				replayed, err := prepared.GetBody()
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer func() { _ = replayed.Close() }()
+				replay, err := io.ReadAll(replayed)
+				if err != nil || !bytes.Equal(replay, body) {
+					t.Fatal("refresh body cannot be replayed")
+				}
+			} else if string(body) != test.body {
+				t.Fatal("non-refresh body was changed")
+			}
+			if prepared.URL.String() != request.URL.String() ||
+				prepared.Header.Get("Authorization") != request.Header.Get("Authorization") {
+				t.Fatal("request URL or client authentication was changed")
+			}
+		})
+	}
+	t.Run("captures exchanged resource instead of endpoint", func(t *testing.T) {
+		transport := &oauthResourceTransport{resourceURI: "https://example.com/mcp"}
+		request, err := http.NewRequestWithContext(context.Background(), http.MethodPost, "https://auth.example/token",
+			strings.NewReader("grant_type=authorization_code&resource="+url.QueryEscape(resource)))
+		if err != nil {
+			t.Fatal(err)
+		}
+		request.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		prepared, err := transport.withRefreshResource(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = prepared.Body.Close() }()
+		if transport.getResourceURI() != resource {
+			t.Fatal("transport did not retain the exact metadata-derived resource")
+		}
+	})
+}
+
+func TestPersistedTokenSourceReloadsResource(t *testing.T) {
+	for _, changedToken := range []bool{false, true} {
+		t.Run(fmt.Sprintf("changed-token-%t", changedToken), func(t *testing.T) {
+			const resource = "https://example.com/MCP/a%2Fb/"
+			var refreshes atomic.Int32
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if err := r.ParseForm(); err != nil {
+					http.Error(w, "invalid form", http.StatusBadRequest)
+					return
+				}
+				if r.PostForm.Get("resource") != resource {
+					http.Error(w, "wrong resource", http.StatusBadRequest)
+					return
+				}
+				refreshes.Add(1)
+				w.Header().Set("Content-Type", "application/json")
+				_, _ = io.WriteString(w, `{"access_token":"new-token","refresh_token":"rotated-token","token_type":"Bearer","expires_in":3600}`)
+			}))
+			defer server.Close()
+			record := persistedOAuth{
+				Config: oauth2.Config{
+					ClientID: "test-client",
+					Endpoint: oauth2.Endpoint{TokenURL: server.URL, AuthStyle: oauth2.AuthStyleInParams},
+				},
+				Token: oauth2.Token{
+					AccessToken: "expired-token", RefreshToken: "refresh-token",
+					Expiry: time.Now().Add(-time.Minute),
+				},
+				Resource: "https://example.com/old",
+			}
+			transport := &oauthResourceTransport{base: http.DefaultTransport, resourceURI: record.Resource}
+			client := &http.Client{Transport: transport}
+			ctx := context.WithValue(context.Background(), oauth2.HTTPClient, client)
+			store := &memoryCredentialStorage{}
+			latest := record
+			latest.Resource = resource
+			if changedToken {
+				latest.Token.RefreshToken = "another-refresh-token"
+			}
+			if err := savePersistedOAuth(store, "test", latest); err != nil {
+				t.Fatal(err)
+			}
+			source := newPersistedTokenSource(record.Config.TokenSource(ctx, &record.Token),
+				record, store, "test", ctx, nil, func(record persistedOAuth) {
+					transport.setResourceURI(record.Resource)
+				})
+			if _, err := source.Token(); err != nil {
+				t.Fatalf("refresh after credential reload: %v", err)
+			}
+			if refreshes.Load() != 1 {
+				t.Fatalf("refresh requests = %d, want 1", refreshes.Load())
+			}
+			saved, err := loadPersistedOAuth(store, "test")
+			if err != nil || saved.Resource != resource || saved.Token.RefreshToken != "rotated-token" {
+				t.Fatal("refreshed credentials lost the resource or rotated token")
+			}
+		})
+	}
+}
+
 func TestRemoteManagerOAuthAuthorizationCodeFlow(t *testing.T) {
+	t.Run("endpoint resource", func(t *testing.T) {
+		testRemoteManagerOAuthAuthorizationCodeFlow(t, false)
+	})
+	t.Run("root metadata resource", func(t *testing.T) {
+		testRemoteManagerOAuthAuthorizationCodeFlow(t, true)
+	})
+}
+
+func testRemoteManagerOAuthAuthorizationCodeFlow(t *testing.T, rootResource bool) {
+	t.Helper()
 	var mu sync.Mutex
 	var codeChallenge string
+	var authorizationResource string
+	var refreshResource string
 	var tokenRefreshes int
+	var remoteResource string
 	var rejectRefresh atomic.Bool
 	oauthMux := http.NewServeMux()
 	oauthMux.HandleFunc("/.well-known/oauth-authorization-server", func(w http.ResponseWriter, r *http.Request) {
@@ -1443,14 +1601,21 @@ func TestRemoteManagerOAuthAuthorizationCodeFlow(t *testing.T) {
 		}
 		mu.Lock()
 		defer mu.Unlock()
+		if r.PostForm.Get("resource") != remoteResource {
+			w.WriteHeader(http.StatusBadRequest)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid_grant"})
+			return
+		}
 		if r.Form.Get("grant_type") == "authorization_code" {
 			verifier := r.Form.Get("code_verifier")
 			if verifier == "" || oauth2.S256ChallengeFromVerifier(verifier) != codeChallenge {
 				http.Error(w, "PKCE verification failed", http.StatusBadRequest)
 				return
 			}
+			authorizationResource = r.Form.Get("resource")
 		} else if r.Form.Get("grant_type") == "refresh_token" {
 			tokenRefreshes++
+			refreshResource = r.Form.Get("resource")
 			if rejectRefresh.Load() {
 				w.WriteHeader(http.StatusBadRequest)
 				_ = json.NewEncoder(w).Encode(map[string]string{"error": "invalid_grant"})
@@ -1473,13 +1638,21 @@ func TestRemoteManagerOAuthAuthorizationCodeFlow(t *testing.T) {
 	})
 	var remoteURL string
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/.well-known/oauth-protected-resource/mcp" {
+		metadataPath := "/.well-known/oauth-protected-resource/mcp"
+		if rootResource {
+			metadataPath = "/.well-known/oauth-protected-resource"
+		}
+		if r.URL.Path == metadataPath {
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(map[string]any{
-				"resource":              remoteURL,
+				"resource":              remoteResource,
 				"authorization_servers": []string{oauthServer.URL},
 				"scopes_supported":      []string{"mcp:read"},
 			})
+			return
+		}
+		if strings.HasPrefix(r.URL.Path, "/.well-known/") {
+			http.NotFound(w, r)
 			return
 		}
 		if r.URL.Path == "/mcp" && !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer token-") {
@@ -1495,6 +1668,10 @@ func TestRemoteManagerOAuthAuthorizationCodeFlow(t *testing.T) {
 	remoteHTTPServer := httptest.NewServer(handler)
 	defer remoteHTTPServer.Close()
 	remoteURL = remoteHTTPServer.URL + "/mcp"
+	remoteResource = remoteURL
+	if rootResource {
+		remoteResource = remoteHTTPServer.URL
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
@@ -1506,7 +1683,11 @@ func TestRemoteManagerOAuthAuthorizationCodeFlow(t *testing.T) {
 		return http.DefaultClient.Do(request)
 	}
 	origin := strings.TrimSuffix(remoteURL, "/mcp")
-	metadata, err := oauthex.GetProtectedResourceMetadata(ctx, origin+"/.well-known/oauth-protected-resource/mcp", remoteURL, http.DefaultClient)
+	metadataURL := origin + "/.well-known/oauth-protected-resource/mcp"
+	if rootResource {
+		metadataURL = origin + "/.well-known/oauth-protected-resource"
+	}
+	metadata, err := oauthex.GetProtectedResourceMetadata(ctx, metadataURL, remoteResource, http.DefaultClient)
 	if err != nil {
 		t.Fatalf("GetProtectedResourceMetadata() error = %v", err)
 	}
@@ -1530,6 +1711,9 @@ func TestRemoteManagerOAuthAuthorizationCodeFlow(t *testing.T) {
 	state := authURL.Query().Get("state")
 	if state == "" || authURL.Query().Get("code_challenge") == "" || authURL.Query().Get("code_challenge_method") != "S256" {
 		t.Fatalf("authorization URL missing PKCE/state parameters: %s", status.AuthURL)
+	}
+	if got := authURL.Query().Get("resource"); got != remoteResource {
+		t.Fatalf("authorization request resource = %q, want %q", got, remoteResource)
 	}
 	redirectURL, err := url.Parse(authURL.Query().Get("redirect_uri"))
 	if err != nil {
@@ -1588,10 +1772,23 @@ func TestRemoteManagerOAuthAuthorizationCodeFlow(t *testing.T) {
 	if status.State != "connected" {
 		t.Fatalf("session status = %+v, want connected", status)
 	}
+	mu.Lock()
+	gotAuthorizationResource := authorizationResource
+	mu.Unlock()
+	if gotAuthorizationResource != remoteResource {
+		t.Fatalf("authorization-code resource = %q, want %q", gotAuthorizationResource, remoteResource)
+	}
 	storageID := credentialID(RemoteServer{Name: "oauth-test", URL: remoteURL})
 	stored, err := store.Get(storageID)
 	if err != nil || !strings.Contains(string(stored), `"refresh_token":"refresh-token"`) {
 		t.Fatalf("stored OAuth credentials = %s, err = %v", stored, err)
+	}
+	var storedRecord persistedOAuth
+	if err := json.Unmarshal(stored, &storedRecord); err != nil {
+		t.Fatalf("decoding stored OAuth credentials: %v", err)
+	}
+	if storedRecord.Resource != remoteResource {
+		t.Fatalf("stored OAuth resource = %q, want %q", storedRecord.Resource, remoteResource)
 	}
 	tools, err := manager.ListTools("oauth-test")
 	if err != nil {
@@ -1606,24 +1803,68 @@ func TestRemoteManagerOAuthAuthorizationCodeFlow(t *testing.T) {
 	}
 	mu.Lock()
 	refreshes := tokenRefreshes
+	gotRefreshResource := refreshResource
 	mu.Unlock()
 	if refreshes == 0 {
 		t.Fatal("OAuth token was not refreshed after expiry")
+	}
+	if gotRefreshResource != remoteResource {
+		t.Fatalf("refresh-token resource = %q, want %q", gotRefreshResource, remoteResource)
 	}
 	stored, err = store.Get(storageID)
 	if err != nil || !strings.Contains(string(stored), `"access_token":"token-`) {
 		t.Fatalf("refreshed OAuth credentials = %s, err = %v", stored, err)
 	}
+	if err := json.Unmarshal(stored, &storedRecord); err != nil {
+		t.Fatalf("decoding refreshed OAuth credentials: %v", err)
+	}
+	if storedRecord.Resource != remoteResource {
+		t.Fatalf("persisted refresh resource = %q, want %q", storedRecord.Resource, remoteResource)
+	}
+	storedRecord.Token.Expiry = time.Now().Add(-time.Minute)
+	if err := savePersistedOAuth(store, storageID, storedRecord); err != nil {
+		t.Fatalf("expiring stored OAuth credentials for restart test: %v", err)
+	}
 
 	manager.Close()
+	mu.Lock()
+	refreshResource = ""
+	refreshesBeforeRestart := tokenRefreshes
+	mu.Unlock()
 	restartedManager := NewRemoteManager(ctx, store)
 	defer restartedManager.Close()
 	status, err = restartedManager.Start(ctx, RemoteServer{Name: "oauth-test", URL: remoteURL})
 	if err != nil || status.State != "connected" || status.AuthURL != "" {
 		t.Fatalf("Start() after manager restart = %+v, %v; want connected without authorization", status, err)
 	}
+	mu.Lock()
+	restartedRefreshResource := refreshResource
+	restartedRefreshes := tokenRefreshes
+	mu.Unlock()
+	if restartedRefreshes <= refreshesBeforeRestart || restartedRefreshResource != remoteResource {
+		t.Fatalf("refresh after restart: count = %d, previous = %d, resource = %q; want new refresh for %q",
+			restartedRefreshes, refreshesBeforeRestart, restartedRefreshResource, remoteResource)
+	}
 
 	restartedManager.Close()
+	if !rootResource {
+		legacyRecord, err := loadPersistedOAuth(store, storageID)
+		if err != nil {
+			t.Fatalf("loading OAuth credentials for legacy test: %v", err)
+		}
+		legacyRecord.Resource = ""
+		legacyRecord.Token.Expiry = time.Now().Add(-time.Minute)
+		if err := savePersistedOAuth(store, storageID, legacyRecord); err != nil {
+			t.Fatalf("saving legacy OAuth credentials: %v", err)
+		}
+		legacyManager := NewRemoteManager(ctx, store)
+		defer legacyManager.Close()
+		status, err = legacyManager.Start(ctx, RemoteServer{Name: "oauth-test", URL: remoteURL})
+		if err != nil || status.State != "connected" || status.AuthURL != "" {
+			t.Fatalf("Start() with legacy credentials = %+v, %v; want connected without authorization", status, err)
+		}
+		legacyManager.Close()
+	}
 	rejectRefresh.Store(true)
 	var authorizationLogs bytes.Buffer
 	previousLogger := slog.Default()
