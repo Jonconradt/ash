@@ -74,6 +74,24 @@ func releaseFixture(t *testing.T) (string, string) {
 	return root, dir
 }
 
+func TestBuildVersionUsesNearestReachableTag(t *testing.T) {
+	_, dir := releaseFixture(t)
+	runFixture(t, dir, nil, "git", "tag", "v0.28.0")
+	runFixture(t, dir, nil, "git", "commit", "--allow-empty", "-m", "prepare beta")
+	runFixture(t, dir, nil, "git", "tag", "v0.29.0-beta.1")
+	runFixture(t, dir, nil, "git", "commit", "--allow-empty", "-m", "continue beta")
+
+	writeFixture(t, filepath.Join(dir, "build-version.mk"), `include Makefile
+.PHONY: print-build-version
+print-build-version:
+	@echo "$(BUILD_VERSION)"
+`, 0o644)
+	got := strings.TrimSpace(runFixture(t, dir, nil, "make", "--no-print-directory", "-f", "build-version.mk", "print-build-version"))
+	if got != "v0.29.0-beta.1" {
+		t.Fatalf("BUILD_VERSION = %q, want nearest prerelease tag v0.29.0-beta.1", got)
+	}
+}
+
 func TestChannelVersions(t *testing.T) {
 	_, dir := releaseFixture(t)
 	for _, channel := range []string{"beta", "stable", "nightly"} {
