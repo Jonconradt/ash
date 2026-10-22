@@ -130,12 +130,12 @@ pre-push:
 	else \
 		log_opts="HEAD"; \
 	fi; \
-	go run github.com/zricethezav/gitleaks/v8@$(GITLEAKS_VERSION) git --redact --verbose --log-opts="$$log_opts" .
+	go run github.com/zricethezav/gitleaks/v8@$(GITLEAKS_VERSION) git --platform github --redact --verbose --log-opts="$$log_opts" .
 	@echo "pre-push: all checks passed"
 
 check-security: security
-	@./scripts/dev/run-quiet.sh "secrets-history" go run github.com/zricethezav/gitleaks/v8@$(GITLEAKS_VERSION) git --redact --verbose --log-opts=--all .
-	@./scripts/dev/run-quiet.sh "secrets-tree" go run github.com/zricethezav/gitleaks/v8@$(GITLEAKS_VERSION) dir --redact --verbose .
+	@./scripts/dev/run-quiet.sh "secrets-history" go run github.com/zricethezav/gitleaks/v8@$(GITLEAKS_VERSION) git --platform github --redact --verbose --log-opts=--all .
+	@./scripts/dev/run-quiet.sh "secrets-tree" go run github.com/zricethezav/gitleaks/v8@$(GITLEAKS_VERSION) dir --platform github --redact --verbose .
 
 # Used by scheduled release automation before it creates a tag.
 verify-ci:
