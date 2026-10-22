@@ -5,12 +5,12 @@ SITE_LOCALES ?=
 
 COVERAGE_MIN ?= 60
 FUZZ_TIME ?= 10s
-GOLANGCI_LINT_VERSION ?= v2.14.0
-RUFF_VERSION ?= 0.12.10
-MARKDOWNLINT_CLI2_VERSION ?= 0.23.2
+GOLANGCI_LINT_VERSION ?= v2.15.0
+RUFF_VERSION ?= 0.17.2
+MARKDOWNLINT_CLI2_VERSION ?= 0.24.0
 HTML_VALIDATE_VERSION ?= 11.17.0
 GOSEC_VERSION ?= v2.29.1-0.20261009120814-7b1b5cebe007
-GOVULNCHECK_VERSION ?= v1.8.0
+GOVULNCHECK_VERSION ?= v1.9.0
 STATICCHECK_VERSION ?= 2026.2.2
 YAMLFMT_VERSION ?= v0.21.0
 GITLEAKS_VERSION ?= v8.30.1
@@ -290,7 +290,12 @@ install: test lint security plugins-build plugins-install
 
 version: release-check release-artifacts
 
-release:
+.PHONY: update-dependencies
+
+update-dependencies:
+	@GO111MODULE=off GOTOOLCHAIN=local GOWORK=off go run ./scripts/dev/update-dependencies/main.go
+
+release: update-dependencies
 	@$(MAKE) --no-print-directory release-check
 	@if [[ "$(RELEASE_SKIP_LOCAL_ARTIFACTS)" != "1" ]]; then \
 		$(MAKE) --no-print-directory release-clean; \

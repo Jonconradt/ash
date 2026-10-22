@@ -59,6 +59,30 @@ local source and dependency checks.
 
 ## Release expectations
 
+- Run `make update-dependencies` to check the 12 pinned Makefile tools against
+  their upstream stable releases and check Go against both upstream releases
+  and the local package manager. This is also the first prerequisite of
+  `make release`. Checks require network access and interactive input; nothing
+  is automatically approved in CI or when input ends.
+- Approve tool updates individually. Newer pins, including Go pseudo-versions,
+  are never downgraded to older stable releases. The updater preserves other
+  Makefile content and does not change environment or command-line overrides.
+- On macOS, the updater refreshes Homebrew metadata and, with approval, attempts
+  `brew upgrade go`. If that fails or the installed compiler remains behind,
+  it prompts you to upgrade manually and rechecks. On Linux, it queries apt,
+  dnf, or pacman and prompts for a manual Go upgrade; refresh apt/pacman package
+  indexes beforehand. Other Linux package managers are reported as unsupported.
+  If distro packages lag upstream, the updater reports both versions rather
+  than claiming the package candidate is the latest upstream release.
+- The Go directive is only advanced, with approval, to the verified locally
+  installed stable compiler version. No toolchain auto-download is used by the
+  updater. With separate approval, it runs `go get -u ./...` followed by
+  `go mod tidy`. These commands can also change the module's Go requirements;
+  command failures stop the updater and retain changes for review.
+- Review updates, run `make config` to refresh installed development tools,
+  run `make lint test`, and commit the changes before retrying `make release`.
+  The existing clean-worktree release check remains in force. The updater does
+  not commit, stash, or discard changes; failures retain changes already applied.
 - All release packaging jobs run on Linux. macOS tarballs for both architectures
   are cross-compiled without Rust plugins; CI validates their Mach-O architecture
   and archive contents, not macOS runtime behavior. Linux and FreeBSD continue

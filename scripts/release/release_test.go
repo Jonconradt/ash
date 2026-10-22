@@ -136,6 +136,8 @@ func TestReleaseVersionRemainsFrozenAfterTagging(t *testing.T) {
 			runFixture(t, dir, nil, "git", "tag", "v1.1.7")
 			want := strings.TrimSpace(runFixture(t, dir, nil, "bash", "scripts/release/next_version.sh", channel))
 			writeFixture(t, filepath.Join(dir, "steps.mk"), `
+update-dependencies:
+	@echo "UPDATE"
 release-check release-clean release-build release-translate release-pkg release-validate release-notes:
 	@echo "STEP $(RELEASE_VERSION)"
 release-publish:
@@ -148,6 +150,10 @@ release-watch:
 MAKE := $(MAKE) -f Makefile -f steps.mk
 `, 0o644)
 			output := runFixture(t, dir, nil, "make", "--no-print-directory", "-f", "Makefile", "-f", "steps.mk", "-f", "invoke.mk", "release", "CHANNEL="+channel)
+			updateIndex := strings.Index(output, "UPDATE\n")
+			if updateIndex < 0 || updateIndex > strings.Index(output, "STEP ") {
+				t.Fatalf("dependency updates did not run before release steps:\n%s", output)
+			}
 			count := 0
 			for line := range strings.SplitSeq(output, "\n") {
 				if strings.HasPrefix(line, "STEP ") {
