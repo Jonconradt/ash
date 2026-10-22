@@ -40,14 +40,6 @@ func ashStateDir() (string, error) {
 	return workspace.StateRoot(home), nil
 }
 
-func ashCacheDir() (string, error) {
-	home, err := osUserHomeDir()
-	if err != nil {
-		return "", err
-	}
-	return workspace.CacheRoot(home), nil
-}
-
 func ashRuntimeDir() (string, error) {
 	home, err := osUserHomeDir()
 	if err != nil {
