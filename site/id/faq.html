@@ -190,6 +190,19 @@
 
           <h3>Apa saja skrip alat dan plugin asli yang disediakan?</h3>
           <p>Skrip bootstrap Python yang diinstal adalah<code>headlines.py</code>,<code>wikipedia.py</code>, Dan<code>yfinance.py</code>di dalam<code>$XDG_DATA_HOME/ash/tools/</code>. Plugin asli yang disediakan adalah<code>what_time_is_it</code>(Pergi),<code>flip_a_coin</code>(Karat), dan<code>calculator</code>(Skrip Ketik) di<code>$XDG_DATA_HOME/ash/plugins/</code>.</p>
+          <p>Plugin Rust, termasuk <code>flip_a_coin</code>, hanya disertakan di Linux dan FreeBSD. Build macOS menyertakan <code>what_time_is_it</code> dan <code>calculator</code>, tetapi tidak menyertakan plugin Rust.</p>
+
+          <h3 id="macos-rust-plugin">Mengapa plugin Rust tidak tersedia di macOS, dan bagaimana memasangnya secara manual?</h3>
+          <p>macOS tidak menyertakan plugin Rust seperti <code>flip_a_coin</code> agar kedua arsitektur dapat dibangun di Linux tanpa runner macOS dan mengurangi biaya CI. Ini bukan batasan kompatibilitas. Homebrew tetap menyertakan plugin Go dan TypeScript; Linux dan FreeBSD tetap menyertakan Rust.</p>
+          <p>Di Mac Anda, pasang Xcode Command Line Tools (<code>xcode-select --install</code> jika diperlukan) dan Rust melalui <a href="https://rustup.rs/">rustup</a>. Jalankan perintah berikut di tempat Anda ingin membuat salinan baru repositori. Makefile plugin membangun untuk arsitektur asli Mac dan memasang langsung ke direktori pengguna, tanpa <code>sudo</code>.</p>
+          <pre><code>git clone https://github.com/Jonconradt/ash.git
+cd ash
+rustup toolchain install 1.99.0 --profile minimal
+plugin_dir="${XDG_DATA_HOME:-$HOME/.local/share}/ash/plugins"
+make -C internal/app/ash_bootstrap/plugins_src/flip_a_coin build BUILD_DIR="$plugin_dir"
+"$plugin_dir/flip_a_coin" --version
+"$plugin_dir/flip_a_coin" --ai-docs</code></pre>
+          <p>Gunakan Makefile plugin, bukan <code>make plugins-build</code>, yang melewati Rust di macOS. Pertahankan <code>$PLUGINS_DIR_LIST</code> di <code>${XDG_CONFIG_HOME:-$HOME/.config}/ash/.ash_allow</code> atau tambahkan <code>flip_a_coin</code>; nama itu tidak boleh ada di <code>.ash_deny</code>. Mulai pemanggilan ash baru. Jalankan <code>"$plugin_dir/flip_a_coin"</code> untuk menguji tanpa penyedia AI.</p>
 
           <h3>Bisaashhubungi sub-agen?</h3>
           <p>Ya. Agen orang tua dapat menggunakan<code>run_sub_agent</code>untuk satu tugas yang terfokus dan independen. Seorang anak mewarisi direktori kerja, konfigurasi, alat, dan izin OS, mengembalikan hasil yang dibatasi, dan tidak dapat membuat anak lain. Maksimum defaultnya adalah enam sub-agen per induk yang dijalankan dan dapat diubah<code>ASH_MAX_AGENTS</code>.</p>

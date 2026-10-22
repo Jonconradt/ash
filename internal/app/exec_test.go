@@ -72,14 +72,12 @@ func TestAgentBudgetConcurrentReservations(t *testing.T) {
 	budget := newAgentBudget(defaultMaxAgents)
 	var group sync.WaitGroup
 	var reserved atomic.Int32
-	for i := 0; i < 32; i++ {
-		group.Add(1)
-		go func() {
-			defer group.Done()
+	for range 32 {
+		group.Go(func() {
 			if budget.reserve() {
 				reserved.Add(1)
 			}
-		}()
+		})
 	}
 	group.Wait()
 	if reserved.Load() != int32(defaultMaxAgents) {

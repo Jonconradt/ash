@@ -182,7 +182,7 @@ func preservedAshEnvValues(path string) (map[string]string, error) {
 	}
 
 	values := map[string]string{}
-	for _, line := range strings.Split(string(content), "\n") {
+	for line := range strings.SplitSeq(string(content), "\n") {
 		key, value, ok := parseExportAssignment(line)
 		if !ok {
 			continue
@@ -240,7 +240,7 @@ func buildFishEnvironmentFile(content string) []byte {
 	b.WriteString("if not set -q ASH_SESSION_ID\n")
 	b.WriteString("\tset -gx ASH_SESSION_ID (command head -c 100 /dev/urandom | command tr -dc 'a-zA-Z0-9' | command fold -w 16 | command head -n 1)\n")
 	b.WriteString("end\n")
-	for _, line := range strings.Split(content, "\n") {
+	for line := range strings.SplitSeq(content, "\n") {
 		key, value, ok := parseExportAssignment(line)
 		if !ok || !fishEnvironmentKeyAllowed(key) {
 			continue

@@ -136,8 +136,7 @@ func (a openAIAdapter) SendStream(ctx context.Context, aiCfg aiConfig, messages 
 }
 
 func mapOpenAIError(err error) error {
-	var apiErr *openai.Error
-	if errors.As(err, &apiErr) {
+	if apiErr, ok := errors.AsType[*openai.Error](err); ok {
 		return chatStatusError{StatusCode: apiErr.StatusCode, Body: apiErr.Message}
 	}
 	return err

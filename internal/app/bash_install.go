@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
@@ -338,7 +339,7 @@ func ensureBashProfileSourcingForInstall(dryRun bool, stdout io.Writer) error {
 	return osWriteFile(profilePath, []byte(updated), 0o600)
 }
 func normalizeBashProfileForInstall(content, bashRCLine string) string {
-	for _, line := range strings.Split(content, "\n") {
+	for line := range strings.SplitSeq(content, "\n") {
 		if isBashRCSourceLine(strings.TrimSpace(line)) {
 			return content
 		}
@@ -361,10 +362,5 @@ func isBashRCSourceLine(line string) bool {
 		`source "$HOME/.bashrc"`,
 		`source ~/.bashrc`,
 	}
-	for _, pattern := range patterns {
-		if line == pattern {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(patterns, line)
 }

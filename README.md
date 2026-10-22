@@ -105,8 +105,10 @@ tag version and Git HEAD without the development suffix.
 make lint
 make test
 make install
+make pre-push
+make check-static
+make check-security
 make verify
-make verify-ci
 make sync-route-words
 make version
 make release
@@ -114,15 +116,24 @@ make release
 make release CHANNEL=stable
 ```
 
-- `make lint` runs `golangci-lint` checks across the module
-- `make security` runs `gosec` and `govulncheck` for security scanning
+- `make lint` checks Go, shell scripts, HTML, JSON, GitHub Actions workflows,
+  YAML formatting, localization, Python, Markdown, and plugin sources
+- `make security` runs Go security/vulnerability analysis plus npm, Cargo, and
+  Python dependency audits
+- `make check-static` and `make check-security` are named aliases for those
+  respective local quality gates; the latter also scans repository history and
+  working-tree files for secrets
+- `make pre-push` runs static checks, security/dependency/secret scanning, and
+  tests against the exact commit being pushed. `make config` installs the
+  repository hooks. Hooks can be bypassed, so this is a local safeguard, not a
+  server-enforced GitHub status check.
 - `make test` runs `go test ./...`
 - `make install` builds `ash`, `ash-broker`, and bundled plugins into user-local directories, then enables Bash shell integration.
 - `make verify` runs the complete quality gate, including race/coverage tests, vet,
   staticcheck, security and secret scans, fuzz tests, and benchmarks
-- `make verify-ci` runs lint, unit tests, and security checks for hosted release
-  builds; it skips race/coverage tests, vet, staticcheck, secret scans, fuzz tests,
-  and benchmarks
+- `make verify-ci` runs the pre-push gate before an automated nightly release;
+  it skips the deeper race/coverage, fuzz, benchmark, and full repository secret
+  scans in `make verify`
 - `make sync-route-words` regenerates the ambiguous-word block in the shell assets from
   `internal/app/ash_bootstrap/route_words.txt`, the canonical list. Edit only that file; a test fails if
   the generated blocks are stale
@@ -133,8 +144,11 @@ make release CHANNEL=stable
   create a `release/vX.Y` branch, and publish the corresponding `vX.Y.0` stable
   release
 - `make release CHANNEL=nightly` publishes a date-stamped nightly prerelease
-- Every release generates the localized static website with the existing
-  Google Translate-backed `make site-locales` process and includes it as
+- Scheduled nightly release automation runs on Ubuntu and validates before
+  tagging. It creates no local artifacts; the tag-triggered workflow builds and
+  validates the release outputs.
+- Non-nightly releases generate the localized static website with the existing
+  Google Translate-backed `make site-locales` process and include it as
   `ash-site-<version>.tar.gz`; generation uses a temporary copy and does not
   modify the working tree
 - GitHub Releases publish installable platform packages and bundled tarballs,
@@ -152,7 +166,8 @@ make release CHANNEL=stable
   example `v1.2.0-nightly.20261011.1`. Release tags are immutable, including
   failed attempts, because Go's checksum database may already have indexed them.
 
-Contributor note: run `make lint test` before submitting changes.
+Contributor note: run `make pre-push` before submitting changes. `make config`
+installs the hook that runs this gate on the exact outgoing commits.
 
 ## Install on Linux, macOS, or FreeBSD
 
@@ -325,17 +340,22 @@ if Python, venv support, or network access is unavailable. Python is not a
 required dependency of the native packages; install Python 3 with venv support
 to use the bundled Python tools.
 
-Native packages remain available from the [latest GitHub release](https://github.com/Jonconradt/ash/releases/latest): macOS `.pkg`, and Linux `.deb`
-or `.rpm` packages. Each package contains `ash`, `ash-broker`, bundled native
+Linux `.deb` and `.rpm` packages and macOS `.tar.gz` archives remain available
+from the [latest GitHub release](https://github.com/Jonconradt/ash/releases/latest).
+Homebrew remains the preferred macOS install method. Each artifact contains `ash`, `ash-broker`, bundled native
 plugins, the `ash` man pages, the MIT license, and
 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md). Linux packages install
-binaries under `/usr/bin` and plugins under `/usr/lib/ash/plugins`; macOS
-packages install under `/usr/local`. These package-manager-owned installs are
+binaries under `/usr/bin` and plugins under `/usr/lib/ash/plugins`. These package-manager-owned installs are
 covered by the MIT license's requirement to retain the copyright and
 permission notice, which identifies and links to the Ash project. They are not
 updated by `ash update`. FreeBSD ships as a `.tar.gz` only; install `bash` with
 `pkg install bash` first. Configure `ASH_AI_ENDPOINT` and `ASH_AI_MODEL` after installation
 as described below.
+
+macOS builds include `what_time_is_it` (Go) and `calculator` (TypeScript), but
+exclude Rust plugins, including `flip_a_coin`. Linux and FreeBSD releases
+continue to include the Rust plugin. This is a bundled-build policy, not a
+restriction on user-provided plugins.
 
 ### Fish support
 
@@ -354,11 +374,13 @@ Canonical publishing is tag-driven in GitHub Actions.
 
 1. Run `make release RELEASE_VERSION=v1.2.3` (or omit `RELEASE_VERSION` to auto-derive).
 2. `make release` creates and pushes the release tag to `origin`.
-3. The `release` workflow runs `make version` in macOS, Linux, and FreeBSD packaging jobs.
+3. The tag-triggered workflow builds and validates macOS, Linux, and FreeBSD
+   artifacts on Linux runners. Source and dependency checks run locally before
+   pushes; the artifact workflow does not repeat them.
 4. GitHub Release assets are published automatically:
 
-- `ash-v1.2.3-darwin-amd64.pkg`
-- `ash-v1.2.3-darwin-arm64.pkg`
+- `ash-v1.2.3-darwin-amd64.tar.gz`
+- `ash-v1.2.3-darwin-arm64.tar.gz`
 - `ash-v1.2.3-linux-amd64.deb`
 - `ash-v1.2.3-linux-arm64.deb`
 - `ash-v1.2.3-linux-amd64.rpm`
@@ -373,9 +395,14 @@ for macOS and Linux. Add a repository secret named
 `HOMEBREW_TAP_GITHUB_TOKEN` containing a classic personal access token with
 permission to create and push to public repositories.
 
+Both macOS architectures are cross-compiled in one Ubuntu job without Rust
+plugins; no macOS runners are used. CI validates tarball contents and Mach-O
+binary architectures, but cannot execute or runtime-smoke-test macOS binaries.
+The Homebrew formula is generated on Ubuntu from the tarball checksums.
+
 Installer man pages are included in release artifacts:
 
-- macOS `.pkg`: `/usr/local/share/man/man1/ash.1`
+- macOS `.tar.gz`: `usr/share/man/man1/ash.1`
 - Linux `.deb`/`.rpm`: `/usr/share/man/man1/ash.1`
 - `.tar.gz`: `usr/share/man/man1/ash.1`
 - Locale-specific pages are installed under `man/<locale>/man1/ash.1` (for
@@ -399,9 +426,19 @@ Requirements for local packaging:
 - macOS with `pkgbuild` and `pkgutil` available
 - Linux packaging requires `fpm` (for `.deb`/`.rpm`) plus `dpkg-deb`/`rpm` for validation
 - Go toolchain installed
+- Node.js/npm for the TypeScript plugin; Rust/Cargo for non-macOS plugin builds
 
-The macOS package is not signed or notarized. Release archives are distributed
-with a signed checksum manifest; package payloads are covered by that manifest.
+The macOS `.pkg` can still be built locally, but is not generated by CI.
+To cross-build macOS tarballs on Linux without Apple packaging tools, run:
+
+```bash
+make release-artifacts RELEASE_TARGET_OSES=darwin \
+  RELEASE_TARGET_ARCHES="amd64 arm64" RELEASE_MACOS_PKG=0 RELEASE_VERSION=v1.2.3
+```
+
+`make release` still requires macOS and creates a local `.pkg` before publishing
+the tag; local build outputs are not handed off to CI.
+Release archives are distributed with a signed checksum manifest.
 
 ## Configure
 
@@ -471,7 +508,7 @@ Common `ASH_AI_ENDPOINT` values:
 
 Notes:
 
-- Cloud endpoints are inferred when the host is not `localhost`, `127.0.0.1`, a private/LAN address (RFC1918 IPv4, IPv6 ULA), or a `.local` mDNS hostname. Set `ASH_STRICT=1` to treat only `localhost`/loopback as non-cloud (private/LAN hosts then require `https` and `ASH_AI_AUTH_TOKEN` like any other cloud endpoint).
+- Cloud endpoints are inferred when the host is not `localhost`, `127.0.0.1`, a private/LAN address (RFC1918 IPv4, IPv6 ULA), a `.local` mDNS hostname, or a hostname that resolves exclusively to private/loopback addresses. Set `ASH_STRICT=1` to treat only `localhost`/loopback as non-cloud (private/LAN hosts then require `https` and `ASH_AI_AUTH_TOKEN` like any other cloud endpoint).
 - Cloud endpoints must use `https`; all except AWS Bedrock require `ASH_AI_AUTH_TOKEN`, which is sent as bearer auth.
 - Provider detection is automatic by endpoint host/path; use `ASH_AI_PROVIDER` only when you need to override.
 - `ASH_AI_CACHE` defaults to enabled. Use `ASH_AI_CACHE=off` to disable provider-native caching.
@@ -558,7 +595,9 @@ For direct OAuth connections, Ash permits non-public IP addresses only for the e
 
 If MCP initialization fails, `ash` continues the request with its local tools and without any remote MCP tools. Interactive runs warn on stderr; non-interactive runs intentionally suppress this expected failure. Scheduled jobs do not inherit the per-shell broker, so they run without MCP tools even when servers are listed in `.ash_allow`. Do not schedule prompts that depend on MCP results; they may complete without performing the requested MCP work.
 
-OAuth credentials are stored in the OS credential manager when available. If it is unavailable, Ash requires `ASH_MCP_CREDENTIAL_KEY` containing a randomly generated 32-byte key encoded as hex or base64 and stores only authenticated-encrypted credentials in `$XDG_DATA_HOME/ash/mcp/mcp-credentials.enc` (default `~/.local/share/ash/mcp/mcp-credentials.enc`) with private permissions. The key itself is not stored by Ash. Short-lived access tokens are refreshed with the stored refresh token; the authorization server controls how long refresh credentials remain valid. Refreshes are coordinated across independent shell brokers, so concurrent terminals do not race with stale rotating refresh tokens. The public MCP playground above does not require OAuth and is only useful for remote transport/tool-discovery smoke testing; it does not test OAuth behavior.
+OAuth credentials are stored in the OS credential manager when available. If it is unavailable, Ash requires `ASH_MCP_CREDENTIAL_KEY` containing a randomly generated 32-byte key encoded as hex or base64 and stores only authenticated-encrypted credentials in `$XDG_DATA_HOME/ash/mcp/mcp-credentials.enc` (default `~/.local/share/ash/mcp/mcp-credentials.enc`) with private permissions. The key itself is not stored by Ash. Ash preserves the protected-resource URI used during authorization and sends it with refresh-token requests so the authorization server can validate the resource binding. Short-lived access tokens are refreshed with the stored refresh token; the authorization server controls how long refresh credentials remain valid. Refreshes are coordinated across independent shell brokers, so concurrent terminals do not race with stale rotating refresh tokens. Broker diagnostics, including OAuth reauthorization reasons, are appended to `$XDG_STATE_HOME/ash/logs/brokers/<ASH_SESSION_ID>.log` (default `~/.local/state/ash/logs/brokers/<ASH_SESSION_ID>.log`) with private permissions. The public MCP playground above does not require OAuth and is only useful for remote transport/tool-discovery smoke testing; it does not test OAuth behavior.
+
+For credentials saved before resource-URI persistence was added, refresh uses the configured MCP URL. If such an older grant was bound to a different resource advertised by server metadata, one new authorization may be needed to persist that resource.
 
 Optional canonical system prompt file:
 
@@ -687,7 +726,8 @@ When enabled, `ash` logs structured diagnostics with Go's standard-library `log/
 
 `ash` publishes these tools to the configured provider on each request:
 
-- `run_unix_command`: executes one allowlisted Unix executable with direct argv (no shell)
+- `run_unix_command`: executes one allowlisted Unix executable with direct argv (no shell); managed Python tools run through Ash's selected interpreter
+- `run_unix_pipeline`: connects allowlisted commands without a shell; managed Python tools are also supported as pipeline stages
 - `run_python3`: when a runnable Python interpreter is available and `ASH_STRICT` is off, executes either `python3 -c <code>` or a `.py` file in the current managed scratch session with optional argv
 - `run_sub_agent`: delegates one focused task to a child ash process, subject to `ASH_MAX_AGENTS`
 - `schedule_future_prompt`: schedules one prompt run via a user `launchd` LaunchAgent

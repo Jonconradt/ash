@@ -2,6 +2,12 @@
 
 `flip_a_coin` is a reference Rust native plugin for Ash. It simulates a fair coin toss and returns either `HEADS` or `TAILS` (or structured JSON).
 
+This plugin is bundled in Linux and FreeBSD releases, but not macOS builds.
+The top-level builder skips all Rust plugins for macOS targets. Its source
+can still be built and tested directly on macOS.
+See the [macOS manual installation FAQ](../../../../../site/faq.html#macos-rust-plugin)
+for prerequisites, build/install commands, and allowlist setup.
+
 ## Plugin Requirements Implementation
 
 1. **AI Documentation (`--ai-docs`)**:

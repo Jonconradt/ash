@@ -4,6 +4,7 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -324,19 +325,31 @@ func parseAIEndpoint(value string) (baseURL string, host string, scheme string, 
 }
 
 // isCloudAIHost reports whether the condition is true. Private/LAN addresses
-// (RFC1918 IPv4, IPv6 ULA), .local mDNS hostnames, and bare single-label
-// hostnames (e.g. "brain", resolved via mDNS/NetBIOS/hosts file rather than
-// public DNS) are treated as non-cloud unless ASH_STRICT is enabled, in which
-// case only localhost/loopback are exempt.
+// (RFC1918 IPv4, IPv6 ULA), .local mDNS hostnames, bare single-label hostnames,
+// and hostnames that resolve exclusively to private/loopback addresses are
+// treated as non-cloud unless ASH_STRICT is enabled, in which case only
+// localhost/loopback are exempt.
 func isCloudAIHost(host string) bool {
+	lookup := func(ctx context.Context, hostname string) ([]net.IP, error) {
+		return net.DefaultResolver.LookupIP(ctx, "ip", hostname)
+	}
+	return isCloudAIHostWithLookup(host, lookup)
+}
+
+func isCloudAIHostWithLookup(host string, lookup func(context.Context, string) ([]net.IP, error)) bool {
 	h := strings.TrimSpace(strings.ToLower(host))
 	if h == "localhost" {
 		return false
 	}
 	ip := net.ParseIP(h)
 	if ip == nil {
-		if !strictSecurityModeEnabled() && (strings.HasSuffix(h, ".local") || !strings.Contains(h, ".")) {
-			return false
+		if !strictSecurityModeEnabled() {
+			if strings.HasSuffix(h, ".local") || !strings.Contains(h, ".") {
+				return false
+			}
+			if hostnameResolvesOnlyToPrivateIPs(h, lookup) {
+				return false
+			}
 		}
 		return true
 	}
@@ -345,6 +358,22 @@ func isCloudAIHost(host string) bool {
 	}
 	if !strictSecurityModeEnabled() && ip.IsPrivate() {
 		return false
+	}
+	return true
+}
+
+func hostnameResolvesOnlyToPrivateIPs(host string, lookup func(context.Context, string) ([]net.IP, error)) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	ips, err := lookup(ctx, host)
+	if err != nil || len(ips) == 0 {
+		return false
+	}
+	for _, ip := range ips {
+		if ip == nil || (!ip.IsPrivate() && !ip.IsLoopback()) {
+			return false
+		}
 	}
 	return true
 }
@@ -443,12 +472,12 @@ func loadAllowlistedCommandsFromSource() (map[string]struct{}, error) {
 // parseDenylistFile parses and validates denylist entries.
 func parseDenylistFile(raw string) map[string]struct{} {
 	set := map[string]struct{}{}
-	for _, line := range strings.Split(raw, "\n") {
+	for line := range strings.SplitSeq(raw, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-		for _, token := range strings.Split(trimmed, ",") {
+		for token := range strings.SplitSeq(trimmed, ",") {
 			name := normalizeToolName(token)
 			if name == "" {
 				continue
@@ -462,7 +491,7 @@ func parseDenylistFile(raw string) map[string]struct{} {
 // parseAllowlistCSV parses and validates input values.
 func parseAllowlistCSV(raw string) map[string]struct{} {
 	set := map[string]struct{}{}
-	for _, part := range strings.Split(raw, ",") {
+	for part := range strings.SplitSeq(raw, ",") {
 		name := normalizeToolName(part)
 		if name == "" {
 			continue
@@ -475,12 +504,12 @@ func parseAllowlistCSV(raw string) map[string]struct{} {
 // parseAllowlistFile parses and validates input values.
 func parseAllowlistFile(raw string) map[string]struct{} {
 	set := map[string]struct{}{}
-	for _, line := range strings.Split(raw, "\n") {
+	for line := range strings.SplitSeq(raw, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || mcpclient.IsRemoteServerLine(trimmed) || strings.Contains(trimmed, toolsDirListToken) || strings.Contains(trimmed, pluginsDirListToken) || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-		for _, token := range strings.Split(trimmed, ",") {
+		for token := range strings.SplitSeq(trimmed, ",") {
 			name := normalizeToolName(token)
 			if name == "" {
 				continue
@@ -497,7 +526,7 @@ func parseAllowlistFileWithTokens(raw string) (map[string]struct{}, error) {
 	if strictSecurityModeEnabled() {
 		return set, nil
 	}
-	for _, line := range strings.Split(raw, "\n") {
+	for line := range strings.SplitSeq(raw, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == toolsDirListToken {
 			tools, err := eligibleToolScripts()

@@ -83,7 +83,9 @@
           <h2>Alldeeglech Entwécklung Workflow</h2>
           <p>Fir eng normal Code Ännerung, lafen déi fokusséiert Tester beim Iteréieren, lafen dann déi erfuerderlech Lint an Test Gates vum Repository virum Enn:</p>
           <pre><code>go test ./internal/app -run 'TestName'
-make lint test</code></pre>
+make check-static
+make check-security
+make test</code></pre>
           <p>Déi meescht Maacht Ziler benotzen<code>scripts/dev/run-quiet.sh</code>: erfollegräich Schrëtt Drécken eng präzis<code>ok</code>Linn, wärend gescheitert Schrëtt hir ageholl Ausgang drécken. Präfix engem Zil mat<code>V=1</code>fir säi komplette Output ze streamen wéi se leeft:</p>
           <pre><code>make V=1 lint
 make V=1 test
@@ -94,12 +96,14 @@ make V=1 verify</code></pre>
         <section id="make-targets">
           <h2>Zilreferenz maachen </h2>
           <dl>
+            <dt><code>make pre-push</code></dt>
+            <dd>Féiert statesch Kontrollen, Sécherheets- an Ofhängegkeetsscannen, Geheimnisserkennung an Tester op de geneeë Commiten aus, déi geschéckt ginn. <code>make config</code> installéiert de Repository-Hook. Lokal Hooks kënnen ëmgaange ginn a sinn net vum Server erzwongen.</dd>
             <dt><code>make lint</code></dt>
             <dd>Kontrolléiert Lokaliséierungskataloge, Shell Syntax fir de Site Installateur, Workflow YAML, Python Lint / Format, Markdown, Plugin Lint, a Go Lint.</dd>
             <dt><code>make test</code></dt>
             <dd>Baut a testt gebierteg Plugins, leeft dann<code>go test ./...</code>.</dd>
             <dt><code>make verify-ci</code></dt>
-            <dd>Leeft Lëntgen, Tester a Sécherheetskontrollen - déi méi séier CI Qualitéitspaart.</dd>
+            <dd>Féiert d'Pre-Push-Kontroll virun der Erstellung vum Nightly-Tag aus. D'Tag-getriggert Artefakt-CI widderhëlt keng Quellcodekontrollen.</dd>
             <dt><code>make verify</code></dt>
             <dd>Leeft déi voll lokal Qualitéitspaart: Lint, Tester, Race Tester, Ofdeckung, Veterinär, statesch Analyse, Sécherheet, Geheimscannen, Fuzzing, a Benchmarks.</dd>
             <dt><code>make test-race</code></dt>
@@ -109,7 +113,7 @@ make V=1 verify</code></pre>
             <dt><code>make test-fuzz</code></dt>
             <dd>Leeft Applikatioun Fuzz Tester fir<code>FUZZ_TIME</code>(Standard 10 Sekonnen).</dd>
             <dt><code>make security</code></dt>
-            <dd>Leeft souwuel<code>gosec</code>an<code>govulncheck</code>.</dd>
+            <dd>Féiert <code>gosec</code>, <code>govulncheck</code> an npm-, Cargo- a Python-Ofhängegkeetsauditen aus.</dd>
             <dt><code>make build</code></dt>
             <dd>Leeft Lint an Tester, baut an installéiert gebierteg Plugins, a baut<code>ash</code>pluss<code>ash-broker</code>ënner<code>~/.local/bin</code>.</dd>
             <dt><code>make install</code></dt>
@@ -130,8 +134,8 @@ make V=1 verify</code></pre>
 
         <section id="release-builders">
           <h2>Fräisetzung Builder an artifacts</h2>
-          <p>De GitHub Verëffentlechungsworkflow trennt Qualitéitskontrollen vun gebiertege Verpackungsbauer. macOS Packagen ginn op Intel an Apple Silicon Leefer gebaut a gefëmmt getest. Linux Builder Cover<code>amd64</code>an<code>arm64</code>an validéieren<code>.deb</code>,<code>.rpm</code>, an tarball installéiert. FreeBSD ass cross-built a verpackt fir<code>amd64</code>.</p>
-          <p>Go Verëffentlechungsbinäre gi mat Trim-Wee a gesträifte Linkeroptiounen gebaut. Native Plugins gi fir datselwecht OS an Architektur gebaut. De Verëffentlechungs-Workflow testt och den installéierten Package oder extrahéierten Archiv, och eng frësch Shell-Installatiounskonfiguratioun.</p>
+          <p>No de Qualitéitskontrolle leeft <code>make release-artifacts</code> op Linux. Een Ubuntu-Job baut d'macOS-Archive fir Intel an Apple Silicon fir Homebrew, ouni macOS-Runner oder <code>.pkg</code>-Installateuren. macOS-Ziler schléissen all Rust-Plugins aus, och <code>flip_a_coin</code> a lokal Builds. Linux a FreeBSD behalen d'Rust-Plugins.</p>
+          <p>CI kontrolléiert den Inhalt vun de macOS-Archiven an d'Mach-O-Architekturen, féiert d'Binärdateien awer net aus. Linux a FreeBSD behalen d'Lafzäittester vun den ausgepaakten Archiven; Packagen a Shell-Integratioune ginn net installéiert. Fir macOS op Linux ze bauen: <code>make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES="amd64 arm64" RELEASE_MACOS_PKG=0 RELEASE_VERSION=v1.2.3</code>. <code>make release</code> erstellt nach ëmmer e lokale <code>.pkg</code> op macOS, ouni lokal Binärdateien un CI ze schécken.</p>
           <p>Fir lokal Artefakt Builds, spezifizéiert d'Zil OS, d'Architektur an d'Versioun explizit:</p>
           <pre><code>make release-artifacts \
   RELEASE_TARGET_OSES=linux \

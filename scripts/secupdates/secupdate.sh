@@ -14,6 +14,7 @@ readonly LOCK_DIR="${TMPDIR:-/tmp}/ash-secupdate.lock"
 
 # Report the failing command and line so the systemd failure mail names the exact
 # step that failed instead of a bare silent `exit 1` from `set -e`.
+# shellcheck disable=SC2154
 trap 'rc=$?; printf "[secupdate] FAILED rc=%d at %s:%d cmd: %s\n" "$rc" "${BASH_SOURCE[0]}" "$LINENO" "$BASH_COMMAND" >&2' ERR
 
 log() {
@@ -142,13 +143,11 @@ main() {
 	cd -- "$REPO_ROOT"
 	update_os
 	update_repository
-	log "running security checks"
-	make security
-	log "running lint and tests"
+	log "running local pre-push validation"
 	(
 		# Test fixtures assert the permission bits they request; keep the service umask elsewhere.
 		umask 022
-		make lint test
+		make pre-push
 	)
 	if ! repository_is_clean; then
 		commit_repository_changes

@@ -55,7 +55,7 @@ func TestBuildPlanAllModeMarksChangedWhenPrecleanRewritesInvalidPersistenceEID(t
 }
 
 func TestCryptoRandIntAlwaysReturnsAnAlphaNumericIndex(t *testing.T) {
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		got := cryptoRandInt(len(alphaNum))
 		if got < 0 || got >= len(alphaNum) {
 			t.Fatalf("cryptoRandInt returned out-of-range index %d", got)

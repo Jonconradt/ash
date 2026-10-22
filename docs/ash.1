@@ -235,8 +235,9 @@ keeps the model warm for a bounded period.
 .B ASH_AI_AUTH_TOKEN
 Optional bearer token for authenticated endpoints. When set, it is sent as
 bearer authentication and is required for cloud endpoints except AWS Bedrock.
-Private/LAN addresses (RFC1918 IPv4, IPv6 ULA) and .local mDNS hostnames are
-treated as non-cloud (like localhost) unless ASH_STRICT is enabled.
+Private/LAN addresses (RFC1918 IPv4, IPv6 ULA), .local mDNS hostnames, and
+hostnames that resolve exclusively to private/loopback addresses are treated
+as non-cloud (like localhost) unless ASH_STRICT is enabled.
 .TP
 .B ASH_AI_PROVIDER
 Optional provider override. Supported values:

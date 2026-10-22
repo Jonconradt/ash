@@ -7,7 +7,6 @@ package scratchlife
 
 import (
 	"bufio"
-	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -129,8 +128,7 @@ func TestValidateSessionIDRejectsTraversal(t *testing.T) {
 func TestCrossProcessHolderProtectsThenReleasesSession(t *testing.T) {
 	root := t.TempDir()
 	sessionID := "cross-process"
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestScratchLockSubprocessHelper$")
 	cmd.Env = append(os.Environ(), "ASH_SCRATCH_LOCK_HELPER=1", "ASH_SCRATCH_LOCK_ROOT="+root, "ASH_SCRATCH_LOCK_SESSION="+sessionID)
 	stdin, err := cmd.StdinPipe()
@@ -185,8 +183,7 @@ func TestCrossProcessHolderProtectsThenReleasesSession(t *testing.T) {
 func TestCleanupRecoversAfterHolderIsKilled(t *testing.T) {
 	root := t.TempDir()
 	sessionID := "killed-process"
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	ctx := t.Context()
 	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestScratchLockSubprocessHelper$")
 	cmd.Env = append(os.Environ(), "ASH_SCRATCH_LOCK_HELPER=1", "ASH_SCRATCH_LOCK_ROOT="+root, "ASH_SCRATCH_LOCK_SESSION="+sessionID)
 	stdin, err := cmd.StdinPipe()

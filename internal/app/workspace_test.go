@@ -194,7 +194,7 @@ func TestListScratchFilesBoundsSerializedPages(t *testing.T) {
 	t.Setenv("HOME", home)
 	t.Setenv("ASH_SESSION_ID", "session_123")
 	t.Setenv("ASH_TOOL_OUTPUT_MAX", "512")
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		result := shim.CallTool(context.Background(), "write_scratch_file", map[string]any{
 			"path":    fmt.Sprintf("nested/file-%d.txt", i),
 			"content": "x",

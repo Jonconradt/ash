@@ -31,6 +31,12 @@ model are also used to generate release notes.
 For a public Ollama or OpenAI-compatible endpoint, configure all three AI
 secrets, including `ASH_AI_AUTH_TOKEN`.
 
+Source and dependency checks run locally through the installed pre-push hook;
+the tag-triggered release workflow focuses on building and validating artifacts.
+The scheduled nightly workflow runs the local-equivalent gate on Ubuntu before
+creating a tag. Local hooks are bypassable and are not a server-side status
+check.
+
 ### Create `RELEASE_GITHUB_TOKEN`
 
 1. On GitHub, open **Settings → Developer settings → Personal access tokens →
@@ -204,10 +210,13 @@ Fetch all remote tags before releasing from a local checkout. Never move or
 delete release tags, including failed attempts: Go's public checksum database
 can index a tag before a GitHub Release exists. Publish a new version instead;
 do not disable checksum verification.
-Release quality checks run the pinned Gitleaks version through Go, so a separate
-`gitleaks` executable is not required. The release quality job checks out full
-Git history for the history scan. Branch and tag push failures stop publication;
-sync the branch and rerun release preparation rather than tagging stale code.
+The local `make pre-push` gate runs the pinned Gitleaks version through Go, so a
+separate `gitleaks` executable is not required. `make config` installs the
+pre-push hook, which scans the exact outgoing commits. `make check-security`
+also scans all local history and working-tree files. The scheduled nightly
+workflow runs the pre-push gate on Ubuntu before creating a tag; tag-triggered
+artifact CI builds and validates outputs without repeating source checks. Local
+hooks can be bypassed and do not provide a server-enforced status check.
 The secret-scan configuration retains the default rules and excludes only
 SHA-256 object-key matches in the translation cache from the generic API-key
 rule; credential values in that file remain subject to scanning.

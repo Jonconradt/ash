@@ -48,7 +48,7 @@ func TestSchedulerDebugLoggingRotatesJSON(t *testing.T) {
 	if !strings.Contains(string(currentData), "second ") {
 		t.Fatalf("expected current log file to contain second entry, got %q", string(currentData))
 	}
-	currentHeader := strings.SplitN(string(currentData), "\n", 2)[0]
+	currentHeader, _, _ := strings.Cut(string(currentData), "\n")
 	if !strings.Contains(currentHeader, `"message":"ash version: `) {
 		t.Fatalf("expected current log file to start with version information, got %q", currentHeader)
 	}
@@ -60,7 +60,7 @@ func TestSchedulerDebugLoggingRotatesJSON(t *testing.T) {
 	if !strings.Contains(string(rotatedData), "first ") {
 		t.Fatalf("expected rotated log file to contain first entry, got %q", string(rotatedData))
 	}
-	rotatedHeader := strings.SplitN(string(rotatedData), "\n", 2)[0]
+	rotatedHeader, _, _ := strings.Cut(string(rotatedData), "\n")
 	if !strings.Contains(rotatedHeader, `"message":"ash version: `) {
 		t.Fatalf("expected rotated log file to start with version information, got %q", rotatedHeader)
 	}

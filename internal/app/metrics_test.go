@@ -171,15 +171,13 @@ func TestExecutionMetricsMissingUsageRemainsUnavailable(t *testing.T) {
 func TestExecutionMetricsConcurrentUpdates(t *testing.T) {
 	metrics := newExecutionMetrics(time.Now())
 	var group sync.WaitGroup
-	for i := 0; i < 32; i++ {
-		group.Add(1)
-		go func() {
-			defer group.Done()
+	for range 32 {
+		group.Go(func() {
 			metrics.addStageDuration(metricsStageAIProcessing, time.Millisecond)
 			metrics.addToolCall("run_unix_command", time.Millisecond)
 			metrics.addSubAgent(time.Millisecond, toolCommandResult{OK: true})
 			metrics.addTokenUsage(1, 1, true)
-		}()
+		})
 	}
 	group.Wait()
 	snap := metrics.snapshot()

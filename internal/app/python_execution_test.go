@@ -256,3 +256,53 @@ func TestCallUnixCommandRunsManagedPythonToolWithSystemPython(t *testing.T) {
 		t.Fatalf("runner args = %#v, want %#v", gotArgs, wantArgs)
 	}
 }
+
+func TestCallUnixPipelineRunsManagedPythonTool(t *testing.T) {
+	originalLookPath := execLookPath
+	originalPipelineRunner := toolPipelineRunner
+	t.Cleanup(func() {
+		execLookPath = originalLookPath
+		toolPipelineRunner = originalPipelineRunner
+	})
+	execLookPath = func(string) (string, error) { return "/usr/bin/python3", nil }
+	t.Setenv("ASH_PYTHON", "python3")
+	t.Setenv("ASH_STRICT", "")
+	t.Setenv("XDG_DATA_HOME", "")
+
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	scriptPath := filepath.Join(home, ".local", "share", "ash", "tools", "wikipedia.py")
+	if err := os.MkdirAll(filepath.Dir(scriptPath), 0o700); err != nil {
+		t.Fatalf("mkdir tools: %v", err)
+	}
+	if err := os.WriteFile(scriptPath, []byte("print('ok')\n"), 0o700); err != nil {
+		t.Fatalf("write Python tool: %v", err)
+	}
+
+	var gotCommands [][]string
+	toolPipelineRunner = func(_ context.Context, commands [][]string, _ string, _ time.Duration, _ int) toolCommandResult {
+		gotCommands = commands
+		return toolCommandResult{OK: true, ExitCode: 0}
+	}
+
+	result := localToolShim{allowlist: map[string]struct{}{"wikipedia.py": {}, "cat": {}}}.CallTool(
+		context.Background(),
+		"run_unix_pipeline",
+		map[string]any{"pipeline": "wikipedia.py Napoleon Bonaparte | cat"},
+	)
+	if !strings.Contains(result, `"ok":true`) {
+		t.Fatalf("expected managed Python pipeline to run, got %s", result)
+	}
+	wantCommands := [][]string{
+		{"python3", scriptPath, "Napoleon", "Bonaparte"},
+		{"cat"},
+	}
+	if len(gotCommands) != len(wantCommands) {
+		t.Fatalf("pipeline commands = %#v, want %#v", gotCommands, wantCommands)
+	}
+	for i := range wantCommands {
+		if strings.Join(gotCommands[i], "\x00") != strings.Join(wantCommands[i], "\x00") {
+			t.Fatalf("pipeline command %d = %#v, want %#v", i, gotCommands[i], wantCommands[i])
+		}
+	}
+}

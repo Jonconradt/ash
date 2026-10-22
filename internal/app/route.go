@@ -22,7 +22,7 @@ func loadAmbiguousRouteWords() []string {
 		panic("embedded ash_bootstrap/route_words.txt is missing: " + err.Error())
 	}
 	words := make([]string, 0, 16)
-	for _, line := range strings.Split(string(content), "\n") {
+	for line := range strings.SplitSeq(string(content), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
@@ -202,10 +202,7 @@ func shouldRoutePrompt(line string) bool {
 		}
 	case "what", "which", "who", "where":
 		if argc >= 3 {
-			limit := 4
-			if argc < limit {
-				limit = argc
-			}
+			limit := min(argc, 4)
 			for i := 1; i < limit; i++ {
 				token := normalizeQuestionToken(args[i])
 				if _, ok := routeQuestionWords[token]; ok {

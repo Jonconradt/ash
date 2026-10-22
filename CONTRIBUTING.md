@@ -13,8 +13,17 @@ make config
 Run:
 
 ```bash
-make lint test
+make check-static
+make check-security
+make test
 ```
+
+`make config` installs the repository-managed Git hooks. The pre-push hook
+validates each exact outgoing commit in a clean temporary worktree and blocks
+the push if static checks, security/dependency/secret scanning, or tests fail.
+This is a local safeguard and can be bypassed with `git push --no-verify`; it is
+not a GitHub-enforced status check. Do not bypass it for release branches or
+tags.
 
 Run install once to configure the local shell integration:
 
@@ -22,7 +31,7 @@ Run install once to configure the local shell integration:
 make install
 ```
 
-For a full release-style verification pass, run:
+For the full local verification pass, run:
 
 ```bash
 make verify
@@ -38,10 +47,9 @@ make V=1 test
 make V=1 verify
 ```
 
-Note for CI: the `V=1` escape hatch can't be injected into an already-queued
-workflow run. If a CI step is flaky and you need its verbose log, edit the
-workflow's `run:` line (for example `make V=1 lint test`) and re-trigger the
-run rather than trying to attach `V=1` after the fact.
+Use `V=1` with any Make target to stream its output locally. Tag-triggered CI
+focuses on artifact generation and platform validation; it does not rerun the
+local source and dependency checks.
 
 ## Testing expectations
 
@@ -51,11 +59,21 @@ run rather than trying to attach `V=1` after the fact.
 
 ## Release expectations
 
+- All release packaging jobs run on Linux. macOS tarballs for both architectures
+  are cross-compiled without Rust plugins; CI validates their Mach-O architecture
+  and archive contents, not macOS runtime behavior. Linux and FreeBSD continue
+  to include Rust plugins.
+- Use `make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES="amd64 arm64" RELEASE_MACOS_PKG=0 RELEASE_VERSION=v1.2.3`
+  to build macOS tarballs from Linux. `make release` still requires macOS for
+  local `.pkg` creation and release-note generation; it does not upload local
+  build outputs to CI. Scheduled nightly orchestration runs on Ubuntu, verifies
+  before tagging, and delegates artifact generation to the tag-triggered workflow.
 - Keep the working tree clean before publishing.
 - Ensure release artifacts are built and validated locally before tagging.
-- Run `make verify` locally before `make release`. `make release` runs the full
-  verification suite by default; hosted release builds use the faster
-  `make verify-ci` target.
+- Run `make verify` locally before `make release`. The pre-push hook runs the
+  focused static, security, and test gates against outgoing commits. Tag-triggered
+  packaging jobs retain artifact and platform validation but no longer repeat
+  source checks. Nightly automation runs the pre-push gate before creating tags.
 - The external Go install check fetches the release tag directly from GitHub
   with `GONOPROXY` and `GONOSUMDB` scoped to `github.com/Jonconradt/ash`.
   This avoids proxy and checksum-database availability delays for newly pushed

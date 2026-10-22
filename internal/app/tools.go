@@ -500,7 +500,15 @@ func (s localToolShim) callUnixPipeline(ctx context.Context, args map[string]any
 				return toolCommandResult{OK: false, Command: pipeline, Error: "argument references a hidden dotfile", EID: "Dz9QaLm2"}
 			}
 		}
-		commands = append(commands, fields)
+		invocation, isManagedPython := managedPythonInvocation(commandName, fields[1:])
+		if isManagedPython {
+			if !pythonExecutionAvailable() {
+				return toolCommandResult{OK: false, Command: commandName, Error: "Python execution is not available", EID: "sLf6Wk8P"}
+			}
+			commands = append(commands, invocation)
+		} else {
+			commands = append(commands, fields)
+		}
 	}
 
 	return toolPipelineRunner(ctx, commands, pipeline, toolTimeout(), toolOutputLimit())
@@ -551,12 +559,11 @@ func (s localToolShim) callUnixCommand(ctx context.Context, args map[string]any)
 	recordScratchExecArgs(ctx, argv)
 
 	// Bundled .py tools run under the managed interpreter so third-party deps resolve.
-	if script, ok := managedPythonScript(commandName); ok {
+	if invocation, ok := managedPythonInvocation(commandName, argv); ok {
 		if !pythonExecutionAvailable() {
 			return toolCommandResult{OK: false, Command: commandName, Error: "Python execution is not available", EID: "sLf6Wk8P"}
 		}
-		interpreter := ashPythonInterpreter()
-		return toolCommandRunner(ctx, interpreter, append([]string{script}, argv...), toolTimeout(), toolOutputLimit())
+		return toolCommandRunner(ctx, invocation[0], invocation[1:], toolTimeout(), toolOutputLimit())
 	}
 
 	// Native binary plugins run directly from the user or system plugin directory.

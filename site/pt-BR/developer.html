@@ -83,7 +83,9 @@
           <h2>Fluxo de trabalho diário de desenvolvimento</h2>
           <p>Para uma alteração normal do código, execute os testes focados durante a iteração e, em seguida, execute o lint e as portas de teste necessários do repositório antes de terminar:</p>
           <pre><code>go test ./internal/app -run 'TestName'
-make lint test</code></pre>
+make check-static
+make check-security
+make test</code></pre>
           <p>A maioria faz com que os alvos usem<code>scripts/dev/run-quiet.sh</code>: etapas bem-sucedidas imprimem uma concisa<code>ok</code>linha, enquanto as etapas com falha imprimem sua saída capturada. Prefixar um alvo com<code>V=1</code>para transmitir sua saída completa enquanto é executado:</p>
           <pre><code>make V=1 lint
 make V=1 test
@@ -94,12 +96,14 @@ make V=1 verify</code></pre>
         <section id="make-targets">
           <h2>Fazer referência de destino</h2>
           <dl>
+            <dt><code>make pre-push</code></dt>
+            <dd>Executa verificações estáticas, análise de segurança e dependências, detecção de segredos e testes nos commits exatos enviados. <code>make config</code> instala o hook do repositório. Hooks locais podem ser ignorados e não são uma verificação imposta pelo servidor.</dd>
             <dt><code>make lint</code></dt>
             <dd>Verifica catálogos de localização, sintaxe de shell para o instalador do site, fluxo de trabalho YAML, lint/formato Python, Markdown, plugin lint e Go lint.</dd>
             <dt><code>make test</code></dt>
             <dd>Constrói e testa plug-ins nativos e depois executa<code>go test ./...</code>.</dd>
             <dt><code>make verify-ci</code></dt>
-            <dd>Executa lint, testes e verificações de segurança – a porta de qualidade de CI mais rápida.</dd>
+            <dd>Executa a verificação pre-push antes de criar a tag nightly. A CI de artefatos acionada pela tag não repete as verificações do código-fonte.</dd>
             <dt><code>make verify</code></dt>
             <dd>Executa todo o portão de qualidade local: lint, testes, testes de corrida, cobertura, veterinário, análise estática, segurança, varreduras secretas, difusão e benchmarks.</dd>
             <dt><code>make test-race</code></dt>
@@ -109,7 +113,7 @@ make V=1 verify</code></pre>
             <dt><code>make test-fuzz</code></dt>
             <dd>Executa testes fuzz de aplicativos para<code>FUZZ_TIME</code>(10 segundos por padrão).</dd>
             <dt><code>make security</code></dt>
-            <dd>Executa ambos<code>gosec</code>e<code>govulncheck</code>.</dd>
+            <dd>Executa <code>gosec</code>, <code>govulncheck</code> e auditorias de dependências npm, Cargo e Python.</dd>
             <dt><code>make build</code></dt>
             <dd>Executa lint e testes, cria e instala plug-ins nativos e cria<code>ash</code>mais<code>ash-broker</code>sob<code>~/.local/bin</code>.</dd>
             <dt><code>make install</code></dt>
@@ -130,8 +134,8 @@ make V=1 verify</code></pre>
 
         <section id="release-builders">
           <h2>Liberar construtores e artefatos</h2>
-          <p>O fluxo de trabalho de lançamento do GitHub separa as verificações de qualidade dos criadores de embalagens nativas. Os pacotes macOS são desenvolvidos e testados em executores Intel e Apple Silicon. Capa para construtores Linux<code>amd64</code>e<code>arm64</code>e validar<code>.deb</code>,<code>.rpm</code>e instalações de tarball. O FreeBSD é construído de forma cruzada e empacotado para<code>amd64</code>.</p>
-          <p>Os binários de lançamento Go são construídos com opções de trim-path e de vinculador removido. Plug-ins nativos são desenvolvidos para o mesmo sistema operacional e arquitetura. O fluxo de trabalho de lançamento também testa o pacote instalado ou o arquivo extraído, incluindo uma nova configuração de instalação do shell.</p>
+          <p>Após as verificações de qualidade, o GitHub executa <code>make release-artifacts</code> no Linux. Um trabalho Ubuntu compila os arquivos macOS Intel e Apple Silicon para o Homebrew, sem executores macOS nem instaladores <code>.pkg</code>. Os destinos macOS excluem todos os plugins Rust, incluindo <code>flip_a_coin</code>, mesmo em compilações locais. Linux e FreeBSD mantêm os plugins Rust.</p>
+          <p>A CI valida o conteúdo dos arquivos macOS e as arquiteturas Mach-O sem executar seus binários. Linux e FreeBSD mantêm testes de execução dos arquivos extraídos; pacotes e integrações do shell não são instalados. Para compilar macOS no Linux: <code>make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES="amd64 arm64" RELEASE_MACOS_PKG=0 RELEASE_VERSION=v1.2.3</code>. <code>make release</code> ainda cria um <code>.pkg</code> local no macOS sem enviar os binários locais à CI.</p>
           <p>Para compilações de artefatos locais, especifique explicitamente o sistema operacional, a arquitetura e a versão de destino:</p>
           <pre><code>make release-artifacts \
   RELEASE_TARGET_OSES=linux \

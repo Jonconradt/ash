@@ -103,8 +103,6 @@ fi
 
 expected_assets=()
 for asset in \
-  "ash-${tag}-darwin-amd64.pkg" \
-  "ash-${tag}-darwin-arm64.pkg" \
   "ash-${tag}-darwin-amd64.tar.gz" \
   "ash-${tag}-darwin-arm64.tar.gz" \
   "ash-${tag}-linux-amd64.deb" \
@@ -114,8 +112,6 @@ for asset in \
   "ash-${tag}-linux-amd64.tar.gz" \
   "ash-${tag}-linux-arm64.tar.gz" \
   "ash-${tag}-freebsd-amd64.tar.gz" \
-  "ash-${tag}-darwin-amd64.pkg.sha256" \
-  "ash-${tag}-darwin-arm64.pkg.sha256" \
   "ash-${tag}-darwin-amd64.tar.gz.sha256" \
   "ash-${tag}-darwin-arm64.tar.gz.sha256" \
   "ash-${tag}-linux-amd64.deb.sha256" \

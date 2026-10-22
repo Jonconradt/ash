@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -76,7 +77,7 @@ func pipelineContainsAsh(args map[string]any) bool {
 	if !ok {
 		return false
 	}
-	for _, part := range strings.Split(pipeline, "|") {
+	for part := range strings.SplitSeq(pipeline, "|") {
 		fields := strings.Fields(part)
 		if len(fields) > 0 && isAshExecutableName(fields[0]) {
 			return true
@@ -177,8 +178,7 @@ func runSubAgentCommand(ctx context.Context, prompt, childID string) toolCommand
 		result.Error = fmt.Sprintf("sub-agent timed out after %s", aiTimeout())
 		return result
 	}
-	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) {
+	if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
 		result.ExitCode = exitErr.ExitCode()
 		result.Error = fmt.Sprintf("sub-agent exited with status %d", result.ExitCode)
 		return result
@@ -279,17 +279,14 @@ func sanitizeCommandArgs(command []string) ([]string, error) {
 	}
 
 	sanitized := append([]string(nil), command...)
-	for _, arg := range sanitized {
-		if isBlockedArgument(arg) {
-			return nil, errors.New("argument contains blocked shell control pattern")
-		}
+	if slices.ContainsFunc(sanitized, isBlockedArgument) {
+		return nil, errors.New("argument contains blocked shell control pattern")
 	}
 	return sanitized, nil
 }
 
 func pipelineExitCode(err error) int {
-	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) {
+	if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
 		return exitErr.ExitCode()
 	}
 	return -1
@@ -340,8 +337,7 @@ func runToolCommandWithInput(ctx context.Context, name string, args []string, st
 		return result
 	}
 
-	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) {
+	if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
 		result.ExitCode = exitErr.ExitCode()
 		result.Error = fmt.Sprintf("command exited with status %d", result.ExitCode)
 		return result
@@ -380,8 +376,7 @@ func runToolCommand(ctx context.Context, name string, args []string, timeout tim
 		return result
 	}
 
-	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) {
+	if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
 		result.ExitCode = exitErr.ExitCode()
 		result.Error = fmt.Sprintf("command exited with status %d", result.ExitCode)
 		return result

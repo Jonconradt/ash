@@ -83,7 +83,9 @@
           <h2>日常開發工作流程</h2>
           <p>對於正常的程式碼更改，請在迭代時執行重點測試，然後在完成之前執行儲存庫所需的 lint 和測試閘：</p>
           <pre><code>go test ./internal/app -run 'TestName'
-make lint test</code></pre>
+make check-static
+make check-security
+make test</code></pre>
           <p>大多數 Make 目標使用<code>scripts/dev/run-quiet.sh</code>：成功的步驟印製一份簡明的<code>ok</code>行，而失敗的步驟則列印捕獲的輸出。目標前綴為<code>V=1</code>在運行時串流其完整輸出：</p>
           <pre><code>make V=1 lint
 make V=1 test
@@ -94,12 +96,14 @@ make V=1 verify</code></pre>
         <section id="make-targets">
           <h2>訂定目標參考</h2>
           <dl>
+            <dt><code>make pre-push</code></dt>
+            <dd>針對即將推送的確切提交執行靜態檢查、安全與相依性掃描、密鑰掃描和測試。<code>make config</code>會安裝存放庫管理的掛鉤。本機掛鉤可以略過，並非伺服器強制檢查。</dd>
             <dt><code>make lint</code></dt>
             <dd>檢查本地化目錄、網站安裝程式的 shell 語法、工作流程 YAML、Python lint/格式、Markdown、外掛程式 lint 和 Go lint。</dd>
             <dt><code>make test</code></dt>
             <dd>建置並測試本機插件，然後運行<code>go test ./...</code>。</dd>
             <dt><code>make verify-ci</code></dt>
-            <dd>運行 lint、測試和安全檢查——更快的 CI 品質門。</dd>
+            <dd>在建立 nightly 標籤前執行 pre-push 檢查。由標籤觸發的成品 CI 不會重複來源程式碼檢查。</dd>
             <dt><code>make verify</code></dt>
             <dd>運行完整的本地品質門：lint、測試、競賽測試、覆蓋、審查、靜態分析、安全性、秘密掃描、模糊測試和基準測試。</dd>
             <dt><code>make test-race</code></dt>
@@ -109,7 +113,7 @@ make V=1 verify</code></pre>
             <dt><code>make test-fuzz</code></dt>
             <dd>運行應用程式模糊測試<code>FUZZ_TIME</code>（預設 10 秒）。</dd>
             <dt><code>make security</code></dt>
-            <dd>兩者都運行<code>gosec</code>和<code>govulncheck</code>。</dd>
+            <dd>執行 <code>gosec</code>、<code>govulncheck</code> 以及 npm、Cargo 和 Python 相依性稽核。</dd>
             <dt><code>make build</code></dt>
             <dd>運行 lint 和測試、建置和安裝本機插件以及構建<code>ash</code>加<code>ash-broker</code>在下面<code>~/.local/bin</code>。</dd>
             <dt><code>make install</code></dt>
@@ -130,8 +134,8 @@ make V=1 verify</code></pre>
 
         <section id="release-builders">
           <h2>發佈建置器和工件</h2>
-          <p>GitHub 發布工作流程將品質檢查與本機打包建構器分開。 macOS 軟體套件是在 Intel 和 Apple Silicon 運行器上建置並進行冒煙測試的。 Linux 建構者封面<code>amd64</code>和<code>arm64</code>並驗證<code>.deb</code>,<code>.rpm</code>和 tarball 安裝。 FreeBSD 是交叉建置和打包的<code>amd64</code>。</p>
-          <p>Go 版本的二進位檔案是使用修剪路徑和剝離的連結器選項建立的。本機插件是為相同的作業系統和架構建構的。發佈工作流程也會對已安裝的軟體包或提取的檔案進行冒煙測試，包括新的 shell 安裝配置。</p>
+          <p>品質檢查後，GitHub 在 Linux 上執行 <code>make release-artifacts</code>。一個 Ubuntu 工作交叉編譯供 Homebrew 使用的 Intel 與 Apple Silicon macOS 封存檔，不使用 macOS 執行器，也不產生 <code>.pkg</code> 安裝套件。macOS 目標（包括本機建置）排除所有 Rust 外掛程式，包括 <code>flip_a_coin</code>。Linux 與 FreeBSD 繼續包含 Rust 外掛程式。</p>
+          <p>CI 驗證 macOS 封存檔內容與 Mach-O 架構，但不執行其二進位檔案。Linux 與 FreeBSD 保留解壓縮封存檔的執行測試；不會安裝套件或設定 shell 整合。在 Linux 上建置 macOS：<code>make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES="amd64 arm64" RELEASE_MACOS_PKG=0 RELEASE_VERSION=v1.2.3</code>。<code>make release</code> 仍在 macOS 上建立本機 <code>.pkg</code>，不會向 CI 傳遞本機二進位檔案。</p>
           <p>對於本機工件構建，請明確指定目標作業系統、架構和版本：</p>
           <pre><code>make release-artifacts \
   RELEASE_TARGET_OSES=linux \

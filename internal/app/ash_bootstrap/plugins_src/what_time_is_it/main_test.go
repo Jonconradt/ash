@@ -262,8 +262,8 @@ func TestPluginLoggingIntegration(t *testing.T) {
 		t.Fatalf("log file is empty")
 	}
 
-	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(strings.TrimSpace(string(data)), "\n")
+	for line := range lines {
 		var entry map[string]any
 		if err := json.Unmarshal([]byte(line), &entry); err != nil {
 			t.Fatalf("log entry is not JSON: %s (err: %v)", line, err)

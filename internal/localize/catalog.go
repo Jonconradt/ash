@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -471,9 +472,7 @@ func mergeCatalog(locale string, files map[string]fileCatalog, merged map[string
 			return err
 		}
 	}
-	for key, value := range entry.Messages {
-		merged[key] = value
-	}
+	maps.Copy(merged, entry.Messages)
 	delete(visited, locale)
 	return nil
 }

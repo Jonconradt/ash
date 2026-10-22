@@ -1,0 +1,7 @@
+{
+  "extends": ["html-validate:standard"],
+  "rules": {
+    "aria-label-misuse": "off",
+    "prefer-native-element": "off"
+  }
+}

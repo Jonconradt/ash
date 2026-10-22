@@ -643,7 +643,7 @@ func FuzzEnsureSingleTrailingNewline(f *testing.F) {
 		if strings.HasSuffix(out, "\n\n") {
 			t.Fatalf("expected exactly one trailing newline for %q, got %q", input, out)
 		}
-		for _, line := range strings.Split(stripSystemPromptComments(input), "\n") {
+		for line := range strings.SplitSeq(stripSystemPromptComments(input), "\n") {
 			if strings.HasPrefix(line, "#") {
 				t.Fatalf("comment line was not stripped: %q", line)
 			}

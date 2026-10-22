@@ -177,7 +177,19 @@
           <p>Follow the <a href="https://github.com/Jonconradt/ash/blob/main/docs/PLUGIN_CONTRACT.md">native plugin contract</a>: expose predictable CLI options, implement <code>--help</code>, <code>--version</code>, and versioned JSON <code>--ai-docs</code> metadata, and describe input/output schemas and failure behavior. Emit compact structured JSON with a <code>status</code> field and actionable error details instead of prose mixed with data. Keep output bounded, validate inputs, set network timeouts, and make the tool safe to call repeatedly. Add its bare filename to <code>$XDG_CONFIG_HOME/ash/.ash_allow</code>; ash can execute it only when it is allowlisted and not listed in <code>$XDG_CONFIG_HOME/ash/.ash_deny</code>.</p>
 
           <h3>What are the provided tool scripts and native plugins?</h3>
-          <p>The installed bootstrap Python scripts are <code>headlines.py</code>, <code>wikipedia.py</code>, and <code>yfinance.py</code> in <code>$XDG_DATA_HOME/ash/tools/</code>. The provided native plugins are <code>what_time_is_it</code> (Go), <code>flip_a_coin</code> (Rust), and <code>calculator</code> (TypeScript) in <code>$XDG_DATA_HOME/ash/plugins/</code>.</p>
+          <p>The installed bootstrap Python scripts are <code>headlines.py</code>, <code>wikipedia.py</code>, and <code>yfinance.py</code> in <code>$XDG_DATA_HOME/ash/tools/</code>. The provided native plugins are <code>what_time_is_it</code> (Go) and <code>calculator</code> (TypeScript) in <code>$XDG_DATA_HOME/ash/plugins/</code>. Linux and FreeBSD also bundle <code>flip_a_coin</code> (Rust); macOS builds exclude Rust plugins.</p>
+
+          <h3 id="macos-rust-plugin">Why is the Rust plugin missing on macOS, and how can I install it manually?</h3>
+          <p>macOS builds omit Rust plugins, including <code>flip_a_coin</code>, so both macOS architectures can be cross-compiled on Linux without macOS CI runners. This reduces release CI costs; it is not a macOS compatibility restriction. Homebrew still installs ash with the Go and TypeScript plugins, and Linux and FreeBSD releases still include the Rust plugin.</p>
+          <p>On your Mac, install Apple's Xcode Command Line Tools (<code>xcode-select --install</code>, if needed) and Rust via <a href="https://rustup.rs/">rustup</a>. Then run the following in a directory where you want a new source checkout. The repository pins the Rust toolchain, and the plugin's own Makefile builds for your Mac's native architecture and installs directly into Ash's user plugin directory; no <code>sudo</code> is needed.</p>
+          <pre><code>git clone https://github.com/Jonconradt/ash.git
+cd ash
+rustup toolchain install 1.99.0 --profile minimal
+plugin_dir="${XDG_DATA_HOME:-$HOME/.local/share}/ash/plugins"
+make -C internal/app/ash_bootstrap/plugins_src/flip_a_coin build BUILD_DIR="$plugin_dir"
+"$plugin_dir/flip_a_coin" --version
+"$plugin_dir/flip_a_coin" --ai-docs</code></pre>
+          <p>Use the plugin's own Makefile, not the top-level <code>make plugins-build</code>, which deliberately skips Rust on macOS. To let the AI call it, keep <code>$PLUGINS_DIR_LIST</code> in <code>${XDG_CONFIG_HOME:-$HOME/.config}/ash/.ash_allow</code> or add the bare name <code>flip_a_coin</code> there. It must not be listed in <code>.ash_deny</code>. Start a new ash invocation to discover it. You can also run <code>"$plugin_dir/flip_a_coin"</code> directly to verify a coin toss without an AI provider.</p>
 
           <h3>Can ash call sub-agents?</h3>
           <p>Yes. A parent agent can use <code>run_sub_agent</code> for one focused, independent task. A child inherits the working directory, configuration, tools, and OS permissions, returns a bounded result, and cannot create another child. The default maximum is six sub-agents per parent run and can be changed with <code>ASH_MAX_AGENTS</code>.</p>

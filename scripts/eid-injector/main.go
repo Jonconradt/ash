@@ -19,6 +19,7 @@ import (
 	mathrand "math/rand"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"unicode/utf8"
@@ -408,8 +409,8 @@ func normalizeSlogCall(call *ast.CallExpr) (bool, *ast.BasicLit) {
 		eidValue = occurrences[0].value
 	}
 
-	for i := len(occurrences) - 1; i >= 0; i-- {
-		occ := occurrences[i]
+	for _, occ := range slices.Backward(occurrences) {
+
 		switch occ.kind {
 		case "pair":
 			call.Args = append(call.Args[:occ.index], call.Args[occ.index+2:]...)
@@ -647,19 +648,9 @@ func expressionContainsCanonicalEIDKey(expr ast.Expr) bool {
 		value, ok := parseStringLiteral(e)
 		return ok && strings.EqualFold(value, canonicalEIDKey)
 	case *ast.CompositeLit:
-		for _, elt := range e.Elts {
-			if expressionContainsCanonicalEIDKey(elt) {
-				return true
-			}
-		}
-		return false
+		return slices.ContainsFunc(e.Elts, expressionContainsCanonicalEIDKey)
 	case *ast.CallExpr:
-		for _, arg := range e.Args {
-			if expressionContainsCanonicalEIDKey(arg) {
-				return true
-			}
-		}
-		return false
+		return slices.ContainsFunc(e.Args, expressionContainsCanonicalEIDKey)
 	case *ast.KeyValueExpr:
 		return expressionContainsCanonicalEIDKey(e.Key) || expressionContainsCanonicalEIDKey(e.Value)
 	case *ast.ParenExpr:
@@ -820,7 +811,7 @@ var fallbackRandInt = mathrand.Intn
 
 func mustRandAlphaNum(n int) string {
 	b := make([]rune, n)
-	for i := 0; i < n; i++ {
+	for i := range n {
 		idx := cryptoRandInt(len(alphaNum))
 		b[i] = alphaNum[idx]
 	}

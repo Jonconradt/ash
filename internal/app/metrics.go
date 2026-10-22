@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"os"
 	"sort"
 	"strconv"
@@ -214,10 +215,7 @@ func recordAIResponseMetrics(ctx context.Context, usage chatUsage, startedAt tim
 	}
 	metrics.addTokenUsage(usage.InputTokens, usage.OutputTokens, usage.Available)
 	metrics.addAIRoundTrip()
-	processing := time.Since(startedAt) - (metrics.stageDuration(metricsStageConnect) - connectBefore)
-	if processing < 0 {
-		processing = 0
-	}
+	processing := max(time.Since(startedAt)-(metrics.stageDuration(metricsStageConnect)-connectBefore), 0)
 	metrics.addStageDuration(metricsStageAIProcessing, processing)
 }
 
@@ -308,9 +306,7 @@ func (m *executionMetrics) snapshot() executionMetricsSnapshot {
 // copyStringIntMap returns an independent copy of src so callers can't mutate metrics state.
 func copyStringIntMap(src map[string]int) map[string]int {
 	dst := make(map[string]int, len(src))
-	for k, v := range src {
-		dst[k] = v
-	}
+	maps.Copy(dst, src)
 	return dst
 }
 

@@ -42,12 +42,13 @@ func TestAllPluginsVerification(t *testing.T) {
 			defer cancel()
 
 			// 1. Build plugin using its Makefile
-			buildCmd := exec.CommandContext(ctx, "make", "-C", pluginDir, "build")
+			buildDir := t.TempDir()
+			buildCmd := exec.CommandContext(ctx, "make", "-C", pluginDir, "build", "BUILD_DIR="+buildDir)
 			if out, err := buildCmd.CombinedOutput(); err != nil {
 				t.Fatalf("make build failed for plugin %s: %v\nOutput: %s", pluginName, err, string(out))
 			}
 
-			binPath := filepath.Join(repoRoot, "bin/plugins", pluginName)
+			binPath := filepath.Join(buildDir, pluginName)
 			if _, err := os.Stat(binPath); err != nil {
 				t.Fatalf("expected binary at %s after build: %v", binPath, err)
 			}
@@ -140,8 +141,8 @@ func TestAllPluginsVerification(t *testing.T) {
 			if len(logData) == 0 {
 				t.Fatalf("%s wrote empty ASH_LOG_FILE", pluginName)
 			}
-			lines := strings.Split(strings.TrimSpace(string(logData)), "\n")
-			for _, line := range lines {
+			lines := strings.SplitSeq(strings.TrimSpace(string(logData)), "\n")
+			for line := range lines {
 				var logEntry map[string]any
 				if err := json.Unmarshal([]byte(line), &logEntry); err != nil {
 					t.Fatalf("%s log entry is not valid JSON: %s (err: %v)", pluginName, line, err)

@@ -98,10 +98,11 @@
         <section id="macos">
           <h2>macOS</h2>
           <h3 id="homebrew">推薦：自製</h3>
-          <p>先決條件：<a href="https://docs.brew.sh/Installation">自製</a>、其支援的 macOS 環境以及工作<code>brew</code>命令。點選會自動選擇 Intel 或 Apple Silicon 檔案。無需 sudo 安裝發行版：</p>
-          <pre><code>brew install Jonconradt/ash/ash
+          <p>先決條件：<a href="https://docs.brew.sh/Installation">自製</a>、其支援的 macOS 環境以及工作<code>brew</code>命令。點選會自動選擇 Intel 或 Apple Silicon 檔案。 Homebrew 6 並不隱式信任此第三者水龍頭。如果 Homebrew 拒絕將公式加載為不受信任，請檢查發布者和公式，然後僅信任此公式（而不是整個水龍頭）：</p>
+          <pre><code>brew trust --formula jonconradt/ash/ash
+brew install Jonconradt/ash/ash
 ash version</code></pre>
-          <p>Homebrew 擁有其前綴中的二進位檔案、捆綁的本機插件、手冊頁和許可證聲明（通常<code>/opt/homebrew</code>在 Apple Silicon 上或<code>/usr/local</code>英特爾）。它根據公式的 SHA-256 校驗和檢查存檔。它不會配置您的提供者或編輯您的 shell 啟動檔案：繼續<a href="#initialize">每個用戶初始化</a>。使用<code>brew upgrade ash</code>用於更新和<code>brew uninstall ash</code>刪除發布；看<a href="#updates">頻道公式</a>對於測試版/每晚。</p>
+          <p>Homebrew 會記住這個本地信任決定。水龍頭無法代表您啟用信任；相信整個水龍頭<code>brew trust jonconradt/ash</code>更廣泛，也允許加載其他公式。要信任 Beta 或 Nightly，請使用相應的公式名稱，<code>jonconradt/ash/ash-beta</code>或者<code>jonconradt/ash/ash-nightly</code>。 Homebrew 拥有其前缀中的二进制文件、捆绑的本机插件、手册页和许可证声明（通常<code>/opt/homebrew</code>在 Apple Silicon 上或<code>/usr/local</code>英特爾）。它根據公式的 SHA-256 校驗和檢查存檔。它不會配置您的提供者或編輯您的 shell 啟動檔案：繼續<a href="#initialize">每個用戶初始化</a>。使用<code>brew upgrade ash</code>用於更新和<code>brew uninstall ash</code>刪除發布；看<a href="#updates">頻道公式</a>對於測試版/每晚。</p>
           <h3 id="macos-pkg">替代方案：本機 .pkg</h3>
           <p>下載<code>darwin-arm64.pkg</code>Apple Silicon 的資產或<code>darwin-amd64.pkg</code>對英特爾來說<a href="https://github.com/Jonconradt/ash/releases">已發布的版本</a>。<a href="#verify-download">驗證其簽署的校驗和清單</a>在打開安裝程式之前。需要管理員存取權限。</p>
           <div class="guide-note guide-warning"><p><strong>cOS 軟體包未簽署且未經公證。 </strong>發布清單提供單獨的發布者/校驗和驗證，而不是 Apple 公證。不要僅僅為了安裝 ash 而停用 Gatekeeper 或繞過安全警告；如果您的安全策略需要，則首選 Homebrew。 </p></div>

@@ -190,6 +190,19 @@
 
           <h3>Quais são os scripts de ferramentas e plug-ins nativos fornecidos?</h3>
           <p>Os scripts Python de bootstrap instalados são<code>headlines.py</code>,<code>wikipedia.py</code>, e<code>yfinance.py</code>em<code>$XDG_DATA_HOME/ash/tools/</code>. Os plug-ins nativos fornecidos são<code>what_time_is_it</code>(Ir),<code>flip_a_coin</code>(ferrugem) e<code>calculator</code>(TypeScript) em<code>$XDG_DATA_HOME/ash/plugins/</code>.</p>
+          <p>Os plugins Rust, incluindo <code>flip_a_coin</code>, são incluídos apenas no Linux e FreeBSD. As compilações macOS incluem <code>what_time_is_it</code> e <code>calculator</code>, mas excluem plugins Rust.</p>
+
+          <h3 id="macos-rust-plugin">Por que o plugin Rust não está no macOS e como instalá-lo manualmente?</h3>
+          <p>O macOS omite plugins Rust, incluindo <code>flip_a_coin</code>, para compilar ambas as arquiteturas no Linux sem executores macOS e reduzir os custos de CI. Não é uma restrição de compatibilidade. O Homebrew mantém os plugins Go e TypeScript; Linux e FreeBSD mantêm Rust.</p>
+          <p>No Mac, instale as ferramentas de linha de comando do Xcode (<code>xcode-select --install</code>, se necessário) e Rust via <a href="https://rustup.rs/">rustup</a>. Execute os comandos onde deseja criar uma nova cópia do repositório. O Makefile do plugin compila para a arquitetura nativa do Mac e instala diretamente no diretório do usuário, sem <code>sudo</code>.</p>
+          <pre><code>git clone https://github.com/Jonconradt/ash.git
+cd ash
+rustup toolchain install 1.99.0 --profile minimal
+plugin_dir="${XDG_DATA_HOME:-$HOME/.local/share}/ash/plugins"
+make -C internal/app/ash_bootstrap/plugins_src/flip_a_coin build BUILD_DIR="$plugin_dir"
+"$plugin_dir/flip_a_coin" --version
+"$plugin_dir/flip_a_coin" --ai-docs</code></pre>
+          <p>Use o Makefile do plugin, não <code>make plugins-build</code>, que ignora Rust no macOS. Mantenha <code>$PLUGINS_DIR_LIST</code> em <code>${XDG_CONFIG_HOME:-$HOME/.config}/ash/.ash_allow</code> ou adicione <code>flip_a_coin</code>; ele não deve constar em <code>.ash_deny</code>. Inicie uma nova invocação do ash. Execute <code>"$plugin_dir/flip_a_coin"</code> para testar sem provedor de IA.</p>
 
           <h3>Podeashchamar subagentes?</h3>
           <p>Sim. Um agente pai pode usar<code>run_sub_agent</code>para uma tarefa focada e independente. Um filho herda o diretório de trabalho, a configuração, as ferramentas e as permissões do sistema operacional, retorna um resultado limitado e não pode criar outro filho. O máximo padrão é de seis subagentes por execução pai e pode ser alterado com<code>ASH_MAX_AGENTS</code>.</p>

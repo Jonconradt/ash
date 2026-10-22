@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -826,8 +827,8 @@ func upgradePluginNames(candidateRoot string) ([]string, error) {
 }
 
 func rollbackUpgradeAssets(changes []upgradeAssetChange) {
-	for index := len(changes) - 1; index >= 0; index-- {
-		item := changes[index]
+	for _, item := range slices.Backward(changes) {
+
 		if item.hadPrevious {
 			_ = writeUpgradeAsset(item.target, item.previous, false)
 		} else {
@@ -907,8 +908,8 @@ func snapshotUpgradeFile(path string) (upgradeFileSnapshot, error) {
 
 func restoreUpgradeFiles(snapshots []upgradeFileSnapshot) error {
 	var restoreErrors []error
-	for index := len(snapshots) - 1; index >= 0; index-- {
-		previous := snapshots[index]
+	for _, previous := range slices.Backward(snapshots) {
+
 		current, err := snapshotUpgradeFile(previous.path)
 		if err != nil {
 			restoreErrors = append(restoreErrors, fmt.Errorf("inspect %s: %w", previous.path, err))

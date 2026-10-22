@@ -168,7 +168,7 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 			toolStarted := time.Now()
 			toolResult := shim.CallTool(ctx, toolName, call.Function.Arguments)
 			if metrics := executionMetricsFromContext(ctx); metrics != nil {
-				metrics.addToolCall(toolName, time.Since(toolStarted))
+				metrics.addToolCall(executionSummaryToolName(toolName, call.Function.Arguments), time.Since(toolStarted))
 			}
 			resultArgs := []any{"request_id", requestIDFromContext(ctx), "name", toolName, "plugin", pluginName, "bytes", len(toolResult), "sha256", hashForLog([]byte(toolResult))}
 			if strictSecurityModeEnabled() {
@@ -265,7 +265,7 @@ func pluginNameForToolCall(toolName string, args map[string]any) string {
 	case "run_unix_pipeline":
 		pipeline, _ := toStringArg(args["pipeline"])
 		names := make([]string, 0, 4)
-		for _, part := range strings.Split(pipeline, "|") {
+		for part := range strings.SplitSeq(pipeline, "|") {
 			fields := strings.Fields(part)
 			if len(fields) == 0 {
 				continue
@@ -279,6 +279,17 @@ func pluginNameForToolCall(toolName string, args map[string]any) string {
 	default:
 		return toolName
 	}
+}
+
+func executionSummaryToolName(toolName string, args map[string]any) string {
+	if toolName != "run_unix_command" {
+		return toolName
+	}
+	pluginName := pluginNameForToolCall(toolName, args)
+	if _, ok := managedNativePlugin(pluginName); ok {
+		return "plugin:" + pluginName
+	}
+	return toolName
 }
 
 // sanitizeArgsForLog encodes tool call arguments for a debug log entry, truncating oversized payloads.

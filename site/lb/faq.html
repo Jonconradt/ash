@@ -190,6 +190,19 @@
 
           <h3>Wat sinn déi geliwwert Tool Scripten an native Plugins?</h3>
           <p>Déi installéiert Bootstrap Python Scripte sinn<code>headlines.py</code>,<code>wikipedia.py</code>,an an<code>yfinance.py</code>an<code>$XDG_DATA_HOME/ash/tools/</code>. Déi geliwwert gebierteg Plugins sinn<code>what_time_is_it</code>(Gitt),<code>flip_a_coin</code>(Rust), an<code>calculator</code>(TypeScript) an<code>$XDG_DATA_HOME/ash/plugins/</code>.</p>
+          <p>Rust-Plugins, dorënner <code>flip_a_coin</code>, ginn nëmmen op Linux a FreeBSD matgeliwwert. macOS-Builds enthalen <code>what_time_is_it</code> a <code>calculator</code>, awer keng Rust-Plugins.</p>
+
+          <h3 id="macos-rust-plugin">Firwat feelt de Rust-Plugin op macOS, a wéi installéieren ech en manuell?</h3>
+          <p>macOS léisst Rust-Plugins wéi <code>flip_a_coin</code> ewech, fir béid Architekturen op Linux ouni macOS-Runner ze bauen an d'CI-Käschten ze reduzéieren. Dat ass keng Kompatibilitéitsbegrenzung. Homebrew behält Go- an TypeScript-Plugins; Linux a FreeBSD behalen Rust.</p>
+          <p>Installéiert op Ärem Mac d'Xcode-Kommandozeilentools (<code>xcode-select --install</code>, wann néideg) a Rust iwwer <a href="https://rustup.rs/">rustup</a>. Féiert dës Kommandoen do aus, wou eng nei Kopie vum Repository entstoe soll. De Makefile vum Plugin baut fir déi nativ Architektur an installéiert direkt am Benotzerverzeechnes, ouni <code>sudo</code>.</p>
+          <pre><code>git clone https://github.com/Jonconradt/ash.git
+cd ash
+rustup toolchain install 1.99.0 --profile minimal
+plugin_dir="${XDG_DATA_HOME:-$HOME/.local/share}/ash/plugins"
+make -C internal/app/ash_bootstrap/plugins_src/flip_a_coin build BUILD_DIR="$plugin_dir"
+"$plugin_dir/flip_a_coin" --version
+"$plugin_dir/flip_a_coin" --ai-docs</code></pre>
+          <p>Benotzt de Makefile vum Plugin, net <code>make plugins-build</code>, dat Rust op macOS iwwerspréngt. Behaalt <code>$PLUGINS_DIR_LIST</code> an <code>${XDG_CONFIG_HOME:-$HOME/.config}/ash/.ash_allow</code> oder füügt <code>flip_a_coin</code> derbäi; den Numm däerf net an <code>.ash_deny</code> stoen. Start ash nei. Mat <code>"$plugin_dir/flip_a_coin"</code> test Dir ouni KI-Ubidder.</p>
 
           <h3>Kannashruffen Ënner-Agenten?</h3>
           <p>Jo. En Elterendeel Agent kann benotzen<code>run_sub_agent</code>fir eng konzentréiert, onofhängeg Aufgab. E Kand ierft den Aarbechtsverzeechnes, d'Konfiguratioun, d'Tools an d'OS Permissiounen, gëtt e begrenzt Resultat zréck a kann net en anert Kand erstellen. De Standard Maximum ass sechs Ënner-Agenten pro Elterendeel lafen a ka geännert ginn mat<code>ASH_MAX_AGENTS</code>.</p>

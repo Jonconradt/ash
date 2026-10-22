@@ -81,8 +81,7 @@ func (a googleAdapter) Send(ctx context.Context, aiCfg aiConfig, messages []mess
 
 	resp, err := client.Models.GenerateContent(ctx, aiCfg.Model, contents, config)
 	if err != nil {
-		var apiErr genai.APIError
-		if errors.As(err, &apiErr) {
+		if apiErr, ok := errors.AsType[genai.APIError](err); ok {
 			return chatResponse{}, chatStatusError{StatusCode: apiErr.Code, Body: apiErr.Message}
 		}
 		return chatResponse{}, err

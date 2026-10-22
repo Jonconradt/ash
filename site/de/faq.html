@@ -190,6 +190,19 @@
 
           <h3>Welche Tool-Skripte und nativen Plugins werden bereitgestellt?</h3>
           <p>Die installierten Bootstrap-Python-Skripte sind<code>headlines.py</code>,<code>wikipedia.py</code>, Und<code>yfinance.py</code>In<code>$XDG_DATA_HOME/ash/tools/</code>. Die bereitgestellten nativen Plugins sind<code>what_time_is_it</code>(Gehen),<code>flip_a_coin</code>(Rost) und<code>calculator</code>(TypeScript) in<code>$XDG_DATA_HOME/ash/plugins/</code>.</p>
+          <p>Rust-Plugins einschließlich <code>flip_a_coin</code> werden nur unter Linux und FreeBSD mitgeliefert. macOS-Builds enthalten <code>what_time_is_it</code> und <code>calculator</code>, aber keine Rust-Plugins.</p>
+
+          <h3 id="macos-rust-plugin">Warum fehlt das Rust-Plugin unter macOS, und wie installiere ich es manuell?</h3>
+          <p>macOS lässt Rust-Plugins wie <code>flip_a_coin</code> weg, damit beide Architekturen unter Linux ohne macOS-Runner gebaut werden können. Das senkt die CI-Kosten und ist keine Kompatibilitätseinschränkung. Homebrew behält Go- und TypeScript-Plugins; Linux und FreeBSD behalten Rust.</p>
+          <p>Installieren Sie auf Ihrem Mac die Xcode-Kommandozeilenwerkzeuge (bei Bedarf <code>xcode-select --install</code>) und Rust über <a href="https://rustup.rs/">rustup</a>. Führen Sie diese Befehle dort aus, wo ein neuer Checkout entstehen soll. Das Makefile des Plugins baut für die native Architektur und installiert direkt ins Benutzerverzeichnis, ohne <code>sudo</code>.</p>
+          <pre><code>git clone https://github.com/Jonconradt/ash.git
+cd ash
+rustup toolchain install 1.99.0 --profile minimal
+plugin_dir="${XDG_DATA_HOME:-$HOME/.local/share}/ash/plugins"
+make -C internal/app/ash_bootstrap/plugins_src/flip_a_coin build BUILD_DIR="$plugin_dir"
+"$plugin_dir/flip_a_coin" --version
+"$plugin_dir/flip_a_coin" --ai-docs</code></pre>
+          <p>Verwenden Sie das Makefile des Plugins statt <code>make plugins-build</code>, das Rust unter macOS überspringt. Behalten Sie <code>$PLUGINS_DIR_LIST</code> in <code>${XDG_CONFIG_HOME:-$HOME/.config}/ash/.ash_allow</code> oder ergänzen Sie <code>flip_a_coin</code>; der Name darf nicht in <code>.ash_deny</code> stehen. Starten Sie ash erneut. Mit <code>"$plugin_dir/flip_a_coin"</code> testen Sie ohne KI-Anbieter.</p>
 
           <h3>KannashSubagenten anrufen?</h3>
           <p>Ja. Ein übergeordneter Agent kann verwenden<code>run_sub_agent</code>für eine fokussierte, unabhängige Aufgabe. Ein untergeordnetes Element erbt das Arbeitsverzeichnis, die Konfiguration, die Tools und die Betriebssystemberechtigungen, gibt ein begrenztes Ergebnis zurück und kann kein weiteres untergeordnetes Element erstellen. Das Standardmaximum beträgt sechs Unteragenten pro übergeordnetem Lauf und kann mit geändert werden<code>ASH_MAX_AGENTS</code>.</p>
