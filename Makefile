@@ -203,7 +203,7 @@ restart-broker:
 	@echo "restart-broker: existing shell brokers stop with their owning shells"
 
 lint: language-lint site-lint yaml-lint python-lint markdown-lint plugins-lint static-config-lint
-	@./scripts/dev/run-quiet.sh "golangci-lint" go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run ./...
+	@./scripts/dev/run-quiet.sh "golangci-lint" go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run --allow-serial-runners ./...
 	@echo "lint: ok"
 
 language-lint:

@@ -30,7 +30,7 @@ test:
 
 lint:
 	@$(RUN_QUIET) "go-vet" go vet ./...
-	@$(RUN_QUIET) "golangci-lint" go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run .
+	@$(RUN_QUIET) "golangci-lint" go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run --allow-serial-runners .
 	@echo "lint: ok"
 
 security:

@@ -222,10 +222,11 @@ func (u *updater) updatePins(ctx context.Context) error {
 	if updated == string(original) {
 		return nil
 	}
-	return replaceFile("Makefile", original, []byte(updated))
+	return replaceFile(original, []byte(updated))
 }
 
-func replaceFile(path string, original, updated []byte) (err error) {
+func replaceFile(original, updated []byte) (err error) {
+	const path = "Makefile"
 	current, err := os.ReadFile(path)
 	if err != nil {
 		return err
@@ -507,9 +508,15 @@ func (u *updater) update(ctx context.Context) error {
 }
 
 func runCommand(ctx context.Context, name string, args ...string) (string, error) {
+	switch name {
+	case "go", "brew", "apt-cache", "dnf", "pacman":
+	default:
+		return "", fmt.Errorf("unsupported command %q", name)
+	}
 	if _, err := fmt.Fprintf(os.Stdout, "+ %s %s\n", name, strings.Join(args, " ")); err != nil {
 		return "", err
 	}
+	// #nosec G204 -- name is restricted to known executables; args are passed directly without a shell.
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Env = append(os.Environ(), "GOTOOLCHAIN=local", "GO111MODULE=on", "GOWORK=off", "LC_ALL=C")
 	cmd.Stdin = os.Stdin

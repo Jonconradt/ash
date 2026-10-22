@@ -47,6 +47,10 @@ make V=1 test
 make V=1 verify
 ```
 
+The root and Go-plugin lint commands wait for the shared `golangci-lint` lock
+when another lint process is running, rather than failing on lock contention.
+They serialize access instead of bypassing the lock.
+
 Use `V=1` with any Make target to stream its output locally. Tag-triggered CI
 focuses on artifact generation and platform validation; it does not rerun the
 local source and dependency checks.

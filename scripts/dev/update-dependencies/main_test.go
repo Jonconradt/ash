@@ -376,7 +376,13 @@ func TestUpdateModuleCommands(t *testing.T) {
 func TestReplaceFileRejectsConcurrentChanges(t *testing.T) {
 	t.Chdir(t.TempDir())
 	writeFile(t, "Makefile", "concurrent edit")
-	if err := replaceFile("Makefile", []byte("original"), []byte("update")); err == nil {
+	if err := replaceFile([]byte("original"), []byte("update")); err == nil {
 		t.Fatal("concurrent change overwritten")
+	}
+}
+
+func TestRunCommandRejectsUnapprovedExecutable(t *testing.T) {
+	if _, err := runCommand(context.Background(), "sh", "-c", "echo unsafe"); err == nil {
+		t.Fatal("unapproved executable accepted")
 	}
 }

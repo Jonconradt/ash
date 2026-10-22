@@ -94,6 +94,40 @@ print-build-version:
 	}
 }
 
+func TestLintSerializesGolangciRunners(t *testing.T) {
+	root, dir := releaseFixture(t)
+	pluginDir := "internal/app/ash_bootstrap/plugins_src/what_time_is_it"
+	copyFixture(t, root, dir, pluginDir+"/Makefile")
+	for _, tc := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{
+			name: "root",
+			args: []string{"-n", "-o", "language-lint", "-o", "site-lint",
+				"-o", "yaml-lint", "-o", "python-lint", "-o", "markdown-lint",
+				"-o", "plugins-lint", "-o", "static-config-lint", "lint"},
+			want: "run --allow-serial-runners ./...",
+		},
+		{
+			name: "go-plugin",
+			args: []string{"-n", "-C", pluginDir, "lint"},
+			want: "run --allow-serial-runners .",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			output := runFixture(t, dir, nil, "make", tc.args...)
+			if !strings.Contains(output, tc.want) {
+				t.Fatalf("lint command does not serialize golangci-lint runners:\n%s", output)
+			}
+			if strings.Contains(output, "--allow-parallel-runners") {
+				t.Fatalf("lint command bypasses the golangci-lint lock:\n%s", output)
+			}
+		})
+	}
+}
+
 func TestChannelVersions(t *testing.T) {
 	_, dir := releaseFixture(t)
 	for _, channel := range []string{"beta", "stable", "nightly"} {
