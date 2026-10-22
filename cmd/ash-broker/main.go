@@ -270,15 +270,11 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 	defer mcpManager.Close()
 	var active sync.WaitGroup
 	var startup sync.WaitGroup
-	startup.Add(1)
-	go func() {
-		defer startup.Done()
+	startup.Go(func() {
 		warmConfiguredMCP(brokerCtx, logger, mcpManager, home)
-	}()
+	})
 	if aiWarmup {
-		startup.Add(1)
-		go func() {
-			defer startup.Done()
+		startup.Go(func() {
 			startedAt := time.Now()
 			status, reused, warmErr := warmAIConnection(brokerCtx, client, endpoint)
 			if warmErr != nil {
@@ -286,7 +282,7 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 			} else {
 				logger.Info("AI connection warm-up completed", "EID", "AiWarmUp3", "http_status", status, "connection_reused", reused, "duration_ms", time.Since(startedAt).Milliseconds())
 			}
-		}()
+		})
 	}
 	go func() {
 		<-brokerCtx.Done()
@@ -313,8 +309,7 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 		if acceptErr != nil {
 			break
 		}
-		active.Add(1)
-		go func() { defer active.Done(); handleBrokerConn(brokerCtx, conn, token, client, allowedHost, mcpManager) }()
+		active.Go(func() { ; handleBrokerConn(brokerCtx, conn, token, client, allowedHost, mcpManager) })
 	}
 	startup.Wait()
 	active.Wait()

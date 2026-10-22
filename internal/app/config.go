@@ -472,12 +472,12 @@ func loadAllowlistedCommandsFromSource() (map[string]struct{}, error) {
 // parseDenylistFile parses and validates denylist entries.
 func parseDenylistFile(raw string) map[string]struct{} {
 	set := map[string]struct{}{}
-	for _, line := range strings.Split(raw, "\n") {
+	for line := range strings.SplitSeq(raw, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-		for _, token := range strings.Split(trimmed, ",") {
+		for token := range strings.SplitSeq(trimmed, ",") {
 			name := normalizeToolName(token)
 			if name == "" {
 				continue
@@ -491,7 +491,7 @@ func parseDenylistFile(raw string) map[string]struct{} {
 // parseAllowlistCSV parses and validates input values.
 func parseAllowlistCSV(raw string) map[string]struct{} {
 	set := map[string]struct{}{}
-	for _, part := range strings.Split(raw, ",") {
+	for part := range strings.SplitSeq(raw, ",") {
 		name := normalizeToolName(part)
 		if name == "" {
 			continue
@@ -504,12 +504,12 @@ func parseAllowlistCSV(raw string) map[string]struct{} {
 // parseAllowlistFile parses and validates input values.
 func parseAllowlistFile(raw string) map[string]struct{} {
 	set := map[string]struct{}{}
-	for _, line := range strings.Split(raw, "\n") {
+	for line := range strings.SplitSeq(raw, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" || mcpclient.IsRemoteServerLine(trimmed) || strings.Contains(trimmed, toolsDirListToken) || strings.Contains(trimmed, pluginsDirListToken) || strings.HasPrefix(trimmed, "#") {
 			continue
 		}
-		for _, token := range strings.Split(trimmed, ",") {
+		for token := range strings.SplitSeq(trimmed, ",") {
 			name := normalizeToolName(token)
 			if name == "" {
 				continue
@@ -526,7 +526,7 @@ func parseAllowlistFileWithTokens(raw string) (map[string]struct{}, error) {
 	if strictSecurityModeEnabled() {
 		return set, nil
 	}
-	for _, line := range strings.Split(raw, "\n") {
+	for line := range strings.SplitSeq(raw, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == toolsDirListToken {
 			tools, err := eligibleToolScripts()

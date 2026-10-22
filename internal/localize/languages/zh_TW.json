@@ -50,7 +50,6 @@
     "install.python.missing_libraries": "此操作成功前，需要第三方套件的隨附 Python 工具會提示缺少程式庫。",
     "install.python.ready": "Python 環境已就緒：%s",
     "install.interactive_hint": "無法自動設定 AI 提供者：目前的 Shell 工作階段不是互動式工作階段（例如透過 'curl | sh' 執行）。",
-    "install.configure_again_hint": "請開啟新終端機並再次執行 'ash install' 以選擇提供者和模型，或手動設定 AI_ENDPOINT、AI_MODEL 和 AI_AUTH_TOKEN。",
     "install.updated_file": "已更新 %s",
     "install.language_downloaded": "已安裝語言套件：%s",
     "install.language_unavailable": "版本 %s 未提供 %s 的語言套件；將繼續使用英文。",

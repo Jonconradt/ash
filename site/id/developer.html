@@ -83,7 +83,9 @@
           <h2>Alur kerja pengembangan sehari-hari</h2>
           <p>Untuk perubahan kode normal, jalankan pengujian terfokus saat melakukan iterasi, lalu jalankan lint dan gerbang pengujian yang diperlukan repositori sebelum menyelesaikan:</p>
           <pre><code>go test ./internal/app -run 'TestName'
-make lint test</code></pre>
+make check-static
+make check-security
+make test</code></pre>
           <p>Kebanyakan membuat target digunakan<code>scripts/dev/run-quiet.sh</code>: langkah sukses cetak satu ringkas<code>ok</code>baris, sementara langkah yang gagal mencetak keluaran yang diambil. Awali target dengan<code>V=1</code>untuk mengalirkan keluaran lengkapnya saat dijalankan:</p>
           <pre><code>make V=1 lint
 make V=1 test
@@ -94,12 +96,14 @@ make V=1 verify</code></pre>
         <section id="make-targets">
           <h2>Buat referensi target</h2>
           <dl>
+            <dt><code>make pre-push</code></dt>
+            <dd>Menjalankan pemeriksaan statis, pemindaian keamanan dan dependensi, pemindaian rahasia, serta pengujian pada commit yang benar-benar akan dikirim. <code>make config</code> memasang hook repositori. Hook lokal dapat dilewati dan bukan pemeriksaan yang diwajibkan server.</dd>
             <dt><code>make lint</code></dt>
             <dd>Memeriksa katalog pelokalan, sintaksis shell untuk penginstal situs, alur kerja YAML, lint/format Python, Markdown, lint plugin, dan Go lint.</dd>
             <dt><code>make test</code></dt>
             <dd>Membangun dan menguji plugin asli, lalu menjalankannya<code>go test ./...</code>.</dd>
             <dt><code>make verify-ci</code></dt>
-            <dd>Menjalankan lint, pengujian, dan pemeriksaan keamanan—gerbang kualitas CI yang lebih cepat.</dd>
+            <dd>Menjalankan pemeriksaan pre-push sebelum membuat tag nightly. CI artefak yang dipicu tag tidak mengulangi pemeriksaan kode sumber.</dd>
             <dt><code>make verify</code></dt>
             <dd>Menjalankan gerbang kualitas lokal secara lengkap: lint, pengujian, pengujian balapan, cakupan, dokter hewan, analisis statis, keamanan, pemindaian rahasia, fuzzing, dan tolok ukur.</dd>
             <dt><code>make test-race</code></dt>
@@ -109,7 +113,7 @@ make V=1 verify</code></pre>
             <dt><code>make test-fuzz</code></dt>
             <dd>Menjalankan pengujian fuzz aplikasi untuk<code>FUZZ_TIME</code>(10 detik secara default).</dd>
             <dt><code>make security</code></dt>
-            <dd>Menjalankan keduanya<code>gosec</code>Dan<code>govulncheck</code>.</dd>
+            <dd>Menjalankan <code>gosec</code>, <code>govulncheck</code>, serta audit dependensi npm, Cargo, dan Python.</dd>
             <dt><code>make build</code></dt>
             <dd>Menjalankan lint dan menguji, membuat dan menginstal plugin asli, serta build<code>ash</code>plus<code>ash-broker</code>di bawah<code>~/.local/bin</code>.</dd>
             <dt><code>make install</code></dt>

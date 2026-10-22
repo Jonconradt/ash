@@ -398,8 +398,7 @@ func bufferedResponseBody(prefix []byte, remaining io.Reader, body io.Closer) io
 }
 
 func jsonRPCErrorCode(err error) int {
-	var wireError *jsonrpc.Error
-	if errors.As(err, &wireError) {
+	if wireError, ok := errors.AsType[*jsonrpc.Error](err); ok {
 		return int(wireError.Code)
 	}
 	return 0

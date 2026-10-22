@@ -69,9 +69,11 @@
 
         <section id="workflow">
           <h2>Everyday development workflow</h2>
-          <p>For a normal code change, run the focused tests while iterating, then run the repository’s required lint and test gates before finishing:</p>
-          <pre><code>go test ./internal/app -run 'TestName'
-make lint test</code></pre>
+          <p>Run the focused tests while iterating. Before pushing, the installed pre-push hook validates every exact outgoing commit in a clean temporary worktree. Run the same gates manually with:</p>
+          <pre><code>make check-static
+make check-security
+make test</code></pre>
+          <p><code>make config</code> installs the repository-managed Git hooks. The local hook blocks pushes when checks fail, but can be bypassed with <code>git push --no-verify</code>; it is not a server-enforced status check.</p>
           <p>Most Make targets use <code>scripts/dev/run-quiet.sh</code>: successful steps print one concise <code>ok</code> line, while failed steps print their captured output. Prefix a target with <code>V=1</code> to stream its complete output as it runs:</p>
           <pre><code>make V=1 lint
 make V=1 test
@@ -83,11 +85,11 @@ make V=1 verify</code></pre>
           <h2>Make target reference</h2>
           <dl>
             <dt><code>make lint</code></dt>
-            <dd>Checks localization catalogs, shell syntax for the site installer, workflow YAML, Python lint/format, Markdown, plugin lint, and Go lint.</dd>
+            <dd>Checks Go formatting and lint, shell scripts, HTML, tracked JSON, GitHub Actions workflows and YAML formatting, localization catalogs, Python, Markdown, and plugin sources.</dd>
             <dt><code>make test</code></dt>
             <dd>Builds and tests native plugins, then runs <code>go test ./...</code>.</dd>
             <dt><code>make verify-ci</code></dt>
-            <dd>Runs lint, tests, and security checks—the faster CI quality gate.</dd>
+            <dd>Runs the pre-push gate before scheduled nightly tag creation. Tag-triggered artifact CI no longer repeats source checks.</dd>
             <dt><code>make verify</code></dt>
             <dd>Runs the full local quality gate: lint, tests, race tests, coverage, vet, static analysis, security, secret scans, fuzzing, and benchmarks.</dd>
             <dt><code>make test-race</code></dt>
@@ -97,7 +99,9 @@ make V=1 verify</code></pre>
             <dt><code>make test-fuzz</code></dt>
             <dd>Runs application fuzz tests for <code>FUZZ_TIME</code> (10 seconds by default).</dd>
             <dt><code>make security</code></dt>
-            <dd>Runs both <code>gosec</code> and <code>govulncheck</code>.</dd>
+            <dd>Runs Go security and vulnerability analysis plus npm, Cargo, and Python dependency audits.</dd>
+            <dt><code>make pre-push</code></dt>
+            <dd>Runs static checks, security and dependency scanning, secret scanning for outgoing commits, and tests. The Git pre-push hook runs this against each pushed commit.</dd>
             <dt><code>make build</code></dt>
             <dd>Runs lint and tests, builds and installs native plugins, and builds <code>ash</code> plus <code>ash-broker</code> under <code>~/.local/bin</code>.</dd>
             <dt><code>make install</code></dt>
@@ -119,7 +123,7 @@ make V=1 verify</code></pre>
 
         <section id="release-builders">
           <h2>Release builders and artifacts</h2>
-          <p>The GitHub release workflow runs quality checks, then <code>make release-artifacts</code> in Linux-hosted packaging jobs. One Ubuntu job cross-compiles both macOS architectures without Rust plugins and publishes tarballs for Homebrew; no macOS runners or CI-generated <code>.pkg</code> installers are used. Linux builders cover <code>amd64</code> and <code>arm64</code> and validate <code>.deb</code>, <code>.rpm</code>, and tarball contents. FreeBSD is cross-built and packaged for <code>amd64</code>.</p>
+          <p>Source checks run locally before pushes. Tag-triggered artifact jobs build and validate the release outputs without repeating those checks. Linux packaging jobs build both macOS architectures without Rust plugins and publish tarballs for Homebrew; no macOS runners or CI-generated <code>.pkg</code> installers are used. Linux builders cover <code>amd64</code> and <code>arm64</code> and validate <code>.deb</code>, <code>.rpm</code>, and tarball contents. FreeBSD is cross-built and packaged for <code>amd64</code>.</p>
           <p>Go release binaries are built with trim-path and stripped linker options. Included native plugins match the target OS and architecture. CI checks macOS archive contents and Mach-O architectures but cannot execute macOS binaries on Linux. Linux and FreeBSD tarballs retain runtime smoke tests; the workflow does not install packages or configure fresh shell integrations.</p>
           <p>For local artifact builds, specify the target OS, architecture, and version explicitly:</p>
           <pre><code>make release-artifacts \
@@ -128,7 +132,7 @@ make V=1 verify</code></pre>
   RELEASE_VERSION=v1.2.3</code></pre>
           <p><code>release-artifacts</code> builds and validates the formats supported for that target. The defaults are host OS (<code>auto</code>) and both <code>amd64 arm64</code>; FreeBSD publishing is limited to <code>amd64</code>. Artifacts go under <code>dist/release</code>. For a single binary/plugin build, use <code>make release-build-one RELEASE_GOOS=linux RELEASE_ARCH=arm64 RELEASE_VERSION=v1.2.3</code>.</p>
           <p>For macOS tarballs built on Linux, use <code>make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES="amd64 arm64" RELEASE_MACOS_PKG=0 RELEASE_VERSION=v1.2.3</code>. Local macOS packaging still defaults to generating a <code>.pkg</code> and requires Apple packaging tools. Local release outputs are not handed off to CI.</p>
-          <p><code>make version</code> runs the release checks and builds artifacts without publishing them. In contrast, <code>make release</code> is a publishing workflow: it requires macOS, a clean working tree and configured Git identity, generates release notes, creates/pushes release references, and watches the GitHub workflow. Its default channel is beta; select stable or nightly with <code>CHANNEL=stable</code> or <code>CHANNEL=nightly</code>. Generated release notes require <code>ASH_AI_ENDPOINT</code> and <code>ASH_AI_MODEL</code>, unless notes are supplied with <code>RELEASE_NOTES_INPUT</code>.</p>
+          <p><code>make version</code> runs release checks and builds artifacts without publishing. A normal <code>make release</code> requires macOS, a clean working tree and configured Git identity, generates release notes, creates/pushes release references, and watches the GitHub workflow. Scheduled nightly orchestration runs on Ubuntu with <code>RELEASE_SKIP_LOCAL_ARTIFACTS=1</code> after its local gate, then the tag workflow builds artifacts. The default channel is beta; select stable or nightly with <code>CHANNEL=stable</code> or <code>CHANNEL=nightly</code>.</p>
           <p>Read the <a href="https://github.com/Jonconradt/ash/blob/main/.github/workflows/release.yml">release workflow</a> and <a href="https://github.com/Jonconradt/ash/blob/main/docs/release-secrets.md">release secrets guide</a> before publishing.</p>
         </section>
 

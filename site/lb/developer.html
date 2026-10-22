@@ -83,7 +83,9 @@
           <h2>Alldeeglech Entwécklung Workflow</h2>
           <p>Fir eng normal Code Ännerung, lafen déi fokusséiert Tester beim Iteréieren, lafen dann déi erfuerderlech Lint an Test Gates vum Repository virum Enn:</p>
           <pre><code>go test ./internal/app -run 'TestName'
-make lint test</code></pre>
+make check-static
+make check-security
+make test</code></pre>
           <p>Déi meescht Maacht Ziler benotzen<code>scripts/dev/run-quiet.sh</code>: erfollegräich Schrëtt Drécken eng präzis<code>ok</code>Linn, wärend gescheitert Schrëtt hir ageholl Ausgang drécken. Präfix engem Zil mat<code>V=1</code>fir säi komplette Output ze streamen wéi se leeft:</p>
           <pre><code>make V=1 lint
 make V=1 test
@@ -94,12 +96,14 @@ make V=1 verify</code></pre>
         <section id="make-targets">
           <h2>Zilreferenz maachen </h2>
           <dl>
+            <dt><code>make pre-push</code></dt>
+            <dd>Féiert statesch Kontrollen, Sécherheets- an Ofhängegkeetsscannen, Geheimnisserkennung an Tester op de geneeë Commiten aus, déi geschéckt ginn. <code>make config</code> installéiert de Repository-Hook. Lokal Hooks kënnen ëmgaange ginn a sinn net vum Server erzwongen.</dd>
             <dt><code>make lint</code></dt>
             <dd>Kontrolléiert Lokaliséierungskataloge, Shell Syntax fir de Site Installateur, Workflow YAML, Python Lint / Format, Markdown, Plugin Lint, a Go Lint.</dd>
             <dt><code>make test</code></dt>
             <dd>Baut a testt gebierteg Plugins, leeft dann<code>go test ./...</code>.</dd>
             <dt><code>make verify-ci</code></dt>
-            <dd>Leeft Lëntgen, Tester a Sécherheetskontrollen - déi méi séier CI Qualitéitspaart.</dd>
+            <dd>Féiert d'Pre-Push-Kontroll virun der Erstellung vum Nightly-Tag aus. D'Tag-getriggert Artefakt-CI widderhëlt keng Quellcodekontrollen.</dd>
             <dt><code>make verify</code></dt>
             <dd>Leeft déi voll lokal Qualitéitspaart: Lint, Tester, Race Tester, Ofdeckung, Veterinär, statesch Analyse, Sécherheet, Geheimscannen, Fuzzing, a Benchmarks.</dd>
             <dt><code>make test-race</code></dt>
@@ -109,7 +113,7 @@ make V=1 verify</code></pre>
             <dt><code>make test-fuzz</code></dt>
             <dd>Leeft Applikatioun Fuzz Tester fir<code>FUZZ_TIME</code>(Standard 10 Sekonnen).</dd>
             <dt><code>make security</code></dt>
-            <dd>Leeft souwuel<code>gosec</code>an<code>govulncheck</code>.</dd>
+            <dd>Féiert <code>gosec</code>, <code>govulncheck</code> an npm-, Cargo- a Python-Ofhängegkeetsauditen aus.</dd>
             <dt><code>make build</code></dt>
             <dd>Leeft Lint an Tester, baut an installéiert gebierteg Plugins, a baut<code>ash</code>pluss<code>ash-broker</code>ënner<code>~/.local/bin</code>.</dd>
             <dt><code>make install</code></dt>

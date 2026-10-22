@@ -107,14 +107,12 @@ func TestExecutionMetricsAddScratchExecEmptyPathIgnored(t *testing.T) {
 func TestExecutionMetricsConcurrentToolAndScratchUpdatesNoRace(t *testing.T) {
 	metrics := newExecutionMetrics(time.Now())
 	var group sync.WaitGroup
-	for i := 0; i < 32; i++ {
-		group.Add(1)
-		go func() {
-			defer group.Done()
+	for range 32 {
+		group.Go(func() {
 			metrics.addToolCall("run_unix_command", time.Millisecond)
 			metrics.addScratchWrite("plan/notes.txt")
 			metrics.addScratchExec("plan/run.sh")
-		}()
+		})
 	}
 	group.Wait()
 

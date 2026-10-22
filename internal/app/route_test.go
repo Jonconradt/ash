@@ -238,10 +238,7 @@ func shouldRouteToAshConservative(command string, args []string) bool {
 	switch cmdLower {
 	case "what", "which", "who", "where":
 		if len(args) >= 3 {
-			limit := 4
-			if len(args) < limit {
-				limit = len(args)
-			}
+			limit := min(len(args), 4)
 			for i := 1; i < limit; i++ {
 				token := strings.ToLower(strings.Trim(args[i], "?!.:,;"))
 				switch token {

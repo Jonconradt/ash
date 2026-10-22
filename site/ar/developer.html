@@ -83,7 +83,9 @@
           <h2>سير عمل التطوير اليومي</h2>
           <p>لتغيير الكود العادي، قم بتشغيل الاختبارات المركزة أثناء التكرار، ثم قم بتشغيل الوبر المطلوب للمستودع وبوابات الاختبار قبل الانتهاء:</p>
           <pre><code>go test ./internal/app -run 'TestName'
-make lint test</code></pre>
+make check-static
+make check-security
+make test</code></pre>
           <p>يتم استخدام معظم الأهداف<code>scripts/dev/run-quiet.sh</code>: الخطوات الناجحة طباعة واحدة مختصرة<code>ok</code>سطر، في حين أن الخطوات الفاشلة تطبع مخرجاتها التي تم التقاطها. بادئة الهدف بـ<code>V=1</code>لدفق الإخراج الكامل أثناء تشغيله:</p>
           <pre><code>make V=1 lint
 make V=1 test
@@ -94,12 +96,14 @@ make V=1 verify</code></pre>
         <section id="make-targets">
           <h2>إنشاء مرجع الهدف</h2>
           <dl>
+            <dt><code>make pre-push</code></dt>
+            <dd>يشغّل الفحوصات الثابتة وفحوصات الأمان والتبعيات واكتشاف الأسرار والاختبارات على عمليات الإيداع الصادرة نفسها. يثبّت <code>make config</code> خطاف المستودع. يمكن تجاوز الخطافات المحلية، وهي ليست فحوصات يفرضها الخادم.</dd>
             <dt><code>make lint</code></dt>
             <dd>التحقق من كتالوجات الترجمة، وبناء جملة Shell لمثبت الموقع، وسير العمل YAML، وPython Lint/format، وMarkdown، وPlugin Lint، وGo lint.</dd>
             <dt><code>make test</code></dt>
             <dd>يبني ويختبر المكونات الإضافية الأصلية، ثم يقوم بتشغيلها<code>go test ./...</code>.</dd>
             <dt><code>make verify-ci</code></dt>
-            <dd>يقوم بتشغيل الوبر والاختبارات وفحوصات الأمان - بوابة جودة CI الأسرع.</dd>
+            <dd>يشغّل فحوصات ما قبل الدفع قبل إنشاء وسم الإصدار الليلي. لا تعيد CI الخاصة بالملفات، التي يبدأها الوسم، فحوصات المصدر.</dd>
             <dt><code>make verify</code></dt>
             <dd>يدير بوابة الجودة المحلية الكاملة: الوبر، والاختبارات، واختبارات السباق، والتغطية، والطبيب البيطري، والتحليل الثابت، والأمن، والمسح السري، والتشويش، والمعايير.</dd>
             <dt><code>make test-race</code></dt>
@@ -109,7 +113,7 @@ make V=1 verify</code></pre>
             <dt><code>make test-fuzz</code></dt>
             <dd>تشغيل اختبارات زغب التطبيق لـ<code>FUZZ_TIME</code>(10 ثواني بشكل افتراضي).</dd>
             <dt><code>make security</code></dt>
-            <dd>يعمل على حد سواء<code>gosec</code>و<code>govulncheck</code>.</dd>
+            <dd>يشغّل <code>gosec</code> و<code>govulncheck</code> وتدقيق تبعيات npm وCargo وPython.</dd>
             <dt><code>make build</code></dt>
             <dd>يقوم بتشغيل الوبر والاختبار، ويبني ويثبت المكونات الإضافية الأصلية، ويبني<code>ash</code>زائد<code>ash-broker</code>تحت<code>~/.local/bin</code>.</dd>
             <dt><code>make install</code></dt>

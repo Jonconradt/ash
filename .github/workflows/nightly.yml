@@ -11,7 +11,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   release:
-    runs-on: macos-14
+    runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.RELEASE_GITHUB_TOKEN }}
     steps:
@@ -47,6 +47,12 @@ jobs:
       - name: Set up Rust
         if: steps.changes.outputs.publish == 'true'
         run: rustup toolchain install 1.99.0 --profile minimal --component clippy
+      - name: Install local validation tools
+        if: steps.changes.outputs.publish == 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+          cargo install cargo-audit --version 0.22.2 --locked
       - name: Set up Go
         if: steps.changes.outputs.publish == 'true'
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
@@ -91,4 +97,4 @@ jobs:
           } > "$notes_path"
       - name: Publish nightly release
         if: steps.changes.outputs.publish == 'true'
-        run: make release CHANNEL=nightly RELEASE_VERIFY_TARGET=verify-ci RELEASE_NOTES_INPUT="$RUNNER_TEMP/nightly-release-notes.md"
+        run: make release CHANNEL=nightly RELEASE_VERIFY_TARGET=verify-ci RELEASE_SKIP_LOCAL_ARTIFACTS=1 RELEASE_NOTES_INPUT="$RUNNER_TEMP/nightly-release-notes.md"

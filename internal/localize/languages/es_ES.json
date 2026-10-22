@@ -52,7 +52,6 @@
     "install.python.missing_libraries": "Las herramientas Python incluidas que necesiten paquetes de terceros indicarán que falta una biblioteca hasta que esto se complete.",
     "install.python.ready": "Entorno Python listo en %s",
     "install.interactive_hint": "No se configuró automáticamente el proveedor de IA: esta sesión del shell no es interactiva (por ejemplo, se ejecuta mediante 'curl | sh').",
-    "install.configure_again_hint": "Abra un terminal nuevo y ejecute 'ash install' de nuevo para elegir proveedor y modelo, o configure manualmente AI_ENDPOINT, AI_MODEL y AI_AUTH_TOKEN.",
     "install.updated_file": "se actualizó %s",
     "install.language_downloaded": "Paquete de idioma instalado: %s",
     "install.language_unavailable": "La versión %s no ofrece un paquete de idioma para %s; se continuará en inglés.",

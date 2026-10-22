@@ -41,8 +41,7 @@ func (a cohereAdapter) Send(ctx context.Context, aiCfg aiConfig, messages []mess
 
 	resp, err := client.V2.Chat(ctx, request)
 	if err != nil {
-		var apiErr *core.APIError
-		if errors.As(err, &apiErr) {
+		if apiErr, ok := errors.AsType[*core.APIError](err); ok {
 			return chatResponse{}, chatStatusError{StatusCode: apiErr.StatusCode, Body: apiErr.Error()}
 		}
 		return chatResponse{}, err

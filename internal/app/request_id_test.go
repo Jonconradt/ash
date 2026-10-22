@@ -50,7 +50,7 @@ func TestRequestIDGeneratorIsRandom(t *testing.T) {
 }
 
 func TestRequestIDGeneratorLength(t *testing.T) {
-	for i := 0; i < 10; i++ {
+	for range 10 {
 		id := requestIDGenerator()
 		if len(id) != 16 {
 			t.Fatalf("expected 16-character hex-encoded request ID, got %q (len %d)", id, len(id))
@@ -61,7 +61,7 @@ func TestRequestIDGeneratorLength(t *testing.T) {
 // TestRequestIDGeneratorNeverAllZero guards against silently reintroducing the unfilled-byte-slice bug.
 func TestRequestIDGeneratorNeverAllZero(t *testing.T) {
 	seen := make(map[string]struct{}, 1000)
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		id := requestIDGenerator()
 		if id == zeroRequestID {
 			t.Fatalf("generator returned the all-zero ID on iteration %d", i)
@@ -193,7 +193,7 @@ func TestRunGeneratesDifferentRequestIDPerInvocation(t *testing.T) {
 func extractDebugLogFieldValues(t *testing.T, logs, field string) []string {
 	t.Helper()
 	var values []string
-	for _, line := range strings.Split(strings.TrimSpace(logs), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(logs), "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue

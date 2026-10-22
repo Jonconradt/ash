@@ -83,7 +83,9 @@
           <h2>Flux de développement quotidien</h2>
           <p>Pour un changement de code normal, exécutez les tests ciblés pendant l'itération, puis exécutez le lint requis et les portes de test du référentiel avant de terminer :</p>
           <pre><code>go test ./internal/app -run 'TestName'
-make lint test</code></pre>
+make check-static
+make check-security
+make test</code></pre>
           <p>La plupart Utiliser les cibles<code>scripts/dev/run-quiet.sh</code>: étapes réussies, imprimez-en une de manière concise<code>ok</code>ligne, tandis que les étapes ayant échoué impriment leur sortie capturée. Préfixez une cible avec<code>V=1</code>pour diffuser sa sortie complète pendant son exécution :</p>
           <pre><code>make V=1 lint
 make V=1 test
@@ -94,12 +96,14 @@ make V=1 verify</code></pre>
         <section id="make-targets">
           <h2>Faire une référence à la cible</h2>
           <dl>
+            <dt><code>make pre-push</code></dt>
+            <dd>Exécute les vérifications statiques, les analyses de sécurité et des dépendances, la détection de secrets et les tests sur les commits exacts envoyés. <code>make config</code> installe le hook du dépôt. Les hooks locaux peuvent être contournés et ne sont pas imposés par le serveur.</dd>
             <dt><code>make lint</code></dt>
             <dd>Vérifie les catalogues de localisation, la syntaxe shell pour le programme d'installation du site, le flux de travail YAML, Python lint/format, Markdown, plugin lint et Go lint.</dd>
             <dt><code>make test</code></dt>
             <dd>Construit et teste les plugins natifs, puis s'exécute<code>go test ./...</code>.</dd>
             <dt><code>make verify-ci</code></dt>
-            <dd>Exécute des peluches, des tests et des contrôles de sécurité : le contrôle de qualité CI plus rapide.</dd>
+            <dd>Exécute le contrôle pre-push avant la création du tag nocturne. La CI des artefacts déclenchée par un tag ne répète pas les vérifications du code source.</dd>
             <dt><code>make verify</code></dt>
             <dd>Exécute le contrôle de qualité local complet : peluches, tests, tests de course, couverture, vétérinaire, analyse statique, sécurité, analyses secrètes, fuzzing et benchmarks.</dd>
             <dt><code>make test-race</code></dt>
@@ -109,7 +113,7 @@ make V=1 verify</code></pre>
             <dt><code>make test-fuzz</code></dt>
             <dd>Exécute des tests fuzz d'application pour<code>FUZZ_TIME</code>(10 secondes par défaut).</dd>
             <dt><code>make security</code></dt>
-            <dd>Exécute les deux<code>gosec</code>et<code>govulncheck</code>.</dd>
+            <dd>Exécute <code>gosec</code>, <code>govulncheck</code> et les audits de dépendances npm, Cargo et Python.</dd>
             <dt><code>make build</code></dt>
             <dd>Exécute lint et teste, construit et installe des plugins natifs et construit<code>ash</code>plus<code>ash-broker</code>sous<code>~/.local/bin</code>.</dd>
             <dt><code>make install</code></dt>

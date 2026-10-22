@@ -83,7 +83,9 @@
           <h2>Fluxo de trabalho diário de desenvolvimento</h2>
           <p>Para uma alteração normal do código, execute os testes focados durante a iteração e, em seguida, execute o lint e as portas de teste necessários do repositório antes de terminar:</p>
           <pre><code>go test ./internal/app -run 'TestName'
-make lint test</code></pre>
+make check-static
+make check-security
+make test</code></pre>
           <p>A maioria faz com que os alvos usem<code>scripts/dev/run-quiet.sh</code>: etapas bem-sucedidas imprimem uma concisa<code>ok</code>linha, enquanto as etapas com falha imprimem sua saída capturada. Prefixar um alvo com<code>V=1</code>para transmitir sua saída completa enquanto é executado:</p>
           <pre><code>make V=1 lint
 make V=1 test
@@ -94,12 +96,14 @@ make V=1 verify</code></pre>
         <section id="make-targets">
           <h2>Fazer referência de destino</h2>
           <dl>
+            <dt><code>make pre-push</code></dt>
+            <dd>Executa verificações estáticas, análise de segurança e dependências, detecção de segredos e testes nos commits exatos enviados. <code>make config</code> instala o hook do repositório. Hooks locais podem ser ignorados e não são uma verificação imposta pelo servidor.</dd>
             <dt><code>make lint</code></dt>
             <dd>Verifica catálogos de localização, sintaxe de shell para o instalador do site, fluxo de trabalho YAML, lint/formato Python, Markdown, plugin lint e Go lint.</dd>
             <dt><code>make test</code></dt>
             <dd>Constrói e testa plug-ins nativos e depois executa<code>go test ./...</code>.</dd>
             <dt><code>make verify-ci</code></dt>
-            <dd>Executa lint, testes e verificações de segurança – a porta de qualidade de CI mais rápida.</dd>
+            <dd>Executa a verificação pre-push antes de criar a tag nightly. A CI de artefatos acionada pela tag não repete as verificações do código-fonte.</dd>
             <dt><code>make verify</code></dt>
             <dd>Executa todo o portão de qualidade local: lint, testes, testes de corrida, cobertura, veterinário, análise estática, segurança, varreduras secretas, difusão e benchmarks.</dd>
             <dt><code>make test-race</code></dt>
@@ -109,7 +113,7 @@ make V=1 verify</code></pre>
             <dt><code>make test-fuzz</code></dt>
             <dd>Executa testes fuzz de aplicativos para<code>FUZZ_TIME</code>(10 segundos por padrão).</dd>
             <dt><code>make security</code></dt>
-            <dd>Executa ambos<code>gosec</code>e<code>govulncheck</code>.</dd>
+            <dd>Executa <code>gosec</code>, <code>govulncheck</code> e auditorias de dependências npm, Cargo e Python.</dd>
             <dt><code>make build</code></dt>
             <dd>Executa lint e testes, cria e instala plug-ins nativos e cria<code>ash</code>mais<code>ash-broker</code>sob<code>~/.local/bin</code>.</dd>
             <dt><code>make install</code></dt>

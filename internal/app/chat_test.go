@@ -663,7 +663,7 @@ func TestChatStreamVerboseLogReportsUnsupportedFallback(t *testing.T) {
 
 func findDebugLogRecord(t *testing.T, logs, message string) map[string]any {
 	t.Helper()
-	for _, line := range strings.Split(strings.TrimSpace(logs), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(logs), "\n") {
 		var record map[string]any
 		if err := json.Unmarshal([]byte(line), &record); err == nil && record["message"] == message {
 			return record

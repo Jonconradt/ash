@@ -52,7 +52,6 @@
     "install.python.missing_libraries": "Mitgelieferte Python-Tools, die Pakete von Drittanbietern benötigen, melden einen Fehler wegen fehlender Bibliotheken, bis die Installation erfolgreich ist.",
     "install.python.ready": "Python-Umgebung bereit unter %s",
     "install.interactive_hint": "KI-Anbieter nicht automatisch konfiguriert: Diese Shell-Sitzung ist nicht interaktiv (zum Beispiel bei Ausführung über 'curl | sh').",
-    "install.configure_again_hint": "Öffne ein neues Terminal und führe erneut 'ash install' aus, um Anbieter und Modell auszuwählen, oder setze AI_ENDPOINT, AI_MODEL und AI_AUTH_TOKEN manuell.",
     "install.updated_file": "%s aktualisiert",
     "install.language_downloaded": "Sprachpaket installiert: %s",
     "install.language_unavailable": "Das Sprachpaket für %s ist in Version %s nicht verfügbar; es wird auf Englisch fortgefahren.",

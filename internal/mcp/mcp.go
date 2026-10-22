@@ -255,7 +255,7 @@ func parseCodexToml(path string) []DiscoveredServer {
 			} else if strings.HasPrefix(line, "args =") {
 				// Naive array processing strip brackets and quotes
 				arrStr := strings.Trim(line[6:], " []")
-				for _, arg := range strings.Split(arrStr, ",") {
+				for arg := range strings.SplitSeq(arrStr, ",") {
 					trimmed := strings.Trim(arg, " \"'")
 					if trimmed != "" {
 						currentServer.Args = append(currentServer.Args, trimmed)

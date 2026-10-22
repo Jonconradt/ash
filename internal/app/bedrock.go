@@ -56,8 +56,7 @@ func (a bedrockAdapter) Send(ctx context.Context, aiCfg aiConfig, messages []mes
 
 	resp, err := client.Converse(ctx, input)
 	if err != nil {
-		var respErr *smithyhttp.ResponseError
-		if errors.As(err, &respErr) {
+		if respErr, ok := errors.AsType[*smithyhttp.ResponseError](err); ok {
 			return chatResponse{}, chatStatusError{StatusCode: respErr.HTTPStatusCode(), Body: respErr.Err.Error()}
 		}
 		return chatResponse{}, err

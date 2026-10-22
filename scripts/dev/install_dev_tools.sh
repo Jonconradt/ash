@@ -25,12 +25,16 @@ YAMLFMT_VERSION="${YAMLFMT_VERSION:-v0.21.0}"
 FPM_VERSION="${FPM_VERSION:-1.18.0}"
 RUFF_VERSION="${RUFF_VERSION:-0.12.10}"
 MARKDOWNLINT_CLI2_VERSION="${MARKDOWNLINT_CLI2_VERSION:-0.23.2}"
+HTML_VALIDATE_VERSION="${HTML_VALIDATE_VERSION:-11.17.0}"
+ACTIONLINT_VERSION="${ACTIONLINT_VERSION:-v1.7.12}"
+PIP_AUDIT_VERSION="${PIP_AUDIT_VERSION:-2.10.1}"
+CARGO_AUDIT_VERSION="${CARGO_AUDIT_VERSION:-0.22.2}"
 
 install_macos_packages() {
 	command -v brew >/dev/null 2>&1 || fail "Homebrew is required on macOS; install it from https://brew.sh and re-run"
 
 	local pkg
-	for pkg in go node python3 git uv; do
+	for pkg in go node python3 git uv shellcheck; do
 		if brew list --formula "$pkg" >/dev/null 2>&1 || brew list --cask "$pkg" >/dev/null 2>&1; then
 			log "brew: $pkg already installed"
 		else
@@ -61,7 +65,7 @@ install_linux_packages() {
 	sudo apt-get update
 
 	local pkg
-	for pkg in golang-go nodejs npm python3 python3-pip git build-essential ruby ruby-dev rpm; do
+	for pkg in golang-go nodejs npm python3 python3-pip git build-essential ruby ruby-dev rpm shellcheck; do
 		apt_install "$pkg"
 	done
 
@@ -88,6 +92,7 @@ install_go_tools() {
 	go install "github.com/zricethezav/gitleaks/v8@${GITLEAKS_VERSION}"
 	go install "github.com/google/yamlfmt/cmd/yamlfmt@${YAMLFMT_VERSION}"
 	go install "honnef.co/go/tools/cmd/staticcheck@${STATICCHECK_VERSION}"
+	go install "github.com/rhysd/actionlint/cmd/actionlint@${ACTIONLINT_VERSION}"
 
 	local gobin
 	gobin="$(go env GOPATH)/bin"
@@ -112,6 +117,10 @@ install_rust_toolchain() {
 		log "rust: adding clippy component"
 		rustup component add clippy
 	fi
+	if ! command -v cargo-audit >/dev/null 2>&1; then
+		log "rust: installing cargo-audit ${CARGO_AUDIT_VERSION}"
+		cargo install cargo-audit --version "$CARGO_AUDIT_VERSION" --locked
+	fi
 
 	case ":${PATH}:" in
 	*":$HOME/.cargo/bin:"*) ;;
@@ -129,6 +138,13 @@ warm_python_and_node_tools() {
 	if command -v npx >/dev/null 2>&1; then
 		log "npm: pre-fetching markdownlint-cli2 ${MARKDOWNLINT_CLI2_VERSION}"
 		npx --yes "markdownlint-cli2@${MARKDOWNLINT_CLI2_VERSION}" --version >/dev/null
+		log "npm: pre-fetching html-validate ${HTML_VALIDATE_VERSION}"
+		npx --yes "html-validate@${HTML_VALIDATE_VERSION}" --version >/dev/null
+	fi
+
+	if command -v uvx >/dev/null 2>&1; then
+		log "uv: pre-fetching pip-audit ${PIP_AUDIT_VERSION}"
+		uvx --from "pip-audit==${PIP_AUDIT_VERSION}" pip-audit --version >/dev/null
 	fi
 }
 
@@ -149,7 +165,7 @@ main() {
 	install_rust_toolchain
 	warm_python_and_node_tools
 
-	log "done: go, node/npm, python3, git, uv, rust/cargo, golangci-lint, gosec, govulncheck, gitleaks, yamlfmt, staticcheck are ready"
+	log "done: Go, Node/npm, Python, git, uv, Rust/cargo, ShellCheck, Go static/security tools, actionlint, HTML/Markdown validators, and dependency auditors are ready"
 }
 
 main "$@"

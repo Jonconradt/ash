@@ -105,8 +105,10 @@ tag version and Git HEAD without the development suffix.
 make lint
 make test
 make install
+make pre-push
+make check-static
+make check-security
 make verify
-make verify-ci
 make sync-route-words
 make version
 make release
@@ -114,15 +116,24 @@ make release
 make release CHANNEL=stable
 ```
 
-- `make lint` runs `golangci-lint` checks across the module
-- `make security` runs `gosec` and `govulncheck` for security scanning
+- `make lint` checks Go, shell scripts, HTML, JSON, GitHub Actions workflows,
+  YAML formatting, localization, Python, Markdown, and plugin sources
+- `make security` runs Go security/vulnerability analysis plus npm, Cargo, and
+  Python dependency audits
+- `make check-static` and `make check-security` are named aliases for those
+  respective local quality gates; the latter also scans repository history and
+  working-tree files for secrets
+- `make pre-push` runs static checks, security/dependency/secret scanning, and
+  tests against the exact commit being pushed. `make config` installs the
+  repository hooks. Hooks can be bypassed, so this is a local safeguard, not a
+  server-enforced GitHub status check.
 - `make test` runs `go test ./...`
 - `make install` builds `ash`, `ash-broker`, and bundled plugins into user-local directories, then enables Bash shell integration.
 - `make verify` runs the complete quality gate, including race/coverage tests, vet,
   staticcheck, security and secret scans, fuzz tests, and benchmarks
-- `make verify-ci` runs lint, unit tests, and security checks for hosted release
-  builds; it skips race/coverage tests, vet, staticcheck, secret scans, fuzz tests,
-  and benchmarks
+- `make verify-ci` runs the pre-push gate before an automated nightly release;
+  it skips the deeper race/coverage, fuzz, benchmark, and full repository secret
+  scans in `make verify`
 - `make sync-route-words` regenerates the ambiguous-word block in the shell assets from
   `internal/app/ash_bootstrap/route_words.txt`, the canonical list. Edit only that file; a test fails if
   the generated blocks are stale
@@ -133,8 +144,11 @@ make release CHANNEL=stable
   create a `release/vX.Y` branch, and publish the corresponding `vX.Y.0` stable
   release
 - `make release CHANNEL=nightly` publishes a date-stamped nightly prerelease
-- Every release generates the localized static website with the existing
-  Google Translate-backed `make site-locales` process and includes it as
+- Scheduled nightly release automation runs on Ubuntu and validates before
+  tagging. It creates no local artifacts; the tag-triggered workflow builds and
+  validates the release outputs.
+- Non-nightly releases generate the localized static website with the existing
+  Google Translate-backed `make site-locales` process and include it as
   `ash-site-<version>.tar.gz`; generation uses a temporary copy and does not
   modify the working tree
 - GitHub Releases publish installable platform packages and bundled tarballs,
@@ -152,7 +166,8 @@ make release CHANNEL=stable
   example `v1.2.0-nightly.20261011.1`. Release tags are immutable, including
   failed attempts, because Go's checksum database may already have indexed them.
 
-Contributor note: run `make lint test` before submitting changes.
+Contributor note: run `make pre-push` before submitting changes. `make config`
+installs the hook that runs this gate on the exact outgoing commits.
 
 ## Install on Linux, macOS, or FreeBSD
 
@@ -359,8 +374,9 @@ Canonical publishing is tag-driven in GitHub Actions.
 
 1. Run `make release RELEASE_VERSION=v1.2.3` (or omit `RELEASE_VERSION` to auto-derive).
 2. `make release` creates and pushes the release tag to `origin`.
-3. The `release` workflow runs quality checks, then `make release-artifacts` in
-   Linux-hosted packaging jobs for macOS, Linux, and FreeBSD targets.
+3. The tag-triggered workflow builds and validates macOS, Linux, and FreeBSD
+   artifacts on Linux runners. Source and dependency checks run locally before
+   pushes; the artifact workflow does not repeat them.
 4. GitHub Release assets are published automatically:
 
 - `ash-v1.2.3-darwin-amd64.tar.gz`

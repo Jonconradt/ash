@@ -83,7 +83,9 @@
           <h2>日常开发工作流程</h2>
           <p>对于正常的代码更改，请在迭代时运行重点测试，然后在完成之前运行存储库所需的 lint 和测试门：</p>
           <pre><code>go test ./internal/app -run 'TestName'
-make lint test</code></pre>
+make check-static
+make check-security
+make test</code></pre>
           <p>大多数 Make 目标使用<code>scripts/dev/run-quiet.sh</code>：成功的步骤打印一份简明的<code>ok</code>行，而失败的步骤则打印捕获的输出。目标前缀为<code>V=1</code>在运行时流式传输其完整输出：</p>
           <pre><code>make V=1 lint
 make V=1 test
@@ -94,12 +96,14 @@ make V=1 verify</code></pre>
         <section id="make-targets">
           <h2>制定目标参考</h2>
           <dl>
+            <dt><code>make pre-push</code></dt>
+            <dd>针对即将推送的确切提交运行静态检查、安全与依赖扫描、密钥扫描和测试。<code>make config</code>会安装仓库管理的钩子。本地钩子可以绕过，并非服务器强制检查。</dd>
             <dt><code>make lint</code></dt>
             <dd>检查本地化目录、站点安装程序的 shell 语法、工作流程 YAML、Python lint/格式、Markdown、插件 lint 和 Go lint。</dd>
             <dt><code>make test</code></dt>
             <dd>构建并测试本机插件，然后运行<code>go test ./...</code>。</dd>
             <dt><code>make verify-ci</code></dt>
-            <dd>运行 lint、测试和安全检查——更快的 CI 质量门。</dd>
+            <dd>在创建 nightly 标签前运行 pre-push 检查。由标签触发的制品 CI 不会重复源代码检查。</dd>
             <dt><code>make verify</code></dt>
             <dd>运行完整的本地质量门：lint、测试、竞赛测试、覆盖、审查、静态分析、安全、秘密扫描、模糊测试和基准测试。</dd>
             <dt><code>make test-race</code></dt>
@@ -109,7 +113,7 @@ make V=1 verify</code></pre>
             <dt><code>make test-fuzz</code></dt>
             <dd>运行应用程序模糊测试<code>FUZZ_TIME</code>（默认 10 秒）。</dd>
             <dt><code>make security</code></dt>
-            <dd>两者都运行<code>gosec</code>和<code>govulncheck</code>。</dd>
+            <dd>运行 <code>gosec</code>、<code>govulncheck</code> 以及 npm、Cargo 和 Python 依赖审计。</dd>
             <dt><code>make build</code></dt>
             <dd>运行 lint 和测试、构建和安装本机插件以及构建<code>ash</code>加<code>ash-broker</code>在下面<code>~/.local/bin</code>。</dd>
             <dt><code>make install</code></dt>

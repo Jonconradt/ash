@@ -1,4 +1,4 @@
-.PHONY: all verify verify-ci build config lint language-lint site-lint yaml-lint python-lint markdown-lint sync-route-words test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install version release release-check release-clean release-build release-translate release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one release-checksums restart-broker plugins-build plugins-test plugins-lint plugins-clean plugins-install
+.PHONY: all verify verify-ci pre-push check-static check-security hooks-install build config lint language-lint site-lint yaml-lint python-lint markdown-lint static-config-lint shell-lint html-lint sync-route-words test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install version release release-check release-clean release-build release-translate release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one release-checksums restart-broker plugins-build plugins-test plugins-lint plugins-clean plugins-install
 
 SHELL := /bin/bash
 SITE_LOCALES ?=
@@ -8,11 +8,15 @@ FUZZ_TIME ?= 10s
 GOLANGCI_LINT_VERSION ?= v2.14.0
 RUFF_VERSION ?= 0.12.10
 MARKDOWNLINT_CLI2_VERSION ?= 0.23.2
+HTML_VALIDATE_VERSION ?= 11.17.0
 GOSEC_VERSION ?= v2.29.1-0.20261009120814-7b1b5cebe007
 GOVULNCHECK_VERSION ?= v1.8.0
-STATICCHECK_VERSION ?= latest
-YAMLFMT_VERSION ?= latest
+STATICCHECK_VERSION ?= 2026.2.1
+YAMLFMT_VERSION ?= v0.21.0
 GITLEAKS_VERSION ?= v8.30.1
+ACTIONLINT_VERSION ?= v1.7.12
+PIP_AUDIT_VERSION ?= 2.10.1
+CARGO_AUDIT_VERSION ?= 0.22.2
 APP_NAME ?= ash
 LOCAL_BIN_DIR ?= $(HOME)/.local/bin
 LOCAL_BINARY_PATH ?= $(LOCAL_BIN_DIR)/$(APP_NAME)
@@ -31,6 +35,7 @@ RELEASE_PACKAGE_DIR ?= $(RELEASE_OUTPUT_DIR)
 RELEASE_TARGET_ARCHES ?= amd64 arm64
 RELEASE_TARGET_OSES ?= auto
 RELEASE_MACOS_PKG ?= 1
+RELEASE_SKIP_LOCAL_ARTIFACTS ?= 0
 RELEASE_GOOS ?= darwin
 RELEASE_FORMAT ?= pkg
 # The interactive release dashboard is for local, manual releases, not CI logs.
@@ -87,31 +92,54 @@ config:
 	YAMLFMT_VERSION=$(YAMLFMT_VERSION) \
 	RUFF_VERSION=$(RUFF_VERSION) \
 	MARKDOWNLINT_CLI2_VERSION=$(MARKDOWNLINT_CLI2_VERSION) \
+	HTML_VALIDATE_VERSION=$(HTML_VALIDATE_VERSION) \
+	ACTIONLINT_VERSION=$(ACTIONLINT_VERSION) \
+	PIP_AUDIT_VERSION=$(PIP_AUDIT_VERSION) \
+	CARGO_AUDIT_VERSION=$(CARGO_AUDIT_VERSION) \
 	./scripts/dev/install_dev_tools.sh
+	@$(MAKE) --no-print-directory hooks-install
+
+hooks-install:
+	@./scripts/dev/install_hooks.sh
+
+check-static: lint
 
 # verify runs the full quality gate quietly: each step prints a single "ok"
 # line on success and dumps its full output only when it fails, ending with one
 # success marker. Run `make V=1 verify` to stream each step's full output.
 verify:
-	@./scripts/dev/run-quiet.sh "lint"        $(MAKE) --no-print-directory lint
+	@./scripts/dev/run-quiet.sh "lint"        $(MAKE) --no-print-directory check-static
 	@./scripts/dev/run-quiet.sh "test"        $(MAKE) --no-print-directory test
 	@./scripts/dev/run-quiet.sh "test-race"   go test -race ./...
 	@./scripts/dev/run-quiet.sh "test-cover"  $(MAKE) --no-print-directory test-cover
 	@./scripts/dev/run-quiet.sh "vet"         go vet ./...
 	@./scripts/dev/run-quiet.sh "staticcheck" $(MAKE) --no-print-directory staticcheck
-	@./scripts/dev/run-quiet.sh "security"    $(MAKE) --no-print-directory security
-	@./scripts/dev/run-quiet.sh "secrets-history" go run github.com/zricethezav/gitleaks/v8@$(GITLEAKS_VERSION) git --redact --verbose --log-opts=--all .
-	@./scripts/dev/run-quiet.sh "secrets-tree"    go run github.com/zricethezav/gitleaks/v8@$(GITLEAKS_VERSION) dir --redact --verbose .
+	@./scripts/dev/run-quiet.sh "security"    $(MAKE) --no-print-directory check-security
 	@./scripts/dev/run-quiet.sh "test-fuzz"   go test -fuzz=Fuzz -fuzztime=$(FUZZ_TIME) ./internal/app
 	@./scripts/dev/run-quiet.sh "benchmark"   go test -bench=. -benchmem ./...
 	@echo "verify: all checks passed"
 
-# verify-ci retains fast lint, unit, and security gates for hosted release builds.
+# Run the same fail-closed checks on the exact commit(s) being pushed.
+pre-push:
+	@$(MAKE) --no-print-directory lint
+	@$(MAKE) --no-print-directory security
+	@$(MAKE) --no-print-directory test
+	@set -euo pipefail; \
+	if [[ -n "$(PUSH_BASE)" ]]; then \
+		log_opts="$(PUSH_BASE)..HEAD"; \
+	else \
+		log_opts="HEAD"; \
+	fi; \
+	go run github.com/zricethezav/gitleaks/v8@$(GITLEAKS_VERSION) git --redact --verbose --log-opts="$$log_opts" .
+	@echo "pre-push: all checks passed"
+
+check-security: security
+	@./scripts/dev/run-quiet.sh "secrets-history" go run github.com/zricethezav/gitleaks/v8@$(GITLEAKS_VERSION) git --redact --verbose --log-opts=--all .
+	@./scripts/dev/run-quiet.sh "secrets-tree" go run github.com/zricethezav/gitleaks/v8@$(GITLEAKS_VERSION) dir --redact --verbose .
+
+# Used by scheduled release automation before it creates a tag.
 verify-ci:
-	@./scripts/dev/run-quiet.sh "lint"     $(MAKE) --no-print-directory lint
-	@./scripts/dev/run-quiet.sh "test"     $(MAKE) --no-print-directory test
-	@./scripts/dev/run-quiet.sh "security" $(MAKE) --no-print-directory security
-	@echo "verify-ci: all checks passed"
+	@$(MAKE) --no-print-directory pre-push
 
 sync-route-words:
 	@cd internal/app && go run ../../cmd/ash --internal-sync-route-words
@@ -174,7 +202,7 @@ build: lint test  site-locales plugins-build plugins-install
 restart-broker:
 	@echo "restart-broker: existing shell brokers stop with their owning shells"
 
-lint: language-lint site-lint yaml-lint python-lint markdown-lint plugins-lint
+lint: language-lint site-lint yaml-lint python-lint markdown-lint plugins-lint static-config-lint
 	@./scripts/dev/run-quiet.sh "golangci-lint" go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run ./...
 	@echo "lint: ok"
 
@@ -185,11 +213,22 @@ site-lint:
 	@./scripts/dev/run-quiet.sh "site-lint" sh -n site/install.sh
 	@./scripts/dev/run-quiet.sh "site-js-syntax" node --check site/site.js
 
+static-config-lint: shell-lint html-lint
+	@./scripts/dev/run-quiet.sh "json-syntax" python3 scripts/dev/validate_json.py
+	@./scripts/dev/run-quiet.sh "gofmt" ./scripts/dev/check_gofmt.sh
+	@./scripts/dev/run-quiet.sh "actionlint" go run github.com/rhysd/actionlint/cmd/actionlint@$(ACTIONLINT_VERSION) .github/workflows/*.yml
+
+shell-lint:
+	@./scripts/dev/run-quiet.sh "shellcheck" ./scripts/dev/check_shell.sh
+
+html-lint:
+	@./scripts/dev/run-quiet.sh "html-validate" npx --yes html-validate@$(HTML_VALIDATE_VERSION) "site/*.html" "site/*/*.html"
+
 site-locales:
 	@python3 site/generate_locales.py $(foreach locale,$(SITE_LOCALES),--locale $(locale))
 
 yaml-lint:
-	@./scripts/dev/run-quiet.sh "yaml-lint" go run github.com/google/yamlfmt/cmd/yamlfmt@latest -lint .github/workflows/*.yml
+	@./scripts/dev/run-quiet.sh "yaml-lint" go run github.com/google/yamlfmt/cmd/yamlfmt@$(YAMLFMT_VERSION) -lint .github/workflows/*.yml
 
 python-lint:
 	@./scripts/dev/run-quiet.sh "ruff-check" uvx ruff@$(RUFF_VERSION) check internal/app/ash_bootstrap/tools
@@ -199,6 +238,9 @@ markdown-lint:
 	@./scripts/dev/run-quiet.sh "markdown-lint" npx --yes markdownlint-cli2@$(MARKDOWNLINT_CLI2_VERSION) "**/*.md" "!dist/**" "!.venv/**" "!node_modules/**" "!**/node_modules/**" "!**/target/**"
 
 security: gosec govulncheck
+	@./scripts/dev/run-quiet.sh "npm-audit" npm --prefix internal/app/ash_bootstrap/plugins_src/calculator audit --audit-level=high
+	@./scripts/dev/run-quiet.sh "cargo-audit" bash -c 'cd internal/app/ash_bootstrap/plugins_src/flip_a_coin && cargo audit'
+	@./scripts/dev/run-quiet.sh "pip-audit" uvx --from pip-audit==$(PIP_AUDIT_VERSION) pip-audit -r internal/app/ash_bootstrap/tools/requirements.txt
 	@echo "security: ok"
 
 gosec:
@@ -237,15 +279,9 @@ vet:
 	@go vet ./...
 
 staticcheck:
-	@if command -v staticcheck >/dev/null 2>&1; then \
-		if ! staticcheck ./...; then \
-			echo "staticcheck failed (toolchain mismatch or local setup issue); skipping"; \
-		fi; \
-	else \
-		echo "staticcheck not installed; skipping"; \
-	fi
+	@go run honnef.co/go/tools/cmd/staticcheck@$(STATICCHECK_VERSION) ./...
 
-install: test lint gosec plugins-build plugins-install
+install: test lint security plugins-build plugins-install
 	@mkdir -p "$(LOCAL_BIN_DIR)"
 	@go build -o "$(LOCAL_BINARY_PATH)" -ldflags "-X github.com/Jonconradt/ash/internal/app.ashVersion=$(BUILD_VERSION) -X github.com/Jonconradt/ash/internal/app.ashCommit=$(BUILD_COMMIT) -X github.com/Jonconradt/ash/internal/app.ashDevelopmentBuild=true" ./cmd/ash
 	@go build -o "$(LOCAL_BIN_DIR)/ash-broker" ./cmd/ash-broker
@@ -256,15 +292,19 @@ version: release-check release-artifacts
 
 release:
 	@$(MAKE) --no-print-directory release-check
-	@$(MAKE) --no-print-directory release-clean
-	@$(MAKE) --no-print-directory release-build
+	@if [[ "$(RELEASE_SKIP_LOCAL_ARTIFACTS)" != "1" ]]; then \
+		$(MAKE) --no-print-directory release-clean; \
+		$(MAKE) --no-print-directory release-build; \
+	fi
 	@if [[ "$(CHANNEL)" == "nightly" ]]; then \
 		echo "skipping website translation for nightly release"; \
 	else \
 		$(MAKE) --no-print-directory release-translate; \
 	fi
-	@$(MAKE) --no-print-directory release-pkg
-	@$(MAKE) --no-print-directory release-validate
+	@if [[ "$(RELEASE_SKIP_LOCAL_ARTIFACTS)" != "1" ]]; then \
+		$(MAKE) --no-print-directory release-pkg; \
+		$(MAKE) --no-print-directory release-validate; \
+	fi
 	@$(MAKE) --no-print-directory release-notes
 	@$(MAKE) --no-print-directory release-publish
 	@$(MAKE) --no-print-directory release-watch
@@ -279,8 +319,12 @@ release-check: $(RELEASE_VERIFY_TARGET)
 		echo "CHANNEL must be beta, stable, or nightly; got: $(CHANNEL)"; \
 		exit 1; \
 	fi
-	@if [[ "$$(uname -s)" != Darwin ]]; then \
-		echo "make release requires macOS for package creation and release-note execution"; \
+	@if [[ "$(RELEASE_SKIP_LOCAL_ARTIFACTS)" != "0" && "$(RELEASE_SKIP_LOCAL_ARTIFACTS)" != "1" ]]; then \
+		echo "RELEASE_SKIP_LOCAL_ARTIFACTS must be 0 or 1"; \
+		exit 1; \
+	fi
+	@if [[ "$$(uname -s)" != Darwin && "$(RELEASE_SKIP_LOCAL_ARTIFACTS)" != "1" ]]; then \
+		echo "make release requires macOS for local package creation; automated release orchestration may set RELEASE_SKIP_LOCAL_ARTIFACTS=1"; \
 		exit 1; \
 	fi
 	@if [[ "$$(git rev-parse --abbrev-ref HEAD)" == HEAD ]]; then \

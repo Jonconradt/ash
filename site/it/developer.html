@@ -83,7 +83,9 @@
           <h2>Flusso di lavoro di sviluppo quotidiano</h2>
           <p>Per una normale modifica del codice, esegui i test mirati durante l'iterazione, quindi esegui i lint richiesti e i test gate del repository prima di terminare:</p>
           <pre><code>go test ./internal/app -run 'TestName'
-make lint test</code></pre>
+make check-static
+make check-security
+make test</code></pre>
           <p>La maggior parte degli obiettivi Make utilizza<code>scripts/dev/run-quiet.sh</code>: i passaggi riusciti ne stampano uno conciso<code>ok</code>linea, mentre i passaggi falliti stampano l'output acquisito. Prefisso una destinazione con<code>V=1</code>per eseguire lo streaming dell'output completo durante l'esecuzione:</p>
           <pre><code>make V=1 lint
 make V=1 test
@@ -94,12 +96,14 @@ make V=1 verify</code></pre>
         <section id="make-targets">
           <h2>Fai riferimento al target</h2>
           <dl>
+            <dt><code>make pre-push</code></dt>
+            <dd>Esegue controlli statici, analisi di sicurezza e delle dipendenze, scansione dei segreti e test sui commit esatti in uscita. <code>make config</code> installa l'hook del repository. Gli hook locali possono essere ignorati e non sono controlli imposti dal server.</dd>
             <dt><code>make lint</code></dt>
             <dd>Controlla i cataloghi di localizzazione, la sintassi della shell per il programma di installazione del sito, il flusso di lavoro YAML, lint/formato Python, Markdown, plugin lint e Go lint.</dd>
             <dt><code>make test</code></dt>
             <dd>Crea e testa i plugin nativi, quindi viene eseguito<code>go test ./...</code>.</dd>
             <dt><code>make verify-ci</code></dt>
-            <dd>Esegue lanugine, test e controlli di sicurezza: il gate di qualità CI più veloce.</dd>
+            <dd>Esegue il controllo pre-push prima della creazione del tag notturno. La CI degli artefatti attivata dal tag non ripete i controlli del codice sorgente.</dd>
             <dt><code>make verify</code></dt>
             <dd>Esegue l'intero controllo di qualità locale: lanugine, test, test di gara, copertura, veterinario, analisi statica, sicurezza, scansioni segrete, fuzzing e benchmark.</dd>
             <dt><code>make test-race</code></dt>
@@ -109,7 +113,7 @@ make V=1 verify</code></pre>
             <dt><code>make test-fuzz</code></dt>
             <dd>Esegue i test fuzz dell'applicazione per<code>FUZZ_TIME</code>(10 secondi per impostazione predefinita).</dd>
             <dt><code>make security</code></dt>
-            <dd>Esegue entrambi<code>gosec</code>E<code>govulncheck</code>.</dd>
+            <dd>Esegue <code>gosec</code>, <code>govulncheck</code> e gli audit delle dipendenze npm, Cargo e Python.</dd>
             <dt><code>make build</code></dt>
             <dd>Esegue lint e testa, crea e installa plug-in nativi e crea<code>ash</code>più<code>ash-broker</code>Sotto<code>~/.local/bin</code>.</dd>
             <dt><code>make install</code></dt>

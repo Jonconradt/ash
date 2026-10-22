@@ -284,8 +284,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 			slog.Warn(localize.Format("log.ash.timeout", []any{timeout}), "EID", "80FzBwhZ")
 			return 1
 		}
-		var statusErr chatStatusError
-		if errors.As(err, &statusErr) {
+		if statusErr, ok := errors.AsType[chatStatusError](err); ok {
 			switch statusErr.StatusCode {
 			case http.StatusServiceUnavailable:
 				slog.Warn(withStatusDetail(pickCloudBusy503Message(), statusErr), "EID", "PUNKPM4h")

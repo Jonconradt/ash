@@ -265,7 +265,7 @@ func pluginNameForToolCall(toolName string, args map[string]any) string {
 	case "run_unix_pipeline":
 		pipeline, _ := toStringArg(args["pipeline"])
 		names := make([]string, 0, 4)
-		for _, part := range strings.Split(pipeline, "|") {
+		for part := range strings.SplitSeq(pipeline, "|") {
 			fields := strings.Fields(part)
 			if len(fields) == 0 {
 				continue

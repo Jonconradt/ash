@@ -6,9 +6,11 @@ package release
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -147,7 +149,7 @@ MAKE := $(MAKE) -f Makefile -f steps.mk
 `, 0o644)
 			output := runFixture(t, dir, nil, "make", "--no-print-directory", "-f", "Makefile", "-f", "steps.mk", "-f", "invoke.mk", "release", "CHANNEL="+channel)
 			count := 0
-			for _, line := range strings.Split(output, "\n") {
+			for line := range strings.SplitSeq(output, "\n") {
 				if strings.HasPrefix(line, "STEP ") {
 					count++
 					if line != "STEP "+want {
@@ -217,7 +219,7 @@ func TestReleaseVerificationDefaultsToFullSuite(t *testing.T) {
 	}
 }
 
-func TestVerifyCIOmitsSlowChecks(t *testing.T) {
+func TestVerifyCIUsesPrePushGate(t *testing.T) {
 	root, err := filepath.Abs("../..")
 	if err != nil {
 		t.Fatal(err)
@@ -231,19 +233,155 @@ func TestVerifyCIOmitsSlowChecks(t *testing.T) {
 		t.Fatal("missing verify-ci target")
 	}
 	section, _, _ = strings.Cut(section, "\nsync-route-words:")
-	for _, skipped := range []string{"test-race", "test-cover", "vet", "staticcheck", "secrets-history", "secrets-tree", "test-fuzz", "benchmark"} {
-		if strings.Contains(section, `"`+skipped+`"`) {
-			t.Errorf("verify-ci unexpectedly runs %s", skipped)
-		}
-	}
-	for _, retained := range []string{`"lint"`, `"test"`, `"security"`} {
-		if !strings.Contains(section, retained) {
-			t.Errorf("verify-ci omits expected check %s", retained)
-		}
+	if !strings.Contains(section, "$(MAKE) --no-print-directory pre-push") {
+		t.Fatal("verify-ci does not run the local pre-push gate")
 	}
 	if !strings.Contains(string(data), `"test-race"`) || !strings.Contains(string(data), `"benchmark"`) {
-		t.Fatal("full verify target lost checks when adding verify-ci")
+		t.Fatal("full verify target lost its extended checks")
 	}
+	_, gate, found := strings.Cut(string(data), "pre-push:\n")
+	if !found {
+		t.Fatal("missing pre-push target")
+	}
+	gate, _, _ = strings.Cut(gate, "\ncheck-security:")
+	for _, check := range []string{"lint", "security", "test", "gitleaks"} {
+		if !strings.Contains(gate, check) {
+			t.Errorf("pre-push gate omits %s", check)
+		}
+	}
+}
+
+func TestPrePushValidatesExactCommitAndMergeBase(t *testing.T) {
+	root, dir, base, pushed := prePushFixture(t)
+	writeFixture(t, filepath.Join(dir, "README.md"), "dirty local worktree\n", 0o644)
+
+	logPath := filepath.Join(t.TempDir(), "make.log")
+	path := installFakeMake(t, logPath, 0)
+	input := fmt.Sprintf("refs/heads/main %s refs/heads/main %s\n", pushed, base)
+	output := runPrePush(t, root, dir, path, logPath, input)
+	if !strings.Contains(output, "Validating pushed commit "+pushed) {
+		t.Fatalf("helper did not identify pushed commit: %s", output)
+	}
+	log, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lines := strings.Split(strings.TrimSpace(string(log)), "\n")
+	if len(lines) < 6 {
+		t.Fatalf("fake make log is incomplete: %q", log)
+	}
+	if strings.Contains(lines[0], dir) {
+		t.Fatalf("validation did not use a separate worktree: %q", lines[0])
+	}
+	if lines[1] != "pre-push" || lines[2] != "PUSH_BASE="+base || lines[3] != pushed {
+		t.Fatalf("validation arguments and commit = %q, want pre-push, PUSH_BASE=%s, %s", lines, base, pushed)
+	}
+	if lines[4] != "committed revision" || lines[5] != "second commit" {
+		t.Fatalf("validation read working-tree changes instead of pushed content: %q", lines)
+	}
+}
+
+func TestPrePushFailureBlocksAndSkipsSecretScan(t *testing.T) {
+	root, dir, base, pushed := prePushFixture(t)
+	logPath := filepath.Join(t.TempDir(), "make.log")
+	path := installFakeMake(t, logPath, 7)
+	input := fmt.Sprintf("refs/heads/main %s refs/heads/main %s\n", pushed, base)
+	cmd := exec.CommandContext(context.Background(), "bash", filepath.Join(root, "scripts/dev/pre-push.sh"))
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "PATH="+path+":"+os.Getenv("PATH"), "PRE_PUSH_LOG="+logPath)
+	cmd.Stdin = strings.NewReader(input)
+	output, err := cmd.CombinedOutput()
+	if err == nil || !strings.Contains(string(output), "pre-push validation failed") {
+		t.Fatalf("failed validation did not block push: err=%v output=%s", err, output)
+	}
+	log, readErr := os.ReadFile(logPath)
+	if readErr != nil || strings.Contains(string(log), "gitleaks") {
+		t.Fatalf("secret scan should not run after failed checks: log=%q err=%v", log, readErr)
+	}
+}
+
+func TestPrePushSkipsDeletedRefs(t *testing.T) {
+	root, dir, _, _ := prePushFixture(t)
+	logPath := filepath.Join(t.TempDir(), "make.log")
+	path := installFakeMake(t, logPath, 0)
+	zeroOID := strings.Repeat("0", 40)
+	input := fmt.Sprintf("refs/heads/deleted %s refs/heads/deleted %s\n", zeroOID, zeroOID)
+	output := runPrePush(t, root, dir, path, logPath, input)
+	if strings.Contains(output, "Validating pushed commit") {
+		t.Fatalf("deleted ref was validated: %s", output)
+	}
+	if _, err := os.Stat(logPath); !os.IsNotExist(err) {
+		t.Fatalf("deleted ref invoked make; stat error = %v", err)
+	}
+}
+
+func TestHookInstallerPreservesCustomPath(t *testing.T) {
+	root, dir := releaseFixture(t)
+	copyFixture(t, root, dir, "scripts/dev/install_hooks.sh")
+	writeFixture(t, filepath.Join(dir, "githooks/pre-commit"), "#!/bin/sh\nexit 0\n", 0o755)
+	writeFixture(t, filepath.Join(dir, "githooks/pre-push"), "#!/bin/sh\nexit 0\n", 0o755)
+
+	runFixture(t, dir, nil, "bash", "scripts/dev/install_hooks.sh")
+	if got := strings.TrimSpace(runFixture(t, dir, nil, "git", "config", "--local", "--get", "core.hooksPath")); got != "githooks" {
+		t.Fatalf("hooks path = %q, want githooks", got)
+	}
+
+	runFixture(t, dir, nil, "git", "config", "--local", "core.hooksPath", "custom-hooks")
+	cmd := fixtureCommand(dir, nil, "bash", "scripts/dev/install_hooks.sh")
+	output, err := cmd.CombinedOutput()
+	if err == nil || !strings.Contains(string(output), "refusing to replace custom hooks") {
+		t.Fatalf("custom hook path was not protected: err=%v output=%s", err, output)
+	}
+	if got := strings.TrimSpace(runFixture(t, dir, nil, "git", "config", "--local", "--get", "core.hooksPath")); got != "custom-hooks" {
+		t.Fatalf("custom hooks path changed to %q", got)
+	}
+}
+
+func prePushFixture(t *testing.T) (string, string, string, string) {
+	t.Helper()
+	root, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := t.TempDir()
+	copyFixture(t, root, dir, "scripts/dev/pre-push.sh")
+	writeFixture(t, filepath.Join(dir, "README.md"), "committed revision\n", 0o644)
+	runFixture(t, dir, nil, "git", "init", "-b", "main")
+	runFixture(t, dir, nil, "git", "add", ".")
+	runFixture(t, dir, nil, "git", "commit", "-m", "base")
+	base := strings.TrimSpace(runFixture(t, dir, nil, "git", "rev-parse", "HEAD"))
+	writeFixture(t, filepath.Join(dir, "README.md"), "committed revision\nsecond commit\n", 0o644)
+	runFixture(t, dir, nil, "git", "add", ".")
+	runFixture(t, dir, nil, "git", "commit", "-m", "pushed")
+	pushed := strings.TrimSpace(runFixture(t, dir, nil, "git", "rev-parse", "HEAD"))
+	return root, dir, base, pushed
+}
+
+func installFakeMake(t *testing.T, logPath string, status int) string {
+	t.Helper()
+	dir := t.TempDir()
+	makeScript := fmt.Sprintf(`#!/bin/sh
+printf '%%s\n' "$PWD" "$@" "$(git rev-parse HEAD)" "$(cat README.md)" > "$PRE_PUSH_LOG"
+exit %d
+`, status)
+	writeFixture(t, filepath.Join(dir, "make"), makeScript, 0o755)
+	if runtime.GOOS == "windows" {
+		t.Skip("pre-push hook tests require a POSIX shell")
+	}
+	return dir
+}
+
+func runPrePush(t *testing.T, root, dir, path, logPath, input string) string {
+	t.Helper()
+	cmd := exec.CommandContext(context.Background(), "bash", filepath.Join(root, "scripts/dev/pre-push.sh"))
+	cmd.Dir = dir
+	cmd.Env = append(os.Environ(), "PATH="+path+":"+os.Getenv("PATH"), "PRE_PUSH_LOG="+logPath)
+	cmd.Stdin = strings.NewReader(input)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("pre-push helper: %v\n%s", err, output)
+	}
+	return string(output)
 }
 
 func TestNightlyRetriesUseImmutableVersions(t *testing.T) {

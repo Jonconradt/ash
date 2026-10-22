@@ -53,8 +53,7 @@ func (a anthropicAdapter) Send(ctx context.Context, aiCfg aiConfig, messages []m
 
 	resp, err := client.Messages.New(ctx, params)
 	if err != nil {
-		var apiErr *anthropic.Error
-		if errors.As(err, &apiErr) {
+		if apiErr, ok := errors.AsType[*anthropic.Error](err); ok {
 			return chatResponse{}, chatStatusError{StatusCode: apiErr.StatusCode, Body: apiErr.Error()}
 		}
 		return chatResponse{}, err

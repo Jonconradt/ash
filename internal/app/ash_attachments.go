@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -147,9 +148,9 @@ func writeResponseAttachments(dir string, attachments []attachment) ([]string, e
 // finalAssistantAttachments returns the attachments (if any) on the last assistant
 // message in messages, so returned files can be saved after the tool loop finishes.
 func finalAssistantAttachments(messages []message) []attachment {
-	for i := len(messages) - 1; i >= 0; i-- {
-		if messages[i].Role == "assistant" {
-			return messages[i].Attachments
+	for _, message := range slices.Backward(messages) {
+		if message.Role == "assistant" {
+			return message.Attachments
 		}
 	}
 	return nil

@@ -90,16 +90,14 @@ func prepareRemoteMCP(ctx context.Context, stderrWriter io.Writer, local mcpTool
 	jobs := make(chan int)
 	var workers sync.WaitGroup
 	for range 4 {
-		workers.Add(1)
-		go func() {
-			defer workers.Done()
+		workers.Go(func() {
 			for index := range jobs {
 				server := servers[index]
 				started[index].response, started[index].err = brokerMCPDo(ctx, brokerproto.Request{
 					MCPAction: "start", MCPServer: server.Name, MCPURL: server.URL, MCPIncludeTools: true,
 				})
 			}
-		}()
+		})
 	}
 	for index := range servers {
 		select {

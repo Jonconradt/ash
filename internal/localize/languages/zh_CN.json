@@ -52,7 +52,6 @@
     "install.python.missing_libraries": "此操作成功前，需要第三方软件包的捆绑 Python 工具会提示缺少库。",
     "install.python.ready": "Python 环境已就绪：%s",
     "install.interactive_hint": "无法自动配置 AI 提供商：当前 Shell 会话不是交互式会话（例如通过 'curl | sh' 运行）。",
-    "install.configure_again_hint": "请打开新终端并再次运行 'ash install' 以选择提供商和模型，或手动设置 AI_ENDPOINT、AI_MODEL 和 AI_AUTH_TOKEN。",
     "install.updated_file": "已更新 %s",
     "install.language_downloaded": "已安装语言包：%s",
     "install.language_unavailable": "版本 %s 未提供 %s 的语言包；将继续使用英语。",

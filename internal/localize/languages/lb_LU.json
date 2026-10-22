@@ -52,7 +52,6 @@
     "install.python.missing_libraries": "Matgeliwwert Python-Tools, déi Drëttubidder-Pakete brauchen, mellen e Feeler wéinst enger feelender Bibliothéik, bis dës Installatioun klappt.",
     "install.python.ready": "Python-Ëmwelt prett an %s",
     "install.interactive_hint": "AI-Ubidder konnt net automatesch konfiguréiert ginn: dës Shell-Sessioun ass net interaktiv (zum Beispill, wann se iwwer 'curl | sh' ausgeféiert gëtt).",
-    "install.configure_again_hint": "Maacht en neien Terminal op a féiert 'ash install' nach eng Kéier aus, fir en Ubidder an e Modell auszewielen, oder setzt AI_ENDPOINT, AI_MODEL an AI_AUTH_TOKEN manuell.",
     "install.updated_file": "%s aktualiséiert",
     "install.language_downloaded": "Sproochepak installéiert: %s",
     "install.language_unavailable": "De Sproochepak fir %s ass an der Versioun %s net disponibel; et geet op Englesch weider.",

@@ -52,7 +52,6 @@
     "install.python.missing_libraries": "Alat Python bawaan yang memerlukan paket pihak ketiga akan melaporkan pustaka yang hilang sampai proses ini berhasil.",
     "install.python.ready": "Lingkungan Python siap di %s",
     "install.interactive_hint": "Penyedia AI tidak dikonfigurasi otomatis: sesi shell ini tidak interaktif (misalnya dijalankan melalui 'curl | sh').",
-    "install.configure_again_hint": "Buka terminal baru dan jalankan 'ash install' lagi untuk memilih penyedia dan model, atau atur AI_ENDPOINT, AI_MODEL, dan AI_AUTH_TOKEN secara manual.",
     "install.updated_file": "%s diperbarui",
     "install.language_downloaded": "Paket bahasa terpasang: %s",
     "install.language_unavailable": "Paket bahasa untuk %s tidak tersedia pada rilis %s; melanjutkan dalam bahasa Inggris.",

@@ -91,7 +91,7 @@ func isBlockedArgument(arg string) bool {
 // segment, so nested hidden directories (e.g. "a/.git/config", "~/.ssh/id_rsa") are also blocked.
 func hasBlockedDotSegment(path string) bool {
 	var segments []string
-	for _, part := range strings.Split(path, "/") {
+	for part := range strings.SplitSeq(path, "/") {
 		if part == "" || part == "." || part == ".." {
 			continue
 		}

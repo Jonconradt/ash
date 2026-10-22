@@ -52,7 +52,6 @@
     "install.python.missing_libraries": "ستبلغ أدوات Python المضمّنة التي تحتاج إلى حزم خارجية عن مكتبة مفقودة إلى أن تنجح هذه العملية.",
     "install.python.ready": "بيئة Python جاهزة في %s",
     "install.interactive_hint": "لم تتم تهيئة موفر الذكاء الاصطناعي تلقائياً: جلسة الصدفة هذه غير تفاعلية (مثلاً، تعمل عبر 'curl | sh').",
-    "install.configure_again_hint": "افتح طرفية جديدة وشغّل 'ash install' مجدداً لاختيار موفر ونموذج، أو عيّن AI_ENDPOINT وAI_MODEL وAI_AUTH_TOKEN يدوياً.",
     "install.updated_file": "تم تحديث %s",
     "install.language_downloaded": "تم تثبيت حزمة اللغة: %s",
     "install.language_unavailable": "حزمة اللغة %s غير متاحة في الإصدار %s؛ ستتم المتابعة باللغة الإنجليزية.",
