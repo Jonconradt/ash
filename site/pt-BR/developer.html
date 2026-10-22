@@ -130,8 +130,8 @@ make V=1 verify</code></pre>
 
         <section id="release-builders">
           <h2>Liberar construtores e artefatos</h2>
-          <p>O fluxo de trabalho de lançamento do GitHub separa as verificações de qualidade dos criadores de embalagens nativas. Os pacotes macOS são desenvolvidos e testados em executores Intel e Apple Silicon. Capa para construtores Linux<code>amd64</code>e<code>arm64</code>e validar<code>.deb</code>,<code>.rpm</code>e instalações de tarball. O FreeBSD é construído de forma cruzada e empacotado para<code>amd64</code>.</p>
-          <p>Os binários de lançamento Go são construídos com opções de trim-path e de vinculador removido. Plug-ins nativos são desenvolvidos para o mesmo sistema operacional e arquitetura. O fluxo de trabalho de lançamento também testa o pacote instalado ou o arquivo extraído, incluindo uma nova configuração de instalação do shell.</p>
+          <p>Após as verificações de qualidade, o GitHub executa <code>make release-artifacts</code> no Linux. Um trabalho Ubuntu compila os arquivos macOS Intel e Apple Silicon para o Homebrew, sem executores macOS nem instaladores <code>.pkg</code>. Os destinos macOS excluem todos os plugins Rust, incluindo <code>flip_a_coin</code>, mesmo em compilações locais. Linux e FreeBSD mantêm os plugins Rust.</p>
+          <p>A CI valida o conteúdo dos arquivos macOS e as arquiteturas Mach-O sem executar seus binários. Linux e FreeBSD mantêm testes de execução dos arquivos extraídos; pacotes e integrações do shell não são instalados. Para compilar macOS no Linux: <code>make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES="amd64 arm64" RELEASE_MACOS_PKG=0 RELEASE_VERSION=v1.2.3</code>. <code>make release</code> ainda cria um <code>.pkg</code> local no macOS sem enviar os binários locais à CI.</p>
           <p>Para compilações de artefatos locais, especifique explicitamente o sistema operacional, a arquitetura e a versão de destino:</p>
           <pre><code>make release-artifacts \
   RELEASE_TARGET_OSES=linux \

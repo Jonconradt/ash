@@ -221,6 +221,7 @@ Compiled Go binaries include Go standard-library code. The Go Authors license
 the standard library under BSD-3-Clause; see the [Go license text](https://go.dev/LICENSE).
 The `flip_a_coin` binary uses Rust standard-library code, licensed under MIT
 or Apache-2.0; see the [Rust license files](https://github.com/rust-lang/rust/tree/1.99.0).
+Rust plugins are bundled in Linux and FreeBSD releases, not macOS builds.
 The calculator plugin requires an independently installed Node.js runtime and
 does not bundle one.
 

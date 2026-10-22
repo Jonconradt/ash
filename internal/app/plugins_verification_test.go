@@ -42,12 +42,13 @@ func TestAllPluginsVerification(t *testing.T) {
 			defer cancel()
 
 			// 1. Build plugin using its Makefile
-			buildCmd := exec.CommandContext(ctx, "make", "-C", pluginDir, "build")
+			buildDir := t.TempDir()
+			buildCmd := exec.CommandContext(ctx, "make", "-C", pluginDir, "build", "BUILD_DIR="+buildDir)
 			if out, err := buildCmd.CombinedOutput(); err != nil {
 				t.Fatalf("make build failed for plugin %s: %v\nOutput: %s", pluginName, err, string(out))
 			}
 
-			binPath := filepath.Join(repoRoot, "bin/plugins", pluginName)
+			binPath := filepath.Join(buildDir, pluginName)
 			if _, err := os.Stat(binPath); err != nil {
 				t.Fatalf("expected binary at %s after build: %v", binPath, err)
 			}

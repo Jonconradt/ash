@@ -51,6 +51,14 @@ run rather than trying to attach `V=1` after the fact.
 
 ## Release expectations
 
+- All release packaging jobs run on Linux. macOS tarballs for both architectures
+  are cross-compiled without Rust plugins; CI validates their Mach-O architecture
+  and archive contents, not macOS runtime behavior. Linux and FreeBSD continue
+  to include Rust plugins.
+- Use `make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES="amd64 arm64" RELEASE_MACOS_PKG=0 RELEASE_VERSION=v1.2.3`
+  to build macOS tarballs from Linux. `make release` still requires macOS for
+  local `.pkg` creation and release-note execution; it does not upload local
+  build outputs to CI.
 - Keep the working tree clean before publishing.
 - Ensure release artifacts are built and validated locally before tagging.
 - Run `make verify` locally before `make release`. `make release` runs the full

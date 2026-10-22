@@ -130,8 +130,8 @@ make V=1 verify</code></pre>
 
         <section id="release-builders">
           <h2>發佈建置器和工件</h2>
-          <p>GitHub 發布工作流程將品質檢查與本機打包建構器分開。 macOS 軟體套件是在 Intel 和 Apple Silicon 運行器上建置並進行冒煙測試的。 Linux 建構者封面<code>amd64</code>和<code>arm64</code>並驗證<code>.deb</code>,<code>.rpm</code>和 tarball 安裝。 FreeBSD 是交叉建置和打包的<code>amd64</code>。</p>
-          <p>Go 版本的二進位檔案是使用修剪路徑和剝離的連結器選項建立的。本機插件是為相同的作業系統和架構建構的。發佈工作流程也會對已安裝的軟體包或提取的檔案進行冒煙測試，包括新的 shell 安裝配置。</p>
+          <p>品質檢查後，GitHub 在 Linux 上執行 <code>make release-artifacts</code>。一個 Ubuntu 工作交叉編譯供 Homebrew 使用的 Intel 與 Apple Silicon macOS 封存檔，不使用 macOS 執行器，也不產生 <code>.pkg</code> 安裝套件。macOS 目標（包括本機建置）排除所有 Rust 外掛程式，包括 <code>flip_a_coin</code>。Linux 與 FreeBSD 繼續包含 Rust 外掛程式。</p>
+          <p>CI 驗證 macOS 封存檔內容與 Mach-O 架構，但不執行其二進位檔案。Linux 與 FreeBSD 保留解壓縮封存檔的執行測試；不會安裝套件或設定 shell 整合。在 Linux 上建置 macOS：<code>make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES="amd64 arm64" RELEASE_MACOS_PKG=0 RELEASE_VERSION=v1.2.3</code>。<code>make release</code> 仍在 macOS 上建立本機 <code>.pkg</code>，不會向 CI 傳遞本機二進位檔案。</p>
           <p>對於本機工件構建，請明確指定目標作業系統、架構和版本：</p>
           <pre><code>make release-artifacts \
   RELEASE_TARGET_OSES=linux \

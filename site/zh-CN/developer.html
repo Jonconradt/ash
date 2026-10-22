@@ -130,8 +130,8 @@ make V=1 verify</code></pre>
 
         <section id="release-builders">
           <h2>发布构建器和工件</h2>
-          <p>GitHub 发布工作流程将质量检查与本机打包构建器分开。 macOS 软件包是在 Intel 和 Apple Silicon 运行器上构建并进行冒烟测试的。 Linux 构建者封面<code>amd64</code>和<code>arm64</code>并验证<code>.deb</code>,<code>.rpm</code>和 tarball 安装。 FreeBSD 是交叉构建和打包的<code>amd64</code>。</p>
-          <p>Go 版本的二进制文件是使用修剪路径和剥离的链接器选项构建的。本机插件是为相同的操作系统和架构构建的。发布工作流程还会对已安装的软件包或提取的存档进行冒烟测试，包括新的 shell 安装配置。</p>
+          <p>质量检查后，GitHub 在 Linux 上运行 <code>make release-artifacts</code>。一个 Ubuntu 任务交叉编译供 Homebrew 使用的 Intel 和 Apple Silicon macOS 归档，不使用 macOS 运行器，也不生成 <code>.pkg</code> 安装包。macOS 目标（包括本地构建）排除所有 Rust 插件，包括 <code>flip_a_coin</code>。Linux 和 FreeBSD 继续包含 Rust 插件。</p>
+          <p>CI 验证 macOS 归档内容和 Mach-O 架构，但不运行其二进制文件。Linux 和 FreeBSD 保留解压归档的运行测试；不会安装软件包或配置 shell 集成。在 Linux 上构建 macOS：<code>make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES="amd64 arm64" RELEASE_MACOS_PKG=0 RELEASE_VERSION=v1.2.3</code>。<code>make release</code> 仍在 macOS 上创建本地 <code>.pkg</code>，不会向 CI 传递本地二进制文件。</p>
           <p>对于本地工件构建，请明确指定目标操作系统、架构和版本：</p>
           <pre><code>make release-artifacts \
   RELEASE_TARGET_OSES=linux \

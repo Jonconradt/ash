@@ -130,8 +130,8 @@ make V=1 verify</code></pre>
 
         <section id="release-builders">
           <h2>Rilis pembangun dan artefak</h2>
-          <p>Alur kerja rilis GitHub memisahkan pemeriksaan kualitas dari pembuat kemasan asli. Paket macOS dibuat dan diuji pada runner Intel dan Apple Silicon. Sampul pembuat Linux<code>amd64</code>Dan<code>arm64</code>dan memvalidasi<code>.deb</code>,<code>.rpm</code>, dan pemasangan tarball. FreeBSD dibuat secara silang dan dikemas untuk<code>amd64</code>.</p>
-          <p>Biner rilis Go dibuat dengan opsi trim-path dan stripped linker. Plugin asli dibuat untuk OS dan arsitektur yang sama. Alur kerja rilis juga menguji paket yang diinstal atau arsip yang diekstraksi, termasuk konfigurasi instalasi shell baru.</p>
+          <p>Setelah pemeriksaan kualitas, GitHub menjalankan <code>make release-artifacts</code> di Linux. Satu tugas Ubuntu mengompilasi silang arsip macOS Intel dan Apple Silicon untuk Homebrew, tanpa runner macOS atau pemasang <code>.pkg</code>. Target macOS mengecualikan semua plugin Rust, termasuk <code>flip_a_coin</code>, juga pada build lokal. Linux dan FreeBSD tetap menyertakan plugin Rust.</p>
+          <p>CI memvalidasi isi arsip macOS dan arsitektur Mach-O tanpa menjalankan binernya. Linux dan FreeBSD tetap menguji eksekusi arsip yang diekstrak; paket dan integrasi shell tidak dipasang. Untuk membangun macOS di Linux: <code>make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES="amd64 arm64" RELEASE_MACOS_PKG=0 RELEASE_VERSION=v1.2.3</code>. <code>make release</code> tetap membuat <code>.pkg</code> lokal di macOS tanpa mengirim biner lokal ke CI.</p>
           <p>Untuk pembuatan artefak lokal, tentukan OS target, arsitektur, dan versi secara eksplisit:</p>
           <pre><code>make release-artifacts \
   RELEASE_TARGET_OSES=linux \

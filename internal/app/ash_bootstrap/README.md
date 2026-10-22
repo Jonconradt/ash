@@ -28,3 +28,7 @@ on install/update.
 
 - `tools/` — Python scripts installed into `$XDG_DATA_HOME/ash/tools/` (default `~/.local/share/ash/tools/`) and made available to the model as callable tools (`headlines.py`, `wikipedia.py`, `yfinance.py`), plus `requirements.txt` and `test_tool_docs.py` (verifies each tool documents its own usage).
 - `plugins_src/` — Native plugins in Go, Rust, and TypeScript with dedicated Makefiles and source trees (`what_time_is_it`, `flip_a_coin`, `calculator`). Built into `$XDG_DATA_HOME/ash/plugins/` (default `~/.local/share/ash/plugins/`).
+
+macOS builds exclude Rust plugins (`flip_a_coin`); Linux and FreeBSD releases
+include them. The top-level builder applies this policy using the target OS,
+including when cross-compiling macOS binaries on Linux.

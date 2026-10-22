@@ -190,6 +190,19 @@
 
           <h3>提供的工具腳本和原生插件有哪些？</h3>
           <p>安裝的引導Python腳本是<code>headlines.py</code>,<code>wikipedia.py</code>， 和<code>yfinance.py</code>在<code>$XDG_DATA_HOME/ash/tools/</code>。提供的本機插件是<code>what_time_is_it</code>（去），<code>flip_a_coin</code>（鐵鏽），以及<code>calculator</code>（打字稿）在<code>$XDG_DATA_HOME/ash/plugins/</code>。</p>
+          <p>Rust 外掛程式（包括 <code>flip_a_coin</code>）僅隨 Linux 與 FreeBSD 提供。macOS 建置包含 <code>what_time_is_it</code> 與 <code>calculator</code>，但排除 Rust 外掛程式。</p>
+
+          <h3 id="macos-rust-plugin">為什麼 macOS 缺少 Rust 外掛程式，如何手動建置並安裝？</h3>
+          <p>macOS 不隨附 <code>flip_a_coin</code> 等 Rust 外掛程式，以便在 Linux 上交叉編譯兩種架構，不使用 macOS 執行器，降低 CI 成本。這不是相容性限制。Homebrew 仍提供 Go 與 TypeScript 外掛程式；Linux 與 FreeBSD 仍包含 Rust 外掛程式。</p>
+          <p>在 Mac 上安裝 Xcode 命令列工具（如有需要，執行 <code>xcode-select --install</code>），並透過 <a href="https://rustup.rs/">rustup</a> 安裝 Rust。在要建立原始碼副本的位置執行以下命令。外掛程式自己的 Makefile 會為本機架構建置，並直接安裝至使用者外掛程式目錄，無需 <code>sudo</code>。</p>
+          <pre><code>git clone https://github.com/Jonconradt/ash.git
+cd ash
+rustup toolchain install 1.99.0 --profile minimal
+plugin_dir="${XDG_DATA_HOME:-$HOME/.local/share}/ash/plugins"
+make -C internal/app/ash_bootstrap/plugins_src/flip_a_coin build BUILD_DIR="$plugin_dir"
+"$plugin_dir/flip_a_coin" --version
+"$plugin_dir/flip_a_coin" --ai-docs</code></pre>
+          <p>請使用外掛程式自己的 Makefile，而不是會在 macOS 跳過 Rust 的頂層 <code>make plugins-build</code>。在 <code>${XDG_CONFIG_HOME:-$HOME/.config}/ash/.ash_allow</code> 中保留 <code>$PLUGINS_DIR_LIST</code> 或加入名稱 <code>flip_a_coin</code>，並確保它不在 <code>.ash_deny</code> 中。重新呼叫 ash 即可發現外掛程式。直接執行 <code>"$plugin_dir/flip_a_coin"</code> 可在沒有 AI 供應商的情況下測試。</p>
 
           <h3>能ash呼叫子代理？</h3>
           <p>是的。父代理可以使用<code>run_sub_agent</code>完成一項專注的、獨立的任務。子級繼承工作目錄、配置、工具和作業系統權限，傳回有界結果，無法建立另一個子級。預設最大值是每個父運行六個子代理，可以使用以下命令進行更改<code>ASH_MAX_AGENTS</code>。</p>

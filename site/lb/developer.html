@@ -130,8 +130,8 @@ make V=1 verify</code></pre>
 
         <section id="release-builders">
           <h2>Fräisetzung Builder an artifacts</h2>
-          <p>De GitHub Verëffentlechungsworkflow trennt Qualitéitskontrollen vun gebiertege Verpackungsbauer. macOS Packagen ginn op Intel an Apple Silicon Leefer gebaut a gefëmmt getest. Linux Builder Cover<code>amd64</code>an<code>arm64</code>an validéieren<code>.deb</code>,<code>.rpm</code>, an tarball installéiert. FreeBSD ass cross-built a verpackt fir<code>amd64</code>.</p>
-          <p>Go Verëffentlechungsbinäre gi mat Trim-Wee a gesträifte Linkeroptiounen gebaut. Native Plugins gi fir datselwecht OS an Architektur gebaut. De Verëffentlechungs-Workflow testt och den installéierten Package oder extrahéierten Archiv, och eng frësch Shell-Installatiounskonfiguratioun.</p>
+          <p>No de Qualitéitskontrolle leeft <code>make release-artifacts</code> op Linux. Een Ubuntu-Job baut d'macOS-Archive fir Intel an Apple Silicon fir Homebrew, ouni macOS-Runner oder <code>.pkg</code>-Installateuren. macOS-Ziler schléissen all Rust-Plugins aus, och <code>flip_a_coin</code> a lokal Builds. Linux a FreeBSD behalen d'Rust-Plugins.</p>
+          <p>CI kontrolléiert den Inhalt vun de macOS-Archiven an d'Mach-O-Architekturen, féiert d'Binärdateien awer net aus. Linux a FreeBSD behalen d'Lafzäittester vun den ausgepaakten Archiven; Packagen a Shell-Integratioune ginn net installéiert. Fir macOS op Linux ze bauen: <code>make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES="amd64 arm64" RELEASE_MACOS_PKG=0 RELEASE_VERSION=v1.2.3</code>. <code>make release</code> erstellt nach ëmmer e lokale <code>.pkg</code> op macOS, ouni lokal Binärdateien un CI ze schécken.</p>
           <p>Fir lokal Artefakt Builds, spezifizéiert d'Zil OS, d'Architektur an d'Versioun explizit:</p>
           <pre><code>make release-artifacts \
   RELEASE_TARGET_OSES=linux \

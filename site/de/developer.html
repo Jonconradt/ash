@@ -130,8 +130,8 @@ make V=1 verify</code></pre>
 
         <section id="release-builders">
           <h2>Release-Builder und Artefakte</h2>
-          <p>Der GitHub-Release-Workflow trennt Qualitätsprüfungen von nativen Verpackungserstellern. macOS-Pakete werden auf Intel- und Apple-Silicon-Läufern erstellt und getestet. Linux-Builder-Abdeckung<code>amd64</code>Und<code>arm64</code>und validieren<code>.deb</code>,<code>.rpm</code>, und Tarball-Installationen. FreeBSD ist Cross-Building und Paket für<code>amd64</code>.</p>
-          <p>Go-Release-Binärdateien werden mit Trim-Path- und Stripped-Linker-Optionen erstellt. Native Plugins werden für dasselbe Betriebssystem und dieselbe Architektur erstellt. Der Release-Workflow testet auch das installierte Paket oder das extrahierte Archiv, einschließlich einer neuen Shell-Installationskonfiguration.</p>
+          <p>Nach den Qualitätsprüfungen führt GitHub <code>make release-artifacts</code> unter Linux aus. Ein Ubuntu-Job erstellt die macOS-Archive für Intel und Apple Silicon für Homebrew, ohne macOS-Runner oder <code>.pkg</code>-Installer. macOS-Ziele schließen alle Rust-Plugins einschließlich <code>flip_a_coin</code> aus, auch bei lokalen Builds. Linux und FreeBSD behalten die Rust-Plugins.</p>
+          <p>CI prüft macOS-Archivinhalte und Mach-O-Architekturen, führt die Binärdateien aber nicht aus. Linux und FreeBSD behalten Laufzeittests der entpackten Archive; Pakete und Shell-Integrationen werden nicht installiert. macOS-Build unter Linux: <code>make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES="amd64 arm64" RELEASE_MACOS_PKG=0 RELEASE_VERSION=v1.2.3</code>. <code>make release</code> erstellt weiterhin ein lokales <code>.pkg</code> auf macOS, überträgt aber keine lokalen Binärdateien an CI.</p>
           <p>Geben Sie für lokale Artefakt-Builds das Zielbetriebssystem, die Architektur und die Version explizit an:</p>
           <pre><code>make release-artifacts \
   RELEASE_TARGET_OSES=linux \

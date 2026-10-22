@@ -30,6 +30,7 @@ RELEASE_TRANSLATION_CACHE ?= .cache/ash/site-translation-cache.json
 RELEASE_PACKAGE_DIR ?= $(RELEASE_OUTPUT_DIR)
 RELEASE_TARGET_ARCHES ?= amd64 arm64
 RELEASE_TARGET_OSES ?= auto
+RELEASE_MACOS_PKG ?= 1
 RELEASE_GOOS ?= darwin
 RELEASE_FORMAT ?= pkg
 # The interactive release dashboard is for local, manual releases, not CI logs.
@@ -117,8 +118,16 @@ sync-route-words:
 
 plugins-build:
 	@mkdir -p "$(PLUGINS_BIN_DIR)"
-	@for dir in $(PLUGINS_SRC_DIR)/*; do \
+	@set -eu; \
+	target_goos="$(PLUGIN_TARGET_GOOS)"; \
+	if [[ -z "$$target_goos" ]]; then target_goos="$$(uname -s | tr '[:upper:]' '[:lower:]')"; fi; \
+	for dir in $(PLUGINS_SRC_DIR)/*; do \
 		if [ -f "$$dir/Makefile" ]; then \
+			if [[ "$$target_goos" == "darwin" && -f "$$dir/Cargo.toml" ]]; then \
+				rm -f "$(PLUGINS_BIN_DIR)/$$(basename "$$dir")"; \
+				echo "skipping Rust plugin for macOS: $$(basename "$$dir")"; \
+				continue; \
+			fi; \
 			./scripts/dev/run-quiet.sh "plugin-build:$$(basename $$dir)" $(MAKE) -C "$$dir" build BUILD_DIR="$(abspath $(PLUGINS_BIN_DIR))" TARGET_GOOS="$(PLUGIN_TARGET_GOOS)" TARGET_GOARCH="$(PLUGIN_TARGET_GOARCH)" || exit 1; \
 		fi; \
 	done
@@ -629,8 +638,10 @@ release-artifacts:
 			darwin) \
 				for arch in $(RELEASE_TARGET_ARCHES); do \
 					$(MAKE) release-build-one RELEASE_GOOS=darwin RELEASE_ARCH=$$arch RELEASE_VERSION=$(RELEASE_VERSION); \
-					$(MAKE) release-pkg-one RELEASE_GOOS=darwin RELEASE_ARCH=$$arch RELEASE_FORMAT=pkg RELEASE_VERSION=$(RELEASE_VERSION); \
-					$(MAKE) release-validate-one RELEASE_GOOS=darwin RELEASE_ARCH=$$arch RELEASE_FORMAT=pkg RELEASE_VERSION=$(RELEASE_VERSION); \
+					if [[ "$(RELEASE_MACOS_PKG)" == "1" ]]; then \
+						$(MAKE) release-pkg-one RELEASE_GOOS=darwin RELEASE_ARCH=$$arch RELEASE_FORMAT=pkg RELEASE_VERSION=$(RELEASE_VERSION); \
+						$(MAKE) release-validate-one RELEASE_GOOS=darwin RELEASE_ARCH=$$arch RELEASE_FORMAT=pkg RELEASE_VERSION=$(RELEASE_VERSION); \
+					fi; \
 					$(MAKE) release-pkg-one RELEASE_GOOS=darwin RELEASE_ARCH=$$arch RELEASE_FORMAT=tar.gz RELEASE_VERSION=$(RELEASE_VERSION); \
 					$(MAKE) release-validate-one RELEASE_GOOS=darwin RELEASE_ARCH=$$arch RELEASE_FORMAT=tar.gz RELEASE_VERSION=$(RELEASE_VERSION); \
 				done; \

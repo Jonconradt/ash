@@ -5,6 +5,15 @@ interface. It does not provide a public Go plugin SDK; packages under Go's
 `internal/` tree are implementation details and cannot be imported by external
 modules as a supported API.
 
+## Bundled platform support
+
+macOS builds bundle `what_time_is_it` (Go) and `calculator` (TypeScript).
+The top-level `plugins-build` target excludes plugins with a `Cargo.toml` when
+the target OS is macOS, including native macOS builds. Linux and FreeBSD
+releases also include `flip_a_coin` (Rust). This packaging policy does not
+prevent users from installing their own compatible Rust executables.
+Plugin source tests still cover Rust on developer machines.
+
 ## Discovery
 
 A plugin is an executable file installed in the user plugin directory

@@ -158,3 +158,18 @@ test('installation and compatibility links resolve to existing pages and anchors
     }
   }
 });
+
+test('every FAQ includes the same macOS Rust plugin installation commands', () => {
+  const faq = fs.readFileSync(path.join(__dirname, 'faq.html'), 'utf8');
+  const install = commands(faq).find((command) => command.includes('plugins_src/flip_a_coin'));
+  assert.ok(install, 'English FAQ must include manual plugin installation commands');
+  assert.ok(install.includes('build BUILD_DIR="$plugin_dir"'));
+  assert.ok(install.includes('${XDG_DATA_HOME:-$HOME/.local/share}/ash/plugins'));
+  assert.ok(install.includes('"$plugin_dir/flip_a_coin" --ai-docs'));
+  for (const language of languages) {
+    const file = path.join(__dirname, language.path, 'faq.html');
+    const html = fs.readFileSync(file, 'utf8');
+    assert.ok(ids(html).includes('macos-rust-plugin'), `${file}: missing Rust plugin FAQ`);
+    assert.ok(commands(html).includes(install), `${file}: inconsistent installation commands`);
+  }
+});

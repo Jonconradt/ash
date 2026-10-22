@@ -427,7 +427,7 @@ func TestReleaseWorkflowUploadsOnlyInstallablePackages(t *testing.T) {
 		{
 			name: "macOS",
 			files: []string{
-				".pkg", ".pkg.sha256", ".tar.gz", ".tar.gz.sha256",
+				".tar.gz", ".tar.gz.sha256",
 			},
 		},
 		{
@@ -448,17 +448,85 @@ func TestReleaseWorkflowUploadsOnlyInstallablePackages(t *testing.T) {
 		}
 		section, _, _ = strings.Cut(section, "\n      - name:")
 		for _, suffix := range upload.files {
-			if !strings.Contains(section, "${{ github.ref_name }}-"+map[string]string{
+			osName := map[string]string{
 				"macOS":   "darwin",
 				"Linux":   "linux",
 				"FreeBSD": "freebsd",
-			}[upload.name]+"-${{ matrix.arch }}"+suffix) {
-				t.Errorf("%s upload omits expected artifact suffix %s", upload.name, suffix)
+			}[upload.name]
+			arches := []string{"${{ matrix.arch }}"}
+			if upload.name == "macOS" {
+				arches = []string{"amd64", "arm64"}
+			}
+			for _, arch := range arches {
+				if !strings.Contains(section, "${{ github.ref_name }}-"+osName+"-"+arch+suffix) {
+					t.Errorf("%s upload omits %s artifact suffix %s", upload.name, arch, suffix)
+				}
 			}
 		}
 		if strings.Contains(section, "dist/release/*") {
 			t.Errorf("%s upload uses a broad glob that can include loose build outputs", upload.name)
 		}
+	}
+}
+
+func TestMacReleaseWorkflowCrossCompilesOnLinux(t *testing.T) {
+	root, _ := releaseFixture(t)
+	data, err := os.ReadFile(filepath.Join(root, ".github/workflows/release.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	workflow := string(data)
+	_, job, found := strings.Cut(workflow, "  package-macos:\n")
+	if !found {
+		t.Fatal("missing macOS packaging job")
+	}
+	job, _, _ = strings.Cut(job, "  package-linux:\n")
+	for _, required := range []string{
+		"runs-on: ubuntu-latest",
+		`RELEASE_TARGET_ARCHES="amd64 arm64"`,
+		"RELEASE_MACOS_PKG=0",
+		"Validate cross-compiled macOS tarballs",
+	} {
+		if !strings.Contains(job, required) {
+			t.Errorf("macOS packaging job is missing %q", required)
+		}
+	}
+	for _, forbidden := range []string{"macos-14", "macos-15-intel", "rustup", "cargo", `"${binary}" --help`} {
+		if strings.Contains(job, forbidden) {
+			t.Errorf("macOS cross-compilation job contains %q", forbidden)
+		}
+	}
+}
+
+func TestMacTarballValidation(t *testing.T) {
+	root, dir := releaseFixture(t)
+	tag := "v1.2.0"
+	for _, arch := range []string{"amd64", "arm64"} {
+		payload := filepath.Join(dir, "payload", arch)
+		for _, name := range []string{"ash-" + tag + "-darwin-" + arch, "ash-broker", "plugins/what_time_is_it", "plugins/calculator"} {
+			writeFixture(t, filepath.Join(payload, name), "fixture", 0o755)
+		}
+		runFixture(t, dir, nil, "mkdir", "-p", "dist/release")
+		runFixture(t, dir, nil, "tar", "-czf", "dist/release/ash-"+tag+"-darwin-"+arch+".tar.gz", "-C", payload, ".")
+	}
+	writeFixture(t, filepath.Join(dir, "bin/file"), `#!/bin/bash
+case "$1" in
+  *amd64*) cpu=x86_64 ;;
+  *arm64*) cpu=arm64 ;;
+  *) exit 1 ;;
+esac
+if [[ "$TEST_WRONG_ARCH" == yes ]]; then cpu=unknown; fi
+printf 'Mach-O 64-bit %s executable\n' "$cpu"
+`, 0o755)
+	env := []string{"PATH=" + filepath.Join(dir, "bin") + ":" + os.Getenv("PATH"), "GITHUB_REF_NAME=" + tag}
+	script := workflowStep(t, root, "release.yml", "Validate cross-compiled macOS tarballs")
+	runFixture(t, dir, env, "bash", "-c", script)
+	if output, err := fixtureCommand(dir, append(env, "TEST_WRONG_ARCH=yes"), "bash", "-c", script).CombinedOutput(); err == nil {
+		t.Fatalf("validation accepted the wrong Mach-O architecture:\n%s", output)
+	}
+	writeFixture(t, filepath.Join(dir, "smoke/arm64/plugins/flip_a_coin"), "stale", 0o755)
+	if output, err := fixtureCommand(dir, env, "bash", "-c", script).CombinedOutput(); err == nil {
+		t.Fatalf("validation accepted a Rust plugin in the macOS payload:\n%s", output)
 	}
 }
 
@@ -630,6 +698,73 @@ MAKE := $(MAKE) -f Makefile -f steps.mk
 	}
 }
 
+func TestMacReleaseCanSkipPkg(t *testing.T) {
+	_, dir := releaseFixture(t)
+	writeFixture(t, filepath.Join(dir, "steps.mk"), `
+release-build-one:
+	@echo "build $(RELEASE_GOOS) $(RELEASE_ARCH)"
+release-pkg-one:
+	@echo "package $(RELEASE_FORMAT)"
+release-validate-one:
+	@echo "validate $(RELEASE_FORMAT)"
+`, 0o644)
+	writeFixture(t, filepath.Join(dir, "invoke.mk"), `
+MAKE := $(MAKE) -f Makefile -f steps.mk
+`, 0o644)
+	for _, skip := range []bool{false, true} {
+		args := []string{"-f", "Makefile", "-f", "steps.mk", "-f", "invoke.mk",
+			"release-artifacts", "RELEASE_TARGET_OSES=darwin", "RELEASE_TARGET_ARCHES=arm64",
+			"RELEASE_VERSION=v1.2.0"}
+		if skip {
+			args = append(args, "RELEASE_MACOS_PKG=0")
+		}
+		output := runFixture(t, dir, nil, "make", args...)
+		for _, action := range []string{"package", "validate"} {
+			if strings.Contains(output, action+" pkg") == skip {
+				t.Fatalf("unexpected macOS pkg %s with skip=%t:\n%s", action, skip, output)
+			}
+			if !strings.Contains(output, action+" tar.gz") {
+				t.Fatalf("macOS release tarball missing %s:\n%s", action, output)
+			}
+		}
+	}
+}
+
+func TestPluginBuildExcludesRustOnlyForMacOS(t *testing.T) {
+	root, dir := releaseFixture(t)
+	copyFixture(t, root, dir, "scripts/dev/run-quiet.sh")
+	for _, name := range []string{"rust_fixture", "go_fixture"} {
+		writeFixture(t, filepath.Join(dir, "plugins", name, "Makefile"), `
+build:
+	@mkdir -p "$(BUILD_DIR)"
+	@touch "$(BUILD_DIR)/$(notdir $(CURDIR))"
+`, 0o644)
+	}
+	writeFixture(t, filepath.Join(dir, "plugins/rust_fixture/Cargo.toml"), "[package]\n", 0o644)
+	writeFixture(t, filepath.Join(dir, "bin/uname"), "#!/bin/sh\nprintf 'Darwin\\n'\n", 0o755)
+	env := []string{"PATH=" + filepath.Join(dir, "bin") + ":" + os.Getenv("PATH")}
+	for _, target := range []string{"darwin", "linux", "freebsd", ""} {
+		t.Run("target="+target, func(t *testing.T) {
+			outputDir := t.TempDir()
+			// A reused output directory must not retain an old Rust executable.
+			writeFixture(t, filepath.Join(outputDir, "rust_fixture"), "stale", 0o755)
+			runFixture(t, dir, env, "make", "plugins-build", "PLUGINS_SRC_DIR=plugins",
+				"PLUGINS_BIN_DIR="+outputDir, "PLUGIN_TARGET_GOOS="+target)
+			if _, err := os.Stat(filepath.Join(outputDir, "go_fixture")); err != nil {
+				t.Fatal(err)
+			}
+			_, err := os.Stat(filepath.Join(outputDir, "rust_fixture"))
+			if target == "darwin" || target == "" {
+				if !os.IsNotExist(err) {
+					t.Fatalf("macOS build retained Rust plugin: %v", err)
+				}
+			} else if err != nil {
+				t.Fatalf("%s build omitted Rust plugin: %v", target, err)
+			}
+		})
+	}
+}
+
 func TestLinuxPackageVersionMapping(t *testing.T) {
 	root, dir := releaseFixture(t)
 	for _, name := range []string{"scripts/package/linux/build_deb.sh", "scripts/package/linux/build_rpm.sh"} {
@@ -776,10 +911,7 @@ func TestDashboardRequiresSuccessfulWorkflow(t *testing.T) {
 	var assets []map[string]string
 	for _, target := range []string{"darwin-amd64", "darwin-arm64", "linux-amd64", "linux-arm64", "freebsd-amd64"} {
 		formats := []string{"tar.gz"}
-		switch {
-		case strings.HasPrefix(target, "darwin"):
-			formats = append(formats, "pkg")
-		case strings.HasPrefix(target, "linux"):
+		if strings.HasPrefix(target, "linux") {
 			formats = append(formats, "deb", "rpm")
 		}
 

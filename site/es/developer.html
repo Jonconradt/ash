@@ -130,8 +130,8 @@ make V=1 verify</code></pre>
 
         <section id="release-builders">
           <h2>Lanzar constructores y artefactos</h2>
-          <p>El flujo de trabajo de lanzamiento de GitHub separa los controles de calidad de los creadores de paquetes nativos. Los paquetes de macOS se crean y se prueban en corredores Intel y Apple Silicon. Cubierta de constructores de Linux<code>amd64</code>y<code>arm64</code>y validar<code>.deb</code>,<code>.rpm</code>y tarball se instala. FreeBSD está construido y empaquetado de forma cruzada para<code>amd64</code>.</p>
-          <p>Los archivos binarios de lanzamiento de Go se crean con opciones de ruta de recorte y enlazador eliminado. Los complementos nativos están diseñados para el mismo sistema operativo y arquitectura. El flujo de trabajo de lanzamiento también prueba el paquete instalado o el archivo extraído, incluida una nueva configuración de instalación de shell.</p>
+          <p>Tras los controles de calidad, GitHub ejecuta <code>make release-artifacts</code> en Linux. Un trabajo Ubuntu compila los archivos macOS de Intel y Apple Silicon para Homebrew, sin ejecutores macOS ni instaladores <code>.pkg</code>. Los destinos macOS excluyen todos los complementos Rust, incluido <code>flip_a_coin</code>, incluso en compilaciones locales. Linux y FreeBSD conservan los complementos Rust.</p>
+          <p>CI valida el contenido de los archivos macOS y las arquitecturas Mach-O, pero no ejecuta sus binarios. Linux y FreeBSD conservan pruebas de ejecución de los archivos extraídos; no se instalan paquetes ni se configura la integración del shell. Para compilar macOS en Linux: <code>make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES="amd64 arm64" RELEASE_MACOS_PKG=0 RELEASE_VERSION=v1.2.3</code>. <code>make release</code> sigue creando un <code>.pkg</code> local en macOS y no transfiere los binarios locales a CI.</p>
           <p>Para compilaciones de artefactos locales, especifique explícitamente el sistema operativo, la arquitectura y la versión de destino:</p>
           <pre><code>make release-artifacts \
   RELEASE_TARGET_OSES=linux \

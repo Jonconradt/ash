@@ -130,8 +130,8 @@ make V=1 verify</code></pre>
 
         <section id="release-builders">
           <h2>الافراج عن بناة والتحف</h2>
-          <p>يفصل سير عمل إصدار GitHub عمليات فحص الجودة عن منشئي الحزم الأصليين. تم تصميم حزم macOS واختبارها على مشغلات Intel وApple Silicon. غلاف منشئي Linux<code>amd64</code>و<code>arm64</code>والتحقق من صحة<code>.deb</code>,<code>.rpm</code>، وتثبيتات tarball. تم تصميم FreeBSD بشكل متقاطع وتعبئته من أجل<code>amd64</code>.</p>
-          <p>تم إنشاء ثنائيات إصدار Go باستخدام مسار القطع وخيارات الرابط المجرد. تم تصميم المكونات الإضافية الأصلية لنفس نظام التشغيل والبنية. يقوم سير عمل الإصدار أيضًا باختبار الحزمة المثبتة أو الأرشيف المستخرج، بما في ذلك تكوين تثبيت shell الجديد.</p>
+          <p>بعد فحوص الجودة، يشغّل GitHub الأمر <code>make release-artifacts</code> على Linux. تبني مهمة Ubuntu واحدة أرشيفات macOS لمعالجَي Intel وApple Silicon لصالح Homebrew، دون مشغّلات macOS أو مثبّتات <code>.pkg</code>. تستبعد أهداف macOS جميع إضافات Rust، ومنها <code>flip_a_coin</code>، حتى في البناء المحلي. يحتفظ Linux وFreeBSD بإضافات Rust.</p>
+          <p>تتحقق CI من محتويات أرشيفات macOS وبنى Mach-O دون تشغيل ملفاتها التنفيذية. يحتفظ Linux وFreeBSD باختبارات تشغيل الأرشيفات المستخرجة؛ لا تُثبّت الحزم أو تكاملات الصدفة. لبناء macOS على Linux: <code>make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES="amd64 arm64" RELEASE_MACOS_PKG=0 RELEASE_VERSION=v1.2.3</code>. ما زال <code>make release</code> ينشئ <code>.pkg</code> محليًا على macOS دون إرسال الملفات التنفيذية المحلية إلى CI.</p>
           <p>بالنسبة إلى تصميمات القطع الأثرية المحلية، حدد نظام التشغيل المستهدف والبنية والإصدار بشكل صريح:</p>
           <pre><code>make release-artifacts \
   RELEASE_TARGET_OSES=linux \
