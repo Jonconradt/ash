@@ -115,7 +115,6 @@ update_repository() {
 	repository_is_clean || fail "repository has local changes; commit or stash them first"
 	log "updating repository"
 	GIT_TERMINAL_PROMPT=0 GIT_SSH_COMMAND="ssh -o BatchMode=yes -o ConnectTimeout=15 -o ServerAliveInterval=15 -o ServerAliveCountMax=2" git -C "$REPO_ROOT" pull --ff-only
-	make config
 }
 
 commit_repository_changes() {
