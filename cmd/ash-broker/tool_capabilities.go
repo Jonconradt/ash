@@ -56,6 +56,7 @@ func (c *toolCapabilityCache) unsupported(endpoint, model string) (bool, error) 
 	if err != nil {
 		return false, err
 	}
+	// #nosec G304 -- path is a hash-derived file name joined under the cache directory by recordPath.
 	content, err := os.ReadFile(path)
 	if errors.Is(err, os.ErrNotExist) {
 		return false, nil
@@ -81,6 +82,7 @@ func (c *toolCapabilityCache) markUnsupported(endpoint, model string) error {
 	if err := os.MkdirAll(c.dir, 0o700); err != nil {
 		return fmt.Errorf("create tool capability cache directory: %w", err)
 	}
+	// #nosec G302 -- Directories require execute permission; 0700 restricts access to the owner.
 	if err := os.Chmod(c.dir, 0o700); err != nil {
 		return fmt.Errorf("set tool capability cache directory permissions: %w", err)
 	}
