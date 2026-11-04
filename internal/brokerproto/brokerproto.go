@@ -39,6 +39,10 @@ type Request struct {
 	ToolCacheAction   string            `json:"tool_cache_action,omitempty"`
 	ToolCacheEndpoint string            `json:"tool_cache_endpoint,omitempty"`
 	ToolCacheModel    string            `json:"tool_cache_model,omitempty"`
+	BrokerAction      string            `json:"broker_action,omitempty"`
+	BrokerBinary      string            `json:"broker_binary,omitempty"`
+	BrokerVersion     string            `json:"broker_version,omitempty"`
+	BrokerInstance    string            `json:"broker_instance,omitempty"`
 }
 
 // Response is the payload the broker sends back to a client.
@@ -54,6 +58,8 @@ type Response struct {
 	MCPToolsReady   bool            `json:"mcp_tools_ready,omitempty"`
 	MCPResult       json.RawMessage `json:"mcp_result,omitempty"`
 	ToolUnsupported bool            `json:"tool_unsupported,omitempty"`
+	BrokerVersion   string          `json:"broker_version,omitempty"`
+	BrokerInstance  string          `json:"broker_instance,omitempty"`
 }
 
 // MCPStatus is the current state of a broker-owned MCP session.

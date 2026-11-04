@@ -16,11 +16,13 @@ import (
 	"net/http/httptrace"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"testing"
 	"time"
 
@@ -122,6 +124,10 @@ func TestBrokerSocketReadyWhileMCPStartupIsBlocked(t *testing.T) {
 		case <-time.After(10 * time.Millisecond):
 		}
 	}
+	status, err := brokerControlRequest(socket, "startup-test-token", brokerproto.Request{BrokerAction: "status"})
+	if err != nil || status.BrokerVersion != version {
+		t.Fatalf("broker status = %+v, %v; want version %q", status, err, version)
+	}
 	sessionLock := filepath.Join(home, ".local", "state", "ash", "scratch", "startup-test", ".ash_scratch_lock")
 	if _, err := os.Stat(sessionLock); err != nil {
 		t.Fatalf("broker socket became ready without its scratch lock: %v", err)
@@ -168,6 +174,103 @@ func TestBrokerParentAlive(t *testing.T) {
 	}
 	if brokerParentAlive(0) {
 		t.Fatal("expected zero PID to be rejected")
+	}
+}
+
+func TestValidateRestartBinary(t *testing.T) {
+	binary := filepath.Join(t.TempDir(), "ash-broker")
+	if err := os.WriteFile(binary, []byte("test binary"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateRestartBinary(binary); err != nil {
+		t.Fatalf("valid restart binary rejected: %v", err)
+	}
+	if err := os.Chmod(binary, 0o777); err != nil {
+		t.Fatal(err)
+	}
+	if err := validateRestartBinary(binary); err == nil {
+		t.Fatal("restart binary writable by other users was accepted")
+	}
+}
+
+func TestBrokerRestartEnvironmentPreservesCredentialKey(t *testing.T) {
+	got := brokerRestartEnvironment([]string{"PATH=/bin", "ASH_MCP_CREDENTIAL_KEY=old", "HOME=/tmp"}, "new")
+	if strings.Join(got, "|") != "PATH=/bin|HOME=/tmp|ASH_MCP_CREDENTIAL_KEY=new" {
+		t.Fatalf("restart environment = %q", got)
+	}
+}
+
+func TestBrokerHotRestartExecsBuiltBinary(t *testing.T) {
+	tempDir := t.TempDir()
+	binary := filepath.Join(tempDir, "ash-broker")
+	buildContext, cancelBuild := context.WithTimeout(context.Background(), time.Minute)
+	defer cancelBuild()
+	build := exec.CommandContext(buildContext, "go", "build", "-ldflags", "-X main.version=restart-test", "-o", binary, ".")
+	if output, err := build.CombinedOutput(); err != nil {
+		t.Fatalf("build restart fixture: %v\n%s", err, output)
+	}
+	home := filepath.Join(tempDir, "home")
+	if err := os.MkdirAll(home, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	socket := filepath.Join("/tmp", "ash-broker-hot-restart-"+strconv.Itoa(os.Getpid())+".sock")
+	token := "hot-restart-test-token"
+	env := make([]string, 0, len(os.Environ())+8)
+	for _, entry := range os.Environ() {
+		name, _, _ := strings.Cut(entry, "=")
+		if name == "HOME" || strings.HasPrefix(name, "ASH_") || strings.HasPrefix(name, "XDG_") {
+			continue
+		}
+		env = append(env, entry)
+	}
+	env = append(env,
+		"HOME="+home,
+		"ASH_AI_ENDPOINT=https://api.example.com/v1",
+		"ASH_AI_MODEL=restart-test",
+		"ASH_BROKER_AI_WARMUP=0",
+		"ASH_BROKER_SOCKET="+socket,
+		"ASH_BROKER_TOKEN="+token,
+		"ASH_MCP_CREDENTIAL_KEY="+strings.Repeat("0", 64),
+	)
+	brokerContext, cancelBroker := context.WithCancel(context.Background())
+	broker := exec.CommandContext(brokerContext, binary, "--socket", socket, "--session-id", "restarttest", "--parent-pid", strconv.Itoa(os.Getpid()))
+	broker.Env = env
+	broker.Stdout = io.Discard
+	broker.Stderr = io.Discard
+	if err := broker.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = broker.Process.Signal(syscall.SIGTERM)
+		_ = broker.Wait()
+		cancelBroker()
+	})
+
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		response, err := brokerControlRequest(socket, token, brokerproto.Request{BrokerAction: "status"})
+		if err == nil && response.BrokerVersion == "restart-test" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("broker did not become ready: response=%+v error=%v", response, err)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	restartContext, cancelRestart := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancelRestart()
+	restart := exec.CommandContext(restartContext, binary, "--restart", binary)
+	restart.Env = env
+	if output, err := restart.CombinedOutput(); err != nil {
+		t.Fatalf("restart broker: %v\n%s", err, output)
+	}
+	response, err := brokerControlRequest(socket, token, brokerproto.Request{BrokerAction: "status"})
+	if err != nil || response.BrokerVersion != "restart-test" {
+		t.Fatalf("status after restart = %+v, %v", response, err)
+	}
+	if err := broker.Process.Signal(syscall.Signal(0)); err != nil {
+		t.Fatalf("broker process did not survive re-exec: %v", err)
 	}
 }
 

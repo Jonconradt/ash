@@ -22,6 +22,7 @@ import (
 	"net/http/httptrace"
 	"net/url"
 	"os"
+	"os/exec"
 	"os/signal"
 	"path/filepath"
 	"strconv"
@@ -60,7 +61,17 @@ func main() {
 func run(args []string, stdout, stderr io.Writer) int {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM, syscall.SIGHUP)
 	defer stop()
-	return runBroker(ctx, args, stdout, stderr)
+	restarts := make(chan brokerRestart, 1)
+	code := runBrokerServer(ctx, args, stdout, stderr, restarts)
+	select {
+	case restart := <-restarts:
+		execArgs := append([]string{restart.binary}, restart.args...)
+		if syscall.Exec(restart.binary, execArgs, restart.env) != nil {
+			return 1
+		}
+	default:
+	}
+	return code
 }
 
 // aiTimeout returns the configured AI request timeout, or the default when unset or invalid.
@@ -95,6 +106,22 @@ func newBrokerLogger(w io.Writer) *slog.Logger {
 }
 
 func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int {
+	return runBrokerServer(ctx, args, stdout, stderr, nil)
+}
+
+type brokerRestart struct {
+	binary string
+	args   []string
+	env    []string
+}
+
+func runBrokerServer(ctx context.Context, args []string, stdout, stderr io.Writer, restarts chan<- brokerRestart) int {
+	if len(args) == 2 && args[0] == "--restart" {
+		if err := requestBrokerRestart(args[1]); err != nil {
+			return 1
+		}
+		return 0
+	}
 	if len(args) == 1 {
 		switch args[0] {
 		case "-h", "--help":
@@ -174,6 +201,7 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 		logger.Error(localize.Text("log.broker.session_id_invalid"), "error", err)
 		return 2
 	}
+	instanceID := strconv.Itoa(os.Getpid()) + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
 	endpoint := strings.TrimSpace(os.Getenv(aiEndpointEnv))
 	if endpoint == "" {
 		logger.Error("ash-broker requires a complete AI environment", "EID", "Ry8VqM3d")
@@ -285,9 +313,20 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 			}
 		})
 	}
+	var restartRequests chan string
+	if restarts != nil {
+		restartRequests = make(chan string, 1)
+	}
+	restartResult := make(chan string, 1)
 	go func() {
-		<-brokerCtx.Done()
-		_ = listener.Close()
+		select {
+		case binary := <-restartRequests:
+			restartResult <- binary
+			cancelBroker()
+			_ = listener.Close()
+		case <-brokerCtx.Done():
+			_ = listener.Close()
+		}
 	}()
 	go func() {
 		ticker := time.NewTicker(brokerParentPollTick)
@@ -310,7 +349,9 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 		if acceptErr != nil {
 			break
 		}
-		active.Go(func() { ; handleBrokerConn(brokerCtx, conn, token, client, allowedHost, toolCapabilities, mcpManager) })
+		active.Go(func() {
+			handleBrokerConnWithRestart(brokerCtx, conn, token, client, allowedHost, toolCapabilities, restartRequests, instanceID, mcpManager)
+		})
 	}
 	startup.Wait()
 	active.Wait()
@@ -318,7 +359,30 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 		transport.CloseIdleConnections()
 	}
 	cancelBroker()
+	select {
+	case binary := <-restartResult:
+		if binary != "" && restarts != nil {
+			restarts <- brokerRestart{
+				binary: binary,
+				args:   append([]string(nil), args...),
+				env:    brokerRestartEnvironment(os.Environ(), credentialKey),
+			}
+		}
+	default:
+	}
 	return 0
+}
+
+func brokerRestartEnvironment(environment []string, credentialKey string) []string {
+	const key = "ASH_MCP_CREDENTIAL_KEY"
+	result := make([]string, 0, len(environment)+1)
+	for _, entry := range environment {
+		if strings.HasPrefix(entry, key+"=") {
+			continue
+		}
+		result = append(result, entry)
+	}
+	return append(result, key+"="+credentialKey)
 }
 
 func openBrokerLog(home, sessionID string) (*os.File, error) {
@@ -469,6 +533,10 @@ func brokerParentAlive(parentPID int) bool {
 }
 
 func handleBrokerConn(ctx context.Context, conn net.Conn, token string, client *http.Client, allowedHost string, toolCapabilities *toolCapabilityCache, mcpManagers ...*mcp.RemoteManager) {
+	handleBrokerConnWithRestart(ctx, conn, token, client, allowedHost, toolCapabilities, nil, "", mcpManagers...)
+}
+
+func handleBrokerConnWithRestart(ctx context.Context, conn net.Conn, token string, client *http.Client, allowedHost string, toolCapabilities *toolCapabilityCache, restartRequests chan<- string, instanceID string, mcpManagers ...*mcp.RemoteManager) {
 	defer func() { _ = conn.Close() }()
 	if !brokerPeerAllowed(conn) {
 		return
@@ -481,6 +549,36 @@ func handleBrokerConn(ctx context.Context, conn net.Conn, token string, client *
 	var request brokerproto.Request
 	if json.Unmarshal(payload, &request) != nil || request.Version != brokerproto.Version || subtle.ConstantTimeCompare([]byte(request.Token), []byte(token)) != 1 {
 		_ = brokerproto.WriteFrame(conn, mustBrokerJSON(brokerproto.Response{Version: brokerproto.Version, Error: "broker request rejected"}))
+		return
+	}
+	if request.BrokerAction != "" {
+		response := brokerproto.Response{Version: brokerproto.Version}
+		switch request.BrokerAction {
+		case "status":
+			response.BrokerVersion = version
+			response.BrokerInstance = instanceID
+		case "restart":
+			if restartRequests == nil {
+				response.Error = "broker restart is unavailable"
+			} else if request.BrokerInstance != instanceID {
+				response.Error = "broker instance changed before restart"
+			} else if err := validateRestartBinary(request.BrokerBinary); err != nil {
+				response.Error = err.Error()
+			} else if candidateVersion, err := brokerBinaryVersion(request.BrokerBinary); err != nil {
+				response.Error = err.Error()
+			} else if candidateVersion != request.BrokerVersion {
+				response.Error = "requested broker version does not match the binary"
+			} else {
+				select {
+				case restartRequests <- request.BrokerBinary:
+				default:
+					response.Error = "broker restart is already in progress"
+				}
+			}
+		default:
+			response.Error = "unknown broker action"
+		}
+		_ = brokerproto.WriteFrame(conn, mustBrokerJSON(response))
 		return
 	}
 	if request.MCPAction != "" {
@@ -522,6 +620,7 @@ func handleBrokerConn(ctx context.Context, conn net.Conn, token string, client *
 			httpRequest.Header.Set(name, value)
 		}
 	}
+
 	if err == nil {
 		httpResponse, doErr := client.Do(httpRequest)
 		if doErr != nil {
@@ -544,6 +643,120 @@ func handleBrokerConn(ctx context.Context, conn net.Conn, token string, client *
 	if err != nil {
 		_ = brokerproto.WriteFrame(conn, mustBrokerJSON(brokerproto.Response{Version: brokerproto.Version, Error: err.Error()}))
 	}
+}
+
+func requestBrokerRestart(binary string) error {
+	socket := strings.TrimSpace(os.Getenv("ASH_BROKER_SOCKET"))
+	token := strings.TrimSpace(os.Getenv("ASH_BROKER_TOKEN"))
+	if socket == "" || token == "" {
+		return errors.New("this shell has no active broker to restart")
+	}
+	absoluteBinary, err := filepath.Abs(binary)
+	if err != nil {
+		return fmt.Errorf("resolving broker binary path: %w", err)
+	}
+	if err := validateRestartBinary(absoluteBinary); err != nil {
+		return err
+	}
+	candidateVersion, err := brokerBinaryVersion(absoluteBinary)
+	if err != nil {
+		return err
+	}
+	current, err := brokerControlRequest(socket, token, brokerproto.Request{BrokerAction: "status"})
+	if err != nil || current.Error != "" || current.BrokerInstance == "" {
+		return errors.New("the running broker does not support hot restart; restart this shell once, then rebuild")
+	}
+	response, err := brokerControlRequest(socket, token, brokerproto.Request{
+		BrokerAction:   "restart",
+		BrokerBinary:   absoluteBinary,
+		BrokerVersion:  candidateVersion,
+		BrokerInstance: current.BrokerInstance,
+	})
+	if err != nil {
+		return fmt.Errorf("requesting broker restart: %w", err)
+	}
+	if response.Error != "" {
+		if response.Error == "broker request rejected" {
+			return errors.New("the running broker does not support hot restart; restart this shell once, then rebuild")
+		}
+		return fmt.Errorf("broker rejected restart: %s", response.Error)
+	}
+
+	deadline := time.Now().Add(10 * time.Second)
+	for time.Now().Before(deadline) {
+		response, err = brokerControlRequest(socket, token, brokerproto.Request{BrokerAction: "status"})
+		if err == nil && response.Error == "" && response.BrokerVersion == candidateVersion && response.BrokerInstance != current.BrokerInstance {
+			return nil
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	return fmt.Errorf("broker did not report restarted version %q within 10 seconds", candidateVersion)
+}
+
+func brokerControlRequest(socket, token string, request brokerproto.Request) (brokerproto.Response, error) {
+	request.Version = brokerproto.Version
+	request.Token = token
+	payload, err := json.Marshal(request)
+	if err != nil {
+		return brokerproto.Response{}, err
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	conn, err := (&net.Dialer{}).DialContext(ctx, "unix", socket)
+	if err != nil {
+		return brokerproto.Response{}, err
+	}
+	defer func() { _ = conn.Close() }()
+	if err := conn.SetDeadline(time.Now().Add(time.Second)); err != nil {
+		return brokerproto.Response{}, err
+	}
+	if err := brokerproto.WriteFrame(conn, payload); err != nil {
+		return brokerproto.Response{}, err
+	}
+	responsePayload, err := brokerproto.ReadFrame(conn)
+	if err != nil {
+		return brokerproto.Response{}, err
+	}
+	var response brokerproto.Response
+	if err := json.Unmarshal(responsePayload, &response); err != nil {
+		return brokerproto.Response{}, err
+	}
+	if response.Version != brokerproto.Version {
+		return brokerproto.Response{}, errors.New("broker protocol version mismatch")
+	}
+	return response, nil
+}
+
+func validateRestartBinary(binary string) error {
+	if !filepath.IsAbs(binary) || filepath.Base(binary) != "ash-broker" {
+		return errors.New("broker restart requires an absolute ash-broker binary path")
+	}
+	info, err := os.Lstat(binary)
+	if err != nil {
+		return fmt.Errorf("checking restart binary: %w", err)
+	}
+	if !info.Mode().IsRegular() || info.Mode()&0o111 == 0 || info.Mode().Perm()&0o022 != 0 {
+		return errors.New("restart binary must be a non-writable executable regular file")
+	}
+	fileOwner, ok := info.Sys().(*syscall.Stat_t)
+	if !ok || fileOwner.Uid != uint32(os.Getuid()) {
+		return errors.New("restart binary must be owned by the current user")
+	}
+	return nil
+}
+
+func brokerBinaryVersion(binary string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	output, err := exec.CommandContext(ctx, binary, "--version").Output()
+	if err != nil {
+		return "", fmt.Errorf("reading restart binary version: %w", err)
+	}
+	candidateVersion := strings.TrimSpace(string(output))
+	if candidateVersion == "" {
+		return "", errors.New("restart binary reported an empty version")
+	}
+	return candidateVersion, nil
 }
 
 func handleToolCapabilityRequest(request brokerproto.Request, allowedHost string, cache *toolCapabilityCache) brokerproto.Response {

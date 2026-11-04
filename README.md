@@ -99,6 +99,24 @@ release tag and Git HEAD, marking the dashboard as a development build (for
 example, `ASH v0.17.1 (dev:abcd) EXECUTION SUMMARY`). Release builds pass the
 tag version and Git HEAD without the development suffix.
 
+To dog-food a build while keeping Homebrew's files untouched, use the default
+`~/.local/bin` output. Ash's shell integration prepends that directory to
+`PATH`; `make build` also hot-restarts the broker for the shell running the
+build:
+
+```bash
+make build
+```
+
+The first build after adding hot-restart support may finish building but fail
+at the restart step if the current broker came from an older Homebrew binary.
+Restart that terminal once, then rebuild. Later builds can restart that
+shell's broker in place. Other terminal sessions keep their existing broker
+until they are restarted. If you set `BUILD_BIN_DIR` to a different directory,
+add that directory to your shell startup `PATH` before opening a terminal; an
+`export` after the shell has started cannot affect its startup-time broker
+lookup.
+
 ## Make Targets
 
 ```bash

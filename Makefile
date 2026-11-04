@@ -20,6 +20,7 @@ CARGO_AUDIT_VERSION ?= 0.22.2
 APP_NAME ?= ash
 LOCAL_BIN_DIR ?= $(HOME)/.local/bin
 LOCAL_BINARY_PATH ?= $(LOCAL_BIN_DIR)/$(APP_NAME)
+BUILD_BIN_DIR ?= $(LOCAL_BIN_DIR)
 PLUGINS_SRC_DIR ?= internal/app/ash_bootstrap/plugins_src
 PLUGINS_BIN_DIR ?= bin/plugins
 LOCAL_PLUGINS_DIR ?= $(if $(XDG_DATA_HOME),$(XDG_DATA_HOME),$(HOME)/.local/share)/ash/plugins
@@ -192,15 +193,21 @@ plugins-install: plugins-build
 	fi
 
 build: lint test  site-locales plugins-build plugins-install
-	@mkdir -p "$(LOCAL_BIN_DIR)"
-	@go build -o "$(LOCAL_BINARY_PATH)" -ldflags "-X github.com/Jonconradt/ash/internal/app.ashVersion=$(BUILD_VERSION) -X github.com/Jonconradt/ash/internal/app.ashCommit=$(BUILD_COMMIT) -X github.com/Jonconradt/ash/internal/app.ashDevelopmentBuild=true" ./cmd/ash
-	@go build -o "$(LOCAL_BIN_DIR)/ash-broker" ./cmd/ash-broker
+	@mkdir -p "$(BUILD_BIN_DIR)"
+	@go build -o "$(BUILD_BIN_DIR)/$(APP_NAME)" -ldflags "-X github.com/Jonconradt/ash/internal/app.ashVersion=$(BUILD_VERSION) -X github.com/Jonconradt/ash/internal/app.ashCommit=$(BUILD_COMMIT) -X github.com/Jonconradt/ash/internal/app.ashDevelopmentBuild=true" ./cmd/ash
+	@go build -o "$(BUILD_BIN_DIR)/ash-broker" -ldflags "-X main.version=$(BUILD_VERSION)-dev+$(BUILD_COMMIT)" ./cmd/ash-broker
 	@$(MAKE) restart-broker
 
-# Existing shell brokers retain their in-memory image until their owning shell
-# exits. New shells will start the newly installed binary.
+# Restart the broker attached to this shell after replacing its binary.
 restart-broker:
-	@echo "restart-broker: existing shell brokers stop with their owning shells"
+	@if [[ -n "$${ASH_BROKER_SOCKET:-}" && -n "$${ASH_BROKER_TOKEN:-}" && -n "$${ASH_BROKER_PID:-}" ]]; then \
+		if ! "$(BUILD_BIN_DIR)/ash-broker" --restart "$(abspath $(BUILD_BIN_DIR)/ash-broker)"; then \
+			echo "restart-broker: hot restart failed; if this shell still uses an older Homebrew broker, restart the shell once and retry"; \
+			exit 1; \
+		fi; \
+	else \
+		echo "restart-broker: no broker is attached to this shell; new shells will start the built binary when BUILD_BIN_DIR is on PATH"; \
+	fi
 
 lint: language-lint site-lint yaml-lint python-lint markdown-lint plugins-lint static-config-lint
 	@./scripts/dev/run-quiet.sh "golangci-lint" go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run --allow-serial-runners ./...
