@@ -24,6 +24,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"os/user"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -66,6 +67,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 	select {
 	case restart := <-restarts:
 		execArgs := append([]string{restart.binary}, restart.args...)
+		// #nosec G204 -- restart.binary is validated as an owner-only ash-broker executable before it is queued.
 		if syscall.Exec(restart.binary, execArgs, restart.env) != nil {
 			return 1
 		}
@@ -731,6 +733,7 @@ func validateRestartBinary(binary string) error {
 	if !filepath.IsAbs(binary) || filepath.Base(binary) != "ash-broker" {
 		return errors.New("broker restart requires an absolute ash-broker binary path")
 	}
+	// #nosec G703 -- the absolute path and exact basename are checked above; the final file is checked for type, ownership, and write permissions below.
 	info, err := os.Lstat(binary)
 	if err != nil {
 		return fmt.Errorf("checking restart binary: %w", err)
@@ -738,8 +741,12 @@ func validateRestartBinary(binary string) error {
 	if !info.Mode().IsRegular() || info.Mode()&0o111 == 0 || info.Mode().Perm()&0o022 != 0 {
 		return errors.New("restart binary must be a non-writable executable regular file")
 	}
+	currentUser, err := user.Current()
+	if err != nil {
+		return fmt.Errorf("determining current user: %w", err)
+	}
 	fileOwner, ok := info.Sys().(*syscall.Stat_t)
-	if !ok || fileOwner.Uid != uint32(os.Getuid()) {
+	if !ok || strconv.FormatUint(uint64(fileOwner.Uid), 10) != currentUser.Uid {
 		return errors.New("restart binary must be owned by the current user")
 	}
 	return nil
@@ -748,6 +755,7 @@ func validateRestartBinary(binary string) error {
 func brokerBinaryVersion(binary string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
+	// #nosec G702 -- binary has been validated as an owner-only ash-broker executable before this version probe.
 	output, err := exec.CommandContext(ctx, binary, "--version").Output()
 	if err != nil {
 		return "", fmt.Errorf("reading restart binary version: %w", err)
