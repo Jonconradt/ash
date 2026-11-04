@@ -190,7 +190,7 @@ func runBrokerServer(ctx context.Context, args []string, stdout, stderr io.Write
 			}
 			sessionID = args[index]
 		default:
-			logger.Error(localize.Format("log.broker.unknown_option", []any{args[index]}), "EID", "Jp2VtR6w")
+			logger.Error(localize.Format("log.broker.unknown_option", []any{args[index]}), "EID", "Jp2VtR6w") // #nosec G706 -- every locale formats the option with %q, escaping log control characters.
 			return 2
 		}
 	}
