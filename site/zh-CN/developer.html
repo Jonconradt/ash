@@ -81,11 +81,11 @@
 
         <section id="workflow">
           <h2>日常开发工作流程</h2>
-          <p>对于正常的代码更改，请在迭代时运行重点测试，然后在完成之前运行存储库所需的 lint 和测试门：</p>
-          <pre><code>go test ./internal/app -run 'TestName'
-make check-static
+          <p>在迭代时运行重点测试。在推送之前，安装的预推送挂钩会验证干净的临时工作树中的每个确切的传出提交。手动运行相同的门：</p>
+          <pre><code>make check-static
 make check-security
 make test</code></pre>
+          <p><code>make config</code>安装存储库管理的 Git 挂钩。当检查失败时，本地钩子会阻止推送，但可以通过以下方式绕过<code>git push --no-verify</code>;它不是服务器强制的状态检查。</p>
           <p>大多数 Make 目标使用<code>scripts/dev/run-quiet.sh</code>：成功的步骤打印一份简明的<code>ok</code>行，而失败的步骤则打印捕获的输出。目标前缀为<code>V=1</code>在运行时流式传输其完整输出：</p>
           <pre><code>make V=1 lint
 make V=1 test
@@ -96,14 +96,12 @@ make V=1 verify</code></pre>
         <section id="make-targets">
           <h2>制定目标参考</h2>
           <dl>
-            <dt><code>make pre-push</code></dt>
-            <dd>针对即将推送的确切提交运行静态检查、安全与依赖扫描、密钥扫描和测试。<code>make config</code>会安装仓库管理的钩子。本地钩子可以绕过，并非服务器强制检查。</dd>
             <dt><code>make lint</code></dt>
-            <dd>检查本地化目录、站点安装程序的 shell 语法、工作流程 YAML、Python lint/格式、Markdown、插件 lint 和 Go lint。</dd>
+            <dd>检查 Go 格式和 lint、shell 脚本、HTML、跟踪的 JSON、GitHub Actions 工作流程和 YAML 格式、本地化目录、Python、Markdown 和插件源。</dd>
             <dt><code>make test</code></dt>
             <dd>构建并测试本机插件，然后运行<code>go test ./...</code>。</dd>
             <dt><code>make verify-ci</code></dt>
-            <dd>在创建 nightly 标签前运行 pre-push 检查。由标签触发的制品 CI 不会重复源代码检查。</dd>
+            <dd>在计划的夜间标签创建之前运行预推门。标签触发的工件 CI 不再重复源检查。</dd>
             <dt><code>make verify</code></dt>
             <dd>运行完整的本地质量门：lint、测试、竞赛测试、覆盖、审查、静态分析、安全、秘密扫描、模糊测试和基准测试。</dd>
             <dt><code>make test-race</code></dt>
@@ -113,7 +111,9 @@ make V=1 verify</code></pre>
             <dt><code>make test-fuzz</code></dt>
             <dd>运行应用程序模糊测试<code>FUZZ_TIME</code>（默认 10 秒）。</dd>
             <dt><code>make security</code></dt>
-            <dd>运行 <code>gosec</code>、<code>govulncheck</code> 以及 npm、Cargo 和 Python 依赖审计。</dd>
+            <dd>运行 Go 安全和漏洞分析以及 npm、Cargo 和 Python 依赖项审核。</dd>
+            <dt><code>make pre-push</code></dt>
+            <dd>运行静态检查、安全性和依赖性扫描、传出提交的秘密扫描以及测试。 Git 预推送挂钩针对每个推送的提交运行此操作。</dd>
             <dt><code>make build</code></dt>
             <dd>运行 lint 和测试、构建和安装本机插件以及构建<code>ash</code>加<code>ash-broker</code>在下面<code>~/.local/bin</code>。</dd>
             <dt><code>make install</code></dt>
@@ -129,20 +129,22 @@ make V=1 verify</code></pre>
         <section id="plugins">
           <h2>插件构建器</h2>
           <p>插件是具有独立于语言的契约的独立可执行文件。插件Makefiles选择每个插件的工具链；默认情况下，本地构建以主机为目标。发布构建通行证<code>PLUGIN_TARGET_GOOS</code>和<code>PLUGIN_TARGET_GOARCH</code>因此 Rust 和其他非 Go 插件二进制文件与发布工件相匹配。</p>
+          <p>顶级构建器排除带有<code>Cargo.toml</code>来自 macOS 目标，包括本机 macOS 版本。 macOS 捆绑包<code>what_time_is_it</code>和<code>calculator</code>; Linux 和 FreeBSD 还捆绑了 Rust<code>flip_a_coin</code>插件。 Rust 源测试在开发人员机器上仍然启用。</p>
           <p>使用<code>make plugins-build</code>将它们构建成<code>bin/plugins</code>,<code>make plugins-test</code>运行他们的测试，并且<code>make plugins-install</code>将它们复制到用户插件目录中。请参阅<a href="https://github.com/Jonconradt/ash/blob/main/docs/PLUGIN_CONTRACT.md">原生插件合约</a>在添加或更改插件之前。</p>
         </section>
 
         <section id="release-builders">
           <h2>发布构建器和工件</h2>
-          <p>质量检查后，GitHub 在 Linux 上运行 <code>make release-artifacts</code>。一个 Ubuntu 任务交叉编译供 Homebrew 使用的 Intel 和 Apple Silicon macOS 归档，不使用 macOS 运行器，也不生成 <code>.pkg</code> 安装包。macOS 目标（包括本地构建）排除所有 Rust 插件，包括 <code>flip_a_coin</code>。Linux 和 FreeBSD 继续包含 Rust 插件。</p>
-          <p>CI 验证 macOS 归档内容和 Mach-O 架构，但不运行其二进制文件。Linux 和 FreeBSD 保留解压归档的运行测试；不会安装软件包或配置 shell 集成。在 Linux 上构建 macOS：<code>make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES="amd64 arm64" RELEASE_MACOS_PKG=0 RELEASE_VERSION=v1.2.3</code>。<code>make release</code> 仍在 macOS 上创建本地 <code>.pkg</code>，不会向 CI 传递本地二进制文件。</p>
+          <p>源检查在推送之前在本地运行。标签触发的工件作业会构建并验证发布输出，而无需重复这些检查。 Linux 打包作业无需 Rust 插件即可构建 macOS 架构，并为 Homebrew 发布 tarball；没有 macOS 运行程序或 CI 生成的<code>.pkg</code>使用安装程序。 Linux 构建者封面<code>amd64</code>和<code>arm64</code>并验证<code>.deb</code>,<code>.rpm</code>和 tarball 内容。 FreeBSD 是交叉构建和打包的<code>amd64</code>。</p>
+          <p>Go 版本的二进制文件是使用修剪路径和剥离的链接器选项构建的。包含的本机插件与目标操作系统和架构相匹配。 CI 检查 macOS 存档内容和 Mach-O 架构，但无法在 Linux 上执行 macOS 二进制文件。 Linux 和 FreeBSD tarball 保留运行时冒烟测试；该工作流程不会安装软件包或配置新的 shell 集成。</p>
           <p>对于本地工件构建，请明确指定目标操作系统、架构和版本：</p>
           <pre><code>make release-artifacts \
   RELEASE_TARGET_OSES=linux \
   RELEASE_TARGET_ARCHES="arm64 amd64" \
   RELEASE_VERSION=v1.2.3</code></pre>
           <p><code>release-artifacts</code>构建并验证该目标支持的格式。默认值是主机操作系统（<code>auto</code>) 以及两者<code>amd64 arm64</code>; FreeBSD 发布仅限于<code>amd64</code>。文物被埋没<code>dist/release</code>。对于单个二进制/插件构建，请使用<code>make release-build-one RELEASE_GOOS=linux RELEASE_ARCH=arm64 RELEASE_VERSION=v1.2.3</code>。</p>
-          <p><code>make version</code>运行发布检查并构建工件而不发布它们。相比之下，<code>make release</code>是一个发布工作流程：它需要 macOS、干净的工作树和配置的 Git 身份、生成发行说明、创建/推送发行参考以及监视 GitHub 工作流程。它的默认渠道是beta；选择稳定或每晚<code>CHANNEL=stable</code>或者<code>CHANNEL=nightly</code>。生成的发行说明需要<code>ASH_AI_ENDPOINT</code>和<code>ASH_AI_MODEL</code>，除非附有注释<code>RELEASE_NOTES_INPUT</code>。</p>
+          <p>对于在 Linux 上构建的 macOS tarball，请使用<code>make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES="amd64 arm64" RELEASE_MACOS_PKG=0 RELEASE_VERSION=v1.2.3</code>。本地 macOS 打包仍然默认生成<code>.pkg</code>并且需要苹果打包工具。本地发布输出不会移交给 CI。</p>
+          <p><code>make version</code>运行发布检查并构建工件而无需发布。一个正常的<code>make release</code>需要 macOS、干净的工作树和配置的 Git 身份、生成发行说明、创建/推送发行参考以及监视 GitHub 工作流程。计划的夜间编排在 Ubuntu 上运行<code>RELEASE_SKIP_LOCAL_ARTIFACTS=1</code>在其本地门之后，标签工作流程将构建工件。默认渠道为beta；选择稳定或每晚<code>CHANNEL=stable</code>或者<code>CHANNEL=nightly</code>。</p>
           <p>阅读<a href="https://github.com/Jonconradt/ash/blob/main/.github/workflows/release.yml">发布工作流程</a>和<a href="https://github.com/Jonconradt/ash/blob/main/docs/release-secrets.md">发布秘密指南</a>在发布之前。</p>
         </section>
 

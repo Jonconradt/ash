@@ -189,12 +189,11 @@
           <p>اتبع<a href="https://github.com/Jonconradt/ash/blob/main/docs/PLUGIN_CONTRACT.md">عقد البرنامج المساعد الأصلي</a>: كشف خيارات CLI التي يمكن التنبؤ بها وتنفيذها<code>--help</code>,<code>--version</code>وإصدار JSON<code>--ai-docs</code>البيانات الوصفية، ووصف مخططات الإدخال/الإخراج وسلوك الفشل. قم بإصدار JSON مدمج ومنظم مع ملف<code>status</code>تفاصيل الأخطاء الميدانية والقابلة للتنفيذ بدلاً من النثر الممزوج بالبيانات. حافظ على تحديد المخرجات، والتحقق من صحة المدخلات، وضبط مهلات الشبكة، وجعل الأداة آمنة للاتصال بشكل متكرر. أضف اسم الملف العاري إلى<code>$XDG_CONFIG_HOME/ash/.ash_allow</code>;ashلا يمكن تنفيذه إلا عندما يكون مدرجًا في القائمة المسموح بها وغير مدرج فيها<code>$XDG_CONFIG_HOME/ash/.ash_deny</code>.</p>
 
           <h3>ما هي البرامج النصية للأداة المتوفرة والمكونات الإضافية الأصلية؟</h3>
-          <p>البرامج النصية المثبتة لـ bootstrap Python هي<code>headlines.py</code>,<code>wikipedia.py</code>، و<code>yfinance.py</code>في<code>$XDG_DATA_HOME/ash/tools/</code>. المكونات الإضافية الأصلية المقدمة هي<code>what_time_is_it</code>(يذهب)،<code>flip_a_coin</code>(الصدأ)، و<code>calculator</code>(تايب سكريبت) في<code>$XDG_DATA_HOME/ash/plugins/</code>.</p>
-          <p>تُضمّن إضافات Rust، ومنها <code>flip_a_coin</code>، في Linux وFreeBSD فقط. تتضمن إصدارات macOS الإضافتين <code>what_time_is_it</code> و<code>calculator</code>، لكنها تستبعد إضافات Rust.</p>
+          <p>البرامج النصية المثبتة لـ bootstrap Python هي<code>headlines.py</code>,<code>wikipedia.py</code>، و<code>yfinance.py</code>في<code>$XDG_DATA_HOME/ash/tools/</code>. المكونات الإضافية الأصلية المقدمة هي<code>what_time_is_it</code>(اذهب) و<code>calculator</code>(تايب سكريبت) في<code>$XDG_DATA_HOME/ash/plugins/</code>. يتم أيضًا تجميع Linux و FreeBSD<code>flip_a_coin</code>(الصدأ)؛ تستبعد إصدارات macOS المكونات الإضافية لـ Rust.</p>
 
-          <h3 id="macos-rust-plugin">لماذا تغيب إضافة Rust عن macOS، وكيف أثبّتها يدويًا؟</h3>
-          <p>يستبعد macOS إضافات Rust، ومنها <code>flip_a_coin</code>، لبناء المعماريتين على Linux دون مشغّلات macOS وتقليل تكلفة CI. هذا ليس قيد توافق. يحتفظ Homebrew بإضافات Go وTypeScript؛ ويحتفظ Linux وFreeBSD بإضافات Rust.</p>
-          <p>على جهاز Mac، ثبّت أدوات سطر أوامر Xcode (<code>xcode-select --install</code> عند الحاجة) وRust عبر <a href="https://rustup.rs/">rustup</a>. نفّذ الأوامر التالية حيث تريد إنشاء نسخة جديدة من المستودع. يبني Makefile الخاص بالإضافة لمعمارية جهازك ويثبّت مباشرة في دليل المستخدم، دون <code>sudo</code>.</p>
+          <h3 id="macos-rust-plugin">لماذا لا يوجد مكون Rust الإضافي على نظام التشغيل macOS، وكيف يمكنني تثبيته يدويًا؟</h3>
+          <p>تتجاهل إصدارات macOS المكونات الإضافية لـ Rust، بما في ذلك<code>flip_a_coin</code>، لذلك يمكن تجميع بنيات macOS بشكل مشترك على نظام Linux بدون مشغلات macOS CI. وهذا يقلل من تكاليف CI للإصدار؛ إنه ليس قيودًا على توافق macOS. لا يزال يتم تثبيت Homebrewashمع المكونات الإضافية Go وTypeScript، ولا تزال إصدارات Linux وFreeBSD تتضمن المكون الإضافي Rust.</p>
+          <p>على جهاز Mac الخاص بك، قم بتثبيت أدوات سطر أوامر Xcode من Apple (<code>xcode-select --install</code>، إذا لزم الأمر) والصدأ عبر<a href="https://rustup.rs/">الصدأ</a>. ثم قم بتشغيل ما يلي في الدليل حيث تريد الخروج من مصدر جديد. يقوم المستودع بتثبيت سلسلة أدوات Rust، ويتم إنشاء ملف Makefile الخاص بالمكون الإضافي للبنية الأصلية لجهاز Mac الخاص بك ويتم تثبيته مباشرة فيAshدليل البرنامج المساعد للمستخدم؛ لا<code>sudo</code>هناك حاجة.</p>
           <pre><code>git clone https://github.com/Jonconradt/ash.git
 cd ash
 rustup toolchain install 1.99.0 --profile minimal
@@ -202,7 +201,7 @@ plugin_dir="${XDG_DATA_HOME:-$HOME/.local/share}/ash/plugins"
 make -C internal/app/ash_bootstrap/plugins_src/flip_a_coin build BUILD_DIR="$plugin_dir"
 "$plugin_dir/flip_a_coin" --version
 "$plugin_dir/flip_a_coin" --ai-docs</code></pre>
-          <p>استخدم Makefile الخاص بالإضافة، لا <code>make plugins-build</code> الذي يتجاوز Rust على macOS. أبقِ <code>$PLUGINS_DIR_LIST</code> في <code>${XDG_CONFIG_HOME:-$HOME/.config}/ash/.ash_allow</code> أو أضف <code>flip_a_coin</code>؛ ويجب ألا يظهر في <code>.ash_deny</code>. ابدأ استدعاءً جديدًا لـ ash. شغّل <code>"$plugin_dir/flip_a_coin"</code> للاختبار دون مزوّد ذكاء اصطناعي.</p>
+          <p>استخدم Makefile الخاص بالمكون الإضافي، وليس المستوى الأعلى<code>make plugins-build</code>، والذي يتخطى Rust على نظام التشغيل macOS عمدًا. للسماح للذكاء الاصطناعي بالاتصال به، احتفظ<code>$PLUGINS_DIR_LIST</code>في<code>${XDG_CONFIG_HOME:-$HOME/.config}/ash/.ash_allow</code>أو إضافة الاسم العاري<code>flip_a_coin</code>هناك. لا يجب أن تكون مدرجة في<code>.ash_deny</code>. ابدأ جديدًاashدعوة لاكتشاف ذلك. يمكنك أيضًا الركض<code>"$plugin_dir/flip_a_coin"</code>مباشرة للتحقق من رمي العملة بدون مزود الذكاء الاصطناعي.</p>
 
           <h3>يستطيعashاستدعاء الوكلاء الفرعيين؟</h3>
           <p>نعم. يمكن للوكيل الأصلي استخدامه<code>run_sub_agent</code>لمهمة واحدة مركزة ومستقلة. يرث الطفل دليل العمل والتكوين والأدوات وأذونات نظام التشغيل، ويعيد نتيجة محددة، ولا يمكنه إنشاء طفل آخر. الحد الأقصى الافتراضي هو ستة وكلاء فرعيين لكل تشغيل رئيسي ويمكن تغييره باستخدام<code>ASH_MAX_AGENTS</code>.</p>

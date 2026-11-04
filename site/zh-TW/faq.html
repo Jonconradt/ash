@@ -189,12 +189,11 @@
           <p>遵循<a href="https://github.com/Jonconradt/ash/blob/main/docs/PLUGIN_CONTRACT.md">原生插件合約</a>：公開可預測的 CLI 選項，實施<code>--help</code>,<code>--version</code>，以及版本化 JSON<code>--ai-docs</code>元數據，並描述輸入/輸出模式和故障行為。發出緊湊的結構化 JSON<code>status</code>字段和可操作的錯誤詳細信息，而不是與數據混合的散文。保持输出有限，验证输入，设置网络超时，并使工具可以安全地重复调用。將其裸檔名添加到<code>$XDG_CONFIG_HOME/ash/.ash_allow</code>;ash僅當它被列入白名單且未列出時才能執行<code>$XDG_CONFIG_HOME/ash/.ash_deny</code>。</p>
 
           <h3>提供的工具腳本和原生插件有哪些？</h3>
-          <p>安裝的引導Python腳本是<code>headlines.py</code>,<code>wikipedia.py</code>， 和<code>yfinance.py</code>在<code>$XDG_DATA_HOME/ash/tools/</code>。提供的本機插件是<code>what_time_is_it</code>（去），<code>flip_a_coin</code>（鐵鏽），以及<code>calculator</code>（打字稿）在<code>$XDG_DATA_HOME/ash/plugins/</code>。</p>
-          <p>Rust 外掛程式（包括 <code>flip_a_coin</code>）僅隨 Linux 與 FreeBSD 提供。macOS 建置包含 <code>what_time_is_it</code> 與 <code>calculator</code>，但排除 Rust 外掛程式。</p>
+          <p>安裝的引導Python腳本是<code>headlines.py</code>,<code>wikipedia.py</code>， 和<code>yfinance.py</code>在<code>$XDG_DATA_HOME/ash/tools/</code>。提供的本機插件是<code>what_time_is_it</code>（去）和<code>calculator</code>（打字稿）在<code>$XDG_DATA_HOME/ash/plugins/</code>。 Linux 和 FreeBSD 也綁在一起<code>flip_a_coin</code>（銹）; macOS 版本不包含 Rust 外掛程式。</p>
 
-          <h3 id="macos-rust-plugin">為什麼 macOS 缺少 Rust 外掛程式，如何手動建置並安裝？</h3>
-          <p>macOS 不隨附 <code>flip_a_coin</code> 等 Rust 外掛程式，以便在 Linux 上交叉編譯兩種架構，不使用 macOS 執行器，降低 CI 成本。這不是相容性限制。Homebrew 仍提供 Go 與 TypeScript 外掛程式；Linux 與 FreeBSD 仍包含 Rust 外掛程式。</p>
-          <p>在 Mac 上安裝 Xcode 命令列工具（如有需要，執行 <code>xcode-select --install</code>），並透過 <a href="https://rustup.rs/">rustup</a> 安裝 Rust。在要建立原始碼副本的位置執行以下命令。外掛程式自己的 Makefile 會為本機架構建置，並直接安裝至使用者外掛程式目錄，無需 <code>sudo</code>。</p>
+          <h3 id="macos-rust-plugin">為什麼 macOS 上缺少 Rust 插件，如何手動安裝？</h3>
+          <p>macOS 建置省略 Rust 插件，包括<code>flip_a_coin</code>，因此兩種 macOS 架構都可以在 Linux 上交叉編譯，而無需 macOS CI 運行程式。這降低了發布 CI 成本；這不是 macOS 相容性限制。自製程式仍然安裝ash附有 Go 和 TypeScript 插件，Linux 和 FreeBSD 版本仍然包含 Rust 插件。</p>
+          <p>在您的 Mac 上，安裝 Apple 的 Xcode 命令列工具 (<code>xcode-select --install</code>，如果需要的話）和 Rust 通過<a href="https://rustup.rs/">魯斯圖普</a>。然後在您想要簽出新來源的目錄中執行以下命令。儲存庫固定 Rust 工具鏈，插件自己的 Makefile 會針對 Mac 的本機架構建置並直接安裝到Ash的使用者插件目錄；不<code>sudo</code>是需要的。</p>
           <pre><code>git clone https://github.com/Jonconradt/ash.git
 cd ash
 rustup toolchain install 1.99.0 --profile minimal
@@ -202,7 +201,7 @@ plugin_dir="${XDG_DATA_HOME:-$HOME/.local/share}/ash/plugins"
 make -C internal/app/ash_bootstrap/plugins_src/flip_a_coin build BUILD_DIR="$plugin_dir"
 "$plugin_dir/flip_a_coin" --version
 "$plugin_dir/flip_a_coin" --ai-docs</code></pre>
-          <p>請使用外掛程式自己的 Makefile，而不是會在 macOS 跳過 Rust 的頂層 <code>make plugins-build</code>。在 <code>${XDG_CONFIG_HOME:-$HOME/.config}/ash/.ash_allow</code> 中保留 <code>$PLUGINS_DIR_LIST</code> 或加入名稱 <code>flip_a_coin</code>，並確保它不在 <code>.ash_deny</code> 中。重新呼叫 ash 即可發現外掛程式。直接執行 <code>"$plugin_dir/flip_a_coin"</code> 可在沒有 AI 供應商的情況下測試。</p>
+          <p>使用外掛自己的Makefile，而不是頂層<code>make plugins-build</code>，它在 macOS 上故意跳過 Rust。要讓 AI 呼叫它，請保留<code>$PLUGINS_DIR_LIST</code>在<code>${XDG_CONFIG_HOME:-$HOME/.config}/ash/.ash_allow</code>或添加裸名<code>flip_a_coin</code>那裡。它不得列在<code>.ash_deny</code>。開始新的ash調用來發現它。你也可以運行<code>"$plugin_dir/flip_a_coin"</code>無需人工智慧提供者即可直接驗證拋硬幣。</p>
 
           <h3>能ash呼叫子代理？</h3>
           <p>是的。父代理可以使用<code>run_sub_agent</code>完成一項專注的、獨立的任務。子級繼承工作目錄、配置、工具和作業系統權限，傳回有界結果，無法建立另一個子級。預設最大值是每個父運行六個子代理，可以使用以下命令進行更改<code>ASH_MAX_AGENTS</code>。</p>

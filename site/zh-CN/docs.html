@@ -149,6 +149,7 @@ ash update [--version vX.Y.Z] [--yes|--skip-customized]</code></pre>
             <dt><code>ASH_LOG_MAX_BYTES</code></dt><dd>旋转前可选的最大日志大小。默认：<code>1048576</code>。</dd>
             <dt><code>ASH_MAX_AGENTS</code></dt><dd>一个父进程生成的可选最大子代理数。默认：<code>6</code>。</dd>
             <dt><code>ASH_MAX_TOOL_ITERS</code></dt><dd>可选的最大 AI 工具调用循环迭代。默认：<code>16</code>。</dd>
+            <dt><code>ASH_PROMPT_TOOLS</code></dt><dd>可选的基于提示的工具调用回退控制。默认 （<code>auto</code>): 当后端拒绝原生工具参数时（例如Ollama回答400“不支持工具”），ash警告并重试一次，并将工具目录注入到提示中；基于提示的工具调用会通过与本机调用相同的验证和白名单，但可靠性较低。什么时候<code>ash-broker</code>处于活动状态时，不受支持的端点/模型对会缓存 7 天，因此以后的调用会跳过失败的本机请求。<code>force</code>/<code>always</code>/<code>1</code>始终使用基于提示的工具调用；<code>off</code>/<code>never</code>/<code>0</code>快速失败而不是后退。</dd>
             <dt><code>ASH_RELEVANCE_WINDOW</code></dt><dd>执行状态中包含可选的最近工具观察结果。默认：<code>4</code>。</dd>
             <dt><code>ASH_RETRY_BASE_DELAY</code></dt><dd>可选的重试退避基本延迟。默认：<code>250ms</code>。</dd>
             <dt><code>ASH_RETRY_MAX_ATTEMPTS</code></dt><dd>可选的可重试请求尝试。默认：<code>3</code>。</dd>

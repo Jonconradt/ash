@@ -81,11 +81,11 @@
 
         <section id="workflow">
           <h2>سير عمل التطوير اليومي</h2>
-          <p>لتغيير الكود العادي، قم بتشغيل الاختبارات المركزة أثناء التكرار، ثم قم بتشغيل الوبر المطلوب للمستودع وبوابات الاختبار قبل الانتهاء:</p>
-          <pre><code>go test ./internal/app -run 'TestName'
-make check-static
+          <p>قم بتشغيل الاختبارات المركزة أثناء التكرار. قبل الدفع، يقوم خطاف الدفع المسبق المثبت بالتحقق من صحة كل التزام صادر في شجرة عمل مؤقتة نظيفة. قم بتشغيل نفس البوابات يدويًا باستخدام:</p>
+          <pre><code>make check-static
 make check-security
 make test</code></pre>
+          <p><code>make config</code>تثبيت خطافات Git المُدارة بواسطة المستودع. يتم دفع كتل الخطاف المحلية عند فشل عمليات التحقق، ولكن يمكن تجاوزها<code>git push --no-verify</code>; إنه ليس فحصًا للحالة يفرضه الخادم.</p>
           <p>يتم استخدام معظم الأهداف<code>scripts/dev/run-quiet.sh</code>: الخطوات الناجحة طباعة واحدة مختصرة<code>ok</code>سطر، في حين أن الخطوات الفاشلة تطبع مخرجاتها التي تم التقاطها. بادئة الهدف بـ<code>V=1</code>لدفق الإخراج الكامل أثناء تشغيله:</p>
           <pre><code>make V=1 lint
 make V=1 test
@@ -96,14 +96,12 @@ make V=1 verify</code></pre>
         <section id="make-targets">
           <h2>إنشاء مرجع الهدف</h2>
           <dl>
-            <dt><code>make pre-push</code></dt>
-            <dd>يشغّل الفحوصات الثابتة وفحوصات الأمان والتبعيات واكتشاف الأسرار والاختبارات على عمليات الإيداع الصادرة نفسها. يثبّت <code>make config</code> خطاف المستودع. يمكن تجاوز الخطافات المحلية، وهي ليست فحوصات يفرضها الخادم.</dd>
             <dt><code>make lint</code></dt>
-            <dd>التحقق من كتالوجات الترجمة، وبناء جملة Shell لمثبت الموقع، وسير العمل YAML، وPython Lint/format، وMarkdown، وPlugin Lint، وGo lint.</dd>
+            <dd>الشيكات Go التنسيق والوبر، البرامج النصية Shell، HTML، JSON المتعقب، سير عمل GitHub Actions وتنسيق YAML، كتالوجات الترجمة، Python، Markdown، ومصادر المكونات الإضافية.</dd>
             <dt><code>make test</code></dt>
             <dd>يبني ويختبر المكونات الإضافية الأصلية، ثم يقوم بتشغيلها<code>go test ./...</code>.</dd>
             <dt><code>make verify-ci</code></dt>
-            <dd>يشغّل فحوصات ما قبل الدفع قبل إنشاء وسم الإصدار الليلي. لا تعيد CI الخاصة بالملفات، التي يبدأها الوسم، فحوصات المصدر.</dd>
+            <dd>تشغيل بوابة الدفع المسبق قبل إنشاء العلامة الليلية المجدولة. لم يعد CI الأثري الذي تم تشغيله بواسطة العلامة يكرر عمليات التحقق من المصدر.</dd>
             <dt><code>make verify</code></dt>
             <dd>يدير بوابة الجودة المحلية الكاملة: الوبر، والاختبارات، واختبارات السباق، والتغطية، والطبيب البيطري، والتحليل الثابت، والأمن، والمسح السري، والتشويش، والمعايير.</dd>
             <dt><code>make test-race</code></dt>
@@ -113,7 +111,9 @@ make V=1 verify</code></pre>
             <dt><code>make test-fuzz</code></dt>
             <dd>تشغيل اختبارات زغب التطبيق لـ<code>FUZZ_TIME</code>(10 ثواني بشكل افتراضي).</dd>
             <dt><code>make security</code></dt>
-            <dd>يشغّل <code>gosec</code> و<code>govulncheck</code> وتدقيق تبعيات npm وCargo وPython.</dd>
+            <dd>يقوم بتشغيل تحليل الأمان والثغرات الأمنية في Go بالإضافة إلى عمليات تدقيق تبعية npm وCargo وPython.</dd>
+            <dt><code>make pre-push</code></dt>
+            <dd>يقوم بإجراء فحوصات ثابتة، وفحص الأمان والتبعية، والمسح السري للالتزامات الصادرة، والاختبارات. يقوم خطاف الدفع المسبق لـ Git بتشغيل هذا ضد كل التزام مدفوع.</dd>
             <dt><code>make build</code></dt>
             <dd>يقوم بتشغيل الوبر والاختبار، ويبني ويثبت المكونات الإضافية الأصلية، ويبني<code>ash</code>زائد<code>ash-broker</code>تحت<code>~/.local/bin</code>.</dd>
             <dt><code>make install</code></dt>
@@ -129,20 +129,22 @@ make V=1 verify</code></pre>
         <section id="plugins">
           <h2>بناة البرنامج المساعد</h2>
           <p>المكونات الإضافية هي ملفات تنفيذية مستقلة بعقد مستقل عن اللغة. يقوم البرنامج المساعد Makefiles بتحديد سلسلة أدوات كل مكون إضافي؛ تستهدف الإصدارات المحلية المضيف افتراضيًا. إصدار يبني تمريرة<code>PLUGIN_TARGET_GOOS</code>و<code>PLUGIN_TARGET_GOARCH</code>لذا فإن Rust والثنائيات الإضافية الأخرى غير التابعة لـ Go تتطابق مع قطعة الإصدار.</p>
+          <p>يستبعد منشئ المستوى الأعلى المكونات الإضافية ذات الامتداد<code>Cargo.toml</code>من أهداف macOS، بما في ذلك إصدارات macOS الأصلية. حزم ماك<code>what_time_is_it</code>و<code>calculator</code>; يقوم Linux وFreeBSD أيضًا بتجميع ملف Rust<code>flip_a_coin</code>البرنامج المساعد. تظل اختبارات مصدر الصدأ ممكنة على أجهزة المطورين.</p>
           <p>يستخدم<code>make plugins-build</code>لبناء لهم في<code>bin/plugins</code>,<code>make plugins-test</code>لإجراء اختباراتهم، و<code>make plugins-install</code>لنسخها إلى دليل البرنامج المساعد للمستخدم. انظر<a href="https://github.com/Jonconradt/ash/blob/main/docs/PLUGIN_CONTRACT.md">عقد البرنامج المساعد الأصلي</a>قبل إضافة أو تغيير البرنامج المساعد.</p>
         </section>
 
         <section id="release-builders">
           <h2>الافراج عن بناة والتحف</h2>
-          <p>بعد فحوص الجودة، يشغّل GitHub الأمر <code>make release-artifacts</code> على Linux. تبني مهمة Ubuntu واحدة أرشيفات macOS لمعالجَي Intel وApple Silicon لصالح Homebrew، دون مشغّلات macOS أو مثبّتات <code>.pkg</code>. تستبعد أهداف macOS جميع إضافات Rust، ومنها <code>flip_a_coin</code>، حتى في البناء المحلي. يحتفظ Linux وFreeBSD بإضافات Rust.</p>
-          <p>تتحقق CI من محتويات أرشيفات macOS وبنى Mach-O دون تشغيل ملفاتها التنفيذية. يحتفظ Linux وFreeBSD باختبارات تشغيل الأرشيفات المستخرجة؛ لا تُثبّت الحزم أو تكاملات الصدفة. لبناء macOS على Linux: <code>make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES="amd64 arm64" RELEASE_MACOS_PKG=0 RELEASE_VERSION=v1.2.3</code>. ما زال <code>make release</code> ينشئ <code>.pkg</code> محليًا على macOS دون إرسال الملفات التنفيذية المحلية إلى CI.</p>
+          <p>يتم تشغيل عمليات التحقق من المصدر محليًا قبل الدفع. تعمل المهام الفنية التي يتم تشغيلها بواسطة العلامة على إنشاء مخرجات الإصدار والتحقق من صحتها دون تكرار عمليات التحقق هذه. تعمل وظائف التغليف في Linux على إنشاء بنيات macOS بدون مكونات Rust الإضافية ونشر كرات القطران لـ Homebrew؛ لا يوجد مشغلات macOS أو تم إنشاؤها بواسطة CI<code>.pkg</code>يتم استخدام المثبتات. غلاف منشئي Linux<code>amd64</code>و<code>arm64</code>والتحقق من صحة<code>.deb</code>,<code>.rpm</code>، ومحتويات كرة القطران. تم تصميم FreeBSD بشكل متقاطع وتعبئته من أجل<code>amd64</code>.</p>
+          <p>تم إنشاء ثنائيات إصدار Go باستخدام مسار القطع وخيارات الرابط المجرد. تتوافق المكونات الإضافية الأصلية المضمنة مع نظام التشغيل والبنية المستهدفة. يتحقق CI من محتويات أرشيف macOS وبنيات Mach-O، لكن لا يمكنه تنفيذ ثنائيات macOS على Linux. تحتفظ كرات القطران Linux وFreeBSD باختبارات الدخان في وقت التشغيل؛ لا يقوم سير العمل بتثبيت الحزم أو تكوين عمليات تكامل Shell جديدة.</p>
           <p>بالنسبة إلى تصميمات القطع الأثرية المحلية، حدد نظام التشغيل المستهدف والبنية والإصدار بشكل صريح:</p>
           <pre><code>make release-artifacts \
   RELEASE_TARGET_OSES=linux \
   RELEASE_TARGET_ARCHES="arm64 amd64" \
   RELEASE_VERSION=v1.2.3</code></pre>
           <p><code>release-artifacts</code>يبني ويتحقق من صحة التنسيقات المدعومة لهذا الهدف. الإعدادات الافتراضية هي نظام التشغيل المضيف (<code>auto</code>) وكلاهما<code>amd64 arm64</code>; يقتصر النشر على FreeBSD على<code>amd64</code>. التحف تذهب تحت<code>dist/release</code>. لإنشاء ثنائي/مكون إضافي واحد، استخدم<code>make release-build-one RELEASE_GOOS=linux RELEASE_ARCH=arm64 RELEASE_VERSION=v1.2.3</code>.</p>
-          <p><code>make version</code>يدير عمليات التحقق من الإصدار ويبني القطع الأثرية دون نشرها. في المقابل،<code>make release</code>هو سير عمل نشر: فهو يتطلب نظام التشغيل macOS، وشجرة عمل نظيفة وهوية Git التي تم تكوينها، وينشئ ملاحظات الإصدار، وينشئ/يدفع مراجع الإصدار، ويراقب سير عمل GitHub. قناتها الافتراضية هي النسخة التجريبية. حدد مستقرًا أو ليلاً مع<code>CHANNEL=stable</code>أو<code>CHANNEL=nightly</code>. تتطلب ملاحظات الإصدار التي تم إنشاؤها<code>ASH_AI_ENDPOINT</code>و<code>ASH_AI_MODEL</code>، ما لم يتم توفير الملاحظات مع<code>RELEASE_NOTES_INPUT</code>.</p>
+          <p>بالنسبة إلى كرات القطران لنظام التشغيل MacOS المبنية على Linux، استخدم<code>make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES="amd64 arm64" RELEASE_MACOS_PKG=0 RELEASE_VERSION=v1.2.3</code>. لا تزال عبوات macOS المحلية تعمل بشكل افتراضي على إنشاء ملف<code>.pkg</code>ويتطلب أدوات التعبئة والتغليف من Apple. لا يتم تسليم مخرجات الإصدار المحلي إلى CI.</p>
+          <p><code>make version</code>يقوم بإجراء عمليات التحقق من الإصدار وإنشاء القطع الأثرية دون النشر. عادي<code>make release</code>يتطلب نظام التشغيل macOS، وشجرة عمل نظيفة وهوية Git التي تم تكوينها، وإنشاء ملاحظات الإصدار، وإنشاء/دفع مراجع الإصدار، ومراقبة سير عمل GitHub. يتم تشغيل التنسيق الليلي المجدول على Ubuntu مع<code>RELEASE_SKIP_LOCAL_ARTIFACTS=1</code>بعد بوابتها المحلية، يقوم سير عمل العلامة ببناء القطع الأثرية. القناة الافتراضية هي بيتا. حدد مستقرًا أو ليلاً مع<code>CHANNEL=stable</code>أو<code>CHANNEL=nightly</code>.</p>
           <p>اقرأ<a href="https://github.com/Jonconradt/ash/blob/main/.github/workflows/release.yml">الافراج عن سير العمل</a>و<a href="https://github.com/Jonconradt/ash/blob/main/docs/release-secrets.md">دليل أسرار الافراج</a>قبل النشر.</p>
         </section>
 

@@ -81,11 +81,11 @@
 
         <section id="workflow">
           <h2>Flusso di lavoro di sviluppo quotidiano</h2>
-          <p>Per una normale modifica del codice, esegui i test mirati durante l'iterazione, quindi esegui i lint richiesti e i test gate del repository prima di terminare:</p>
-          <pre><code>go test ./internal/app -run 'TestName'
-make check-static
+          <p>Esegui test mirati durante l'iterazione. Prima del push, l'hook pre-push installato convalida ogni esatto commit in uscita in un albero di lavoro temporaneo e pulito. Esegui manualmente gli stessi cancelli con:</p>
+          <pre><code>make check-static
 make check-security
 make test</code></pre>
+          <p><code>make config</code>installa gli hook Git gestiti dal repository. L'hook locale blocca i push quando i controlli falliscono, ma può essere aggirato<code>git push --no-verify</code>; non è un controllo dello stato imposto dal server.</p>
           <p>La maggior parte degli obiettivi Make utilizza<code>scripts/dev/run-quiet.sh</code>: i passaggi riusciti ne stampano uno conciso<code>ok</code>linea, mentre i passaggi falliti stampano l'output acquisito. Prefisso una destinazione con<code>V=1</code>per eseguire lo streaming dell'output completo durante l'esecuzione:</p>
           <pre><code>make V=1 lint
 make V=1 test
@@ -96,14 +96,12 @@ make V=1 verify</code></pre>
         <section id="make-targets">
           <h2>Fai riferimento al target</h2>
           <dl>
-            <dt><code>make pre-push</code></dt>
-            <dd>Esegue controlli statici, analisi di sicurezza e delle dipendenze, scansione dei segreti e test sui commit esatti in uscita. <code>make config</code> installa l'hook del repository. Gli hook locali possono essere ignorati e non sono controlli imposti dal server.</dd>
             <dt><code>make lint</code></dt>
-            <dd>Controlla i cataloghi di localizzazione, la sintassi della shell per il programma di installazione del sito, il flusso di lavoro YAML, lint/formato Python, Markdown, plugin lint e Go lint.</dd>
+            <dd>Controlla la formattazione e i lanugine di Go, gli script di shell, HTML, JSON tracciato, flussi di lavoro di GitHub Actions e formattazione YAML, cataloghi di localizzazione, Python, Markdown e origini di plug-in.</dd>
             <dt><code>make test</code></dt>
             <dd>Crea e testa i plugin nativi, quindi viene eseguito<code>go test ./...</code>.</dd>
             <dt><code>make verify-ci</code></dt>
-            <dd>Esegue il controllo pre-push prima della creazione del tag notturno. La CI degli artefatti attivata dal tag non ripete i controlli del codice sorgente.</dd>
+            <dd>Esegue il pre-push gate prima della creazione pianificata dei tag notturni. L'elemento CI degli artefatti attivato da tag non ripete più i controlli dell'origine.</dd>
             <dt><code>make verify</code></dt>
             <dd>Esegue l'intero controllo di qualità locale: lanugine, test, test di gara, copertura, veterinario, analisi statica, sicurezza, scansioni segrete, fuzzing e benchmark.</dd>
             <dt><code>make test-race</code></dt>
@@ -113,7 +111,9 @@ make V=1 verify</code></pre>
             <dt><code>make test-fuzz</code></dt>
             <dd>Esegue i test fuzz dell'applicazione per<code>FUZZ_TIME</code>(10 secondi per impostazione predefinita).</dd>
             <dt><code>make security</code></dt>
-            <dd>Esegue <code>gosec</code>, <code>govulncheck</code> e gli audit delle dipendenze npm, Cargo e Python.</dd>
+            <dd>Esegue l'analisi della sicurezza e delle vulnerabilità Go oltre ai controlli delle dipendenze npm, Cargo e Python.</dd>
+            <dt><code>make pre-push</code></dt>
+            <dd>Esegue controlli statici, scansione di sicurezza e dipendenze, scansione segreta per commit in uscita e test. L'hook pre-push Git lo esegue contro ogni commit inviato.</dd>
             <dt><code>make build</code></dt>
             <dd>Esegue lint e testa, crea e installa plug-in nativi e crea<code>ash</code>più<code>ash-broker</code>Sotto<code>~/.local/bin</code>.</dd>
             <dt><code>make install</code></dt>
@@ -129,20 +129,22 @@ make V=1 verify</code></pre>
         <section id="plugins">
           <h2>Costruttori di plugin</h2>
           <p>I plugin sono eseguibili autonomi con un contratto indipendente dalla lingua. I plugin Makefile selezionano la toolchain di ciascun plugin; le build locali prendono di mira l'host per impostazione predefinita. Il rilascio delle build passa<code>PLUGIN_TARGET_GOOS</code>E<code>PLUGIN_TARGET_GOARCH</code>quindi Rust e altri file binari dei plugin non Go corrispondono all'artefatto di rilascio.</p>
+          <p>Il builder di livello superiore esclude i plugin con a<code>Cargo.toml</code>da destinazioni macOS, incluse build macOS native. pacchetti macOS<code>what_time_is_it</code>E<code>calculator</code>; Anche Linux e FreeBSD raggruppano Rust<code>flip_a_coin</code>collegare. I test delle sorgenti Rust rimangono abilitati sulle macchine degli sviluppatori.</p>
           <p>Utilizzo<code>make plugins-build</code>per costruirli<code>bin/plugins</code>,<code>make plugins-test</code>per eseguire i loro test, e<code>make plugins-install</code>per copiarli nella directory dei plugin dell'utente. Vedi il<a href="https://github.com/Jonconradt/ash/blob/main/docs/PLUGIN_CONTRACT.md">contratto di plugin nativo</a>prima di aggiungere o modificare un plugin.</p>
         </section>
 
         <section id="release-builders">
           <h2>Rilascia builder e artefatti</h2>
-          <p>Dopo i controlli di qualità, GitHub esegue <code>make release-artifacts</code> su Linux. Un job Ubuntu compila gli archivi macOS Intel e Apple Silicon per Homebrew, senza runner macOS né installer <code>.pkg</code>. I target macOS escludono tutti i plugin Rust, incluso <code>flip_a_coin</code>, anche nelle build locali. Linux e FreeBSD mantengono i plugin Rust.</p>
-          <p>La CI verifica contenuti degli archivi macOS e architetture Mach-O senza eseguirne i binari. Linux e FreeBSD mantengono i test di esecuzione degli archivi estratti; non vengono installati pacchetti o integrazioni della shell. Per compilare macOS su Linux: <code>make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES="amd64 arm64" RELEASE_MACOS_PKG=0 RELEASE_VERSION=v1.2.3</code>. <code>make release</code> crea ancora un <code>.pkg</code> locale su macOS senza trasferire i binari locali alla CI.</p>
+          <p>I controlli del codice sorgente vengono eseguiti localmente prima dei push. I processi di artefatto attivati ​​da tag creano e convalidano gli output di rilascio senza ripetere tali controlli. I lavori di packaging Linux creano entrambe le architetture macOS senza plugin Rust e pubblicano tarball per Homebrew; nessun runner macOS o generato da CI<code>.pkg</code>vengono utilizzati gli installatori. Copertina dei builder Linux<code>amd64</code>E<code>arm64</code>e convalidare<code>.deb</code>,<code>.rpm</code>e il contenuto del file tar. FreeBSD è cross-built e confezionato per<code>amd64</code>.</p>
+          <p>I file binari della versione Go sono creati con le opzioni trim-path e stripped linker. I plugin nativi inclusi corrispondono al sistema operativo e all'architettura di destinazione. CI controlla i contenuti dell'archivio macOS e le architetture Mach-O ma non può eseguire i binari macOS su Linux. I tarball di Linux e FreeBSD mantengono i test di fumo in fase di esecuzione; il flusso di lavoro non installa pacchetti né configura nuove integrazioni con la shell.</p>
           <p>Per le build di artefatti locali, specificare esplicitamente il sistema operativo, l'architettura e la versione di destinazione:</p>
           <pre><code>make release-artifacts \
   RELEASE_TARGET_OSES=linux \
   RELEASE_TARGET_ARCHES="arm64 amd64" \
   RELEASE_VERSION=v1.2.3</code></pre>
           <p><code>release-artifacts</code>crea e convalida i formati supportati per quel target. Le impostazioni predefinite sono il sistema operativo host (<code>auto</code>) ed entrambi<code>amd64 arm64</code>; La pubblicazione di FreeBSD è limitata a<code>amd64</code>. I manufatti affondano<code>dist/release</code>. Per una singola build binaria/plugin, utilizzare<code>make release-build-one RELEASE_GOOS=linux RELEASE_ARCH=arm64 RELEASE_VERSION=v1.2.3</code>.</p>
-          <p><code>make version</code>esegue i controlli di rilascio e crea gli artefatti senza pubblicarli. Al contrario,<code>make release</code>è un flusso di lavoro di pubblicazione: richiede macOS, un albero di lavoro pulito e un'identità Git configurata, genera note di rilascio, crea/invia riferimenti di rilascio e controlla il flusso di lavoro GitHub. Il suo canale predefinito è beta; seleziona stabile o notturno con<code>CHANNEL=stable</code>O<code>CHANNEL=nightly</code>. Le note di rilascio generate richiedono<code>ASH_AI_ENDPOINT</code>E<code>ASH_AI_MODEL</code>, a meno che non siano fornite note<code>RELEASE_NOTES_INPUT</code>.</p>
+          <p>Per i tarball macOS basati su Linux, utilizzare<code>make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES="amd64 arm64" RELEASE_MACOS_PKG=0 RELEASE_VERSION=v1.2.3</code>. Per impostazione predefinita, il pacchetto macOS locale continua a generare un file<code>.pkg</code>e richiede gli strumenti di packaging Apple. Gli output di rilascio locale non vengono trasferiti a CI.</p>
+          <p><code>make version</code>esegue controlli di rilascio e crea artefatti senza pubblicarli. Una normale<code>make release</code>richiede macOS, un albero di lavoro pulito e un'identità Git configurata, genera note di rilascio, crea/invia riferimenti alla versione e controlla il flusso di lavoro GitHub. L'orchestrazione notturna pianificata viene eseguita su Ubuntu con<code>RELEASE_SKIP_LOCAL_ARTIFACTS=1</code>dopo il gate locale, il flusso di lavoro del tag crea artefatti. Il canale predefinito è beta; seleziona stabile o notturno con<code>CHANNEL=stable</code>O<code>CHANNEL=nightly</code>.</p>
           <p>Leggi il<a href="https://github.com/Jonconradt/ash/blob/main/.github/workflows/release.yml">flusso di lavoro di rilascio</a>E<a href="https://github.com/Jonconradt/ash/blob/main/docs/release-secrets.md">rilasciare la guida ai segreti</a>prima della pubblicazione.</p>
         </section>
 

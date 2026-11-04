@@ -81,11 +81,11 @@
 
         <section id="workflow">
           <h2>Alldeeglech Entwécklung Workflow</h2>
-          <p>Fir eng normal Code Ännerung, lafen déi fokusséiert Tester beim Iteréieren, lafen dann déi erfuerderlech Lint an Test Gates vum Repository virum Enn:</p>
-          <pre><code>go test ./internal/app -run 'TestName'
-make check-static
+          <p>Fuert déi fokusséiert Tester beim Iteréieren. Ier Dir dréckt, validéiert den installéierten Pre-Push Haken all exakt erausginn Engagement an engem propperen temporäre Worktree. Laf déiselwecht Paarte manuell mat:</p>
+          <pre><code>make check-static
 make check-security
 make test</code></pre>
+          <p><code>make config</code>installéiert de repository-verwalte Git Hooks. Déi lokal Hakenblocken dréckt wann d'Schecken feelen, awer kënne mat ëmgoen<code>git push --no-verify</code>; et ass net e Server-gezwongen Status Check.</p>
           <p>Déi meescht Maacht Ziler benotzen<code>scripts/dev/run-quiet.sh</code>: erfollegräich Schrëtt Drécken eng präzis<code>ok</code>Linn, wärend gescheitert Schrëtt hir ageholl Ausgang drécken. Präfix engem Zil mat<code>V=1</code>fir säi komplette Output ze streamen wéi se leeft:</p>
           <pre><code>make V=1 lint
 make V=1 test
@@ -96,14 +96,12 @@ make V=1 verify</code></pre>
         <section id="make-targets">
           <h2>Zilreferenz maachen </h2>
           <dl>
-            <dt><code>make pre-push</code></dt>
-            <dd>Féiert statesch Kontrollen, Sécherheets- an Ofhängegkeetsscannen, Geheimnisserkennung an Tester op de geneeë Commiten aus, déi geschéckt ginn. <code>make config</code> installéiert de Repository-Hook. Lokal Hooks kënnen ëmgaange ginn a sinn net vum Server erzwongen.</dd>
             <dt><code>make lint</code></dt>
-            <dd>Kontrolléiert Lokaliséierungskataloge, Shell Syntax fir de Site Installateur, Workflow YAML, Python Lint / Format, Markdown, Plugin Lint, a Go Lint.</dd>
+            <dd>Kontrolléiert Go Formatéierung a Lint, Shell Scripten, HTML, verfollegt JSON, GitHub Actions Workflows an YAML Formatéierung, Lokaliséierungskataloge, Python, Markdown, a Plugin Quellen.</dd>
             <dt><code>make test</code></dt>
             <dd>Baut a testt gebierteg Plugins, leeft dann<code>go test ./...</code>.</dd>
             <dt><code>make verify-ci</code></dt>
-            <dd>Féiert d'Pre-Push-Kontroll virun der Erstellung vum Nightly-Tag aus. D'Tag-getriggert Artefakt-CI widderhëlt keng Quellcodekontrollen.</dd>
+            <dd>Leeft de Pre-Push Gate virun der geplangter Nuetstag Kreatioun. Tag-ausgeléist Artefakt CI widderhuelen net méi Quellkontrolle.</dd>
             <dt><code>make verify</code></dt>
             <dd>Leeft déi voll lokal Qualitéitspaart: Lint, Tester, Race Tester, Ofdeckung, Veterinär, statesch Analyse, Sécherheet, Geheimscannen, Fuzzing, a Benchmarks.</dd>
             <dt><code>make test-race</code></dt>
@@ -113,7 +111,9 @@ make V=1 verify</code></pre>
             <dt><code>make test-fuzz</code></dt>
             <dd>Leeft Applikatioun Fuzz Tester fir<code>FUZZ_TIME</code>(Standard 10 Sekonnen).</dd>
             <dt><code>make security</code></dt>
-            <dd>Féiert <code>gosec</code>, <code>govulncheck</code> an npm-, Cargo- a Python-Ofhängegkeetsauditen aus.</dd>
+            <dd>Leeft Go Sécherheet a Schwachstelle Analyse plus npm, Cargo, a Python Ofhängegkeet Audits.</dd>
+            <dt><code>make pre-push</code></dt>
+            <dd>Leeft statesch Kontrollen, Sécherheets- an Ofhängegkeetsscannen, geheime Scannen fir erausgaang Verpflichtungen, an Tester. De Git Pre-Push Hook leeft dëst géint all gedréckte Verpflichtung.</dd>
             <dt><code>make build</code></dt>
             <dd>Leeft Lint an Tester, baut an installéiert gebierteg Plugins, a baut<code>ash</code>pluss<code>ash-broker</code>ënner<code>~/.local/bin</code>.</dd>
             <dt><code>make install</code></dt>
@@ -129,20 +129,22 @@ make V=1 verify</code></pre>
         <section id="plugins">
           <h2>Plugin Builder</h2>
           <p>Plugins si Standalone ausführbar mat engem Sproochonofhängege Kontrakt. De Plugin Makefiles wielt all Plugin Toolchain; lokal Builds zielen den Host par défaut. Fräisetzung baut Passe<code>PLUGIN_TARGET_GOOS</code>an<code>PLUGIN_TARGET_GOARCH</code>also Rust an aner Net-Go Plugin Binären passen dem Release Artefakt.</p>
+          <p>Den Top-Level Builder ausgeschloss Plugins mat engem<code>Cargo.toml</code>vu macOS Ziler, dorënner gebierteg macOS Builds. macOS Bündel<code>what_time_is_it</code>an<code>calculator</code>; Linux a FreeBSD bündelen och de Rust<code>flip_a_coin</code>astiechen. Rust Quell Tester bleiwen op Entwéckler Maschinnen aktivéiert.</p>
           <p>Benotzt<code>make plugins-build</code>fir se anzebauen<code>bin/plugins</code>,<code>make plugins-test</code>hir Tester ze lafen, an<code>make plugins-install</code>fir se an de Benotzer Plugin Verzeechnes ze kopéieren. Kuckt de<a href="https://github.com/Jonconradt/ash/blob/main/docs/PLUGIN_CONTRACT.md">gebierteg Plugin Kontrakt</a>ier e Plugin derbäigesat oder geännert gëtt.</p>
         </section>
 
         <section id="release-builders">
           <h2>Fräisetzung Builder an artifacts</h2>
-          <p>No de Qualitéitskontrolle leeft <code>make release-artifacts</code> op Linux. Een Ubuntu-Job baut d'macOS-Archive fir Intel an Apple Silicon fir Homebrew, ouni macOS-Runner oder <code>.pkg</code>-Installateuren. macOS-Ziler schléissen all Rust-Plugins aus, och <code>flip_a_coin</code> a lokal Builds. Linux a FreeBSD behalen d'Rust-Plugins.</p>
-          <p>CI kontrolléiert den Inhalt vun de macOS-Archiven an d'Mach-O-Architekturen, féiert d'Binärdateien awer net aus. Linux a FreeBSD behalen d'Lafzäittester vun den ausgepaakten Archiven; Packagen a Shell-Integratioune ginn net installéiert. Fir macOS op Linux ze bauen: <code>make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES="amd64 arm64" RELEASE_MACOS_PKG=0 RELEASE_VERSION=v1.2.3</code>. <code>make release</code> erstellt nach ëmmer e lokale <code>.pkg</code> op macOS, ouni lokal Binärdateien un CI ze schécken.</p>
+          <p>Quellkontrolle lafen lokal virum Drock. Tag-ausgeléist Artefaktjobs bauen a validéieren d'Verëffentlechungsausgaben ouni dës Kontrollen ze widderhuelen. Linux Verpakung Aarbechtsplaze bauen béid macOS Architekturen ouni Rust Plugins a publizéieren Tarballs fir Homebrew; keng MacOS Leefer oder CI-generéiert<code>.pkg</code>Installateure benotzt ginn. Linux Builder Cover<code>amd64</code>an<code>arm64</code>an validéieren<code>.deb</code>,<code>.rpm</code>, an tarball Inhalter. FreeBSD ass cross-built a verpackt fir<code>amd64</code>.</p>
+          <p>Go Verëffentlechungsbinäre gi mat Trim-Wee a gesträifte Linkeroptiounen gebaut. Inkludéiert gebierteg Plugins passen dem Zil OS an der Architektur. CI kontrolléiert macOS Archiv Inhalt a Mach-O Architekturen awer kann net macOS Binären op Linux ausféieren. Linux a FreeBSD Tarballs behalen Runtime Rauchtester; de Workflow installéiert keng Packagen oder konfiguréiert frësch Shell-Integratioune.</p>
           <p>Fir lokal Artefakt Builds, spezifizéiert d'Zil OS, d'Architektur an d'Versioun explizit:</p>
           <pre><code>make release-artifacts \
   RELEASE_TARGET_OSES=linux \
   RELEASE_TARGET_ARCHES="arm64 amd64" \
   RELEASE_VERSION=v1.2.3</code></pre>
           <p><code>release-artifacts</code>baut a validéiert d'Formater déi fir dat Zil ënnerstëtzt ginn. D'Defaults sinn Host OS (<code>auto</code>) a béid<code>amd64 arm64</code>; FreeBSD Verëffentlechung ass limitéiert op<code>amd64</code>. Artefakte ginn ënner<code>dist/release</code>. Fir eng eenzeg binär / Plugin bauen, benotzen<code>make release-build-one RELEASE_GOOS=linux RELEASE_ARCH=arm64 RELEASE_VERSION=v1.2.3</code>.</p>
-          <p><code>make version</code>leeft d'Verëffentlechungskontrollen a baut Artefakte ouni se ze publizéieren. Am Géigesaz,<code>make release</code>ass e Verëffentlechungs-Workflow: et erfuerdert macOS, e propperen Aarbechtsbaum a konfiguréiert Git Identitéit, generéiert Verëffentlechungsnotizen, erstellt / dréckt Verëffentlechungsreferenzen, a kuckt de GitHub Workflow. Säi Standardkanal ass Beta; wielt stabil oder Nightly mat<code>CHANNEL=stable</code>oder<code>CHANNEL=nightly</code>. Generéiert Verëffentlechungsnotizen erfuerderlech<code>ASH_AI_ENDPOINT</code>an<code>ASH_AI_MODEL</code>, ausser Notizen sinn mat geliwwert<code>RELEASE_NOTES_INPUT</code>.</p>
+          <p>Fir macOS Tarballs op Linux gebaut, benotzt<code>make release-artifacts RELEASE_TARGET_OSES=darwin RELEASE_TARGET_ARCHES="amd64 arm64" RELEASE_MACOS_PKG=0 RELEASE_VERSION=v1.2.3</code>. Lokal macOS Verpackung ass ëmmer nach Standard fir eng generéieren<code>.pkg</code>a erfuerdert Apple Verpackungstools. Lokal Verëffentlechungsausgaben ginn net un CI iwwerginn.</p>
+          <p><code>make version</code>leeft Verëffentlechungskontrollen a baut Artefakte ouni Verëffentlechung. Eng normal<code>make release</code>erfuerdert macOS, e propperen Aarbechtsbaum a konfiguréiert Git Identitéit, generéiert Verëffentlechungsnotizen, erstellt / dréckt Verëffentlechungsreferenzen, a kuckt de GitHub Workflow. Geplangte Nightly Orchestratioun leeft op Ubuntu mat<code>RELEASE_SKIP_LOCAL_ARTIFACTS=1</code>no sengem lokalen Paart, da baut den Tag Workflow Artefakte. De Standardkanal ass Beta; wielt stabil oder Nightly mat<code>CHANNEL=stable</code>oder<code>CHANNEL=nightly</code>.</p>
           <p>Liest de<a href="https://github.com/Jonconradt/ash/blob/main/.github/workflows/release.yml">Fräisetzung Workflow</a>an<a href="https://github.com/Jonconradt/ash/blob/main/docs/release-secrets.md">Fräisetzung Geheimnisser Guide</a>virun der Verëffentlechung.</p>
         </section>
 
