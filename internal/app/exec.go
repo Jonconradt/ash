@@ -158,6 +158,10 @@ func runSubAgentCommand(ctx context.Context, prompt, childID string) toolCommand
 	}()
 	err = cmd.Wait()
 	close(processDone)
+	if commandCtx.Err() != nil {
+		// CommandContext may kill the leader before the watcher kills its process group.
+		terminateProcessTree(cmd)
+	}
 	result := toolCommandResult{
 		OK:      err == nil,
 		Command: "run_sub_agent",

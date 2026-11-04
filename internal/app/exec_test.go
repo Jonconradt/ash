@@ -136,7 +136,7 @@ func TestRunSubAgentCommandTimeoutKillsProcessGroup(t *testing.T) {
 	osExecutable = func() (string, error) { return scriptPath, nil }
 	t.Cleanup(func() { osExecutable = origExecutable })
 	t.Setenv("PID_PATH", pidPath)
-	t.Setenv("ASH_AI_TIMEOUT", "1s")
+	t.Setenv("ASH_AI_TIMEOUT", "5s")
 	t.Setenv(childAgentEnvName, "")
 
 	result := runSubAgentCommand(context.Background(), "ignored", "parent.abc123")
