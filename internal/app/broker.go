@@ -17,14 +17,16 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/Jonconradt/ash/internal/brokerproto"
 )
 
 const (
-	brokerSocketEnv = "ASH_BROKER_SOCKET"
-	brokerTokenEnv  = "ASH_BROKER_TOKEN"
-	brokerLeaseEnv  = "ASH_BROKER_LEASE"
+	brokerSocketEnv         = "ASH_BROKER_SOCKET"
+	brokerTokenEnv          = "ASH_BROKER_TOKEN"
+	brokerLeaseEnv          = "ASH_BROKER_LEASE"
+	brokerCapabilityTimeout = 2 * time.Second
 )
 
 func brokerConfigured() bool {
@@ -113,6 +115,10 @@ func brokerDo(ctx context.Context, req *http.Request) (*http.Response, bool, err
 }
 
 func brokerMCPDo(ctx context.Context, request brokerproto.Request) (brokerproto.Response, error) {
+	return brokerControlDo(ctx, request)
+}
+
+func brokerControlDo(ctx context.Context, request brokerproto.Request) (brokerproto.Response, error) {
 	socket := strings.TrimSpace(os.Getenv(brokerSocketEnv))
 	token := strings.TrimSpace(os.Getenv(brokerTokenEnv))
 	if socket == "" || token == "" {
@@ -165,4 +171,31 @@ func brokerMCPDo(ctx context.Context, request brokerproto.Request) (brokerproto.
 		return brokerproto.Response{}, errors.New(response.Error)
 	}
 	return response, nil
+}
+
+func brokerPromptToolsUnsupported(ctx context.Context, endpoint, model string) (bool, error) {
+	if !brokerConfigured() {
+		return false, nil
+	}
+	response, err := brokerControlDo(ctx, brokerproto.Request{
+		ToolCacheAction:   "lookup",
+		ToolCacheEndpoint: endpoint,
+		ToolCacheModel:    model,
+	})
+	if err != nil {
+		return false, err
+	}
+	return response.ToolUnsupported, nil
+}
+
+func brokerRememberPromptToolsUnsupported(ctx context.Context, endpoint, model string) error {
+	if !brokerConfigured() {
+		return nil
+	}
+	_, err := brokerControlDo(ctx, brokerproto.Request{
+		ToolCacheAction:   "mark_unsupported",
+		ToolCacheEndpoint: endpoint,
+		ToolCacheModel:    model,
+	})
+	return err
 }

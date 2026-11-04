@@ -238,7 +238,7 @@ func TestHandleBrokerConnRoundTrip(t *testing.T) {
 			if acceptErr != nil {
 				return
 			}
-			go handleBrokerConn(context.Background(), conn, "test-token", client, serverURL.Host)
+			go handleBrokerConn(context.Background(), conn, "test-token", client, serverURL.Host, nil)
 		}
 	}()
 
@@ -271,7 +271,7 @@ func TestHandleBrokerConnRejectsUnconfiguredHost(t *testing.T) {
 			if acceptErr != nil {
 				return
 			}
-			go handleBrokerConn(context.Background(), conn, "test-token", client, "api.example.com")
+			go handleBrokerConn(context.Background(), conn, "test-token", client, "api.example.com", nil)
 		}
 	}()
 
@@ -300,7 +300,7 @@ func TestHandleBrokerConnRejectsBadToken(t *testing.T) {
 			if acceptErr != nil {
 				return
 			}
-			go handleBrokerConn(context.Background(), conn, "real-token", client, "api.example.com")
+			go handleBrokerConn(context.Background(), conn, "real-token", client, "api.example.com", nil)
 		}
 	}()
 

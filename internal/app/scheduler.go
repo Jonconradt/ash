@@ -46,6 +46,7 @@ func schedulerEnvAllowlist() map[string]string {
 		"ASH_TOOL_TIMEOUT",
 		"ASH_TOOL_OUTPUT_MAX",
 		"ASH_MAX_TOOL_ITERS",
+		"ASH_PROMPT_TOOLS",
 		maxAgentsEnvName,
 	}
 	out := map[string]string{}

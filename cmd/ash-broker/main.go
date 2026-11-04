@@ -208,6 +208,7 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 		}()
 	}
 	scratchRoot := filepath.Join(workspace.StateRoot(home), "scratch")
+	toolCapabilities := newToolCapabilityCache(filepath.Join(workspace.CacheRoot(home), "tool-capabilities"))
 	scratchLock, err := scratchlife.Acquire(scratchRoot, sessionID)
 	if err != nil {
 		logger.Error(localize.Format("log.scratch.lifecycle_failed", []any{err}), "error", err)
@@ -309,7 +310,7 @@ func runBroker(ctx context.Context, args []string, stdout, stderr io.Writer) int
 		if acceptErr != nil {
 			break
 		}
-		active.Go(func() { ; handleBrokerConn(brokerCtx, conn, token, client, allowedHost, mcpManager) })
+		active.Go(func() { ; handleBrokerConn(brokerCtx, conn, token, client, allowedHost, toolCapabilities, mcpManager) })
 	}
 	startup.Wait()
 	active.Wait()
@@ -467,7 +468,7 @@ func brokerParentAlive(parentPID int) bool {
 	return err == nil || errors.Is(err, syscall.EPERM)
 }
 
-func handleBrokerConn(ctx context.Context, conn net.Conn, token string, client *http.Client, allowedHost string, mcpManagers ...*mcp.RemoteManager) {
+func handleBrokerConn(ctx context.Context, conn net.Conn, token string, client *http.Client, allowedHost string, toolCapabilities *toolCapabilityCache, mcpManagers ...*mcp.RemoteManager) {
 	defer func() { _ = conn.Close() }()
 	if !brokerPeerAllowed(conn) {
 		return
@@ -488,6 +489,11 @@ func handleBrokerConn(ctx context.Context, conn net.Conn, token string, client *
 			return
 		}
 		response := handleMCPRequest(ctx, request, mcpManagers[0])
+		_ = brokerproto.WriteFrame(conn, mustBrokerJSON(response))
+		return
+	}
+	if request.ToolCacheAction != "" {
+		response := handleToolCapabilityRequest(request, allowedHost, toolCapabilities)
 		_ = brokerproto.WriteFrame(conn, mustBrokerJSON(response))
 		return
 	}
@@ -538,6 +544,34 @@ func handleBrokerConn(ctx context.Context, conn net.Conn, token string, client *
 	if err != nil {
 		_ = brokerproto.WriteFrame(conn, mustBrokerJSON(brokerproto.Response{Version: brokerproto.Version, Error: err.Error()}))
 	}
+}
+
+func handleToolCapabilityRequest(request brokerproto.Request, allowedHost string, cache *toolCapabilityCache) brokerproto.Response {
+	response := brokerproto.Response{Version: brokerproto.Version}
+	endpoint, err := url.Parse(strings.TrimSpace(request.ToolCacheEndpoint))
+	if err != nil || endpoint.User != nil || endpoint.Host == "" ||
+		(endpoint.Scheme != "http" && endpoint.Scheme != "https") ||
+		!strings.EqualFold(endpoint.Host, allowedHost) {
+		response.Error = "tool capability endpoint rejected"
+		return response
+	}
+	if cache == nil {
+		response.Error = "tool capability cache unavailable"
+		return response
+	}
+	switch request.ToolCacheAction {
+	case "lookup":
+		response.ToolUnsupported, err = cache.unsupported(request.ToolCacheEndpoint, request.ToolCacheModel)
+	case "mark_unsupported":
+		err = cache.markUnsupported(request.ToolCacheEndpoint, request.ToolCacheModel)
+	default:
+		response.Error = "unknown tool capability action"
+		return response
+	}
+	if err != nil {
+		response.Error = err.Error()
+	}
+	return response
 }
 
 func handleMCPRequest(ctx context.Context, request brokerproto.Request, manager *mcp.RemoteManager) brokerproto.Response {

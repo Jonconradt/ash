@@ -47,6 +47,19 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 
 	maxIters := maxToolIterations()
 	tools := shim.ListTools()
+	promptToolsCfg := configuredPromptToolsMode()
+	promptToolsActive := promptToolsCfg == promptToolsForce && len(tools) > 0
+	if !promptToolsActive && promptToolsCfg == promptToolsAuto && len(tools) > 0 {
+		cacheCtx, cancel := context.WithTimeout(ctx, brokerCapabilityTimeout)
+		unsupported, cacheErr := brokerPromptToolsUnsupported(cacheCtx, aiCfg.BaseURL, aiCfg.Model)
+		cancel()
+		if cacheErr != nil {
+			slog.Warn(localize.Format("log.runner.prompt_tools_cache_read_failed", []any{cacheErr}), "request_id", requestIDFromContext(ctx), "EID", "u8F3cL2n")
+		} else if unsupported {
+			promptToolsActive = true
+			slog.Warn(localize.Format("log.runner.prompt_tools_cached", []any{aiCfg.Model}), "request_id", requestIDFromContext(ctx), "EID", "w7VqP4mN")
+		}
+	}
 	tasks := buildExecutionTasks(userInput, taskListMax())
 	observations := make([]toolObservation, 0, 8)
 	stallRounds := 0
@@ -60,22 +73,50 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 	for i := 0; i <= maxIters; i++ {
 		slog.Debug(localize.Text("log.runner.loop_iteration"), "request_id", requestIDFromContext(ctx), "iteration", i+1, "message_count", len(messages), "EID", "K9mhqboH")
 		roundMessages := append([]message{}, messages...)
-		stateMessage := buildExecutionStateMessage(userInput, tasks, observations, relevanceWindow())
-		defenseMessage := buildPromptInjectionDefenseMessage()
+		injected := []message{buildExecutionStateMessage(userInput, tasks, observations, relevanceWindow()), buildPromptInjectionDefenseMessage()}
+		roundTools := tools
+		if promptToolsActive {
+			// Prompt-based tool mode: the backend rejects the native tools
+			// parameter, so describe the tools in a system message instead and
+			// send no tools on the wire.
+			injected = append(injected, buildPromptToolCatalogMessage(tools))
+			roundTools = nil
+		}
 		if len(roundMessages) == 0 {
-			roundMessages = append(roundMessages, stateMessage)
-			roundMessages = append(roundMessages, defenseMessage)
+			roundMessages = append(roundMessages, injected...)
 		} else {
 			insertAt := len(roundMessages) - 1
-			roundMessages = append(roundMessages[:insertAt], append([]message{stateMessage, defenseMessage}, roundMessages[insertAt:]...)...)
+			roundMessages = append(roundMessages[:insertAt], append(injected, roundMessages[insertAt:]...)...)
 		}
 
-		response, err := chatStreamExecutor(ctx, aiCfg, roundMessages, tools, nil)
+		response, err := chatStreamExecutor(ctx, aiCfg, roundMessages, roundTools, nil)
 		if err != nil {
+			// A tools-unsupported rejection downgrades this turn to prompt-based
+			// tool use (unless disabled) instead of failing the session. The retry
+			// happens exactly once: with promptToolsActive set, tools are no
+			// longer sent, so this rejection cannot recur.
+			if !promptToolsActive && len(tools) > 0 && promptToolsCfg != promptToolsOff && isToolsUnsupportedError(err) {
+				promptToolsActive = true
+				cacheCtx, cancel := context.WithTimeout(ctx, brokerCapabilityTimeout)
+				cacheErr := brokerRememberPromptToolsUnsupported(cacheCtx, aiCfg.BaseURL, aiCfg.Model)
+				cancel()
+				if cacheErr != nil {
+					slog.Warn(localize.Format("log.runner.prompt_tools_cache_write_failed", []any{cacheErr}), "request_id", requestIDFromContext(ctx), "EID", "m5GxR8cQ")
+				}
+				slog.Warn(localize.Format("log.runner.prompt_tools_fallback", []any{aiCfg.Model, err}), "request_id", requestIDFromContext(ctx), "EID", "e2PmJ6xW")
+				i--
+				continue
+			}
 			return "", nil, err
 		}
 
 		assistant := response.Message
+		if promptToolsActive && len(assistant.ToolCalls) == 0 {
+			if calls := parsePromptToolCalls(assistant.Content, tools); len(calls) > 0 {
+				slog.Debug("parsed prompt-based tool calls", "request_id", requestIDFromContext(ctx), "count", len(calls), "EID", "q9TfVr3L")
+				assistant.ToolCalls = calls
+			}
+		}
 		if strings.TrimSpace(assistant.Role) == "" {
 			assistant.Role = "assistant"
 		}
@@ -94,7 +135,14 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 				assistant.ToolCalls[j].Function.Index = &idx
 			}
 		}
-		messages = append(messages, assistant)
+		historyAssistant := assistant
+		if promptToolsActive {
+			// The fenced tool_call block in Content is the canonical record of a
+			// prompt-based call; wire-level tool_calls would be rejected or mangled
+			// by backends without native tool support.
+			historyAssistant.ToolCalls = nil
+		}
+		messages = append(messages, historyAssistant)
 
 		if len(assistant.ToolCalls) == 0 {
 			slog.Debug(localize.Text("log.runner.no_tool_calls"), "request_id", requestIDFromContext(ctx), "EID", "lEPk12rd")
@@ -186,12 +234,16 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 			observations = append(observations, observation)
 			applyToolObservationToTasks(tasks, observation)
 			toolContent := renderToolMessageForModel(toolName, toolResult)
-			messages = append(messages, message{
-				Role:       "tool",
-				Content:    toolContent,
-				ToolName:   toolName,
-				ToolCallID: call.ID,
-			})
+			if promptToolsActive {
+				messages = append(messages, promptToolResultMessage(toolName, toolContent))
+			} else {
+				messages = append(messages, message{
+					Role:       "tool",
+					Content:    toolContent,
+					ToolName:   toolName,
+					ToolCallID: call.ID,
+				})
+			}
 
 			signature := toolCallSignature(toolName, call.Function.Arguments, toolResult)
 			if signature == lastCallSignature {
