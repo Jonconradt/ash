@@ -518,20 +518,58 @@ func runCommand(ctx context.Context, name string, args ...string) (string, error
 	default:
 		return "", fmt.Errorf("unsupported command %q", name)
 	}
-	if _, err := fmt.Fprintf(os.Stdout, "+ %s %s\n", name, strings.Join(args, " ")); err != nil {
-		return "", err
+	command := name + " " + strings.Join(args, " ")
+	verbose := os.Getenv("V") == "1" || os.Getenv("VERBOSE") == "1" || os.Getenv("ASH_VERBOSE") == "1"
+	if verbose {
+		if _, err := fmt.Fprintf(os.Stdout, "+ %s\n", command); err != nil {
+			return "", err
+		}
 	}
 	// #nosec G204 -- name is restricted to known executables; args are passed directly without a shell.
 	cmd := exec.CommandContext(ctx, name, args...)
 	cmd.Env = append(os.Environ(), "GOTOOLCHAIN=local", "GO111MODULE=on", "GOWORK=off", "LC_ALL=C")
 	cmd.Stdin = os.Stdin
-	var output bytes.Buffer
-	cmd.Stdout = io.MultiWriter(os.Stdout, &output)
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return "", fmt.Errorf("%s %s: %w", name, strings.Join(args, " "), err)
+	var stdout, stderr bytes.Buffer
+	if verbose {
+		cmd.Stdout = io.MultiWriter(os.Stdout, &stdout)
+		cmd.Stderr = os.Stderr
+	} else {
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
 	}
-	return output.String(), nil
+	runErr := cmd.Run()
+	if verbose {
+		if runErr != nil {
+			return "", fmt.Errorf("%s: %w", command, runErr)
+		}
+		return stdout.String(), nil
+	}
+	if runErr != nil {
+		if _, err := fmt.Fprintf(os.Stdout, "==> %s ... FAILED\n", command); err != nil {
+			return "", err
+		}
+		for _, captured := range []struct {
+			stream string
+			output string
+		}{{"stdout", stdout.String()}, {"stderr", stderr.String()}} {
+			if captured.output == "" {
+				continue
+			}
+			if _, err := fmt.Fprintf(os.Stdout, "----- %s %s -----\n%s", command, captured.stream, captured.output); err != nil {
+				return "", err
+			}
+			if !strings.HasSuffix(captured.output, "\n") {
+				if _, err := fmt.Fprintln(os.Stdout); err != nil {
+					return "", err
+				}
+			}
+		}
+		return "", fmt.Errorf("%s: %w", command, runErr)
+	}
+	if _, err := fmt.Fprintf(os.Stdout, "==> %s ... ok\n", command); err != nil {
+		return "", err
+	}
+	return stdout.String(), nil
 }
 
 func main() {

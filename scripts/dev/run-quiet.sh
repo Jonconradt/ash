@@ -7,6 +7,7 @@
 # Used by the Makefile "quiet" verify path so a green run prints one line per
 # step plus a final success marker, while a failing run surfaces the full
 # output of just the step that failed.
+# Set V=1, VERBOSE=1, or ASH_VERBOSE=1 to stream command output.
 #
 # Usage: run-quiet.sh <label> <command> [args...]
 # Exit status is the command's exit status (non-zero on failure).
@@ -16,7 +17,7 @@ set -u
 label="$1"
 shift
 
-if [[ "${V:-${VERBOSE:-0}}" == "1" ]]; then
+if [[ "${V:-0}" == "1" || "${VERBOSE:-0}" == "1" || "${ASH_VERBOSE:-0}" == "1" ]]; then
 	"$@"
 	exit $?
 fi

@@ -108,7 +108,7 @@ check-static: lint
 
 # verify runs the full quality gate quietly: each step prints a single "ok"
 # line on success and dumps its full output only when it fails, ending with one
-# success marker. Run `make V=1 verify` to stream each step's full output.
+# success marker. Set V=1, VERBOSE=1, or ASH_VERBOSE=1 to stream full output.
 verify:
 	@./scripts/dev/run-quiet.sh "lint"        $(MAKE) --no-print-directory check-static
 	@./scripts/dev/run-quiet.sh "test"        $(MAKE) --no-print-directory test

@@ -39,7 +39,8 @@ make verify
 
 The lint/test/verify targets are quiet by default: each step prints a single
 `ok` line on success and dumps its full output only when it fails. To see the
-full streaming output while debugging, prefix the target with `V=1`:
+full streaming output while debugging, prefix the target with `V=1`,
+`VERBOSE=1`, or `ASH_VERBOSE=1`:
 
 ```bash
 make V=1 lint
@@ -51,9 +52,9 @@ The root and Go-plugin lint commands wait for the shared `golangci-lint` lock
 when another lint process is running, rather than failing on lock contention.
 They serialize access instead of bypassing the lock.
 
-Use `V=1` with any Make target to stream its output locally. Tag-triggered CI
-focuses on artifact generation and platform validation; it does not rerun the
-local source and dependency checks.
+Use `V=1`, `VERBOSE=1`, or `ASH_VERBOSE=1` with any Make target to stream its
+output locally. Tag-triggered CI focuses on artifact generation and platform
+validation; it does not rerun the local source and dependency checks.
 
 ## Testing expectations
 
@@ -68,6 +69,9 @@ local source and dependency checks.
   and the local package manager. This is also the first prerequisite of
   `make release`. Checks require network access. The standalone target asks
   for approval; `make release` automatically approves updater prompts.
+  Successful Homebrew, package-manager, and Go commands print a one-line
+  summary; command output is shown only on failure. Set `V=1`, `VERBOSE=1`, or
+  `ASH_VERBOSE=1` to stream full command output.
 - Approve tool updates individually. Newer pins, including Go pseudo-versions,
   are never downgraded to older stable releases. The updater preserves other
   Makefile content and does not change environment or command-line overrides.
