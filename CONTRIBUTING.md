@@ -62,6 +62,21 @@ validation; it does not rerun the local source and dependency checks.
 - Prefer table-driven tests for config and parsing logic.
 - Keep tests deterministic and avoid depending on external services.
 
+### VM package tests
+
+Run `scripts/vm.sh --platform ubuntu --mode interactive` on an Apple Silicon
+Mac to install the published beta package in a retained Tart VM. Use `--channel`
+to select another package channel. Exported `ASH_AI*` settings are forwarded to
+the guest.
+
+Tart's default shared networking supports internet and LAN connections, but
+does not forward the Mac's Bonjour (`.local`) resolution. For a `.local`
+`ASH_AI_ENDPOINT`, the harness resolves its IPv4 address on the host and adds
+that hostname to the guest's `/etc/hosts`, without changing the endpoint URL.
+Host resolution must succeed; an IPv6-only result is not supported by this
+mapping. Recreate the VM if the server's address changes. This only maps the
+configured AI endpoint, not every `.local` name.
+
 ## Release expectations
 
 - Run `make update-dependencies` to check the 12 pinned Makefile tools against

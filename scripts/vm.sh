@@ -81,6 +81,7 @@ while (($#)); do
 			echo "ASH_TEST_PLATFORM, ASH_TEST_MODE, and backend-specific image variables can override defaults."
 			echo "Tart stores local VMs and image cache under ~/.tart by default."
 			echo "--tart-home sets TART_HOME for Tart commands and requires a macOS host."
+			echo "Tart guests receive the host's IPv4 mapping for a .local ASH_AI_ENDPOINT."
 			echo "Linux cloud-image URL override: ASH_TEST_QEMU_IMAGE=<URL>."
 			echo
 			echo "Host backends:"
@@ -520,6 +521,35 @@ fi
 if [[ "$backend" == "qemu" ]]; then
 	echo "Waiting for cloud-init to finish guest setup..."
 	guest_exec "$guest_shell" -lc 'cloud-init status --wait'
+fi
+
+# Shared networking forwards unicast DNS, not the host's Bonjour resolver.
+if [[ "$backend" == "tart" && -n "${ASH_AI_ENDPOINT:-}" ]]; then
+	ai_authority="${ASH_AI_ENDPOINT#*://}"
+	ai_authority="${ai_authority%%/*}"
+	ai_authority="${ai_authority%%\?*}"
+	ai_authority="${ai_authority%%\#*}"
+	ai_authority="${ai_authority##*@}"
+	ai_hostname="${ai_authority%%:*}"
+	ai_hostname="$(printf '%s' "$ai_hostname" | tr '[:upper:]' '[:lower:]')"
+	ai_hostname="${ai_hostname%.}"
+	if [[ "$ai_hostname" == *.local ]]; then
+		if [[ ! "$ai_hostname" =~ ^[a-z0-9][a-z0-9.-]*\.local$ ]]; then
+			echo "Invalid .local AI endpoint hostname." >&2
+			exit 2
+		fi
+		ai_address="$(dscacheutil -q host -a name "$ai_hostname" |
+			awk '$1 == "ip_address:" && $2 ~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$/ { if (!found++) print $2 }')"
+		if [[ -z "$ai_address" ]]; then
+			echo "Cannot resolve the .local AI endpoint to an IPv4 address on the host; check host Bonjour/DNS before retrying." >&2
+			exit 1
+		fi
+		echo "Forwarding host DNS for the .local AI endpoint to the guest."
+		guest_exec /bin/bash -c '
+			set -euo pipefail
+			printf "%s %s %s.\n" "$2" "$1" "$1" | sudo tee -a /etc/hosts >/dev/null
+		' ash-vm-dns "$ai_hostname" "$ai_address"
+	fi
 fi
 
 if [[ "$ai_variable_count" -gt 0 ]]; then
