@@ -38,6 +38,18 @@ const (
 	taskStatusBlocked = "blocked"
 )
 
+func logPromptToolsCacheReadFailure(ctx context.Context, err error) {
+	message := localize.Format("log.runner.prompt_tools_cache_read_failed", []any{err})
+	attrs := []any{"request_id", requestIDFromContext(ctx), "EID", "u8F3cL2n"}
+	if stdinIsInteractive() {
+		slog.Warn(message, append(attrs, "EID", "CAftnWsr")...,
+		)
+		return
+	}
+	slog.Debug(message, append(attrs, "EID", "3jpWD3Qh")...,
+	)
+}
+
 // runToolLoop runs the requested operation.
 func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages []message, shim mcpToolShim) (string, []message, error) {
 	configureDebugLogging()
@@ -54,7 +66,7 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 		unsupported, cacheErr := brokerPromptToolsUnsupported(cacheCtx, aiCfg.BaseURL, aiCfg.Model)
 		cancel()
 		if cacheErr != nil {
-			slog.Warn(localize.Format("log.runner.prompt_tools_cache_read_failed", []any{cacheErr}), "request_id", requestIDFromContext(ctx), "EID", "u8F3cL2n")
+			logPromptToolsCacheReadFailure(ctx, cacheErr)
 		} else if unsupported {
 			promptToolsActive = true
 			// only enable this warning if ASH_VERBOSE=1

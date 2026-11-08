@@ -5,7 +5,9 @@ package app
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +16,38 @@ import (
 	"strings"
 	"testing"
 )
+
+func TestPromptToolsCacheReadFailureLogLevel(t *testing.T) {
+	originalWriter := debugWriter
+	originalJSON := debugJSONLogging
+	originalLogger := appLogger
+	originalDefault := slog.Default()
+	originalInteractive := stdinIsInteractive
+	t.Cleanup(func() {
+		debugWriter = originalWriter
+		debugJSONLogging = originalJSON
+		appLogger = originalLogger
+		slog.SetDefault(originalDefault)
+		stdinIsInteractive = originalInteractive
+	})
+
+	t.Setenv("ASH_VERBOSE", "0")
+	t.Setenv("ASH_LOG_FILE", "")
+	var output bytes.Buffer
+	configureDebugLogging(&output)
+
+	stdinIsInteractive = func() bool { return false }
+	logPromptToolsCacheReadFailure(context.Background(), errors.New("socket missing"))
+	if output.Len() != 0 {
+		t.Fatalf("non-interactive cache failure produced default output: %q", output.String())
+	}
+
+	stdinIsInteractive = func() bool { return true }
+	logPromptToolsCacheReadFailure(context.Background(), errors.New("socket missing"))
+	if !strings.Contains(output.String(), "Could not read the prompt tool capability cache") {
+		t.Fatalf("interactive cache failure was not logged as a warning: %q", output.String())
+	}
+}
 
 func TestSchedulerDebugLoggingRotatesJSON(t *testing.T) {
 	origWriter := debugWriter
