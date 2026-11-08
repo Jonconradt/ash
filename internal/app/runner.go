@@ -57,7 +57,10 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 			slog.Warn(localize.Format("log.runner.prompt_tools_cache_read_failed", []any{cacheErr}), "request_id", requestIDFromContext(ctx), "EID", "u8F3cL2n")
 		} else if unsupported {
 			promptToolsActive = true
-			slog.Warn(localize.Format("log.runner.prompt_tools_cached", []any{aiCfg.Model}), "request_id", requestIDFromContext(ctx), "EID", "w7VqP4mN")
+			// only enable this warning if ASH_VERBOSE=1
+			if verboseLoggingEnabled() {
+				slog.Warn(localize.Format("log.runner.prompt_tools_cached", []any{aiCfg.Model}), "request_id", requestIDFromContext(ctx), "EID", "w7VqP4mN")
+			}
 		}
 	}
 	tasks := buildExecutionTasks(userInput, taskListMax())

@@ -110,11 +110,26 @@ func TestParsePromptToolCalls(t *testing.T) {
 		}
 	})
 
+	t.Run("bare JSON call", func(t *testing.T) {
+		content := `{"name": "run_unix_command", "arguments": {"command": "date"}}`
+		calls := parsePromptToolCalls(content, tools)
+		if len(calls) != 1 || calls[0].Function.Name != "run_unix_command" || calls[0].Function.Arguments["command"] != "date" {
+			t.Fatalf("expected one parsed bare JSON call, got %#v", calls)
+		}
+	})
+
 	t.Run("missing arguments defaults to empty object", func(t *testing.T) {
 		content := "```tool_call\n{\"name\": \"what_time_is_it\"}\n```"
 		calls := parsePromptToolCalls(content, tools)
 		if len(calls) != 1 || calls[0].Function.Arguments == nil || len(calls[0].Function.Arguments) != 0 {
 			t.Fatalf("expected one call with empty arguments, got %#v", calls)
+		}
+	})
+
+	t.Run("bare JSON surrounded by prose is not executed", func(t *testing.T) {
+		content := `Try this: {"name": "run_unix_command", "arguments": {"command": "date"}}`
+		if calls := parsePromptToolCalls(content, tools); len(calls) != 0 {
+			t.Fatalf("expected no calls from prose, got %#v", calls)
 		}
 	})
 
@@ -213,7 +228,7 @@ func TestRunToolLoopPromptToolsFallback(t *testing.T) {
 			if !foundCatalog {
 				t.Fatalf("fallback retry must carry the prompt tool catalog")
 			}
-			return chatResponse{Message: message{Role: "assistant", Content: "```tool_call\n{\"name\": \"what_time_is_it\", \"arguments\": {}}\n```"}}, nil
+			return chatResponse{Message: message{Role: "assistant", Content: `{"name": "what_time_is_it", "arguments": {}}`}}, nil
 		default:
 			last := msgs[len(msgs)-1]
 			if last.Role != "user" || !strings.Contains(last.Content, "Tool result for") || !strings.Contains(last.Content, "12:00") {

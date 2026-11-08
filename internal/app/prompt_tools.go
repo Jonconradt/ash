@@ -84,26 +84,30 @@ func buildPromptToolCatalogMessage(tools []toolDefinition) message {
 	b.WriteString(`{"name": "<tool_name>", "arguments": {}}` + "\n")
 	b.WriteString("```\n")
 	b.WriteString("The block body must be a single JSON object with a listed tool name and arguments matching that tool's schema. ")
+	b.WriteString("If you cannot produce the fenced block, a single bare JSON object in that same format is also accepted. ")
 	b.WriteString("After each call you will receive a message beginning with \"Tool result for\" containing the output; use it to continue. ")
 	b.WriteString("If no tool is needed, answer normally without any tool_call block.")
 	return message{Role: "system", Content: b.String()}
 }
 
 // parsePromptToolCalls extracts prompt-based tool calls from an assistant
-// reply. Only a fenced block opened by a line equal to ```tool_call and closed
-// by a ``` line parses as a call, and only when its body is a JSON object
-// naming a known tool; malformed JSON, unknown tool names, and call-like text
-// inside ordinary prose are left as plain text and never executed. The
-// returned calls carry the same tool names and argument objects native tool
-// calling would, so they pass through the identical validation and allowlist
-// enforcement downstream.
+// reply. A fenced block opened by a line equal to ```tool_call and closed by
+// a ``` line, or a reply consisting only of one JSON object, parses as a call
+// only when it names a known tool. Malformed JSON, unknown tool names, and
+// call-like text inside ordinary prose are left as plain text and never
+// executed. The returned calls carry the same tool names and argument objects
+// native tool calling would, so they pass through the identical validation
+// and allowlist enforcement downstream.
 func parsePromptToolCalls(content string, tools []toolDefinition) []toolCall {
-	if !strings.Contains(content, promptToolCallFence) {
-		return nil
-	}
 	known := make(map[string]struct{}, len(tools))
 	for _, tool := range tools {
 		known[tool.Function.Name] = struct{}{}
+	}
+	if !strings.Contains(content, promptToolCallFence) {
+		if call, ok := parsePromptToolCallBody(strings.TrimSpace(content), known); ok {
+			return []toolCall{call}
+		}
+		return nil
 	}
 
 	var calls []toolCall
@@ -127,27 +131,33 @@ func parsePromptToolCalls(content string, tools []toolDefinition) []toolCall {
 		}
 		i = end
 
-		var parsed struct {
-			Name      string         `json:"name"`
-			Arguments map[string]any `json:"arguments"`
+		if call, ok := parsePromptToolCallBody(strings.TrimSpace(strings.Join(body, "\n")), known); ok {
+			calls = append(calls, call)
 		}
-		if err := json.Unmarshal([]byte(strings.TrimSpace(strings.Join(body, "\n"))), &parsed); err != nil {
-			continue
-		}
-		name := strings.TrimSpace(parsed.Name)
-		if _, ok := known[name]; !ok {
-			continue
-		}
-		args := parsed.Arguments
-		if args == nil {
-			args = map[string]any{}
-		}
-		calls = append(calls, toolCall{
-			Type:     "function",
-			Function: toolFunctionCall{Name: name, Arguments: args},
-		})
 	}
 	return calls
+}
+
+func parsePromptToolCallBody(body string, known map[string]struct{}) (toolCall, bool) {
+	var parsed struct {
+		Name      string         `json:"name"`
+		Arguments map[string]any `json:"arguments"`
+	}
+	if err := json.Unmarshal([]byte(body), &parsed); err != nil {
+		return toolCall{}, false
+	}
+	name := strings.TrimSpace(parsed.Name)
+	if _, ok := known[name]; !ok {
+		return toolCall{}, false
+	}
+	args := parsed.Arguments
+	if args == nil {
+		args = map[string]any{}
+	}
+	return toolCall{
+		Type:     "function",
+		Function: toolFunctionCall{Name: name, Arguments: args},
+	}, true
 }
 
 // promptToolResultMessage wraps a tool result for a backend without native
