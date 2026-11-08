@@ -227,8 +227,8 @@ func TestApprovalsAssumeYes(t *testing.T) {
 	if err != nil || !approved {
 		t.Fatalf("approve = %v, %v; want true, nil", approved, err)
 	}
-	if got, want := output.String(), "update? [y/N]: y\n"; got != want {
-		t.Fatalf("approve output = %q; want %q", got, want)
+	if got := output.String(); got != "" {
+		t.Fatalf("approve output = %q; want no prompt in assume-yes mode", got)
 	}
 }
 

@@ -153,8 +153,7 @@ func (u *updater) latest(ctx context.Context, item tool) (string, error) {
 
 func (u *updater) approve(message string) (bool, error) {
 	if u.assumeYes {
-		_, err := fmt.Fprintf(u.output, "%s [y/N]: y\n", message)
-		return err == nil, err
+		return true, nil
 	}
 	if _, err := fmt.Fprintf(u.output, "%s [y/N]: ", message); err != nil {
 		return false, err
