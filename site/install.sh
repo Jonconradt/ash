@@ -6,6 +6,7 @@ set -eu
 
 repository="Jonconradt/ash"
 install_dir=${ASH_INSTALL_DIR:-"$HOME/.local/bin"}
+cosign_install_url="https://docs.sigstore.dev/cosign/system_config/installation/"
 
 fail() {
   printf 'ash installer: %s\n' "$1" >&2
@@ -19,6 +20,7 @@ Install the latest ash release for Linux, macOS, or FreeBSD.
 Usage: install.sh
 
 Set ASH_INSTALL_DIR to choose another installation directory.
+If cosign is unavailable, the installer asks before continuing without signature verification.
 EOF
 }
 
@@ -43,7 +45,25 @@ esac
 command -v tar >/dev/null 2>&1 || fail "tar is required"
 command -v uname >/dev/null 2>&1 || fail "uname is required"
 command -v install >/dev/null 2>&1 || fail "install is required"
-command -v cosign >/dev/null 2>&1 || fail "cosign is required to verify release signatures; install Sigstore cosign and rerun"
+
+verify_signature=yes
+if ! command -v cosign >/dev/null 2>&1; then
+  verify_signature=no
+  printf 'ash installer: WARNING: cosign is unavailable; the release signature cannot be verified.\n' >&2
+  printf 'The SHA-256 check will still run, but its manifest will not be authenticated.\n' >&2
+  printf 'Continue without signature verification? [y,N] ' >&2
+  if { : < /dev/tty; } 2>/dev/null; then
+    answer=''
+    IFS= read -r answer < /dev/tty || answer=''
+  else
+    printf 'N\n' >&2
+    fail "no terminal is available to confirm; install cosign from $cosign_install_url and rerun"
+  fi
+  case $answer in
+    y|Y) ;;
+    *) fail "installation cancelled; install cosign from $cosign_install_url and rerun" ;;
+  esac
+fi
 
 if command -v curl >/dev/null 2>&1; then
   downloader=curl
@@ -129,11 +149,13 @@ download "$download_base/$asset" "$tmp_dir/$asset" || fail "could not download $
 download "$download_base/SHA256SUMS" "$tmp_dir/SHA256SUMS" || fail "could not download SHA256SUMS"
 download "$download_base/SHA256SUMS.sigstore.json" "$tmp_dir/SHA256SUMS.sigstore.json" || fail "could not download signature bundle"
 
-cosign verify-blob "$tmp_dir/SHA256SUMS" \
-  --bundle "$tmp_dir/SHA256SUMS.sigstore.json" \
-  --certificate-identity "https://github.com/$repository/.github/workflows/release.yml@refs/tags/$tag" \
-  --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-  >/dev/null || fail "release signature verification failed"
+if [ "$verify_signature" = yes ]; then
+  cosign verify-blob "$tmp_dir/SHA256SUMS" \
+    --bundle "$tmp_dir/SHA256SUMS.sigstore.json" \
+    --certificate-identity "https://github.com/$repository/.github/workflows/release.yml@refs/tags/$tag" \
+    --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+    >/dev/null || fail "release signature verification failed"
+fi
 
 expected=$(awk -v name="$asset" '$2 == name { print $1; exit }' "$tmp_dir/SHA256SUMS")
 [ -n "$expected" ] || fail "SHA256SUMS does not contain $asset"

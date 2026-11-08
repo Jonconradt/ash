@@ -194,8 +194,11 @@ for OS-specific prerequisites, recommended package managers, Ollama and free clo
 tiers, channel subscriptions, updates, and uninstall instructions.
 Prefer your package manager over executing a website script.
 
-If you choose the alternative script installer, install Sigstore `cosign` first,
-download and inspect the script, and execute the saved copy only if you trust it:
+If you choose the alternative script installer, download and inspect the
+script, and execute the saved copy only if you trust it. The installer uses
+Sigstore `cosign` to verify the release signature when available. Without it,
+the installer warns and asks before continuing without signature verification;
+the archive checksum is still checked, but its manifest is unauthenticated:
 
 ```bash
 curl -fsSL https://jonconradt.github.io/ash/install.sh -o ash-install.sh
@@ -205,7 +208,7 @@ rm ./ash-install.sh
 ```
 
 The installer supports Linux and macOS on `amd64` and `arm64`, and FreeBSD on
-`amd64`. It verifies the signed release `SHA256SUMS` manifest with `cosign`,
+`amd64`. With `cosign`, it verifies the signed release `SHA256SUMS` manifest,
 then verifies the archive digest and installs `ash` to
 `~/.local/bin` without requiring `sudo`. Set `ASH_INSTALL_DIR` to choose a
 different destination when needed.
