@@ -86,11 +86,11 @@
 make check-security
 make test</code></pre>
           <p><code>make config</code>installéiert de repository-verwalte Git Hooks. Déi lokal Hakenblocken dréckt wann d'Schecken feelen, awer kënne mat ëmgoen<code>git push --no-verify</code>; et ass net e Server-gezwongen Status Check.</p>
-          <p>Déi meescht Maacht Ziler benotzen<code>scripts/dev/run-quiet.sh</code>: erfollegräich Schrëtt Drécken eng präzis<code>ok</code>Linn, wärend gescheitert Schrëtt hir ageholl Ausgang drécken. Präfix engem Zil mat<code>V=1</code>fir säi komplette Output ze streamen wéi se leeft:</p>
+          <p>Déi meescht Maacht Ziler benotzen<code>scripts/dev/run-quiet.sh</code>: erfollegräich Schrëtt Drécken eng präzis<code>ok</code>Linn, wärend gescheitert Schrëtt hir ageholl Ausgang drécken. Präfix engem Zil mat<code>V=1</code>,<code>VERBOSE=1</code>, oder<code>ASH_VERBOSE=1</code>fir säi komplette Output ze streamen wéi se leeft:</p>
           <pre><code>make V=1 lint
 make V=1 test
 make V=1 verify</code></pre>
-          <p><code>V=1</code>kontrolléiert Make's roueg wrapper. Et ass getrennt vun<code>ASH_VERBOSE</code>, déi Runtime Diagnostik amAshProgramm.</p>
+          <p><code>V=1</code>,<code>VERBOSE=1</code>,an an<code>ASH_VERBOSE=1</code>kontrolléieren Maacht roueg wrapper.<code>ASH_VERBOSE=1</code>erméiglecht och Runtime Diagnostik an derAshProgramm.</p>
         </section>
 
         <section id="make-targets">
@@ -158,7 +158,7 @@ ASH_LOG_FILE="$HOME/.local/state/ash/debug.jsonl" \
 ASH_LOG_MAX_BYTES=10485760 \
 ash "investigate this error"</code></pre>
           <p>Wéini<code>ASH_LOG_FILE</code>gesat ass, verbose JSON Log records ginn op dee Wee geschriwwe; den Elterenverzeichnis gëtt erstallt wéi néideg.<code>ASH_LOG_MAX_BYTES</code>kontrolléiert Rotatioun an Default op<code>1048576</code>bytes (1 MiB). Ouni eng explizit Logdatei benotzt Debug-Output de Prozessdiagnostesche Schrëftsteller. Halt d'Logbicher privat a iwwerpréift se ier Dir deelt.</p>
-          <p>Dëst ass ënnerscheet vu Make's<code>V=1</code>: benotzen<code>V=1</code>ze gesinn bauen / Test Kommando Ausgang an<code>ASH_VERBOSE=1</code>ze diagnostizéieren anAshRuntime Opruff.</p>
+          <p><code>ASH_VERBOSE=1</code>kann och mat Make benotzt ginn fir Build / Test Kommando-Ausgang ze gesinn; beim LafenAsh, et erméiglecht zousätzlech Runtime Diagnostik.</p>
         </section>
 
         <section id="find-log-source">

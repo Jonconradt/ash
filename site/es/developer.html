@@ -86,11 +86,11 @@
 make check-security
 make test</code></pre>
           <p><code>make config</code>Instala los ganchos de Git administrados por el repositorio. El gancho local bloquea el empuje cuando fallan las comprobaciones, pero se puede evitar con<code>git push --no-verify</code>; no es una verificación de estado impuesta por el servidor.</p>
-          <p>La mayoría de los objetivos hacen uso<code>scripts/dev/run-quiet.sh</code>: pasos exitosos imprime uno conciso<code>ok</code>línea, mientras que los pasos fallidos imprimen su salida capturada. Prefije un objetivo con<code>V=1</code>para transmitir su salida completa mientras se ejecuta:</p>
+          <p>La mayoría de los objetivos hacen uso<code>scripts/dev/run-quiet.sh</code>: pasos exitosos imprime uno conciso<code>ok</code>línea, mientras que los pasos fallidos imprimen su salida capturada. Prefije un objetivo con<code>V=1</code>,<code>VERBOSE=1</code>, o<code>ASH_VERBOSE=1</code>para transmitir su salida completa mientras se ejecuta:</p>
           <pre><code>make V=1 lint
 make V=1 test
 make V=1 verify</code></pre>
-          <p><code>V=1</code>controla el envoltorio silencioso de Make. esta separado de<code>ASH_VERBOSE</code>, que permite realizar diagnósticos en tiempo de ejecución en elAshprograma.</p>
+          <p><code>V=1</code>,<code>VERBOSE=1</code>, y<code>ASH_VERBOSE=1</code>controla el envoltorio silencioso de Make.<code>ASH_VERBOSE=1</code>también permite el diagnóstico en tiempo de ejecución en elAshprograma.</p>
         </section>
 
         <section id="make-targets">
@@ -158,7 +158,7 @@ ASH_LOG_FILE="$HOME/.local/state/ash/debug.jsonl" \
 ASH_LOG_MAX_BYTES=10485760 \
 ash "investigate this error"</code></pre>
           <p>Cuando<code>ASH_LOG_FILE</code>está configurado, los registros de registro JSON detallados se escriben en esa ruta; el directorio principal se crea según sea necesario.<code>ASH_LOG_MAX_BYTES</code>controla la rotación y por defecto<code>1048576</code>bytes (1 MiB). Sin un archivo de registro explícito, la salida de depuración utiliza el escritor de diagnóstico de procesos. Mantenga los registros privados y revíselos antes de compartirlos.</p>
-          <p>Esto es distinto del de Make.<code>V=1</code>: usar<code>V=1</code>para ver el resultado del comando de compilación/prueba y<code>ASH_VERBOSE=1</code>para diagnosticar unAshinvocación en tiempo de ejecución.</p>
+          <p><code>ASH_VERBOSE=1</code>también se puede utilizar con Make para ver el resultado del comando de compilación/prueba; al correrAsh, además permite el diagnóstico en tiempo de ejecución.</p>
         </section>
 
         <section id="find-log-source">

@@ -86,11 +86,11 @@
 make check-security
 make test</code></pre>
           <p><code>make config</code>安裝儲存庫管理的 Git 掛鉤。當檢查失敗時，本機鉤子會阻止推送，但可以透過以下方式繞過<code>git push --no-verify</code>;它不是伺服器強制的狀態檢查。</p>
-          <p>大多數 Make 目標使用<code>scripts/dev/run-quiet.sh</code>：成功的步驟印製一份簡明的<code>ok</code>行，而失敗的步驟則列印捕獲的輸出。目標前綴為<code>V=1</code>在運行時串流其完整輸出：</p>
+          <p>大多數 Make 目標使用<code>scripts/dev/run-quiet.sh</code>：成功的步驟印製一份簡明的<code>ok</code>行，而失敗的步驟則列印捕獲的輸出。目標前綴為<code>V=1</code>,<code>VERBOSE=1</code>， 或者<code>ASH_VERBOSE=1</code>在運行時串流其完整輸出：</p>
           <pre><code>make V=1 lint
 make V=1 test
 make V=1 verify</code></pre>
-          <p><code>V=1</code>控制 Make 的安靜包裝器。它是獨立於<code>ASH_VERBOSE</code>，這使得運行時診斷成為可能Ash程式.</p>
+          <p><code>V=1</code>,<code>VERBOSE=1</code>， 和<code>ASH_VERBOSE=1</code>控制 Make 的安靜包裝器。<code>ASH_VERBOSE=1</code>也啟用運行時診斷Ash程式.</p>
         </section>
 
         <section id="make-targets">
@@ -158,7 +158,7 @@ ASH_LOG_FILE="$HOME/.local/state/ash/debug.jsonl" \
 ASH_LOG_MAX_BYTES=10485760 \
 ash "investigate this error"</code></pre>
           <p>什麼時候<code>ASH_LOG_FILE</code>設定後，詳細 JSON 日誌記錄將寫入該路徑；父目錄是根據需要建立的。<code>ASH_LOG_MAX_BYTES</code>控制旋轉並預設為<code>1048576</code>位元組 (1 MiB)。如果沒有顯式日誌文件，偵錯輸出將使用進程診斷編寫器。將日誌保密並在共享之前進行審查。</p>
-          <p>這與Make不同<code>V=1</code>： 使用<code>V=1</code>查看建置/測試命令輸出和<code>ASH_VERBOSE=1</code>診斷Ash運行時調用。</p>
+          <p><code>ASH_VERBOSE=1</code>也可以與 Make 一起使用來查看構建/測試命令輸出；跑步時Ash，它還支援運行時診斷。</p>
         </section>
 
         <section id="find-log-source">

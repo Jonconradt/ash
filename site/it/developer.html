@@ -86,11 +86,11 @@
 make check-security
 make test</code></pre>
           <p><code>make config</code>installa gli hook Git gestiti dal repository. L'hook locale blocca i push quando i controlli falliscono, ma può essere aggirato<code>git push --no-verify</code>; non è un controllo dello stato imposto dal server.</p>
-          <p>La maggior parte degli obiettivi Make utilizza<code>scripts/dev/run-quiet.sh</code>: i passaggi riusciti ne stampano uno conciso<code>ok</code>linea, mentre i passaggi falliti stampano l'output acquisito. Prefisso una destinazione con<code>V=1</code>per eseguire lo streaming dell'output completo durante l'esecuzione:</p>
+          <p>La maggior parte degli obiettivi Make utilizza<code>scripts/dev/run-quiet.sh</code>: i passaggi riusciti ne stampano uno conciso<code>ok</code>linea, mentre i passaggi falliti stampano l'output acquisito. Prefisso una destinazione con<code>V=1</code>,<code>VERBOSE=1</code>, O<code>ASH_VERBOSE=1</code>per eseguire lo streaming dell'output completo durante l'esecuzione:</p>
           <pre><code>make V=1 lint
 make V=1 test
 make V=1 verify</code></pre>
-          <p><code>V=1</code>controlla il wrapper silenzioso di Make. È separato da<code>ASH_VERBOSE</code>, che abilita la diagnostica di runtime inAshprogramma.</p>
+          <p><code>V=1</code>,<code>VERBOSE=1</code>, E<code>ASH_VERBOSE=1</code>controlla il wrapper silenzioso di Make.<code>ASH_VERBOSE=1</code>abilita anche la diagnostica di runtime inAshprogramma.</p>
         </section>
 
         <section id="make-targets">
@@ -158,7 +158,7 @@ ASH_LOG_FILE="$HOME/.local/state/ash/debug.jsonl" \
 ASH_LOG_MAX_BYTES=10485760 \
 ash "investigate this error"</code></pre>
           <p>Quando<code>ASH_LOG_FILE</code>è impostato, i record di log JSON dettagliati vengono scritti su quel percorso; la directory principale viene creata secondo necessità.<code>ASH_LOG_MAX_BYTES</code>controlla la rotazione e il valore predefinito è<code>1048576</code>byte (1 MiB). Senza un file di registro esplicito, l'output di debug utilizza il writer della diagnostica del processo. Mantieni i registri privati ​​e rivedili prima di condividerli.</p>
-          <p>Questo è diverso da quello di Make<code>V=1</code>: utilizzo<code>V=1</code>per vedere l'output del comando build/test e<code>ASH_VERBOSE=1</code>per diagnosticare unAshinvocazione in fase di esecuzione.</p>
+          <p><code>ASH_VERBOSE=1</code>può essere utilizzato anche con Make per vedere l'output del comando build/test; durante la corsaAsh, abilita inoltre la diagnostica di runtime.</p>
         </section>
 
         <section id="find-log-source">

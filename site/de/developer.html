@@ -86,11 +86,11 @@
 make check-security
 make test</code></pre>
           <p><code>make config</code>Installiert die vom Repository verwalteten Git-Hooks. Der lokale Hook blockiert Pushs, wenn Prüfungen fehlschlagen, kann aber mit umgangen werden<code>git push --no-verify</code>; Es handelt sich nicht um eine vom Server erzwungene Statusprüfung.</p>
-          <p>Die meisten Make-Ziele werden verwendet<code>scripts/dev/run-quiet.sh</code>: Erfolgreiche Schritte drucken einen prägnanten<code>ok</code>Zeile, während fehlgeschlagene Schritte ihre erfasste Ausgabe drucken. Stellen Sie einem Ziel ein Präfix voran<code>V=1</code>um die komplette Ausgabe während der Ausführung zu streamen:</p>
+          <p>Die meisten Make-Ziele werden verwendet<code>scripts/dev/run-quiet.sh</code>: Erfolgreiche Schritte drucken einen prägnanten<code>ok</code>Zeile, während fehlgeschlagene Schritte ihre erfasste Ausgabe drucken. Stellen Sie einem Ziel ein Präfix voran<code>V=1</code>,<code>VERBOSE=1</code>, oder<code>ASH_VERBOSE=1</code>um die komplette Ausgabe während der Ausführung zu streamen:</p>
           <pre><code>make V=1 lint
 make V=1 test
 make V=1 verify</code></pre>
-          <p><code>V=1</code>steuert den leisen Wrapper von Make. Es ist getrennt von<code>ASH_VERBOSE</code>, was eine Laufzeitdiagnose im ermöglichtAshProgramm.</p>
+          <p><code>V=1</code>,<code>VERBOSE=1</code>, Und<code>ASH_VERBOSE=1</code>Kontrollieren Sie den leisen Wrapper von Make.<code>ASH_VERBOSE=1</code>Ermöglicht auch die Laufzeitdiagnose imAshProgramm.</p>
         </section>
 
         <section id="make-targets">
@@ -158,7 +158,7 @@ ASH_LOG_FILE="$HOME/.local/state/ash/debug.jsonl" \
 ASH_LOG_MAX_BYTES=10485760 \
 ash "investigate this error"</code></pre>
           <p>Wann<code>ASH_LOG_FILE</code>festgelegt ist, werden ausführliche JSON-Protokolldatensätze in diesen Pfad geschrieben. Das übergeordnete Verzeichnis wird nach Bedarf erstellt.<code>ASH_LOG_MAX_BYTES</code>steuert die Drehung und ist standardmäßig auf<code>1048576</code>Bytes (1 MiB). Ohne eine explizite Protokolldatei verwendet die Debug-Ausgabe den Prozessdiagnose-Writer. Halten Sie Protokolle privat und überprüfen Sie sie, bevor Sie sie teilen.</p>
-          <p>Dies unterscheidet sich von Make’s<code>V=1</code>: verwenden<code>V=1</code>um die Ausgabe des Build-/Testbefehls anzuzeigen und<code>ASH_VERBOSE=1</code>eine Diagnose stellenAshLaufzeitaufruf.</p>
+          <p><code>ASH_VERBOSE=1</code>kann auch mit Make verwendet werden, um die Ausgabe des Build-/Testbefehls anzuzeigen; beim LaufenAsh, ermöglicht es zusätzlich eine Laufzeitdiagnose.</p>
         </section>
 
         <section id="find-log-source">

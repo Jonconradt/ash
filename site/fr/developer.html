@@ -86,11 +86,11 @@
 make check-security
 make test</code></pre>
           <p><code>make config</code>installe les hooks Git gérés par le référentiel. Le hook local bloque lorsque les vérifications échouent, mais peut être contourné avec<code>git push --no-verify</code>; il ne s'agit pas d'une vérification d'état imposée par le serveur.</p>
-          <p>La plupart Utiliser les cibles<code>scripts/dev/run-quiet.sh</code>: étapes réussies, imprimez-en une de manière concise<code>ok</code>ligne, tandis que les étapes ayant échoué impriment leur sortie capturée. Préfixez une cible avec<code>V=1</code>pour diffuser sa sortie complète pendant son exécution :</p>
+          <p>La plupart Utiliser les cibles<code>scripts/dev/run-quiet.sh</code>: étapes réussies, imprimez-en une de manière concise<code>ok</code>ligne, tandis que les étapes ayant échoué impriment leur sortie capturée. Préfixez une cible avec<code>V=1</code>,<code>VERBOSE=1</code>, ou<code>ASH_VERBOSE=1</code>pour diffuser sa sortie complète pendant son exécution :</p>
           <pre><code>make V=1 lint
 make V=1 test
 make V=1 verify</code></pre>
-          <p><code>V=1</code>contrôle le wrapper silencieux de Make. Il est distinct de<code>ASH_VERBOSE</code>, qui permet les diagnostics d'exécution dans leAshprogramme.</p>
+          <p><code>V=1</code>,<code>VERBOSE=1</code>, et<code>ASH_VERBOSE=1</code>contrôlez l’emballage silencieux de Make.<code>ASH_VERBOSE=1</code>permet également les diagnostics d'exécution dans leAshprogramme.</p>
         </section>
 
         <section id="make-targets">
@@ -158,7 +158,7 @@ ASH_LOG_FILE="$HOME/.local/state/ash/debug.jsonl" \
 ASH_LOG_MAX_BYTES=10485760 \
 ash "investigate this error"</code></pre>
           <p>Quand<code>ASH_LOG_FILE</code>est défini, les enregistrements détaillés du journal JSON sont écrits dans ce chemin ; le répertoire parent est créé selon les besoins.<code>ASH_LOG_MAX_BYTES</code>contrôle la rotation et est par défaut<code>1048576</code>octets (1 Mo). Sans fichier journal explicite, la sortie de débogage utilise le rédacteur de diagnostic de processus. Gardez les journaux privés et examinez-les avant de les partager.</p>
-          <p>Ceci est distinct de celui de Make<code>V=1</code>: utiliser<code>V=1</code>pour voir le résultat de la commande build/test et<code>ASH_VERBOSE=1</code>diagnostiquer unAshappel à l'exécution.</p>
+          <p><code>ASH_VERBOSE=1</code>peut également être utilisé avec Make pour voir le résultat de la commande build/test ; en courantAsh, il permet en outre les diagnostics d'exécution.</p>
         </section>
 
         <section id="find-log-source">

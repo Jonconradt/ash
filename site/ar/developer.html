@@ -86,11 +86,11 @@
 make check-security
 make test</code></pre>
           <p><code>make config</code>تثبيت خطافات Git المُدارة بواسطة المستودع. يتم دفع كتل الخطاف المحلية عند فشل عمليات التحقق، ولكن يمكن تجاوزها<code>git push --no-verify</code>; إنه ليس فحصًا للحالة يفرضه الخادم.</p>
-          <p>يتم استخدام معظم الأهداف<code>scripts/dev/run-quiet.sh</code>: الخطوات الناجحة طباعة واحدة مختصرة<code>ok</code>سطر، في حين أن الخطوات الفاشلة تطبع مخرجاتها التي تم التقاطها. بادئة الهدف بـ<code>V=1</code>لدفق الإخراج الكامل أثناء تشغيله:</p>
+          <p>يتم استخدام معظم الأهداف<code>scripts/dev/run-quiet.sh</code>: الخطوات الناجحة طباعة واحدة مختصرة<code>ok</code>سطر، في حين أن الخطوات الفاشلة تطبع مخرجاتها التي تم التقاطها. بادئة الهدف بـ<code>V=1</code>,<code>VERBOSE=1</code>، أو<code>ASH_VERBOSE=1</code>لدفق الإخراج الكامل أثناء تشغيله:</p>
           <pre><code>make V=1 lint
 make V=1 test
 make V=1 verify</code></pre>
-          <p><code>V=1</code>يتحكم في غلاف Make الهادئ. إنه منفصل عن<code>ASH_VERBOSE</code>، والذي يتيح تشخيص وقت التشغيل فيAshبرنامج.</p>
+          <p><code>V=1</code>,<code>VERBOSE=1</code>، و<code>ASH_VERBOSE=1</code>التحكم في غلاف Make الهادئ.<code>ASH_VERBOSE=1</code>يتيح أيضًا تشخيص وقت التشغيل في ملفAshبرنامج.</p>
         </section>
 
         <section id="make-targets">
@@ -158,7 +158,7 @@ ASH_LOG_FILE="$HOME/.local/state/ash/debug.jsonl" \
 ASH_LOG_MAX_BYTES=10485760 \
 ash "investigate this error"</code></pre>
           <p>متى<code>ASH_LOG_FILE</code>تم تعيينه، تتم كتابة سجلات سجل JSON المطولة على هذا المسار؛ يتم إنشاء الدليل الأصلي حسب الحاجة.<code>ASH_LOG_MAX_BYTES</code>يتحكم في التدوير والإعدادات الافتراضية<code>1048576</code>بايت (1 ميجابايت). بدون ملف سجل صريح، يستخدم إخراج التصحيح كاتب تشخيص العملية. حافظ على خصوصية السجلات وراجعها قبل مشاركتها.</p>
-          <p>وهذا يختلف عن Make<code>V=1</code>: يستخدم<code>V=1</code>لرؤية إخراج أمر البناء/الاختبار و<code>ASH_VERBOSE=1</code>لتشخيصAshاستدعاء وقت التشغيل.</p>
+          <p><code>ASH_VERBOSE=1</code>يمكن استخدامه أيضًا مع Make لرؤية مخرجات أمر البناء/الاختبار؛ عند التشغيلAsh، بالإضافة إلى أنه يتيح تشخيص وقت التشغيل.</p>
         </section>
 
         <section id="find-log-source">
