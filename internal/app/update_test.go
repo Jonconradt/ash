@@ -52,6 +52,18 @@ func TestParseUpgradeArgs(t *testing.T) {
 	}
 }
 
+func TestUpgradeAssetAndBinaryNames(t *testing.T) {
+	const version = "v1.2.3"
+	const goos = "linux"
+	const goarch = "amd64"
+	if got, want := upgradeAssetName(version, goos, goarch), "ash-v1.2.3-linux-amd64.tar.gz"; got != want {
+		t.Fatalf("upgradeAssetName() = %q, want %q", got, want)
+	}
+	if got, want := upgradeBinaryName(version, goos, goarch), "ash-v1.2.3-linux-amd64"; got != want {
+		t.Fatalf("upgradeBinaryName() = %q, want %q", got, want)
+	}
+}
+
 func TestCompareUpgradeVersions(t *testing.T) {
 	less := upgradeVersion{major: 1, minor: 9, patch: 9}
 	greater := upgradeVersion{major: 2}
@@ -356,7 +368,7 @@ func TestInstallUpgradeArchiveInstallsAshAndBroker(t *testing.T) {
 		name string
 		data []byte
 	}{
-		{name: upgradeAssetName("v1.2.3", runtime.GOOS, runtime.GOARCH), data: ash},
+		{name: upgradeBinaryName("v1.2.3", runtime.GOOS, runtime.GOARCH), data: ash},
 		{name: "ash-broker", data: broker},
 		{name: "plugins/calculator", data: plugin},
 	} {

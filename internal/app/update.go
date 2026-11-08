@@ -124,8 +124,12 @@ type legacyRekorPayload struct {
 	LogIndex       int64  `json:"logIndex"`
 }
 
+func upgradeBinaryName(version, goos, goarch string) string {
+	return fmt.Sprintf("ash-%s-%s-%s", version, goos, goarch)
+}
+
 func upgradeAssetName(version, goos, goarch string) string {
-	return fmt.Sprintf("ash-%s-%s-%s.tar.gz", version, goos, goarch)
+	return upgradeBinaryName(version, goos, goarch) + ".tar.gz"
 }
 
 func selectUpgradeAssets(release upgradeRelease, goos, goarch string) (upgradeAsset, upgradeAsset, upgradeAsset, error) {
@@ -519,7 +523,7 @@ func installUpgradeArchiveWithSignature(content []byte, version string, options 
 	if len(unsupportedEntries) > 0 {
 		return errors.New("archive contains unsupported entries")
 	}
-	binaryPath, err := findUpgradeBinary(staging, upgradeAssetName(version, runtime.GOOS, runtime.GOARCH))
+	binaryPath, err := findUpgradeBinary(staging, upgradeBinaryName(version, runtime.GOOS, runtime.GOARCH))
 	if err != nil {
 		return err
 	}
