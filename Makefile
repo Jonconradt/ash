@@ -2,13 +2,14 @@
 
 SHELL := /bin/bash
 SITE_LOCALES ?=
+UPDATE_DEPENDENCIES_ASSUME_YES ?= 0
 
 COVERAGE_MIN ?= 60
 FUZZ_TIME ?= 10s
 GOLANGCI_LINT_VERSION ?= v2.15.0
-RUFF_VERSION ?= 0.17.3
+RUFF_VERSION ?= 0.17.4
 MARKDOWNLINT_CLI2_VERSION ?= 0.24.0
-HTML_VALIDATE_VERSION ?= 11.18.0
+HTML_VALIDATE_VERSION ?= 11.19.0
 GOSEC_VERSION ?= v2.30.0
 GOVULNCHECK_VERSION ?= v1.9.0
 STATICCHECK_VERSION ?= 2026.2.2
@@ -300,8 +301,9 @@ version: release-check release-artifacts
 .PHONY: update-dependencies
 
 update-dependencies:
-	@GO111MODULE=off GOTOOLCHAIN=local GOWORK=off go run ./scripts/dev/update-dependencies/main.go
+	@UPDATE_DEPENDENCIES_ASSUME_YES="$(UPDATE_DEPENDENCIES_ASSUME_YES)" GO111MODULE=off GOTOOLCHAIN=local GOWORK=off go run ./scripts/dev/update-dependencies/main.go
 
+release: UPDATE_DEPENDENCIES_ASSUME_YES := 1
 release: update-dependencies
 	@$(MAKE) --no-print-directory release-check
 	@if [[ "$(RELEASE_SKIP_LOCAL_ARTIFACTS)" != "1" ]]; then \

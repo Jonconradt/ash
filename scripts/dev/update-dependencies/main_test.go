@@ -190,6 +190,21 @@ func TestApprovals(t *testing.T) {
 	}
 }
 
+func TestApprovalsAssumeYes(t *testing.T) {
+	var output strings.Builder
+	u := fixtureUpdater(t, "")
+	u.assumeYes = true
+	u.output = &output
+
+	approved, err := u.approve("update?")
+	if err != nil || !approved {
+		t.Fatalf("approve = %v, %v; want true, nil", approved, err)
+	}
+	if got, want := output.String(), "update? [y/N]: y\n"; got != want {
+		t.Fatalf("approve output = %q; want %q", got, want)
+	}
+}
+
 func TestGoUpgrade(t *testing.T) {
 	for _, tt := range []struct {
 		name      string

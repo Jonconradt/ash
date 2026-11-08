@@ -66,8 +66,8 @@ local source and dependency checks.
 - Run `make update-dependencies` to check the 12 pinned Makefile tools against
   their upstream stable releases and check Go against both upstream releases
   and the local package manager. This is also the first prerequisite of
-  `make release`. Checks require network access and interactive input; nothing
-  is automatically approved in CI or when input ends.
+  `make release`. Checks require network access. The standalone target asks
+  for approval; `make release` automatically approves updater prompts.
 - Approve tool updates individually. Newer pins, including Go pseudo-versions,
   are never downgraded to older stable releases. The updater preserves other
   Makefile content and does not change environment or command-line overrides.

@@ -98,12 +98,13 @@ func newerStable(candidate, current string) (bool, error) {
 }
 
 type updater struct {
-	input  *bufio.Reader
-	output io.Writer
-	client *http.Client
-	run    func(context.Context, string, ...string) (string, error)
-	lookup func(string) (string, error)
-	goos   string
+	input     *bufio.Reader
+	output    io.Writer
+	client    *http.Client
+	run       func(context.Context, string, ...string) (string, error)
+	lookup    func(string) (string, error)
+	goos      string
+	assumeYes bool
 }
 
 func (u *updater) fetch(ctx context.Context, url string, target any) error {
@@ -151,6 +152,10 @@ func (u *updater) latest(ctx context.Context, item tool) (string, error) {
 }
 
 func (u *updater) approve(message string) (bool, error) {
+	if u.assumeYes {
+		_, err := fmt.Fprintf(u.output, "%s [y/N]: y\n", message)
+		return err == nil, err
+	}
 	if _, err := fmt.Fprintf(u.output, "%s [y/N]: ", message); err != nil {
 		return false, err
 	}
@@ -531,12 +536,13 @@ func runCommand(ctx context.Context, name string, args ...string) (string, error
 
 func main() {
 	u := updater{
-		input:  bufio.NewReader(os.Stdin),
-		output: os.Stdout,
-		client: &http.Client{Timeout: 30 * time.Second},
-		run:    runCommand,
-		lookup: exec.LookPath,
-		goos:   runtime.GOOS,
+		input:     bufio.NewReader(os.Stdin),
+		output:    os.Stdout,
+		client:    &http.Client{Timeout: 30 * time.Second},
+		run:       runCommand,
+		lookup:    exec.LookPath,
+		goos:      runtime.GOOS,
+		assumeYes: os.Getenv("UPDATE_DEPENDENCIES_ASSUME_YES") == "1",
 	}
 	if err := u.update(context.Background()); err != nil {
 		fmt.Fprintf(os.Stderr, "update-dependencies: %v\nChanges already applied are retained; review git diff before retrying.\n", err)
