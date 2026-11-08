@@ -114,6 +114,8 @@ func TestUpdatePins(t *testing.T) {
 				answer = "yes\n"
 			}
 			u := fixtureUpdater(t, strings.Repeat(answer, len(tools)))
+			var output strings.Builder
+			u.output = &output
 			var makefile strings.Builder
 			makefile.WriteString("# preserve unrelated content\nOTHER ?= unchanged\n")
 			for _, item := range tools {
@@ -122,6 +124,12 @@ func TestUpdatePins(t *testing.T) {
 			writeFile(t, "Makefile", makefile.String())
 			if err := u.updatePins(context.Background()); err != nil {
 				t.Fatal(err)
+			}
+			for _, item := range tools {
+				wantLine := fmt.Sprintf("%s: pinned %s1.2.3; latest stable %s99.2.3\n", item.key, item.prefix, item.prefix)
+				if !strings.Contains(output.String(), wantLine) {
+					t.Errorf("update output missing %q", wantLine)
+				}
 			}
 			got, err := os.ReadFile("Makefile")
 			if err != nil {
@@ -143,6 +151,25 @@ func TestUpdatePins(t *testing.T) {
 				t.Fatalf("temporary files remain: %v, %v", matches, err)
 			}
 		})
+	}
+}
+
+func TestUpdatePinsOmitsUnchangedVersions(t *testing.T) {
+	u := fixtureUpdater(t, "")
+	var output strings.Builder
+	u.output = &output
+
+	var makefile strings.Builder
+	for _, item := range tools {
+		fmt.Fprintf(&makefile, "%s ?= %s99.2.3\n", item.key, item.prefix)
+	}
+	writeFile(t, "Makefile", makefile.String())
+
+	if err := u.updatePins(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if got := output.String(); got != "" {
+		t.Fatalf("update output = %q; want no unchanged pin status lines", got)
 	}
 }
 

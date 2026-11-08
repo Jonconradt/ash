@@ -205,10 +205,10 @@ func (u *updater) updatePins(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("%s: %w", item.key, err)
 		}
-		if _, err := fmt.Fprintf(u.output, "%s: pinned %s; latest stable %s\n", item.key, current, latest); err != nil {
-			return err
-		}
 		if newer {
+			if _, err := fmt.Fprintf(u.output, "%s: pinned %s; latest stable %s\n", item.key, current, latest); err != nil {
+				return err
+			}
 			changes = append(changes, update{item, current, latest})
 		}
 	}
