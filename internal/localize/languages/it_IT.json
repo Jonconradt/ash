@@ -1,7 +1,7 @@
 {
   "locale": "it_IT",
   "messages": {
-    "usage.ash.prompt": "uso: ash [--attach <percorso>]... [--] <testo>",
+    "usage.ash.prompt": "uso: ash [--continue|-c] [--attach <percorso>]... [--] <testo>",
     "usage.ash.install": "       ash install [--shell bash|zsh|fish] [--shell-integration|--disable-shell-integration] [--dry-run] [--overwrite]",
     "install.dry_run_no_changes": "[simulazione] nessun file è stato modificato",
     "install.assets_only": "Risorse di Ash installate; l'integrazione della shell non è abilitata. Esegui di nuovo con --shell-integration per abilitarla.",
@@ -196,6 +196,7 @@
     "log.cloud.rate_limit.2": "L'API ha rallentato. Lasciale un po' di respiro.",
     "log.cloud.rate_limit.3": "La quota di richieste si sta riposando. Riprova a breve.",
     "log.cloud.rate_limit.4": "Al modello serve una pausa merenda prima della prossima domanda.",
-    "log.cloud.rate_limit.5": "Per ora hai superato la quota. Una breve pausa dovrebbe bastare."
+    "log.cloud.rate_limit.5": "Per ora hai superato la quota. Una breve pausa dovrebbe bastare.",
+    "log.runner.tool_failure_streak": "Lo strumento non è riuscito più volte con lo stesso errore; i nuovi tentativi vengono interrotti"
   }
 }

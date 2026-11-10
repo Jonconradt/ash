@@ -17,3 +17,6 @@ coverage.out
 node_modules/
 **/node_modules/
 **/target/
+
+# Temporary files
+interactions_ash_2026-10-20_211008/

@@ -60,13 +60,54 @@ func formatUntrustedEvidenceBlock(kind, source, content string) string {
 }
 
 // buildSystemPrompt creates the system prompt prefix that includes guidance and the user's request.
-func buildSystemPrompt(userPrompt string, now time.Time) string {
-	guidance := subAgentSystemGuidance() + "\n\n" + scratchWorkspaceSystemGuidance()
-	trimmed := strings.TrimSpace(userPrompt)
-	if trimmed == "" {
-		return guidance
+// Sub-agent and scratch guidance is included only when the corresponding tools
+// are actually exposed, so sessions that cannot call them do not pay for the text.
+func buildSystemPrompt(userPrompt string, now time.Time, tools []toolDefinition) string {
+	var guidance strings.Builder
+	if hasTool(tools, "run_sub_agent") {
+		guidance.WriteString(subAgentSystemGuidance())
 	}
-	return guidance + "\n\n" + trimmed
+	if hasScratchTools(tools) {
+		if guidance.Len() > 0 {
+			guidance.WriteString("\n\n")
+		}
+		guidance.WriteString(scratchWorkspaceSystemGuidance())
+	}
+	// Child agents cannot delegate; keep their standalone directive even when
+	// run_sub_agent is absent, since they need the no-delegation instruction.
+	if !hasTool(tools, "run_sub_agent") && isChildAgent() {
+		if guidance.Len() > 0 {
+			guidance.WriteString("\n\n")
+		}
+		guidance.WriteString(subAgentSystemGuidance())
+	}
+	trimmed := strings.TrimSpace(userPrompt)
+	if guidance.Len() == 0 {
+		return trimmed
+	}
+	if trimmed == "" {
+		return guidance.String()
+	}
+	return guidance.String() + "\n\n" + trimmed
+}
+
+func hasTool(tools []toolDefinition, name string) bool {
+	for _, tool := range tools {
+		if tool.Function.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func hasScratchTools(tools []toolDefinition) bool {
+	for _, tool := range tools {
+		switch tool.Function.Name {
+		case "read_scratch_file", "write_scratch_file", "append_scratch_file", "replace_scratch_file", "edit_scratch_file", "list_scratch_files":
+			return true
+		}
+	}
+	return false
 }
 
 func scratchWorkspaceSystemGuidance() string {

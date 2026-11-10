@@ -1,7 +1,7 @@
 {
   "locale": "lb_LU",
   "messages": {
-    "usage.ash.prompt": "Benotzung: ash [--attach <wee>]... [--] <text>",
+    "usage.ash.prompt": "Benotzung: ash [--continue|-c] [--attach <wee>]... [--] <text>",
     "usage.ash.install": "       ash install [--shell bash|zsh|fish] [--shell-integration|--disable-shell-integration] [--dry-run] [--overwrite]",
     "install.dry_run_no_changes": "[Testlaf] keng Dateie goufen geännert",
     "install.assets_only": "Ash-Assets installéiert; Shell-Integratioun ass net aktivéiert. Start mat --shell-integration nei, fir se z'aktivéieren.",
@@ -196,6 +196,7 @@
     "log.cloud.rate_limit.2": "D'API huet gebremst. Gitt hir e bëssen Zäit.",
     "log.cloud.rate_limit.3": "D'Ufrosquot schléift e bëssen. Probéiert et geschwënn nach eng Kéier.",
     "log.cloud.rate_limit.4": "De Modell brauch eng kleng Paus fir e Snack virun der nächster Fro.",
-    "log.cloud.rate_limit.5": "Dir hutt d'Quot fir de Moment iwwerschratt. Eng kuerz Paus soll duergoen."
+    "log.cloud.rate_limit.5": "Dir hutt d'Quot fir de Moment iwwerschratt. Eng kuerz Paus soll duergoen.",
+    "log.runner.tool_failure_streak": "Tool ass nei selwechten Feeler 2 Uni heianschlo gi wou gezelte Versich widderhuelen"
   }
 }

@@ -230,9 +230,9 @@ func TestRunToolLoopPromptToolsFallback(t *testing.T) {
 			}
 			return chatResponse{Message: message{Role: "assistant", Content: `{"name": "what_time_is_it", "arguments": {}}`}}, nil
 		default:
-			last := msgs[len(msgs)-1]
-			if last.Role != "user" || !strings.Contains(last.Content, "Tool result for") || !strings.Contains(last.Content, "12:00") {
-				t.Fatalf("expected the tool result as a user message, got %#v", last)
+			last, ok := lastUserMessageForTest(msgs)
+			if !ok || !strings.Contains(last.Content, "Tool result for") || !strings.Contains(last.Content, "12:00") {
+				t.Fatalf("expected the tool result as a user message, got %#v", msgs)
 			}
 			for _, msg := range msgs {
 				if msg.Role == "tool" || len(msg.ToolCalls) > 0 {

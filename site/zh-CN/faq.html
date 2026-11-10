@@ -72,7 +72,7 @@
           <p>你需要<code>ash</code>可执行文件、AI 端点和模型名称。跑步<code>ash install</code>自动配置这些：它使用已设置的云提供商 API 密钥或找到时正在运行的本地推理服务器，否则它会显示编号的提供商菜单并提示输入 API 密钥，然后让您从端点的模型列表中选择模型。您还可以设置<code>ASH_AI_ENDPOINT</code>和<code>ASH_AI_MODEL</code>手动。本地端点（例如 Ollama）可以使用<code>http://localhost:11434</code>，以及 LAN 主机，例如<code>http://brain.local:11434</code>或者私有 IP 也被视为本地 IP（除非<code>ASH_STRICT=1</code>）；云端点必须使用 HTTPS，并且通常需要<code>ASH_AI_AUTH_TOKEN</code>。 Shell 集成是可选的：您可以随时运行<code>ash "your question"</code>直接地。</p>
 
           <h3>哪里有ash安装，如何检查我的 shell 是否可以找到它？</h3>
-          <p>经过验证的安装人员地点ash在<code>~/.local/bin/ash</code>。将该目录添加到您的<code>PATH</code>使用 shell 的正常配置；<code>ash install</code>除非您通过，否则不会编辑 shell 启动文件<code>--shell-integration</code>。打开一个新终端，然后运行<code>command -v ash</code>确认。自更新程序将其替换二进制文件安装到相同的用户本地位置。安装程序需要 Sigstore<code>cosign</code>验证签名的校验和清单。</p>
+          <p>安装程序放置ash在<code>~/.local/bin/ash</code>。将该目录添加到您的<code>PATH</code>使用 shell 的正常配置；<code>ash install</code>除非您通过，否则不会编辑 shell 启动文件<code>--shell-integration</code>。打开一个新终端，然后运行<code>command -v ash</code>确认。自更新程序将其替换二进制文件安装到相同的用户本地位置。安装程序使用 Sigstore 验证签名的校验和清单<code>cosign</code>当可用时。如果没有 cosign，它会在继续之前发出警告和提示；默认值为“否”，如果您选择继续，则校验和清单将未经身份验证。</p>
 
           <h3>我该如何使用ash不改变我的外壳？</h3>
           <p>直接传递引用的提示：<code>ash "how do I find large files?"</code>。没有任何争论，ash还接受非交互式标准输入提示，例如<code>git diff | ash</code>。当您学习时，直接使用是最不令人惊讶的选择ash或编写脚本。</p>

@@ -267,11 +267,17 @@ func TestRunToolLoop(t *testing.T) {
 			return
 		}
 
-		if len(req.Messages) == 0 || req.Messages[len(req.Messages)-1].Role != "tool" {
+		var toolMessage *message
+		for i := range req.Messages {
+			if req.Messages[i].Role == "tool" {
+				toolMessage = &req.Messages[i]
+			}
+		}
+		if toolMessage == nil {
 			t.Fatalf("expected tool message in follow-up request, got %#v", req.Messages)
 		}
-		if req.Messages[len(req.Messages)-1].ToolName != "run_unix_command" {
-			t.Fatalf("expected tool_name in follow-up request, got %#v", req.Messages[len(req.Messages)-1])
+		if toolMessage.ToolName != "run_unix_command" {
+			t.Fatalf("expected tool_name in follow-up request, got %#v", *toolMessage)
 		}
 
 		assistantCallPreserved := false
@@ -745,5 +751,65 @@ func TestRunToolLoopStrictRedactsToolArgsAndOutput(t *testing.T) {
 	}
 	if strings.Contains(logs, "super-secret-result") {
 		t.Fatalf("expected tool output values to be suppressed under ASH_STRICT, got %q", logs)
+	}
+}
+
+func TestRunToolLoopStopsAfterRepeatedSameToolFailures(t *testing.T) {
+	originalPipelineRunner := toolPipelineRunner
+	t.Cleanup(func() { toolPipelineRunner = originalPipelineRunner })
+
+	toolPipelineRunner = func(_ context.Context, _ [][]string, display string, _ time.Duration, _ int) toolCommandResult {
+		return toolCommandResult{
+			OK:       false,
+			Command:  display,
+			ExitCode: 1,
+			Stderr:   "exit status 1",
+			Error:    "exit status 1",
+			EID:      "j7qQm8vN",
+		}
+	}
+
+	// Mirrors the file-028 variant sequence from the #34 logs: the same
+	// pipeline tool fails identically while the model tweaks args.
+	pipelines := []string{
+		"find . -maxdepth 1 -type f -printf '%T@ %p\\n' | sort -k1,1nr | head -n5",
+		"find . -maxdepth 1 -type f -exec stat -c \"%Y %n\" {} + | sort -nr | head -n5",
+		"find . -maxdepth 1 -type f -printf %T@\\\\ %p\\\\n | sort -k1,1nr | head -n5",
+		"ls -lt | grep '^-' | head -n 5",
+		"ls -lt | grep -- '^-' | head -n 5",
+	}
+
+	chatCalls := 0
+	originalExecutor := chatStreamExecutor
+	t.Cleanup(func() { chatStreamExecutor = originalExecutor })
+	chatStreamExecutor = func(_ context.Context, _ aiConfig, _ []message, _ []toolDefinition, _ func(streamDelta)) (chatResponse, error) {
+		chatCalls++
+		if chatCalls <= len(pipelines) {
+			pipeline := pipelines[chatCalls-1]
+			return chatResponse{Message: message{Role: "assistant", ToolCalls: []toolCall{{Type: "function", Function: toolFunctionCall{Name: "run_unix_pipeline", Arguments: map[string]any{"pipeline": pipeline}}}}}}, nil
+		}
+		return chatResponse{Message: message{Role: "assistant", Content: "done"}}, nil
+	}
+
+	shim := localToolShim{allowlist: map[string]struct{}{"find": {}, "ls": {}, "sort": {}, "head": {}, "grep": {}, "stat": {}}}
+	final, updated, err := runToolLoop(context.Background(), testAIConfig("http://example.invalid", "model"), "show me the last 5 files last modified", []message{{Role: "user", Content: "show me the last 5 files last modified"}}, shim)
+	if err != nil {
+		t.Fatalf("runToolLoop returned error: %v", err)
+	}
+	if chatCalls >= len(pipelines) {
+		t.Fatalf("loop should stop after the second identical pipeline failure, made %d chat calls (updated %#v)", chatCalls, updated)
+	}
+	if !strings.Contains(final, "Stopping retries") || !strings.Contains(final, "run_unix_pipeline") {
+		t.Fatalf("expected a stop summary naming the tool, got %q", final)
+	}
+	sawStopNotice := false
+	for _, msg := range updated {
+		if msg.Role == "system" && strings.Contains(msg.Content, "already failed twice") {
+			sawStopNotice = true
+			break
+		}
+	}
+	if !sawStopNotice {
+		t.Fatalf("expected stop notice in messages, got %#v", updated)
 	}
 }

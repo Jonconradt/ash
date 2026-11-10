@@ -1,7 +1,7 @@
 {
   "locale": "ar_AE",
   "messages": {
-    "usage.ash.prompt": "الاستخدام: ash [--attach <المسار>]... [--] <النص>",
+    "usage.ash.prompt": "الاستخدام: ash [--continue|-c] [--attach <المسار>]... [--] <النص>",
     "usage.ash.install": "       ash install [--shell bash|zsh|fish] [--shell-integration|--disable-shell-integration] [--dry-run] [--overwrite]",
     "install.dry_run_no_changes": "[تشغيل تجريبي] لم يتم تغيير أي ملفات",
     "install.assets_only": "تم تثبيت ملفات Ash؛ لم يتم تفعيل تكامل الصدفة. أعد التشغيل مع --shell-integration لتفعيله.",
@@ -196,6 +196,7 @@
     "log.cloud.rate_limit.2": "ضغطت واجهة API على المكابح؛ امنحها مساحة للتنفس.",
     "log.cloud.rate_limit.3": "حصة الطلبات تتمدد قليلاً. حاول مرة أخرى بعد قليل.",
     "log.cloud.rate_limit.4": "يحتاج النموذج إلى استراحة وجبة خفيفة قبل السؤال التالي.",
-    "log.cloud.rate_limit.5": "لقد استهلكت حصتك بالكتابة مؤقتاً. استراحة قصيرة تكفي."
+    "log.cloud.rate_limit.5": "لقد استهلكت حصتك بالكتابة مؤقتاً. استراحة قصيرة تكفي.",
+    "log.runner.tool_failure_streak": "فشلت الأداة مرارًا بنفس الخطأ؛ يتم إيقاف إعادة المحاولة"
   }
 }

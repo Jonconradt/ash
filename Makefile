@@ -1,4 +1,4 @@
-.PHONY: all verify verify-ci pre-push check-static check-security hooks-install build config lint language-lint site-lint yaml-lint python-lint markdown-lint static-config-lint shell-lint html-lint sync-route-words test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install version release release-check release-clean release-build release-translate release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one release-checksums restart-broker plugins-build plugins-test plugins-lint plugins-clean plugins-install
+.PHONY: all verify verify-ci pre-push check-static check-security hooks-install build config lint language-lint site-lint yaml-lint python-lint markdown-lint static-config-lint shell-lint html-lint sync-route-words test go-test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install version release release-check release-clean release-build release-translate release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one release-checksums restart-broker plugins-build plugins-test plugins-lint plugins-clean plugins-install
 
 SHELL := /bin/bash
 SITE_LOCALES ?=
@@ -260,8 +260,11 @@ govulncheck:
 test: plugins-test
 	@./scripts/dev/run-quiet.sh "site-tests" node --test site/site.test.cjs
 	@./scripts/dev/run-quiet.sh "site-generator-tests" python3 -B -m unittest discover -s site -p 'test_*.py'
-	@./scripts/dev/run-quiet.sh "go-test" go test ./...
+	@$(MAKE) --no-print-directory go-test
 	@echo "test: ok"
+
+go-test:
+	@./scripts/dev/run-quiet.sh "go-test" go test ./...
 
 test-race:
 	@./scripts/dev/run-quiet.sh "go-test-race" go test -race ./...

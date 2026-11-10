@@ -83,6 +83,7 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 	repeatLimit := toolRepeatLimit()
 	lastCallSignature := ""
 	repeatCount := 0
+	failureStreaks := map[string]int{}
 	slog.Debug(localize.Text("log.runner.loop_started"), "request_id", requestIDFromContext(ctx), "max_iters", maxIters, "tools", len(tools), "EID", "kLt1nKGy")
 
 	for i := 0; i <= maxIters; i++ {
@@ -97,12 +98,9 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 			injected = append(injected, buildPromptToolCatalogMessage(tools))
 			roundTools = nil
 		}
-		if len(roundMessages) == 0 {
-			roundMessages = append(roundMessages, injected...)
-		} else {
-			insertAt := len(roundMessages) - 1
-			roundMessages = append(roundMessages[:insertAt], append(injected, roundMessages[insertAt:]...)...)
-		}
+		// Volatile per-round context is appended at the end so the static
+		// prefix (system prompt, prior turns) stays stable for prefix caching.
+		roundMessages = append(roundMessages, injected...)
 
 		response, err := chatStreamExecutor(ctx, aiCfg, roundMessages, roundTools, nil)
 		if err != nil {
@@ -260,6 +258,11 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 				})
 			}
 
+			if failureKey, failed := toolFailureSignature(toolName, toolResult); failed {
+				failureStreaks[failureKey]++
+			} else {
+				clearFailureStreaksForTool(failureStreaks, toolName)
+			}
 			signature := toolCallSignature(toolName, call.Function.Arguments, toolResult)
 			if signature == lastCallSignature {
 				repeatCount++
@@ -275,6 +278,15 @@ func runToolLoop(ctx context.Context, aiCfg aiConfig, userInput string, messages
 				})
 				repeatCount = 0
 			}
+		}
+		if exhausted, count := findExhaustedFailure(failureStreaks, maxToolFailureStreaks()); exhausted != "" {
+			slog.Debug(localize.Text("log.runner.tool_failure_streak"), "request_id", requestIDFromContext(ctx), "failure_key", exhausted, "count", count, "EID", "mK4pQw2r")
+			messages = append(messages, message{
+				Role:    "system",
+				Content: "The same tool already failed twice with the same error and will not retry variants. Stop calling tools and answer with what you observed, explaining what failed.",
+			})
+			final := summarizeRepeatedFailure(exhausted, count, observations)
+			return final, messages, nil
 		}
 	}
 
@@ -305,6 +317,96 @@ func reasoningEchoContent(reasoning string) string {
 		reasoning = reasoning[:maxEchoBytes]
 	}
 	return "<think>\n" + reasoning + "\n</think>"
+}
+
+// maxToolFailureStreaks returns how many consecutive same-tool same-error
+// failures the loop tolerates before stopping. Fixed at the #34 threshold:
+// after two identical failures, variants will not be retried.
+func maxToolFailureStreaks() int {
+	return 2
+}
+
+// toolFailureSignature returns a stable key for a failed tool result so that
+// argument variants with the identical failure ("the same way") share a streak.
+// It returns ok=false for successful results.
+func toolFailureSignature(toolName, toolResult string) (string, bool) {
+	var parsed toolCommandResult
+	if err := json.Unmarshal([]byte(toolResult), &parsed); err != nil {
+		return "", false
+	}
+	if parsed.OK {
+		return "", false
+	}
+	detail := strings.TrimSpace(parsed.Error)
+	if detail == "" {
+		detail = strings.TrimSpace(parsed.Stderr)
+	}
+	if idx := strings.Index(detail, "\n"); idx >= 0 {
+		detail = detail[:idx]
+	}
+	if detail == "" {
+		detail = "(no error detail)"
+	}
+	return toolName + "\x00" + fmt.Sprintf("exit=%d\x00%s", parsed.ExitCode, detail), true
+}
+
+// clearFailureStreaksForTool resets streaks for a tool after a successful call,
+// so only consecutive same-error failures count toward exhaustion.
+func clearFailureStreaksForTool(streaks map[string]int, toolName string) {
+	prefix := toolName + "\x00"
+	for key := range streaks {
+		if strings.HasPrefix(key, prefix) {
+			delete(streaks, key)
+		}
+	}
+}
+
+// findExhaustedFailure returns the first failure key that reached the streak
+// limit, and its count.
+func findExhaustedFailure(streaks map[string]int, limit int) (string, int) {
+	if limit <= 0 {
+		return "", 0
+	}
+	for key, count := range streaks {
+		if count >= limit {
+			return key, count
+		}
+	}
+	return "", 0
+}
+
+// summarizeRepeatedFailure builds the final user-visible answer when the loop
+// stops after repeated identical failures, naming the tool, count, and last error.
+func summarizeRepeatedFailure(failureKey string, count int, observations []toolObservation) string {
+	parts := strings.SplitN(failureKey, "\x00", 3)
+	toolName := failureKey
+	exitDetail := ""
+	if len(parts) >= 3 {
+		toolName = parts[0]
+		exitDetail = parts[1] + " " + parts[2]
+	} else if len(parts) >= 2 {
+		toolName = parts[0]
+		exitDetail = parts[1]
+	}
+	lastErr := ""
+	for i := len(observations) - 1; i >= 0; i-- {
+		if observations[i].Command != "" && observations[i].Command != toolName {
+			if !observations[i].OK {
+				lastErr = observations[i].Command + ": " + observations[i].Summary
+				break
+			}
+		}
+		if lastErr == "" && !observations[i].OK {
+			lastErr = observations[i].Command + ": " + observations[i].Summary
+		}
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "Stopping retries: %s failed %d times with the same error (%s).", toolName, count, strings.TrimSpace(exitDetail))
+	if lastErr != "" {
+		b.WriteString(" Last failure: " + lastErr + ".")
+	}
+	b.WriteString(" Please adjust the command or approach.")
+	return b.String()
 }
 
 // toolCallSignature returns a stable identifier for a tool invocation and its result, used to detect no-progress repetition.

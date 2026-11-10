@@ -1,7 +1,7 @@
 {
   "locale": "zh_CN",
   "messages": {
-    "usage.ash.prompt": "用法：ash [--attach <路径>]... [--] <文本>",
+    "usage.ash.prompt": "用法：ash [--continue|-c] [--attach <路径>]... [--] <文本>",
     "usage.ash.install": "       ash install [--shell bash|zsh|fish] [--shell-integration|--disable-shell-integration] [--dry-run] [--overwrite]",
     "install.dry_run_no_changes": "[试运行] 未更改任何文件",
     "install.assets_only": "Ash 资源已安装；尚未启用 Shell 集成。使用 --shell-integration 重新运行以启用。",
@@ -196,6 +196,7 @@
     "log.cloud.rate_limit.2": "API 已轻轻踩下刹车，给它一点喘息时间吧。",
     "log.cloud.rate_limit.3": "请求额度正在安静地躺平休息，稍后再试。",
     "log.cloud.rate_limit.4": "模型需要吃点心补充能量，再回答下一个问题。",
-    "log.cloud.rate_limit.5": "你暂时把额度打字用完啦，稍作停顿就好。"
+    "log.cloud.rate_limit.5": "你暂时把额度打字用完啦，稍作停顿就好。",
+    "log.runner.tool_failure_streak": "工具以相同错误反复失败，已停止重试"
   }
 }

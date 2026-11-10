@@ -2,7 +2,7 @@
   "locale": "zh_TW",
   "parent": "zh_CN",
   "messages": {
-    "usage.ash.prompt": "用法：ash [--attach <路徑>]... [--] <文字>",
+    "usage.ash.prompt": "用法：ash [--continue|-c] [--attach <路徑>]... [--] <文字>",
     "usage.ash.install": "       ash install [--shell bash|zsh|fish] [--shell-integration|--disable-shell-integration] [--dry-run] [--overwrite]",
     "install.dry_run_no_changes": "[試執行] 未變更任何檔案",
     "legal.ash_attribution": "Ash 專案：https://github.com/Jonconradt/ash | MIT 授權；請參閱 LICENSE 與 THIRD_PARTY_NOTICES.md。",
@@ -194,6 +194,7 @@
     "log.cloud.rate_limit.2": "API 已輕輕踩下煞車，給它一點喘息時間吧。",
     "log.cloud.rate_limit.3": "請求額度正在安靜地躺平休息，稍後再試。",
     "log.cloud.rate_limit.4": "模型需要吃點心補充能量，再回答下一個問題。",
-    "log.cloud.rate_limit.5": "你暫時把額度打字用完啦，稍作停頓就好。"
+    "log.cloud.rate_limit.5": "你暫時把額度打字用完啦，稍作停頓就好。",
+    "log.runner.tool_failure_streak": "工具以相同錯誤反覆失敗，已停止重試"
   }
 }

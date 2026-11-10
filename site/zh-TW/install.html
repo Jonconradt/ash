@@ -241,14 +241,15 @@ set -gx ASH_AI_AUTH_TOKEN "$GROQ_API_KEY"</code></pre>
         <section id="script">
           <h2>腳本安裝：替代方案，而不是首選</h2>
           <p>偏好 Homebrew、APT、DNF 或 Pacman：它們追蹤擁有的文件，使用其信任配置驗證下載，並提供熟悉的更新/刪除。他们仍然需要信任的发布者和软件包安装操作。 </p>
-          <div class="guide-note guide-warning"><p><strong>網站腳本使用您帳戶的權限來執行程式碼。 </strong>受感染的網站、發布者或更改腳本可以讀取機密、更改檔案或安裝其他軟體。 HTTPS 保護傳輸，而不是該程式碼的意圖。將 URL 直接透過管道傳輸到 shell 會在您查看它之前執行它。腳本的存檔簽章檢查不會驗證腳本本身。切勿使用 sudo 運行它或禁用其驗證。 </p></div>
-          <p>先決條件：支援的作業系統/架構，<code>$SHELL</code>識別 Bash/zsh/Fish，<a href="https://docs.sigstore.dev/cosign/system_config/installation/">Sigstore聯名</a>,<code>tar</code>,<code>uname</code>,<code>install</code>、標準 shell 實用程式、SHA-256 指令（<code>sha256sum</code>,<code>shasum</code>， 或者<code>sha256</code>）和一個下載器（<code>curl</code>,<code>wget</code>，或Python）。該範例使用了curl。 FreeBSD 還需要 Bash。您的主/安裝目錄必須是可寫入的。</p>
+          <div class="guide-note guide-warning"><p><strong>網站腳本使用您帳戶的權限來執行程式碼。 </strong>受感染的網站、發布者或更改腳本可以讀取機密、更改檔案或安裝其他軟體。 HTTPS 保護傳輸，而不是該程式碼的意圖。將 URL 直接透過管道傳輸到 shell 會在您查看它之前執行它。腳本的存檔簽章檢查不會驗證腳本本身。切勿使用 sudo 運行它。如果您在沒有簽名驗證的情況下繼續，則校驗和清單未經身份驗證，無法確定發布者的真實性。 </p></div>
+          <p>先決條件：支援的作業系統/架構，<code>$SHELL</code>識別 Bash/zsh/Fish，<code>tar</code>,<code>uname</code>,<code>install</code>、標準 shell 實用程式、SHA-256 指令（<code>sha256sum</code>,<code>shasum</code>， 或者<code>sha256</code>）和一個下載器（<code>curl</code>,<code>wget</code>，或Python）。訊號儲存<a href="https://docs.sigstore.dev/cosign/system_config/installation/"><code>cosign</code></a>建議用於簽名驗證；如果不可用，安裝程式會發出警告並提示，然後再繼續安裝。該範例使用了curl。 FreeBSD 還需要 Bash。您的主/安裝目錄必須是可寫入的。</p>
           <p>下載到本機文件，使用編輯器檢查它，並且僅在您信任其來源和行為時才執行。檢查並不能保證安全；不要盲目執行以下步驟：</p>
           <pre><code>curl -fsSL https://jonconradt.github.io/ash/install.sh -o ash-install.sh
 less ash-install.sh</code></pre>
           <p>檢查後，以一般使用者身分執行已儲存的副本：</p>
           <pre><code>sh ./ash-install.sh
 rm ./ash-install.sh</code></pre>
+          <p>如果<code>cosign</code>不可用，安裝程式詢問<code>Continue without signature verification? [y,N]</code>;預設為否。繼續檢查存檔的 SHA-256 摘要<code>SHA256SUMS</code>，但沒有驗證清單未經過身份驗證的簽名。安裝<a href="https://docs.sigstore.dev/cosign/system_config/installation/">聯合簽名</a>如果您不接受該風險。</p>
           <p><code>install.sh</code>下載最新版本，驗證其 Sigstore 簽署的校驗和清單和存檔摘要，然後安裝<code>ash</code>/<code>ash-broker</code>在<code>~/.local/bin</code>。原生插件消失了<code>$XDG_DATA_HOME/ash/plugins</code>。它運行每個用戶設定並在啟用 shell 整合之前進行詢問。如果沒有互動式終端，可能會跳過提供者/整合提示：運行<code>ash install</code>之後進行互動。</p>
           <p>您可以設定<code>ASH_INSTALL_DIR</code>在運行腳本之前選擇另一個目的地。自己將該目的地加入 PATH 中。<strong>僅在以下情況下支援自我更新<code>~/.local/bin</code></strong>;自訂目的地需要手動替換。該腳本沒有 Beta/Nightly 選擇器。</p>
         </section>

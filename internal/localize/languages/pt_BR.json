@@ -1,7 +1,7 @@
 {
   "locale": "pt_BR",
   "messages": {
-    "usage.ash.prompt": "uso: ash [--attach <caminho>]... [--] <texto>",
+    "usage.ash.prompt": "uso: ash [--continue|-c] [--attach <caminho>]... [--] <texto>",
     "usage.ash.install": "       ash install [--shell bash|zsh|fish] [--shell-integration|--disable-shell-integration] [--dry-run] [--overwrite]",
     "install.dry_run_no_changes": "[simulação] nenhum arquivo foi alterado",
     "install.assets_only": "Recursos do Ash instalados; a integração com o shell não foi habilitada. Execute novamente com --shell-integration para habilitá-la.",
@@ -196,6 +196,7 @@
     "log.cloud.rate_limit.2": "A API pisou no freio. Dê um pouco de espaço para ela.",
     "log.cloud.rate_limit.3": "A cota de solicitações está tirando uma soneca. Tente novamente em breve.",
     "log.cloud.rate_limit.4": "O modelo precisa de uma pausa para um lanche antes da próxima pergunta.",
-    "log.cloud.rate_limit.5": "Você excedeu a cota por enquanto. Uma pausa curta deve resolver."
+    "log.cloud.rate_limit.5": "Você excedeu a cota por enquanto. Uma pausa curta deve resolver.",
+    "log.runner.tool_failure_streak": "A ferramenta falhou repetidamente com o mesmo erro; as novas tentativas foram interrompidas"
   }
 }

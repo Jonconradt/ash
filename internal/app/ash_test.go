@@ -121,8 +121,8 @@ func TestRun(t *testing.T) {
 		if len(gotReq.Messages) == 0 {
 			t.Fatalf("expected request messages")
 		}
-		last := gotReq.Messages[len(gotReq.Messages)-1]
-		if last.Role != "user" || last.Content != "prompt from stdin" {
+		last, ok := lastUserMessageForTest(gotReq.Messages)
+		if !ok || last.Content != "prompt from stdin" {
 			t.Fatalf("expected stdin prompt as final user message, got role=%q content=%q", last.Role, last.Content)
 		}
 	})
@@ -182,8 +182,8 @@ func TestRun(t *testing.T) {
 		if len(gotReq.Messages) == 0 {
 			t.Fatalf("expected request messages")
 		}
-		last := gotReq.Messages[len(gotReq.Messages)-1]
-		if last.Role != "user" || last.Content != "prompt from args" {
+		last, ok := lastUserMessageForTest(gotReq.Messages)
+		if !ok || last.Content != "prompt from args" {
 			t.Fatalf("expected argv prompt as final user message, got role=%q content=%q", last.Role, last.Content)
 		}
 	})
@@ -590,6 +590,15 @@ func TestRun(t *testing.T) {
 			t.Fatalf("expected original system prompt suffix, got %q", gotReq.Messages[0].Content)
 		}
 	})
+}
+
+func lastUserMessageForTest(messages []message) (message, bool) {
+	for i := len(messages) - 1; i >= 0; i-- {
+		if messages[i].Role == "user" {
+			return messages[i], true
+		}
+	}
+	return message{}, false
 }
 
 func TestMainHelperProcess(t *testing.T) {

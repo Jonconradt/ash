@@ -65,7 +65,7 @@ Is this thing secure and safe? It really depends on how bold you are. It runs as
 - Enables provider-native caching by default when supported
 - Shows an ANSI-friendly thinking indicator while waiting for the AI response
 - Supports `Ctrl-C` to abort an in-flight request
-- Keeps chat history across calls
+- Starts each prompt with fresh context; use `--continue` (or `ASH_CONTINUE=1`) to include prior history, or let the model rewind with the `read_conversation_history` tool
 - Uses `$XDG_CONFIG_HOME/ash/.ash_system` (default `~/.config/ash/.ash_system`) as the canonical system prompt file when present
 - Always prepends current local date/time to the system prompt sent to the model
 - Supports emoji input/output (UTF-8)
@@ -551,6 +551,7 @@ Notes:
 - `ASH_AI_TIMEOUT` (optional): AI request timeout. Default `3m`.
 - `ASH_BROKER_AI_WARMUP` (optional): Send one credential-free `HEAD` request to the AI endpoint's origin at broker startup to warm its reusable HTTP connection. Enabled by default; set to `0` to disable. Set to `1` to enable explicitly. The probe does not validate API health or warm a local model.
 - `ASH_HISTORY_MAX` (optional): Max retained history messages per key. Default `40`.
+- `ASH_CONTINUE` (optional): Include prior conversation history in the prompt (`1`, `true`, `yes`, `on`, `enabled`). Default off (fresh context per prompt); unrecognized values stay fresh. The `--continue`/`-c` flags opt in for a single invocation.
 - `ASH_ALLOW` (optional): Comma-separated allowlisted executables for `run_unix_command`; it overrides `.ash_allow` and does not expand Ash internal tokens.
 - `ASH_DENY` (optional): Comma-separated denylist for commands, tools, and plugins; it overrides `.ash_deny`.
 - `ASH_TOOL_TIMEOUT` (optional): Timeout for local tool execution. Default `15s`.
@@ -652,6 +653,12 @@ $XDG_STATE_HOME/ash/history/task_$ASH_SESSION_ID.json
 ```
 
 Generic `SESSION_ID` is ignored; set `ASH_SESSION_ID` to choose an explicit session identity.
+
+Each prompt starts with fresh context by default. To include prior history,
+pass `--continue` (or `-c`) for that invocation, or set `ASH_CONTINUE=1`.
+Unrecognized `ASH_CONTINUE` values stay fresh. The model can also rewind on
+demand with the `read_conversation_history` tool (last 5 prompts by default,
+`keyword` search supported, at most 20 messages returned).
 
 Optional max history messages (default: `40`):
 

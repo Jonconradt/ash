@@ -3,6 +3,7 @@
 ash \- practical shell assistant for command-not-found workflows
 .SH SYNOPSIS
 .B ash
+.RI [ --continue | -c ]
 .RI [ --attach " path" ]...
 .RI [ text ... ]
 .br
@@ -82,7 +83,16 @@ For Fish, the target is
 Print the version of the running ash binary.
 .TP
 .B ash [text ...]
-Run a single assistant request.
+Run a single assistant request with fresh context.
+.IP
+.B --continue
+.IP
+.B -c
+Include prior conversation history in the prompt for this invocation only.
+Each prompt otherwise starts with fresh context; the model can rewind with
+the
+.B read_conversation_history
+tool when earlier context is needed.
 .IP
 .B --attach
 .I path
@@ -295,6 +305,11 @@ Optional. Defaults to 1, sending one bounded, unauthenticated HEAD request to th
 .TP
 .B ASH_HISTORY_MAX
 Optional max number of history messages retained per key. Default is 40.
+.TP
+.B ASH_CONTINUE
+Optional. When true-like (1, true, yes, on, enabled), include prior
+conversation history in the prompt. Default is off (fresh context per
+prompt). Unrecognized values stay fresh.
 .TP
 .B ASH_ALLOW
 Optional comma-separated allowlist for

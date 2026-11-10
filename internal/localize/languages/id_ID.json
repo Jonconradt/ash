@@ -1,7 +1,7 @@
 {
   "locale": "id_ID",
   "messages": {
-    "usage.ash.prompt": "penggunaan: ash [--attach <jalur>]... [--] <teks>",
+    "usage.ash.prompt": "penggunaan: ash [--continue|-c] [--attach <jalur>]... [--] <teks>",
     "usage.ash.install": "       ash install [--shell bash|zsh|fish] [--shell-integration|--disable-shell-integration] [--dry-run] [--overwrite]",
     "install.dry_run_no_changes": "[uji coba] tidak ada file yang diubah",
     "install.assets_only": "Aset Ash terpasang; integrasi shell belum diaktifkan. Jalankan ulang dengan --shell-integration untuk mengaktifkannya.",
@@ -196,6 +196,7 @@
     "log.cloud.rate_limit.2": "API menginjak rem. Beri sedikit ruang untuk bernapas.",
     "log.cloud.rate_limit.3": "Kuota permintaan sedang berbaring sejenak. Coba lagi nanti.",
     "log.cloud.rate_limit.4": "Model perlu rehat camilan sebelum menjawab pertanyaan berikutnya.",
-    "log.cloud.rate_limit.5": "Kamu mengetik hingga kuota habis untuk saat ini. Istirahat sebentar akan membantu."
+    "log.cloud.rate_limit.5": "Kamu mengetik hingga kuota habis untuk saat ini. Istirahat sebentar akan membantu.",
+    "log.runner.tool_failure_streak": "Alat gagal berulang kali dengan kesalahan yang sama; pengulangan dihentikan"
   }
 }

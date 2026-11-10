@@ -37,6 +37,7 @@ func schedulerEnvAllowlist() map[string]string {
 		"PATH",
 		"ASH_AI_TIMEOUT",
 		"ASH_HISTORY_MAX",
+		"ASH_CONTINUE",
 		"ASH_VERBOSE",
 		"ASH_LOG_FILE",
 		"ASH_LOG_FORMAT",

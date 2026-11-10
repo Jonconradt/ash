@@ -1,7 +1,7 @@
 {
   "locale": "en_US",
   "messages": {
-    "usage.ash.prompt": "usage: ash [--attach <path>]... [--] <text>",
+    "usage.ash.prompt": "usage: ash [--continue|-c] [--attach <path>]... [--] <text>",
     "usage.ash.install": "       ash install [--shell bash|zsh|fish] [--shell-integration|--disable-shell-integration] [--dry-run] [--overwrite]",
     "usage.ash.mcp": "       ash mcp add <url> [--no-browser]",
     "usage.ash.update": "       ash update [--version vX.Y.Z] [--yes|--skip-customized]",
@@ -196,6 +196,7 @@
     "log.cloud.rate_limit.2": "The API tapped the brakes. Give it a little breathing room.",
     "log.cloud.rate_limit.3": "The request quota is taking a quiet lie-down. Try again shortly.",
     "log.cloud.rate_limit.4": "The model needs a snack break before the next question.",
-    "log.cloud.rate_limit.5": "You have out-typed the quota for now. A short pause should do it."
+    "log.cloud.rate_limit.5": "You have out-typed the quota for now. A short pause should do it.",
+    "log.runner.tool_failure_streak": "Tool failed repeatedly with the same error; stopping retries"
   }
 }

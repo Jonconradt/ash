@@ -24,9 +24,17 @@ type mcpToolShim interface {
 }
 
 type localToolShim struct {
-	allowlist map[string]struct{}
-	agents    *agentBudget
+	allowlist  map[string]struct{}
+	agents     *agentBudget
+	historyKey string
 }
+
+const (
+	defaultHistoryToolPrompts  = 5
+	historyToolMaxReturned     = 20
+	historyToolTruncateBytes   = 4096
+	historyToolMaxPromptsInput = 100
+)
 
 // ListTools returns the tool definitions exposed to the AI client by the local shim.
 func (s localToolShim) ListTools() []toolDefinition {
@@ -304,6 +312,22 @@ func (s localToolShim) ListTools() []toolDefinition {
 		{
 			Type: "function",
 			Function: toolFunctionDefinition{
+				Name:        "read_conversation_history",
+				Description: "Read persisted prior messages for this session when earlier context is needed. Each prompt normally starts with fresh context; call this to rewind. By default returns the last 5 prompts; use keyword for a case-insensitive search of persisted messages. Returns at most 20 messages.",
+				Parameters: map[string]any{
+					"type": "object",
+					"properties": map[string]any{
+						"last_n_prompts": map[string]any{"type": "integer", "minimum": 0, "description": "Number of recent user prompts to include; defaults to 5"},
+						"keyword":        map[string]any{"type": "string", "description": "Case-insensitive substring search over persisted messages; when combined with last_n_prompts, filters within that window"},
+						"offset":         map[string]any{"type": "integer", "minimum": 0, "description": "Zero-based offset into the selected messages; defaults to 0"},
+						"limit":          map[string]any{"type": "integer", "minimum": 1, "maximum": historyToolMaxReturned, "description": "Maximum messages to return (at most 20); defaults to the remaining selected messages"},
+					},
+				},
+			},
+		},
+		{
+			Type: "function",
+			Function: toolFunctionDefinition{
 				Name:        "list_scratch_files",
 				Description: "List files in this session's scratch workspace to rediscover existing artifacts. Returns sorted relative and absolute paths, byte sizes, and a continuation offset; excludes hidden files and symlinks.",
 				Parameters: map[string]any{
@@ -409,6 +433,8 @@ func (s localToolShim) CallTool(ctx context.Context, name string, args map[strin
 		result = s.callEditScratchFile(ctx, args)
 	case "list_scratch_files":
 		result = s.callListScratchFiles(args)
+	case "read_conversation_history":
+		result = s.callReadConversationHistory(args)
 	default:
 		result = toolCommandResult{OK: false, Error: fmt.Sprintf("unknown tool: %s", name), EID: "Ryr9hU7l"}
 	}
@@ -1271,4 +1297,162 @@ func scratchPaginationArg(args map[string]any, key string, defaultValue, maxValu
 		return 0, fmt.Errorf("%s must be between 0 and %d", key, maxValue)
 	}
 	return int(parsed), nil
+}
+
+// callReadConversationHistory returns a bounded slice of persisted prior
+// messages for the current history key. It supports a last-N-prompts window
+// (default 5) with an optional case-insensitive keyword search, offset/limit
+// paging, and a hard cap of 20 returned messages.
+func (s localToolShim) callReadConversationHistory(args map[string]any) toolCommandResult {
+	const command = "read_conversation_history"
+	if strings.TrimSpace(s.historyKey) == "" {
+		return toolCommandResult{OK: false, Command: command, Error: "conversation history is not configured for this session", EID: "7rF5MhPj"}
+	}
+	_, lastNProvided := args["last_n_prompts"]
+	if v, present := args["last_n_prompts"]; present && v == nil {
+		lastNProvided = false
+	}
+	lastN, err := historyIntArg(args, "last_n_prompts", defaultHistoryToolPrompts, historyToolMaxPromptsInput)
+	if err != nil {
+		return toolCommandResult{OK: false, Command: command, Error: err.Error(), EID: "hN3pQr5s"}
+	}
+	keyword := ""
+	if raw, present := args["keyword"]; present && raw != nil {
+		value, ok := raw.(string)
+		if !ok {
+			return toolCommandResult{OK: false, Command: command, Error: "keyword must be a string", EID: "kW4dYt8m"}
+		}
+		keyword = strings.TrimSpace(value)
+	}
+	keywordProvided := keyword != ""
+	offset, err := historyIntArg(args, "offset", 0, 1000000)
+	if err != nil {
+		return toolCommandResult{OK: false, Command: command, Error: err.Error(), EID: "oF6sWd2l"}
+	}
+	_, limitProvided := args["limit"]
+	if v, present := args["limit"]; present && v == nil {
+		limitProvided = false
+	}
+	limit, err := historyIntArg(args, "limit", 0, 1000000)
+	if err != nil {
+		return toolCommandResult{OK: false, Command: command, Error: err.Error(), EID: "lM9vCb3n"}
+	}
+	if limitProvided && limit < 1 {
+		return toolCommandResult{OK: false, Command: command, Error: "limit must be an integer from 1 to 20", EID: "lM9vCb3n"}
+	}
+	if limit > historyToolMaxReturned {
+		limit = historyToolMaxReturned
+	}
+
+	path, err := getHistoryPath()
+	if err != nil {
+		return toolCommandResult{OK: false, Command: command, Error: err.Error(), EID: "7rF5MhPj"}
+	}
+	data, err := loadHistory(path)
+	if err != nil {
+		return toolCommandResult{OK: false, Command: command, Error: err.Error(), EID: "UxY51gAq"}
+	}
+	conversation := data.Conversations[s.historyKey]
+	if len(conversation) == 0 {
+		return toolCommandResult{OK: false, Command: command, Error: "no conversation history found for this session", EID: "hN3pQr5s"}
+	}
+
+	selected := conversation
+	if lastNProvided {
+		selected = lastNPromptsSlice(conversation, lastN)
+	} else if !keywordProvided {
+		selected = lastNPromptsSlice(conversation, defaultHistoryToolPrompts)
+	}
+	if keywordProvided {
+		lower := strings.ToLower(keyword)
+		filtered := make([]message, 0, len(selected))
+		for _, m := range selected {
+			if strings.Contains(strings.ToLower(m.Content), lower) || strings.Contains(strings.ToLower(m.Role), lower) {
+				filtered = append(filtered, m)
+			}
+		}
+		selected = filtered
+	}
+	if offset >= len(selected) {
+		selected = nil
+	} else if offset > 0 {
+		selected = selected[offset:]
+	}
+	if limitProvided && len(selected) > limit {
+		selected = selected[:limit]
+	}
+	if len(selected) > historyToolMaxReturned {
+		selected = selected[:historyToolMaxReturned]
+	}
+	if len(selected) == 0 {
+		return toolCommandResult{OK: true, Command: command, ExitCode: 0, Stdout: "no matching history messages"}
+	}
+	var b strings.Builder
+	for i, m := range selected {
+		if i > 0 {
+			b.WriteString("\n---\n")
+		}
+		content := truncateHistoryContent(m.Content)
+		fmt.Fprintf(&b, "%s: %s", m.Role, content)
+	}
+	return toolCommandResult{OK: true, Command: command, ExitCode: 0, Stdout: b.String()}
+}
+
+func historyIntArg(args map[string]any, key string, defaultValue, maxValue int) (int, error) {
+	value, present := args[key]
+	if !present || value == nil {
+		return defaultValue, nil
+	}
+	var parsed int64
+	switch number := value.(type) {
+	case int:
+		parsed = int64(number)
+	case int32:
+		parsed = int64(number)
+	case int64:
+		parsed = number
+	case float64:
+		if math.IsNaN(number) || math.IsInf(number, 0) || number < 0 || math.Trunc(number) != number {
+			return 0, fmt.Errorf("%s must be an integer", key)
+		}
+		parsed = int64(number)
+	case json.Number:
+		numberParsed, err := number.Int64()
+		if err != nil {
+			return 0, fmt.Errorf("%s must be an integer", key)
+		}
+		parsed = numberParsed
+	default:
+		return 0, fmt.Errorf("%s must be an integer", key)
+	}
+	if parsed < 0 || parsed > int64(maxValue) {
+		return 0, fmt.Errorf("%s must be between 0 and %d", key, maxValue)
+	}
+	return int(parsed), nil
+}
+
+// lastNPromptsSlice returns the slice of conversation covering the last n user
+// prompts (counting from the end). Values beyond the available prompts return
+// the whole conversation; zero returns empty.
+func lastNPromptsSlice(conversation []message, n int) []message {
+	if n <= 0 {
+		return nil
+	}
+	count := 0
+	for i := len(conversation) - 1; i >= 0; i-- {
+		if conversation[i].Role == "user" {
+			count++
+			if count == n {
+				return conversation[i:]
+			}
+		}
+	}
+	return conversation
+}
+
+func truncateHistoryContent(value string) string {
+	if len(value) <= historyToolTruncateBytes {
+		return value
+	}
+	return value[:historyToolTruncateBytes] + "\n...truncated..."
 }

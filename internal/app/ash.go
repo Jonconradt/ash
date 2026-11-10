@@ -165,6 +165,9 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 0
 	}
 
+	args, continueFlag := parseContinueFlags(args)
+	continueMode := continueFlag || continueEnabled()
+
 	args, attachPaths, err := parseAttachFlags(args)
 	if err != nil {
 		_, _ = fmt.Fprintf(stderr, "%s\n", err)
@@ -239,24 +242,27 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 1
 	}
 
+	localShim := localToolShim{allowlist: allowlist, agents: newAgentBudget(maxAgents()), historyKey: aiCfg.HistoryKey}
+
 	systemPrompt, err := readSystemPromptWithAllowlist(allowlist)
 	if err != nil {
 		slog.Error(localize.Format("log.ash.file_read_failed", []any{systemFileName, err}), "EID", "8N3r3Vz0")
 		return 1
 	}
-	systemPrompt = buildSystemPrompt(systemPrompt, timeNow())
+	systemPrompt = buildSystemPrompt(systemPrompt, timeNow(), localShim.ListTools())
 
 	requestID := requestIDGenerator()
 	summaryRequestID = requestID
 	metrics.addStageDuration(metricsStageDefaults, timeNow().Sub(defaultsStarted))
 	slog.Debug("Allowlist loaded", "request_id", requestID, "allowlist", strings.Join(sortedAllowlist(allowlist), ","), "EID", "oYccBW9V")
 
-	localShim := localToolShim{allowlist: allowlist, agents: newAgentBudget(maxAgents())}
-
 	conversation := history.Conversations[aiCfg.HistoryKey]
-	messages := make([]message, 0, len(conversation)+2)
+	priorConversation := append([]message(nil), conversation...)
+	messages := make([]message, 0, len(priorConversation)+2)
 	messages = append(messages, message{Role: "system", Content: systemPrompt})
-	messages = append(messages, conversation...)
+	if continueMode {
+		messages = append(messages, priorConversation...)
+	}
 	messages = append(messages, message{Role: "user", Content: userInput, Attachments: attachments})
 
 	timeout := aiTimeout()
@@ -335,8 +341,16 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 	}
 
-	conversation = stripSystemMessage(updatedMessages)
-	conversation = keepRecentMessages(conversation, historyLimit())
+	turn := stripSystemMessage(updatedMessages)
+	if continueMode {
+		conversation = keepRecentMessages(turn, historyLimit())
+	} else {
+		// Fresh mode did not send prior history to the model, but still append
+		// this turn to the persisted conversation so the on-demand history
+		// tool can retrieve it later.
+		merged := append(append([]message(nil), priorConversation...), turn...)
+		conversation = keepRecentMessages(merged, historyLimit())
+	}
 	history.Conversations[aiCfg.HistoryKey] = conversation
 
 	if err := saveHistory(historyPath, history); err != nil {
@@ -344,6 +358,39 @@ func run(args []string, stdout, stderr io.Writer) int {
 	}
 
 	return 0
+}
+
+// parseContinueFlags removes leading --continue/-c continuation flags and
+// reports whether one was present. Only flags before the prompt text (and
+// before any leading --attach pairs) are consumed, so prompt text that merely
+// mentions "-c" is preserved; use "--" to treat a leading "--continue" as
+// literal prompt text.
+func parseContinueFlags(args []string) ([]string, bool) {
+	continueFlag := false
+	remaining := make([]string, 0, len(args))
+	i := 0
+	// Consume the leading flag region: --continue, -c, and --attach pairs.
+	for i < len(args) {
+		switch args[i] {
+		case "--":
+			remaining = append(remaining, args[i:]...)
+			return remaining, continueFlag
+		case "--continue", "-c":
+			continueFlag = true
+			i++
+		case "--attach":
+			remaining = append(remaining, args[i])
+			i++
+			if i < len(args) {
+				remaining = append(remaining, args[i])
+				i++
+			}
+		default:
+			remaining = append(remaining, args[i:]...)
+			return remaining, continueFlag
+		}
+	}
+	return remaining, continueFlag
 }
 
 // printUsage writes the CLI usage text for the ash command to w.

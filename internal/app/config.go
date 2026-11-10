@@ -583,11 +583,13 @@ func expandSystemPromptWithAllowlist(prompt string, allowlist map[string]struct{
 	if err != nil {
 		panic("embedded " + instructionsPath + " is missing: " + err.Error())
 	}
+	prompt = normalizeInternalPromptTokens(prompt)
 	prompt = strings.ReplaceAll(prompt, "$IF_PYTHON_AVAILABLE", string(instructions))
 	prompt = stripSystemPromptComments(prompt)
 	prompt = strings.ReplaceAll(prompt, toolsDirListToken, renderEligibleToolScripts(allowlist))
 	prompt = strings.ReplaceAll(prompt, pluginsDirListToken, renderEligiblePlugins(allowlist))
 	prompt = strings.ReplaceAll(prompt, "$ASH_RESPONSE_LANGUAGE", responseLanguageName())
+	prompt = collapseBlankRuns(prompt)
 
 	unameValue := ""
 	if _, err := execLookPath("uname"); err == nil {
@@ -605,6 +607,37 @@ func expandSystemPromptWithAllowlist(prompt string, allowlist map[string]struct{
 		}
 		return os.Getenv(key)
 	})
+}
+
+// normalizeInternalPromptTokens rewrites braced internal tokens (${TOKEN})
+// to the bare $TOKEN form so the ReplaceAll passes below expand them. Without
+// this, os.Expand would silently map them to unset environment values and a
+// subject sentence could render with its subject missing.
+func normalizeInternalPromptTokens(prompt string) string {
+	for _, name := range []string{"TOOLS_DIR_LIST", "PLUGINS_DIR_LIST", "IF_PYTHON_AVAILABLE", "ASH_RESPONSE_LANGUAGE"} {
+		prompt = strings.ReplaceAll(prompt, "${"+name+"}", "$"+name)
+	}
+	return prompt
+}
+
+// collapseBlankRuns limits consecutive blank lines so sections whose
+// placeholders expanded empty do not leave runs of empty lines in the prompt.
+func collapseBlankRuns(prompt string) string {
+	lines := strings.Split(prompt, "\n")
+	kept := lines[:0]
+	blank := 0
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			blank++
+			if blank > 2 {
+				continue
+			}
+		} else {
+			blank = 0
+		}
+		kept = append(kept, line)
+	}
+	return strings.Join(kept, "\n")
 }
 
 // eligibleToolScripts returns readable, executable regular files in Ash's managed tools directory.
@@ -772,6 +805,19 @@ func stripSystemPromptComments(prompt string) string {
 		}
 	}
 	return strings.Join(kept, "\n")
+}
+
+// continueEnabled reports whether ash should include prior conversation history
+// in the outgoing prompt. Defaults to false (fresh context per prompt);
+// ASH_CONTINUE=1/true/yes opts into continuation. Unrecognized values fail
+// closed to fresh rather than failing config validation.
+func continueEnabled() bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("ASH_CONTINUE"))) {
+	case "1", "true", "yes", "on", "enabled":
+		return true
+	default:
+		return false
+	}
 }
 
 // historyLimit returns the maximum number of messages retained for chat history, or the default when unset or invalid.

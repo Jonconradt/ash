@@ -1,7 +1,7 @@
 {
   "locale": "fr_FR",
   "messages": {
-    "usage.ash.prompt": "utilisation : ash [--attach <chemin>]... [--] <texte>",
+    "usage.ash.prompt": "utilisation : ash [--continue|-c] [--attach <chemin>]... [--] <texte>",
     "usage.ash.install": "       ash install [--shell bash|zsh|fish] [--shell-integration|--disable-shell-integration] [--dry-run] [--overwrite]",
     "install.dry_run_no_changes": "[simulation] aucun fichier n'a été modifié",
     "install.assets_only": "Les ressources Ash sont installées ; l'intégration au shell n'est pas activée. Relancez avec --shell-integration pour l'activer.",
@@ -196,6 +196,7 @@
     "log.cloud.rate_limit.2": "L'API a ralenti. Laissez-lui un peu de répit.",
     "log.cloud.rate_limit.3": "Le quota de requêtes se repose tranquillement. Réessayez bientôt.",
     "log.cloud.rate_limit.4": "Le modèle a besoin d'une pause goûter avant la prochaine question.",
-    "log.cloud.rate_limit.5": "Vous avez dépassé le quota de saisie pour le moment. Une courte pause devrait suffire."
+    "log.cloud.rate_limit.5": "Vous avez dépassé le quota de saisie pour le moment. Une courte pause devrait suffire.",
+    "log.runner.tool_failure_streak": "Outil échoue à plusieurs reprises avec la même erreur ; les nouvelles tentatives sont arrêtées"
   }
 }

@@ -1,7 +1,7 @@
 {
   "locale": "de_DE",
   "messages": {
-    "usage.ash.prompt": "Verwendung: ash [--attach <pfad>]... [--] <text>",
+    "usage.ash.prompt": "Verwendung: ash [--continue|-c] [--attach <pfad>]... [--] <text>",
     "usage.ash.install": "       ash install [--shell bash|zsh|fish] [--shell-integration|--disable-shell-integration] [--dry-run] [--overwrite]",
     "install.dry_run_no_changes": "[Probelauf] Es wurden keine Dateien geändert",
     "install.assets_only": "Ash-Dateien installiert; Shell-Integration ist nicht aktiviert. Mit --shell-integration erneut ausführen, um sie zu aktivieren.",
@@ -196,6 +196,7 @@
     "log.cloud.rate_limit.2": "Die API hat abgebremst. Gib ihr etwas Luft.",
     "log.cloud.rate_limit.3": "Das Anfragekontingent hält gerade ein Nickerchen. Versuche es bald erneut.",
     "log.cloud.rate_limit.4": "Das Modell braucht vor der nächsten Frage eine kleine Snackpause.",
-    "log.cloud.rate_limit.5": "Du hast das Kontingent vorerst ausgeschöpft. Eine kurze Pause sollte reichen."
+    "log.cloud.rate_limit.5": "Du hast das Kontingent vorerst ausgeschöpft. Eine kurze Pause sollte reichen.",
+    "log.runner.tool_failure_streak": "Tool ist wiederholt mit demselben Fehler fehlgeschlagen; Wiederholungen werden gestoppt"
   }
 }

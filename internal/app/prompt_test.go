@@ -365,8 +365,15 @@ func TestReadSystemPromptErrors(t *testing.T) {
 func TestBuildSystemPrompt(t *testing.T) {
 	now := time.Date(2026, time.July, 24, 9, 15, 30, 0, time.FixedZone("PDT", -7*3600))
 
+	fullTools := []toolDefinition{
+		{Function: toolFunctionDefinition{Name: "run_sub_agent"}},
+		{Function: toolFunctionDefinition{Name: "read_scratch_file"}},
+		{Function: toolFunctionDefinition{Name: "write_scratch_file"}},
+		{Function: toolFunctionDefinition{Name: "list_scratch_files"}},
+	}
+
 	t.Run("guidance only when empty prompt", func(t *testing.T) {
-		got := buildSystemPrompt("", now)
+		got := buildSystemPrompt("", now, fullTools)
 		if strings.Contains(got, "Current local datetime") {
 			t.Fatalf("datetime should not be in system prompt: got %q", got)
 		}
@@ -384,7 +391,7 @@ func TestBuildSystemPrompt(t *testing.T) {
 	})
 
 	t.Run("guidance plus prompt body", func(t *testing.T) {
-		got := buildSystemPrompt("sys-msg", now)
+		got := buildSystemPrompt("sys-msg", now, fullTools)
 		if strings.Contains(got, "Current local datetime") {
 			t.Fatalf("datetime should not be in system prompt: got %q", got)
 		}
@@ -396,6 +403,43 @@ func TestBuildSystemPrompt(t *testing.T) {
 		}
 		if !strings.Contains(got, "list_scratch_files") || !strings.HasSuffix(got, "sys-msg") {
 			t.Fatalf("custom prompt did not retain the runtime scratch guide: %q", got)
+		}
+	})
+
+	t.Run("no guidance when tools are not exposed", func(t *testing.T) {
+		got := buildSystemPrompt("sys-msg", now, nil)
+		if got != "sys-msg" {
+			t.Fatalf("expected prompt body only when no tools are exposed, got %q", got)
+		}
+		got = buildSystemPrompt("", now, nil)
+		if got != "" {
+			t.Fatalf("expected empty prompt when no guidance applies, got %q", got)
+		}
+	})
+
+	t.Run("scratch only and sub-agent only", func(t *testing.T) {
+		scratchOnly := []toolDefinition{{Function: toolFunctionDefinition{Name: "read_scratch_file"}}}
+		got := buildSystemPrompt("", now, scratchOnly)
+		if !strings.Contains(got, "Scratch workspace:") || strings.Contains(got, "Execution guidance: Use run_sub_agent") {
+			t.Fatalf("expected scratch guidance without sub-agent guidance, got %q", got)
+		}
+		agentOnly := []toolDefinition{{Function: toolFunctionDefinition{Name: "run_sub_agent"}}}
+		got = buildSystemPrompt("", now, agentOnly)
+		if !strings.Contains(got, "only for an independent, well-scoped task") || strings.Contains(got, "Scratch workspace:") {
+			t.Fatalf("expected sub-agent guidance without scratch guidance, got %q", got)
+		}
+	})
+
+	t.Run("braced internal tokens expand with subject intact", func(t *testing.T) {
+		got := expandSystemPromptWithAllowlist("${TOOLS_DIR_LIST}, ${PLUGINS_DIR_LIST}, and ${IF_PYTHON_AVAILABLE} are internal Ash substitutions.", nil)
+		if strings.Contains(got, "are internal Ash substitutions") && !strings.Contains(got, "Python authoring") {
+			t.Fatalf("braced subject sentence lost its subject: %q", got)
+		}
+		if strings.Contains(got, "${") || strings.Contains(got, "$TOOLS_DIR_LIST") || strings.Contains(got, "$PLUGINS_DIR_LIST") || strings.Contains(got, "$IF_PYTHON_AVAILABLE") {
+			t.Fatalf("internal token left unexpanded: %q", got)
+		}
+		if !strings.Contains(got, "No eligible") {
+			t.Fatalf("expected eligible-list rendering for braced tokens, got %q", got)
 		}
 	})
 }

@@ -1,7 +1,7 @@
 {
   "locale": "es_ES",
   "messages": {
-    "usage.ash.prompt": "uso: ash [--attach <ruta>]... [--] <texto>",
+    "usage.ash.prompt": "uso: ash [--continue|-c] [--attach <ruta>]... [--] <texto>",
     "usage.ash.install": "       ash install [--shell bash|zsh|fish] [--shell-integration|--disable-shell-integration] [--dry-run] [--overwrite]",
     "install.dry_run_no_changes": "[simulación] no se modificaron archivos",
     "install.assets_only": "Se instalaron los recursos de Ash; la integración del shell no está habilitada. Vuelve a ejecutar con --shell-integration para habilitarla.",
@@ -196,6 +196,7 @@
     "log.cloud.rate_limit.2": "La API ha pisado el freno. Dale un poco de margen.",
     "log.cloud.rate_limit.3": "La cuota de peticiones se ha tumbado a descansar. Prueba dentro de un rato.",
     "log.cloud.rate_limit.4": "El modelo necesita una pausa para merendar antes de la siguiente pregunta.",
-    "log.cloud.rate_limit.5": "Por ahora has agotado la cuota a base de teclear. Una pausa lo solucionará."
+    "log.cloud.rate_limit.5": "Por ahora has agotado la cuota a base de teclear. Una pausa lo solucionará.",
+    "log.runner.tool_failure_streak": "La herramienta falló repetidamente con el mismo error; se detienen los reintentos"
   }
 }
