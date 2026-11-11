@@ -30,6 +30,7 @@ type toolCommandResult struct {
 	Untrusted   bool         `json:"untrusted,omitempty"`
 	Command     string       `json:"command"`
 	ExitCode    int          `json:"exit_code"`
+	ErrorCode   string       `json:"error_code,omitempty"`
 	Stdout      string       `json:"stdout,omitempty"`
 	Stderr      string       `json:"stderr,omitempty"`
 	Error       string       `json:"error,omitempty"`

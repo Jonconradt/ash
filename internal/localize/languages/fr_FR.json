@@ -165,6 +165,7 @@
     "log.ash.file_read_failed": "échec de lecture de %s : %v",
     "log.ash.timeout": "L'IA a mis plus de %s ; nous devrions probablement réessayer plus tard",
     "log.ash.provider_request_failed": "échec de la requête %s : %v",
+    "log.ash.endpoint_error": "L’IA n’a pas envie de parler maintenant (erreur renvoyée %s)",
     "log.ash.attachment_save_failed": "échec de l'enregistrement des pièces jointes renvoyées : %v",
     "log.ash.history_save_failed": "avertissement : échec de l'enregistrement de l'historique : %v",
     "log.install.error": "erreur d'installation : %v",
@@ -197,6 +198,8 @@
     "log.cloud.rate_limit.3": "Le quota de requêtes se repose tranquillement. Réessayez bientôt.",
     "log.cloud.rate_limit.4": "Le modèle a besoin d'une pause goûter avant la prochaine question.",
     "log.cloud.rate_limit.5": "Vous avez dépassé le quota de saisie pour le moment. Une courte pause devrait suffire.",
-    "log.runner.tool_failure_streak": "Outil échoue à plusieurs reprises avec la même erreur ; les nouvelles tentatives sont arrêtées"
+    "log.runner.tool_failure_streak": "Outil échoue à plusieurs reprises avec la même erreur ; les nouvelles tentatives sont arrêtées",
+    "log.runner.mcp_permanent_http_error": "Nouvel essai de l’outil MCP %s abandonné après l’erreur HTTP permanente %s. Dernier échec : %s",
+    "log.runner.mcp_nonretryable_error": "Nouvel essai de l’outil MCP %s abandonné, car l’échec n’est pas une erreur HTTP temporaire. Dernier échec : %s"
   }
 }

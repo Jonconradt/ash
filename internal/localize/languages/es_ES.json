@@ -165,6 +165,7 @@
     "log.ash.file_read_failed": "no se pudo leer %s: %v",
     "log.ash.timeout": "La IA tardó más de %s; probablemente sea mejor volver a intentarlo más tarde",
     "log.ash.provider_request_failed": "falló la solicitud a %s: %v",
+    "log.ash.endpoint_error": "La IA no tiene ganas de hablar ahora (error devuelto %s)",
     "log.ash.attachment_save_failed": "no se pudieron guardar los adjuntos devueltos: %v",
     "log.ash.history_save_failed": "aviso: no se pudo guardar el historial: %v",
     "log.install.error": "error de instalación: %v",
@@ -197,6 +198,8 @@
     "log.cloud.rate_limit.3": "La cuota de peticiones se ha tumbado a descansar. Prueba dentro de un rato.",
     "log.cloud.rate_limit.4": "El modelo necesita una pausa para merendar antes de la siguiente pregunta.",
     "log.cloud.rate_limit.5": "Por ahora has agotado la cuota a base de teclear. Una pausa lo solucionará.",
-    "log.runner.tool_failure_streak": "La herramienta falló repetidamente con el mismo error; se detienen los reintentos"
+    "log.runner.tool_failure_streak": "La herramienta falló repetidamente con el mismo error; se detienen los reintentos",
+    "log.runner.mcp_permanent_http_error": "No se volverá a intentar la herramienta MCP %s tras el error HTTP permanente %s. Último fallo: %s",
+    "log.runner.mcp_nonretryable_error": "No se volverá a intentar la herramienta MCP %s porque el fallo no es un error HTTP temporal. Último fallo: %s"
   }
 }

@@ -164,6 +164,7 @@
     "log.ash.file_read_failed": "failed to read %s: %v",
     "log.ash.timeout": "AI took longer than %s, so we should probably try again later",
     "log.ash.provider_request_failed": "%s request failed: %v",
+    "log.ash.endpoint_error": "AI doesn't feel like talking now (returned error %s)",
     "log.ash.attachment_save_failed": "failed to save returned attachments: %v",
     "log.ash.history_save_failed": "warning: failed to save history: %v",
     "log.ash.output_write_failed": "failed to write output: %v",
@@ -197,6 +198,8 @@
     "log.cloud.rate_limit.3": "The request quota is taking a quiet lie-down. Try again shortly.",
     "log.cloud.rate_limit.4": "The model needs a snack break before the next question.",
     "log.cloud.rate_limit.5": "You have out-typed the quota for now. A short pause should do it.",
-    "log.runner.tool_failure_streak": "Tool failed repeatedly with the same error; stopping retries"
+    "log.runner.tool_failure_streak": "Tool failed repeatedly with the same error; stopping retries",
+    "log.runner.mcp_permanent_http_error": "Not retrying MCP tool %s after permanent HTTP error %s. Last failure: %s",
+    "log.runner.mcp_nonretryable_error": "Not retrying MCP tool %s because the failure is not a temporary HTTP error. Last failure: %s"
   }
 }

@@ -165,6 +165,7 @@
     "log.ash.file_read_failed": "%s konnt net gelies ginn: %v",
     "log.ash.timeout": "D'AI huet méi laang wéi %s gebraucht; mir sollten et spéider nach eng Kéier probéieren",
     "log.ash.provider_request_failed": "%s-Ufro feelgeschloen: %v",
+    "log.ash.endpoint_error": "D'KI huet elo keng Loscht ze schwätzen (Feeler zréckginn %s)",
     "log.ash.attachment_save_failed": "Zeréckgeschéckt Uschlëss konnten net gespäichert ginn: %v",
     "log.ash.history_save_failed": "Warnung: Historique konnt net gespäichert ginn: %v",
     "log.install.error": "Installatiounsfeeler: %v",
@@ -197,6 +198,8 @@
     "log.cloud.rate_limit.3": "D'Ufrosquot schléift e bëssen. Probéiert et geschwënn nach eng Kéier.",
     "log.cloud.rate_limit.4": "De Modell brauch eng kleng Paus fir e Snack virun der nächster Fro.",
     "log.cloud.rate_limit.5": "Dir hutt d'Quot fir de Moment iwwerschratt. Eng kuerz Paus soll duergoen.",
-    "log.runner.tool_failure_streak": "Tool ass nei selwechten Feeler 2 Uni heianschlo gi wou gezelte Versich widderhuelen"
+    "log.runner.tool_failure_streak": "Tool ass nei selwechten Feeler 2 Uni heianschlo gi wou gezelte Versich widderhuelen",
+    "log.runner.mcp_permanent_http_error": "MCP-Tool %s gëtt nom permanente HTTP-Feeler %s net nach eng Kéier probéiert. Leschte Feeler: %s",
+    "log.runner.mcp_nonretryable_error": "MCP-Tool %s gëtt net nach eng Kéier probéiert, well de Feeler keen temporäre HTTP-Feeler ass. Leschte Feeler: %s"
   }
 }

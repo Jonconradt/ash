@@ -165,6 +165,7 @@
     "log.ash.file_read_failed": "读取 %s 失败：%v",
     "log.ash.timeout": "AI 响应时间超过 %s，稍后再试可能更合适",
     "log.ash.provider_request_failed": "%s 请求失败：%v",
+    "log.ash.endpoint_error": "AI 现在不想说话（返回的错误 %s）",
     "log.ash.attachment_save_failed": "保存返回的附件失败：%v",
     "log.ash.history_save_failed": "警告：保存历史记录失败：%v",
     "log.install.error": "安装错误：%v",
@@ -197,6 +198,8 @@
     "log.cloud.rate_limit.3": "请求额度正在安静地躺平休息，稍后再试。",
     "log.cloud.rate_limit.4": "模型需要吃点心补充能量，再回答下一个问题。",
     "log.cloud.rate_limit.5": "你暂时把额度打字用完啦，稍作停顿就好。",
-    "log.runner.tool_failure_streak": "工具以相同错误反复失败，已停止重试"
+    "log.runner.tool_failure_streak": "工具以相同错误反复失败，已停止重试",
+    "log.runner.mcp_permanent_http_error": "MCP 工具 %s 遇到永久性 HTTP 错误 %s 后不再重试。上次失败：%s",
+    "log.runner.mcp_nonretryable_error": "MCP 工具 %s 的失败不是临时 HTTP 错误，因此不再重试。上次失败：%s"
   }
 }

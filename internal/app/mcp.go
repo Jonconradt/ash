@@ -14,8 +14,10 @@ import (
 	"net/url"
 	"os"
 	"os/exec"
+	"regexp"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -42,6 +44,8 @@ type remoteMCPCallResult struct {
 	Content           []remoteMCPTextItem `json:"content"`
 	StructuredContent json.RawMessage     `json:"structuredContent"`
 }
+
+var remoteMCPErrorCodePattern = regexp.MustCompile(`(?i)\b(?:http(?:\s+status)?|status(?:\s+code)?|error(?:\s+code)?|code)\s*[:=]?\s*(-?\d{3,})\b|^\s*(-?\d{3,})\b`)
 
 type remoteMCPUsage struct {
 	mu    sync.Mutex
@@ -284,12 +288,83 @@ func (s remoteToolShim) CallTool(ctx context.Context, name string, args map[stri
 		MCPArgs:   args,
 	})
 	if err != nil {
-		return fmt.Sprintf("MCP tool call failed: %v", err)
+		return formatRemoteMCPFailure(name, fmt.Sprintf("MCP tool call failed: %v", err), nil)
 	}
 	if len(response.MCPResult) == 0 {
-		return "MCP tool call returned no result"
+		return formatRemoteMCPFailure(name, "MCP tool call returned no result", nil)
 	}
-	return formatRemoteMCPResult(response.MCPResult)
+	formatted := formatRemoteMCPResult(response.MCPResult)
+	var result remoteMCPCallResult
+	if err := json.Unmarshal(response.MCPResult, &result); err == nil && result.IsError {
+		return formatRemoteMCPFailure(name, formatted, response.MCPResult)
+	}
+	return formatted
+}
+
+func formatRemoteMCPFailure(name, detail string, raw json.RawMessage) string {
+	result := toolCommandResult{
+		OK:        false,
+		Command:   name,
+		ExitCode:  -1,
+		ErrorCode: remoteMCPErrorCode(raw, detail),
+		Error:     detail, EID: "U8M6M5yr",
+	}
+	encoded, err := json.Marshal(result)
+	if err != nil {
+		return fmt.Sprintf("MCP tool call result encoding failed: %v; original error: %s", err, detail)
+	}
+	return string(encoded)
+}
+
+func remoteMCPErrorCode(raw json.RawMessage, detail string) string {
+	if len(raw) > 0 {
+		var payload any
+		if err := json.Unmarshal(raw, &payload); err == nil {
+			if code := findRemoteMCPErrorCode(payload); code != "" {
+				return code
+			}
+		}
+	}
+	match := remoteMCPErrorCodePattern.FindStringSubmatch(detail)
+	if len(match) > 2 {
+		if match[1] != "" {
+			return match[1]
+		}
+		return match[2]
+	}
+	return ""
+}
+
+func findRemoteMCPErrorCode(value any) string {
+	switch typed := value.(type) {
+	case map[string]any:
+		for _, key := range []string{"error_code", "status_code", "code"} {
+			if raw, ok := typed[key]; ok {
+				switch code := raw.(type) {
+				case float64:
+					if code == float64(int64(code)) {
+						return strconv.FormatInt(int64(code), 10)
+					}
+				case string:
+					if strings.TrimSpace(code) != "" {
+						return strings.TrimSpace(code)
+					}
+				}
+			}
+		}
+		for _, child := range typed {
+			if code := findRemoteMCPErrorCode(child); code != "" {
+				return code
+			}
+		}
+	case []any:
+		for _, child := range typed {
+			if code := findRemoteMCPErrorCode(child); code != "" {
+				return code
+			}
+		}
+	}
+	return ""
 }
 
 func formatRemoteMCPResult(raw json.RawMessage) string {

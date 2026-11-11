@@ -165,6 +165,7 @@
     "log.ash.file_read_failed": "تعذرت قراءة %s: %v",
     "log.ash.timeout": "استغرق الذكاء الاصطناعي أكثر من %s؛ يُفضّل المحاولة مرة أخرى لاحقاً",
     "log.ash.provider_request_failed": "فشل طلب %s: %v",
+    "log.ash.endpoint_error": "لا يرغب الذكاء الاصطناعي في التحدث الآن (الخطأ المُعاد %s)",
     "log.ash.attachment_save_failed": "تعذر حفظ المرفقات المعادة: %v",
     "log.ash.history_save_failed": "تحذير: تعذر حفظ السجل: %v",
     "log.install.error": "خطأ في التثبيت: %v",
@@ -197,6 +198,8 @@
     "log.cloud.rate_limit.3": "حصة الطلبات تتمدد قليلاً. حاول مرة أخرى بعد قليل.",
     "log.cloud.rate_limit.4": "يحتاج النموذج إلى استراحة وجبة خفيفة قبل السؤال التالي.",
     "log.cloud.rate_limit.5": "لقد استهلكت حصتك بالكتابة مؤقتاً. استراحة قصيرة تكفي.",
-    "log.runner.tool_failure_streak": "فشلت الأداة مرارًا بنفس الخطأ؛ يتم إيقاف إعادة المحاولة"
+    "log.runner.tool_failure_streak": "فشلت الأداة مرارًا بنفس الخطأ؛ يتم إيقاف إعادة المحاولة",
+    "log.runner.mcp_permanent_http_error": "لن تتم إعادة محاولة أداة MCP ‏%s بعد خطأ HTTP دائم %s. آخر فشل: %s",
+    "log.runner.mcp_nonretryable_error": "لن تتم إعادة محاولة أداة MCP ‏%s لأن الفشل ليس خطأ HTTP مؤقتًا. آخر فشل: %s"
   }
 }

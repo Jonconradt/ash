@@ -165,6 +165,7 @@
     "log.ash.file_read_failed": "falha ao ler %s: %v",
     "log.ash.timeout": "A IA levou mais de %s; provavelmente devemos tentar novamente mais tarde",
     "log.ash.provider_request_failed": "falha na solicitação a %s: %v",
+    "log.ash.endpoint_error": "A IA não está a fim de conversar agora (erro retornado %s)",
     "log.ash.attachment_save_failed": "falha ao salvar os anexos retornados: %v",
     "log.ash.history_save_failed": "aviso: falha ao salvar o histórico: %v",
     "log.install.error": "erro de instalação: %v",
@@ -197,6 +198,8 @@
     "log.cloud.rate_limit.3": "A cota de solicitações está tirando uma soneca. Tente novamente em breve.",
     "log.cloud.rate_limit.4": "O modelo precisa de uma pausa para um lanche antes da próxima pergunta.",
     "log.cloud.rate_limit.5": "Você excedeu a cota por enquanto. Uma pausa curta deve resolver.",
-    "log.runner.tool_failure_streak": "A ferramenta falhou repetidamente com o mesmo erro; as novas tentativas foram interrompidas"
+    "log.runner.tool_failure_streak": "A ferramenta falhou repetidamente com o mesmo erro; as novas tentativas foram interrompidas",
+    "log.runner.mcp_permanent_http_error": "A ferramenta MCP %s não será tentada novamente após o erro HTTP permanente %s. Última falha: %s",
+    "log.runner.mcp_nonretryable_error": "A ferramenta MCP %s não será tentada novamente porque a falha não é um erro HTTP temporário. Última falha: %s"
   }
 }

@@ -165,6 +165,7 @@
     "log.ash.file_read_failed": "%s konnte nicht gelesen werden: %v",
     "log.ash.timeout": "Die KI hat länger als %s gebraucht; wir sollten es später erneut versuchen",
     "log.ash.provider_request_failed": "%s-Anfrage fehlgeschlagen: %v",
+    "log.ash.endpoint_error": "Die KI möchte gerade nicht sprechen (zurückgegebener Fehler %s)",
     "log.ash.attachment_save_failed": "Zurückgegebene Anhänge konnten nicht gespeichert werden: %v",
     "log.ash.history_save_failed": "Warnung: Verlauf konnte nicht gespeichert werden: %v",
     "log.install.error": "Installationsfehler: %v",
@@ -197,6 +198,8 @@
     "log.cloud.rate_limit.3": "Das Anfragekontingent hält gerade ein Nickerchen. Versuche es bald erneut.",
     "log.cloud.rate_limit.4": "Das Modell braucht vor der nächsten Frage eine kleine Snackpause.",
     "log.cloud.rate_limit.5": "Du hast das Kontingent vorerst ausgeschöpft. Eine kurze Pause sollte reichen.",
-    "log.runner.tool_failure_streak": "Tool ist wiederholt mit demselben Fehler fehlgeschlagen; Wiederholungen werden gestoppt"
+    "log.runner.tool_failure_streak": "Tool ist wiederholt mit demselben Fehler fehlgeschlagen; Wiederholungen werden gestoppt",
+    "log.runner.mcp_permanent_http_error": "MCP-Tool %s wird nach dem permanenten HTTP-Fehler %s nicht erneut versucht. Letzter Fehler: %s",
+    "log.runner.mcp_nonretryable_error": "MCP-Tool %s wird nicht erneut versucht, da der Fehler kein temporärer HTTP-Fehler ist. Letzter Fehler: %s"
   }
 }

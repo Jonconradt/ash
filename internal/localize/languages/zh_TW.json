@@ -163,6 +163,7 @@
     "log.ash.file_read_failed": "讀取 %s 失敗：%v",
     "log.ash.timeout": "AI 回應時間超過 %s，稍後再試可能較合適",
     "log.ash.provider_request_failed": "%s 要求失敗：%v",
+    "log.ash.endpoint_error": "AI 現在不想說話（回傳錯誤 %s）",
     "log.ash.attachment_save_failed": "無法儲存傳回的附件：%v",
     "log.ash.history_save_failed": "警告：無法儲存歷程記錄：%v",
     "log.install.error": "安裝錯誤：%v",
@@ -195,6 +196,8 @@
     "log.cloud.rate_limit.3": "請求額度正在安靜地躺平休息，稍後再試。",
     "log.cloud.rate_limit.4": "模型需要吃點心補充能量，再回答下一個問題。",
     "log.cloud.rate_limit.5": "你暫時把額度打字用完啦，稍作停頓就好。",
-    "log.runner.tool_failure_streak": "工具以相同錯誤反覆失敗，已停止重試"
+    "log.runner.tool_failure_streak": "工具以相同錯誤反覆失敗，已停止重試",
+    "log.runner.mcp_permanent_http_error": "MCP 工具 %s 遇到永久性 HTTP 錯誤 %s 後不再重試。上次失敗：%s",
+    "log.runner.mcp_nonretryable_error": "MCP 工具 %s 的失敗不是暫時性 HTTP 錯誤，因此不再重試。上次失敗：%s"
   }
 }

@@ -106,6 +106,37 @@ func TestFormatRemoteMCPResultForModel(t *testing.T) {
 			t.Fatalf("formatted error result = %q", got)
 		}
 	})
+
+	t.Run("normalizes MCP failures and preserves their error code", func(t *testing.T) {
+		raw := json.RawMessage(`{"isError":true,"code":402,"content":[{"type":"text","text":"payment required"}]}`)
+		got := formatRemoteMCPFailure("mcp_billing_charge", formatRemoteMCPResult(raw), raw)
+		var result toolCommandResult
+		if err := json.Unmarshal([]byte(got), &result); err != nil {
+			t.Fatalf("unmarshal remote MCP failure: %v", err)
+		}
+		if result.OK || result.ErrorCode != "402" || !strings.Contains(result.Error, "payment required") {
+			t.Fatalf("normalized MCP failure = %+v", result)
+		}
+		key, failed := toolFailureSignature("mcp_billing_charge", got)
+		if !failed {
+			t.Fatal("MCP failure was not recognized by the shared failure counter")
+		}
+		summary := summarizeRepeatedFailure(key, 2, []toolObservation{{Command: "mcp_billing_charge", Summary: "payment required"}})
+		if !strings.Contains(summary, "error=402") {
+			t.Fatalf("failure summary omitted remote error code: %q", summary)
+		}
+	})
+
+	t.Run("extracts HTTP error code from MCP transport failures", func(t *testing.T) {
+		got := formatRemoteMCPFailure("mcp_billing_charge", "MCP tool call failed: HTTP status 402: payment required", nil)
+		var result toolCommandResult
+		if err := json.Unmarshal([]byte(got), &result); err != nil {
+			t.Fatalf("unmarshal remote MCP transport failure: %v", err)
+		}
+		if result.ErrorCode != "402" {
+			t.Fatalf("ErrorCode = %q, want 402", result.ErrorCode)
+		}
+	})
 }
 
 func TestPrepareRemoteMCPWithNoConfigPreservesLocalShim(t *testing.T) {

@@ -165,6 +165,7 @@
     "log.ash.file_read_failed": "gagal membaca %s: %v",
     "log.ash.timeout": "AI memerlukan waktu lebih dari %s; sebaiknya coba lagi nanti",
     "log.ash.provider_request_failed": "permintaan %s gagal: %v",
+    "log.ash.endpoint_error": "AI sedang tidak ingin berbicara (kesalahan yang dikembalikan %s)",
     "log.ash.attachment_save_failed": "gagal menyimpan lampiran yang dikembalikan: %v",
     "log.ash.history_save_failed": "peringatan: gagal menyimpan riwayat: %v",
     "log.install.error": "kesalahan instalasi: %v",
@@ -197,6 +198,8 @@
     "log.cloud.rate_limit.3": "Kuota permintaan sedang berbaring sejenak. Coba lagi nanti.",
     "log.cloud.rate_limit.4": "Model perlu rehat camilan sebelum menjawab pertanyaan berikutnya.",
     "log.cloud.rate_limit.5": "Kamu mengetik hingga kuota habis untuk saat ini. Istirahat sebentar akan membantu.",
-    "log.runner.tool_failure_streak": "Alat gagal berulang kali dengan kesalahan yang sama; pengulangan dihentikan"
+    "log.runner.tool_failure_streak": "Alat gagal berulang kali dengan kesalahan yang sama; pengulangan dihentikan",
+    "log.runner.mcp_permanent_http_error": "Alat MCP %s tidak akan dicoba ulang setelah kesalahan HTTP permanen %s. Kegagalan terakhir: %s",
+    "log.runner.mcp_nonretryable_error": "Alat MCP %s tidak akan dicoba ulang karena kegagalan ini bukan kesalahan HTTP sementara. Kegagalan terakhir: %s"
   }
 }

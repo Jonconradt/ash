@@ -165,6 +165,7 @@
     "log.ash.file_read_failed": "impossibile leggere %s: %v",
     "log.ash.timeout": "L'AI ha impiegato più di %s; probabilmente dovremmo riprovare più tardi",
     "log.ash.provider_request_failed": "richiesta a %s non riuscita: %v",
+    "log.ash.endpoint_error": "L’IA non ha voglia di parlare adesso (errore restituito %s)",
     "log.ash.attachment_save_failed": "impossibile salvare gli allegati restituiti: %v",
     "log.ash.history_save_failed": "avviso: impossibile salvare la cronologia: %v",
     "log.install.error": "errore di installazione: %v",
@@ -197,6 +198,8 @@
     "log.cloud.rate_limit.3": "La quota di richieste si sta riposando. Riprova a breve.",
     "log.cloud.rate_limit.4": "Al modello serve una pausa merenda prima della prossima domanda.",
     "log.cloud.rate_limit.5": "Per ora hai superato la quota. Una breve pausa dovrebbe bastare.",
-    "log.runner.tool_failure_streak": "Lo strumento non è riuscito più volte con lo stesso errore; i nuovi tentativi vengono interrotti"
+    "log.runner.tool_failure_streak": "Lo strumento non è riuscito più volte con lo stesso errore; i nuovi tentativi vengono interrotti",
+    "log.runner.mcp_permanent_http_error": "Nuovo tentativo dello strumento MCP %s non eseguito dopo l’errore HTTP permanente %s. Ultimo errore: %s",
+    "log.runner.mcp_nonretryable_error": "Nuovo tentativo dello strumento MCP %s non eseguito perché l’errore non è un errore HTTP temporaneo. Ultimo errore: %s"
   }
 }
