@@ -83,8 +83,8 @@ func TestBuildPromptToolCatalogMessage(t *testing.T) {
 		},
 	}}
 	msg := buildPromptToolCatalogMessage(tools)
-	if msg.Role != "system" {
-		t.Fatalf("expected system role, got %q", msg.Role)
+	if msg.Role != "user" {
+		t.Fatalf("expected user role, got %q", msg.Role)
 	}
 	for _, want := range []string{"run_unix_command", "run an allowlisted executable", promptToolCallFence, `"required":["command"]`} {
 		if !strings.Contains(msg.Content, want) {
@@ -221,7 +221,7 @@ func TestRunToolLoopPromptToolsFallback(t *testing.T) {
 			}
 			foundCatalog := false
 			for _, msg := range msgs {
-				if msg.Role == "system" && strings.Contains(msg.Content, promptToolCallFence) {
+				if msg.Role == "user" && strings.Contains(msg.Content, promptToolCallFence) {
 					foundCatalog = true
 				}
 			}
@@ -230,8 +230,19 @@ func TestRunToolLoopPromptToolsFallback(t *testing.T) {
 			}
 			return chatResponse{Message: message{Role: "assistant", Content: `{"name": "what_time_is_it", "arguments": {}}`}}, nil
 		default:
-			last, ok := lastUserMessageForTest(msgs)
-			if !ok || !strings.Contains(last.Content, "Tool result for") || !strings.Contains(last.Content, "12:00") {
+			// The tool result is a user-role message, but it is no longer
+			// necessarily the last user message: the per-round injections
+			// (execution state, injection defense, tool catalog) are now
+			// user-role messages too and are appended after it in the
+			// payload, so look for the tool result anywhere.
+			sawToolResult := false
+			for _, msg := range msgs {
+				if msg.Role == "user" && strings.Contains(msg.Content, "Tool result for") && strings.Contains(msg.Content, "12:00") {
+					sawToolResult = true
+					break
+				}
+			}
+			if !sawToolResult {
 				t.Fatalf("expected the tool result as a user message, got %#v", msgs)
 			}
 			for _, msg := range msgs {
@@ -311,7 +322,7 @@ func TestRunToolLoopPromptToolsForcedPlainAnswer(t *testing.T) {
 		}
 		foundCatalog := false
 		for _, msg := range msgs {
-			if msg.Role == "system" && strings.Contains(msg.Content, promptToolCallFence) {
+			if msg.Role == "user" && strings.Contains(msg.Content, promptToolCallFence) {
 				foundCatalog = true
 			}
 		}
@@ -346,7 +357,7 @@ func TestRunToolLoopNativeToolsUnchangedOnSuccess(t *testing.T) {
 			t.Fatalf("native tool calling must keep sending tools, got none on call %d", calls)
 		}
 		for _, msg := range msgs {
-			if msg.Role == "system" && strings.Contains(msg.Content, promptToolCallFence) {
+			if msg.Role == "user" && strings.Contains(msg.Content, promptToolCallFence) {
 				t.Fatalf("native tool calling must not inject the prompt tool catalog")
 			}
 		}
@@ -456,7 +467,7 @@ func TestRunToolLoopCachesUnsupportedToolsWithBroker(t *testing.T) {
 			}
 			foundCatalog := false
 			for _, msg := range msgs {
-				if msg.Role == "system" && strings.Contains(msg.Content, promptToolCallFence) {
+				if msg.Role == "user" && strings.Contains(msg.Content, promptToolCallFence) {
 					foundCatalog = true
 					break
 				}

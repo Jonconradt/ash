@@ -121,9 +121,8 @@ func TestRun(t *testing.T) {
 		if len(gotReq.Messages) == 0 {
 			t.Fatalf("expected request messages")
 		}
-		last, ok := lastUserMessageForTest(gotReq.Messages)
-		if !ok || last.Content != "prompt from stdin" {
-			t.Fatalf("expected stdin prompt as final user message, got role=%q content=%q", last.Role, last.Content)
+		if !userMessageWithContentForTest(gotReq.Messages, "prompt from stdin") {
+			t.Fatalf("expected stdin prompt as a user message, got %#v", gotReq.Messages)
 		}
 	})
 
@@ -182,9 +181,8 @@ func TestRun(t *testing.T) {
 		if len(gotReq.Messages) == 0 {
 			t.Fatalf("expected request messages")
 		}
-		last, ok := lastUserMessageForTest(gotReq.Messages)
-		if !ok || last.Content != "prompt from args" {
-			t.Fatalf("expected argv prompt as final user message, got role=%q content=%q", last.Role, last.Content)
+		if !userMessageWithContentForTest(gotReq.Messages, "prompt from args") {
+			t.Fatalf("expected argv prompt as a user message, got %#v", gotReq.Messages)
 		}
 	})
 
@@ -619,13 +617,16 @@ func TestRun(t *testing.T) {
 	})
 }
 
-func lastUserMessageForTest(messages []message) (message, bool) {
-	for i := len(messages) - 1; i >= 0; i-- {
-		if messages[i].Role == "user" {
-			return messages[i], true
+// userMessageWithContentForTest reports whether any user-role message has
+// exactly the given content. Per-round injections are user-role messages
+// too, so the user's turn is no longer necessarily the last user message.
+func userMessageWithContentForTest(messages []message, content string) bool {
+	for _, msg := range messages {
+		if msg.Role == "user" && msg.Content == content {
+			return true
 		}
 	}
-	return message{}, false
+	return false
 }
 
 func TestMainHelperProcess(t *testing.T) {

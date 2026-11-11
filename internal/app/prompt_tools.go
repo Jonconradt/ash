@@ -64,9 +64,11 @@ func isToolsUnsupportedError(err error) bool {
 const promptToolCallFence = "```tool_call"
 
 // buildPromptToolCatalogMessage renders the native tool definitions as a
-// system message for backends without native tool calling: the catalog of
+// user message for backends without native tool calling: the catalog of
 // names, descriptions, and argument schemas, plus the single machine-parseable
-// call format parsePromptToolCalls understands.
+// call format parsePromptToolCalls understands. It is a user-role message
+// because strict chat templates reject a system message after a non-system
+// turn, and this catalog is injected mid-conversation on every round.
 func buildPromptToolCatalogMessage(tools []toolDefinition) message {
 	var b strings.Builder
 	b.WriteString("This server does not support native tool calling, so tool calls are exchanged as plain text.\n")
@@ -87,7 +89,7 @@ func buildPromptToolCatalogMessage(tools []toolDefinition) message {
 	b.WriteString("If you cannot produce the fenced block, a single bare JSON object in that same format is also accepted. ")
 	b.WriteString("After each call you will receive a message beginning with \"Tool result for\" containing the output; use it to continue. ")
 	b.WriteString("If no tool is needed, answer normally without any tool_call block.")
-	return message{Role: "system", Content: b.String()}
+	return message{Role: "user", Content: b.String()}
 }
 
 // parsePromptToolCalls extracts prompt-based tool calls from an assistant

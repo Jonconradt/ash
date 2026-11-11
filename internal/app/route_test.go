@@ -109,9 +109,8 @@ func TestRunRoutedPromptUsesNormalExecution(t *testing.T) {
 	requests := 0
 	chatStreamExecutor = func(_ context.Context, _ aiConfig, messages []message, _ []toolDefinition, _ func(streamDelta)) (chatResponse, error) {
 		requests++
-		last, ok := lastUserMessageForTest(messages)
-		if !ok || last.Content != "What is the time?" {
-			t.Fatalf("unexpected user message: %#v", last)
+		if !userMessageWithContentForTest(messages, "What is the time?") {
+			t.Fatalf("unexpected user message: %#v", messages)
 		}
 		return chatResponse{Message: message{Role: "assistant", Content: "answer"}}, nil
 	}
