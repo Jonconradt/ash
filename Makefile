@@ -260,6 +260,7 @@ govulncheck:
 test: plugins-test
 	@./scripts/dev/run-quiet.sh "site-tests" node --test site/site.test.cjs
 	@./scripts/dev/run-quiet.sh "site-generator-tests" python3 -B -m unittest discover -s site -p 'test_*.py'
+	@./scripts/dev/run-quiet.sh "python-tool-tests" python3 -B -m unittest discover -s internal/app/ash_bootstrap/tools -p 'test_*.py'
 	@$(MAKE) --no-print-directory go-test
 	@echo "test: ok"
 

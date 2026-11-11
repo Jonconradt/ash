@@ -16,7 +16,9 @@ def build_ai_docs() -> str:
 - Use the first matching page and include a link to the page.
 
 Arguments:
-- --query TEXT: The search query to find on Wikipedia (default: quantum computing).
+- QUERY...: Search terms to look up, including multiword queries.
+- --query TEXT: The search query to find on Wikipedia; takes precedence over QUERY...
+  (default: quantum computing when neither form is provided).
 - --user-agent TEXT: Descriptive User-Agent header for respectful API usage.
 - --ai-docs: Print this documentation and exit.
 
@@ -118,7 +120,16 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Search Wikipedia and print AI-friendly JSON output."
     )
-    parser.add_argument("--query", default="quantum computing", help="Search query to look up.")
+    parser.add_argument(
+        "query_parts",
+        nargs="*",
+        metavar="QUERY",
+        help="Search query to look up (multiple words are joined).",
+    )
+    parser.add_argument(
+        "--query",
+        help="Search query to look up; takes precedence over positional query words.",
+    )
     parser.add_argument(
         "--user-agent",
         default="MyAIAgent/1.0 (contact@example.com)",
@@ -136,7 +147,10 @@ def main() -> None:
         print(build_ai_docs())
         return
 
-    output = wikipedia_search_tool(args.query, args.user_agent)
+    query = (
+        args.query if args.query is not None else " ".join(args.query_parts) or "quantum computing"
+    )
+    output = wikipedia_search_tool(query, args.user_agent)
     print(output)
 
 
