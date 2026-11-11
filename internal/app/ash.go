@@ -273,6 +273,8 @@ func run(args []string, stdout, stderr io.Writer) int {
 	messages = append(messages, message{Role: "system", Content: systemPrompt})
 	if continueMode {
 		messages = append(messages, priorConversation...)
+	} else if recentContext := recentConversationContext(priorConversation); recentContext != "" {
+		messages = append(messages, message{Role: "user", Content: recentContext})
 	}
 	messages = append(messages, message{Role: "user", Content: userInput, Attachments: attachments})
 

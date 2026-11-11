@@ -65,7 +65,7 @@ Is this thing secure and safe? It really depends on how bold you are. It runs as
 - Enables provider-native caching by default when supported
 - Shows an ANSI-friendly thinking indicator while waiting for the AI response
 - Supports `Ctrl-C` to abort an in-flight request
-- Starts each prompt with fresh context; use `--continue` (or `ASH_CONTINUE=1`) to include prior history, or let the model rewind with the `read_conversation_history` tool
+- Includes the immediately preceding turn as quoted context for follow-up questions; use `--continue` (or `ASH_CONTINUE=1`) to include the full prior history, or use `read_conversation_history` to look up older turns
 - Uses `$XDG_CONFIG_HOME/ash/.ash_system` (default `~/.config/ash/.ash_system`) as the canonical system prompt file when present
 - Always prepends current local date/time to the system prompt sent to the model
 - Supports emoji input/output (UTF-8)
@@ -654,11 +654,13 @@ $XDG_STATE_HOME/ash/history/task_$ASH_SESSION_ID.json
 
 Generic `SESSION_ID` is ignored; set `ASH_SESSION_ID` to choose an explicit session identity.
 
-Each prompt starts with fresh context by default. To include prior history,
+Each prompt includes only the immediately preceding turn by default, as quoted
+context for resolving follow-up questions. To include the full prior history,
 pass `--continue` (or `-c`) for that invocation, or set `ASH_CONTINUE=1`.
-Unrecognized `ASH_CONTINUE` values stay fresh. The model can also rewind on
-demand with the `read_conversation_history` tool (last 5 prompts by default,
-`keyword` search supported, at most 20 messages returned).
+Unrecognized `ASH_CONTINUE` values keep the prompt limited to the preceding
+turn. The model can also look up older messages with the
+`read_conversation_history` tool (last 5 prompts by default, `keyword` search
+supported, at most 20 messages returned).
 
 Optional max history messages (default: `40`):
 

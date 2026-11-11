@@ -807,10 +807,10 @@ func stripSystemPromptComments(prompt string) string {
 	return strings.Join(kept, "\n")
 }
 
-// continueEnabled reports whether ash should include prior conversation history
-// in the outgoing prompt. Defaults to false (fresh context per prompt);
-// ASH_CONTINUE=1/true/yes opts into continuation. Unrecognized values fail
-// closed to fresh rather than failing config validation.
+// continueEnabled reports whether ash should include all prior conversation
+// history in the outgoing prompt. The most recent turn is included separately
+// by default; ASH_CONTINUE=1/true/yes opts into full continuation. Unrecognized
+// values leave the prompt limited to the most recent turn.
 func continueEnabled() bool {
 	switch strings.ToLower(strings.TrimSpace(os.Getenv("ASH_CONTINUE"))) {
 	case "1", "true", "yes", "on", "enabled":

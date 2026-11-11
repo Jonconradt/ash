@@ -29,7 +29,7 @@
 The CLI entry point in [internal/app/ash.go](internal/app/ash.go) initializes configuration, loads the system prompt, resolves history, and runs the tool loop. The main control flow is:
 
 1. parse environment-based configuration
-2. load prompt/history/allowlist state (fresh context by default; prior history is included only in continue mode)
+2. load prompt/history/allowlist state (the immediately preceding turn is included as quoted context; full history is included only in continue mode)
 3. run the chat/tool loop
 4. render the final assistant reply
 
@@ -115,7 +115,7 @@ adding to the global-stub-var pattern; prefer constructor/parameter-injected dep
 
 ## Operational notes
 
-- History is stored under the user workspace directory and is retained with a bounded cleanup policy. Each prompt starts with fresh context; `--continue`/`-c` or `ASH_CONTINUE` opts into including prior history, and the `read_conversation_history` tool returns a bounded on-demand slice (last 5 prompts by default, keyword search supported, at most 20 messages).
+- History is stored under the user workspace directory and is retained with a bounded cleanup policy. Each prompt includes only the immediately preceding turn as quoted context; `--continue`/`-c` or `ASH_CONTINUE` opts into including the full prior history, and the `read_conversation_history` tool returns a bounded on-demand slice (last 5 prompts by default, keyword search supported, at most 20 messages).
 - Shell integrations check `$XDG_STATE_HOME/ash/.ash_snooze_until` (default `~/.local/state/ash/.ash_snooze_until`) before automatic wrapper and command-not-found routing. Direct `ash` invocations bypass this check.
 - User-visible messages are plain text by default. ASH_VERBOSE enables structured JSON debug logging, which can optionally be written to a rotating log file.
 - Tool execution is restricted by allowlist and path containment rules. Ash resolves the allowlist once per request, uses it for enforcement and tool schemas, and renders eligible managed scripts through the internal `$TOOLS_DIR_LIST` prompt substitution.

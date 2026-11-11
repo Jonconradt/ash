@@ -316,19 +316,19 @@ func TestReadConversationHistoryToolRegistered(t *testing.T) {
 	}
 }
 
-// TestRunDefaultsToFreshContext verifies the run path sends only the current
-// turn (not persisted history) by default, and includes it with --continue.
-func TestRunDefaultsToFreshContext(t *testing.T) {
+// TestRunContext verifies that fresh requests get only the immediately prior
+// turn as reference context, while --continue includes the full conversation.
+func TestRunContext(t *testing.T) {
 	for _, tc := range []struct {
-		name        string
-		args        []string
-		envContinue string
-		wantHistory bool
+		name               string
+		args               []string
+		envContinue        string
+		wantEarlierHistory bool
 	}{
-		{"fresh by default", []string{"second prompt"}, "", false},
-		{"continue flag includes history", []string{"--continue", "second prompt"}, "", true},
-		{"continue env includes history", []string{"second prompt"}, "1", true},
-		{"invalid env stays fresh", []string{"second prompt"}, "maybe", false},
+		{"latest turn by default", []string{"second prompt"}, "", false},
+		{"continue flag includes all history", []string{"--continue", "second prompt"}, "", true},
+		{"continue env includes all history", []string{"second prompt"}, "1", true},
+		{"invalid env includes only latest turn", []string{"second prompt"}, "maybe", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			home := t.TempDir()
@@ -373,8 +373,12 @@ func TestRunDefaultsToFreshContext(t *testing.T) {
 				t.Fatalf("mkdir: %v", err)
 			}
 			prior := []message{
-				{Role: "user", Content: "first unrelated question"},
-				{Role: "assistant", Content: "first answer"},
+				{Role: "user", Content: "first older question"},
+				{Role: "assistant", Content: "first older answer"},
+				{Role: "user", Content: "latest prior question"},
+				{Role: "assistant", ToolCalls: []toolCall{{Function: toolFunctionCall{Name: "run_python3"}}}},
+				{Role: "tool", ToolName: "run_python3", Content: "Prime check result: no primes found"},
+				{Role: "assistant", Content: "latest prior answer based on the script execution"},
 			}
 			data := historyData{
 				SchemaVersion: historySchemaVersion,
@@ -395,9 +399,22 @@ func TestRunDefaultsToFreshContext(t *testing.T) {
 				_ = joinedBuf.WriteByte('\n')
 			}
 			joined := joinedBuf.String()
-			hasPrior := strings.Contains(joined, "first unrelated question")
-			if hasPrior != tc.wantHistory {
-				t.Fatalf("request includes prior history = %v, want %v; messages=%q", hasPrior, tc.wantHistory, joined)
+			hasLatest := strings.Contains(joined, "latest prior question") &&
+				strings.Contains(joined, "latest prior answer based on the script execution") &&
+				strings.Contains(joined, "Prime check result: no primes found")
+			hasToolCall := strings.Contains(joined, "assistant requested tools: run_python3")
+			for _, m := range gotMessages {
+				for _, call := range m.ToolCalls {
+					hasToolCall = hasToolCall || call.Function.Name == "run_python3"
+				}
+			}
+			hasLatest = hasLatest && hasToolCall
+			if !hasLatest {
+				t.Fatalf("request omitted the latest prior turn; messages=%q", joined)
+			}
+			hasEarlier := strings.Contains(joined, "first older question")
+			if hasEarlier != tc.wantEarlierHistory {
+				t.Fatalf("request includes older history = %v, want %v; messages=%q", hasEarlier, tc.wantEarlierHistory, joined)
 			}
 			if !strings.Contains(joined, "second prompt") {
 				t.Fatalf("request missing current prompt: %q", joined)
@@ -414,7 +431,7 @@ func TestRunDefaultsToFreshContext(t *testing.T) {
 				_ = savedBuf.WriteByte('\n')
 			}
 			savedJoined := savedBuf.String()
-			if !strings.Contains(savedJoined, "first unrelated question") || !strings.Contains(savedJoined, "second prompt") {
+			if !strings.Contains(savedJoined, "first older question") || !strings.Contains(savedJoined, "latest prior question") || !strings.Contains(savedJoined, "second prompt") {
 				t.Fatalf("persisted history should retain prior + current turns: %q", savedJoined)
 			}
 		})

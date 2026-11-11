@@ -83,16 +83,17 @@ For Fish, the target is
 Print the version of the running ash binary.
 .TP
 .B ash [text ...]
-Run a single assistant request with fresh context.
+Run a single assistant request. The immediately preceding turn is included as
+quoted context for resolving follow-up questions.
 .IP
 .B --continue
 .IP
 .B -c
-Include prior conversation history in the prompt for this invocation only.
-Each prompt otherwise starts with fresh context; the model can rewind with
-the
+Include the full prior conversation history in the prompt for this invocation
+only. By default, only the immediately preceding turn is included; the model
+can look up older history with the
 .B read_conversation_history
-tool when earlier context is needed.
+tool.
 .IP
 .B --attach
 .I path
@@ -308,8 +309,9 @@ Optional max number of history messages retained per key. Default is 40.
 .TP
 .B ASH_CONTINUE
 Optional. When true-like (1, true, yes, on, enabled), include prior
-conversation history in the prompt. Default is off (fresh context per
-prompt). Unrecognized values stay fresh.
+conversation history in the prompt. By default, only the immediately
+preceding turn is included. Unrecognized values keep the prompt limited to
+that turn.
 .TP
 .B ASH_ALLOW
 Optional comma-separated allowlist for

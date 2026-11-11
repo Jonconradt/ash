@@ -313,7 +313,7 @@ func (s localToolShim) ListTools() []toolDefinition {
 			Type: "function",
 			Function: toolFunctionDefinition{
 				Name:        "read_conversation_history",
-				Description: "Read persisted prior messages for this session when earlier context is needed. Each prompt normally starts with fresh context; call this to rewind. By default returns the last 5 prompts; use keyword for a case-insensitive search of persisted messages. Returns at most 20 messages.",
+				Description: "Read persisted prior messages for this session. Use this for turns older than the automatically included most recent turn, or for more details not present there. By default returns the last 5 prompts; use keyword for a case-insensitive search of all persisted messages. Returns at most 20 messages.",
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
@@ -1454,5 +1454,9 @@ func truncateHistoryContent(value string) string {
 	if len(value) <= historyToolTruncateBytes {
 		return value
 	}
-	return value[:historyToolTruncateBytes] + "\n...truncated..."
+	end := historyToolTruncateBytes
+	for end > 0 && !utf8.ValidString(value[:end]) {
+		end--
+	}
+	return value[:end] + "\n...truncated..."
 }

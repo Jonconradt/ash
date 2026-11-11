@@ -430,6 +430,20 @@ func TestBuildSystemPrompt(t *testing.T) {
 		}
 	})
 
+	t.Run("conversation history guidance only when tool is exposed", func(t *testing.T) {
+		historyOnly := []toolDefinition{{Function: toolFunctionDefinition{Name: "read_conversation_history"}}}
+		got := buildSystemPrompt("", now, historyOnly)
+		if !strings.Contains(got, "call read_conversation_history before responding") ||
+			!strings.Contains(got, "do not deny or invent prior exchanges") ||
+			!strings.Contains(got, "keyword") {
+			t.Fatalf("expected actionable conversation-history guidance, got %q", got)
+		}
+		got = buildSystemPrompt("sys-msg", now, nil)
+		if got != "sys-msg" {
+			t.Fatalf("conversation-history guidance should require its tool, got %q", got)
+		}
+	})
+
 	t.Run("braced internal tokens expand with subject intact", func(t *testing.T) {
 		got := expandSystemPromptWithAllowlist("${TOOLS_DIR_LIST}, ${PLUGINS_DIR_LIST}, and ${IF_PYTHON_AVAILABLE} are internal Ash substitutions.", nil)
 		if strings.Contains(got, "are internal Ash substitutions") && !strings.Contains(got, "Python authoring") {
