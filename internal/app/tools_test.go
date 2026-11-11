@@ -364,6 +364,32 @@ func TestLocalToolShimRunUnixCommandPolicy(t *testing.T) {
 		}
 	})
 
+	t.Run("flattens one nested args array", func(t *testing.T) {
+		wikipediaShim := localToolShim{allowlist: map[string]struct{}{"wikipedia.py": {}}}
+		var gotArgs []string
+		toolCommandRunner = func(ctx context.Context, name string, args []string, timeout time.Duration, outputMax int) toolCommandResult {
+			if name != "python3" {
+				t.Fatalf("unexpected command %q", name)
+			}
+			if len(args) == 0 || filepath.Base(args[0]) != "wikipedia.py" {
+				t.Fatalf("unexpected script invocation %#v", args)
+			}
+			gotArgs = append([]string(nil), args[1:]...)
+			return toolCommandResult{OK: true, Command: name, ExitCode: 0}
+		}
+
+		resultJSON := wikipediaShim.CallTool(context.Background(), "run_unix_command", map[string]any{
+			"command": "wikipedia.py",
+			"args":    []any{[]any{"--query", "botanical definition of a fruit"}},
+		})
+		if !strings.Contains(resultJSON, `"ok":true`) {
+			t.Fatalf("expected success, got %s", resultJSON)
+		}
+		if !reflect.DeepEqual(gotArgs, []string{"--query", "botanical definition of a fruit"}) {
+			t.Fatalf("unexpected args %#v", gotArgs)
+		}
+	})
+
 	t.Run("drops empty args", func(t *testing.T) {
 		toolCommandRunner = func(ctx context.Context, name string, args []string, timeout time.Duration, outputMax int) toolCommandResult {
 			if name != "ls" {

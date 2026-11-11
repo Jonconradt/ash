@@ -439,3 +439,20 @@ func toStringSliceArg(value any) ([]string, error) {
 
 	return out, nil
 }
+
+func toCommandArgSlice(value any) ([]string, error) {
+	args, err := toStringSliceArg(value)
+	if err == nil {
+		return args, nil
+	}
+
+	raw, ok := value.([]any)
+	if !ok || len(raw) != 1 {
+		return nil, err
+	}
+	nested, ok := raw[0].([]any)
+	if !ok {
+		return nil, err
+	}
+	return toStringSliceArg(nested)
+}

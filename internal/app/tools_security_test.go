@@ -127,6 +127,14 @@ func TestCallUnixCommandAdversarialArguments(t *testing.T) {
 			},
 			want: "must be an array",
 		},
+		{
+			name: "malformed nested args",
+			args: map[string]any{
+				"command": "ls",
+				"args":    []any{[]any{"foo;bar"}},
+			},
+			want: "blocked shell control pattern",
+		},
 	}
 
 	for _, tt := range adversarialArgs {

@@ -62,7 +62,7 @@ func (s localToolShim) ListTools() []toolDefinition {
 							"items": map[string]any{
 								"type": "string",
 							},
-							"description": "Direct argv passed to the executable",
+							"description": "Direct argv passed to the executable; a single accidentally nested string array is also accepted",
 						},
 					},
 					"required": []string{"command"},
@@ -567,7 +567,7 @@ func (s localToolShim) callUnixCommand(ctx context.Context, args map[string]any)
 		return toolCommandResult{OK: false, Command: commandName, Error: "command is not allowlisted", EID: "ABLaPipP"}
 	}
 
-	argv, err := toStringSliceArg(args["args"])
+	argv, err := toCommandArgSlice(args["args"])
 	if err != nil {
 		return toolCommandResult{OK: false, Command: commandName, Error: err.Error(), EID: "8t4jO24H"}
 	}
