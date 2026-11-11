@@ -1,9 +1,19 @@
 // Copyright (c) 2026 Jonathan L. Conradt
 // SPDX-License-Identifier: MIT
 
+import { spawnSync } from "node:child_process";
 import test from "node:test";
 import assert from "node:assert/strict";
+import * as path from "node:path";
 import { MathParser } from "./index.js";
+
+function runCalculator(...args: string[]) {
+  return spawnSync(
+    process.execPath,
+    [path.join(__dirname, "index.js"), ...args],
+    { encoding: "utf8" }
+  );
+}
 
 test("Basic arithmetic and operator precedence", () => {
   assert.equal(new MathParser("2 + 3 * 4").parse(), 14);
@@ -73,4 +83,34 @@ test("Security and injection resistance", () => {
   assert.throws(() => new MathParser("require('fs')").parse());
   assert.throws(() => new MathParser("console.log(1)").parse());
   assert.throws(() => new MathParser("__proto__").parse());
+});
+
+test("CLI defaults to an expression and JSON output when no arguments are provided", () => {
+  const result = runCalculator();
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), {
+    status: "success",
+    expression: "2 + 2 * 3",
+    result: 8
+  });
+});
+
+test("CLI joins positional arguments into an expression", () => {
+  const result = runCalculator("2", "+", "2");
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), {
+    status: "success",
+    expression: "2 + 2",
+    result: 4
+  });
+});
+
+test("CLI removes recognized options and joins the remaining expression arguments", () => {
+  const result = runCalculator("--format", "json", "3", "*", "4");
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), {
+    status: "success",
+    expression: "3 * 4",
+    result: 12
+  });
 });

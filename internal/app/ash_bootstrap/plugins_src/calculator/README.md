@@ -9,6 +9,7 @@
 2. **Standard CLI Flags**:
    - `--version` / `-v`: Displays plugin name and version (`calculator 1.0.0`).
    - `--help` / `-h`: Displays usage examples and options.
+   - Accepts positional expressions, joining multiple arguments with spaces. When no expression is supplied, evaluates `2 + 2 * 3`; JSON output is the default.
 3. **Structured Logging (`slog` compatibility)**:
    - Reads `ASH_LOG_FILE`, `ASH_LOG_FORMAT`, and `ASH_VERBOSE`.
    - Writes structured JSON / text log entries matching Ash's logging conventions with Event Identifiers (`EID`).

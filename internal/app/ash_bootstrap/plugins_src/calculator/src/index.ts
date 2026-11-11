@@ -9,6 +9,7 @@ import * as process from "node:process";
 
 const PLUGIN_NAME = "calculator";
 const VERSION = "1.0.0";
+const DEFAULT_EXPRESSION = "2 + 2 * 3";
 
 function getAiDocs(): string {
   const docs = {
@@ -19,10 +20,9 @@ function getAiDocs(): string {
       $schema: "https://json-schema.org/draft/2020-12/schema",
       type: "object",
       properties: {
-        "--expr": { type: "string" },
+        "--expr": { type: "string", default: DEFAULT_EXPRESSION },
         "--format": { type: "string", enum: ["json", "text"], default: "json" }
       },
-      required: ["--expr"],
       additionalProperties: false
     },
     output_schema: {
@@ -42,7 +42,8 @@ function getAiDocs(): string {
       "Support arithmetic (+, -, *, /, %, ^), parentheses, constants (pi, e), and standard math functions (sin, cos, tan, sqrt, log, ln, exp, abs, floor, ceil, round)."
     ],
     Arguments: {
-      "--expr": "Mathematical expression string to evaluate (e.g. '2 + 2 * 3', 'sin(pi / 4)', 'sqrt(144) + 10^2')",
+      "expression": `Optional positional expression to evaluate. Defaults to '${DEFAULT_EXPRESSION}' when no expression is supplied.`,
+      "--expr": "Optional mathematical expression string (e.g. '2 + 2 * 3', 'sin(pi / 4)', 'sqrt(144) + 10^2')",
       "--format": "Output format: 'json' (default) or 'text'",
       "--ai-docs": "Print AI documentation and exit",
       "--version": "Print version and exit",
@@ -306,7 +307,7 @@ function main() {
       process.exit(0);
     }
     if (rawArgs[0] === "--help" || rawArgs[0] === "-h") {
-      console.log(`${PLUGIN_NAME} - TypeScript math expression evaluator plugin for Ash\n\nUsage:\n  ${PLUGIN_NAME} [--expr "<expression>"] [--format text|json]\n\nFlags:\n  --expr EXPR   Mathematical expression to evaluate\n  --format FMT  Output format: 'text' (default) or 'json'\n  --ai-docs     Print AI documentation and exit\n  -v, --version Print version and exit\n  -h, --help    Print help and exit`);
+      console.log(`${PLUGIN_NAME} - TypeScript math expression evaluator plugin for Ash\n\nUsage:\n  ${PLUGIN_NAME} [--expr "<expression>" | <expression> ...] [--format json|text]\n\nFlags:\n  --expr EXPR   Mathematical expression to evaluate\n  --format FMT  Output format: 'json' (default) or 'text'\n  --ai-docs     Print AI documentation and exit\n  -v, --version Print version and exit\n  -h, --help    Print help and exit\n\nWhen no expression is supplied, evaluates '${DEFAULT_EXPRESSION}'.`);
       process.exit(0);
     }
   }
@@ -315,15 +316,24 @@ function main() {
 
   let expr = "";
   let format = "json";
+  let hasExplicitExpression = false;
+  const expressionParts: string[] = [];
 
   for (let i = 0; i < rawArgs.length; i++) {
     if (rawArgs[i] === "--expr" && i + 1 < rawArgs.length) {
       expr = rawArgs[++i];
+      hasExplicitExpression = true;
     } else if (rawArgs[i] === "--format" && i + 1 < rawArgs.length) {
       format = rawArgs[++i];
-    } else if (!rawArgs[i].startsWith("-") && !expr) {
-      expr = rawArgs[i];
+    } else {
+      expressionParts.push(rawArgs[i]);
     }
+  }
+
+  if (expressionParts.length > 0) {
+    expr = [...(hasExplicitExpression ? [expr] : []), ...expressionParts].join(" ");
+  } else if (!hasExplicitExpression) {
+    expr = DEFAULT_EXPRESSION;
   }
 
   if (!expr.trim()) {
