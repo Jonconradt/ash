@@ -362,7 +362,9 @@ Optional cap on execution tasks derived from a request. Default is 6.
 Optional number of recent tool observations included in execution state. Default is 4.
 .TP
 .B ASH_TASK_STALL_ROUNDS
-Optional maximum assistant stall rounds before stopping execution. Default is 2.
+Legacy setting accepted for compatibility; no longer triggers continuation requests.
+The heuristic task list is advisory. A final assistant answer ends the tool loop
+even if tasks remain pending.
 .TP
 .B ASH_RETRY_MAX_ATTEMPTS
 Optional maximum AI request attempts on retryable failures. Default is 3.

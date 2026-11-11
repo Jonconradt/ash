@@ -136,9 +136,8 @@ _ash_leading_question_word() {
 	return 1
 }
 
-# The heuristic itself lives in Go (ash route --check) so every shell shares one
-# implementation. These guards only reject inputs that Go could never route, and
-# they stay fork-free so ordinary command use never pays for a subprocess.
+# These fork-free guards reject obvious commands. Go makes the final routing
+# decision in the same process that handles the prompt.
 _ash_should_route() {
 	local cmd="$1"
 	shift
@@ -160,7 +159,7 @@ _ash_should_route() {
 	esac
 
 	builtin type -P ash >/dev/null 2>&1 || return 1
-	command ash route --check -- "$cmd" "$@"
+	return 0
 }
 
 _ash_route_or_delegate() {
@@ -172,8 +171,9 @@ _ash_route_or_delegate() {
 	fi
   if _ash_should_route "$cmd" "$@"; then
 	_ash_ensure_broker >/dev/null 2>&1
-	ash -- "$cmd" "$@"
-    return $?
+	local status=0
+	command ash --internal-route-prompt "$cmd" "$@" || status=$?
+	[[ $status -eq 125 ]] || return "$status"
   fi
   command "$cmd" "$@"
 }
@@ -187,8 +187,9 @@ _ash_route_or_delegate_builtin() {
 	fi
   if _ash_should_route "$builtin_name" "$@"; then
 	_ash_ensure_broker >/dev/null 2>&1
-	ash -- "$builtin_name" "$@"
-    return $?
+	local status=0
+	command ash --internal-route-prompt "$builtin_name" "$@" || status=$?
+	[[ $status -eq 125 ]] || return "$status"
   fi
   builtin "$builtin_name" "$@"
 }
@@ -201,12 +202,14 @@ _ash_route_or_delegate_say() {
 		return $?
 	fi
 	if _ash_should_route "$cmd" "$@"; then
+		_ash_ensure_broker >/dev/null 2>&1
+		local status=0
 		if command -v say >/dev/null 2>&1; then
-			ash --say "$cmd" "$@"
-			return $?
+			command ash --internal-route-prompt --say "$cmd" "$@" || status=$?
+		else
+			command ash --internal-route-prompt "$cmd" "$@" || status=$?
 		fi
-		ash -- "$cmd" "$@"
-		return $?
+		[[ $status -eq 125 ]] || return "$status"
 	fi
 	command "$cmd" "$@"
 }

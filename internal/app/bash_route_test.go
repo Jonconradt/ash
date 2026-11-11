@@ -28,10 +28,10 @@ func extractBashRouteGuards(t *testing.T) string {
 	if start < 0 {
 		t.Fatal("bash asset is missing the routing guards")
 	}
-	marker := "\tcommand ash route --check -- \"$cmd\" \"$@\"\n}"
+	marker := "\treturn 0\n}"
 	end := strings.Index(asset[start:], marker)
 	if end < 0 {
-		t.Fatal("bash asset no longer delegates to ash route --check")
+		t.Fatal("bash asset is missing the routing guard terminator")
 	}
 	return asset[start : start+end+len(marker)]
 }
@@ -88,9 +88,12 @@ func TestBashPrefilterNeverRejectsRoutablePrompts(t *testing.T) {
 		if !shouldRoutePrompt(line) {
 			t.Fatalf("corpus entry %q is not routable in Go; fix the test corpus", line)
 		}
-		passed, _ := runBashPrefilter(t, fields)
+		passed, consulted := runBashPrefilter(t, fields)
 		if !passed {
 			t.Errorf("bash guards rejected %q, but Go would route it", line)
+		}
+		if consulted {
+			t.Errorf("bash guards forked ash for %q", line)
 		}
 	}
 }
@@ -132,9 +135,13 @@ func TestBashAssetDelegatesRoutingPolicyToGo(t *testing.T) {
 		t.Fatalf("read embedded bash asset: %v", err)
 	}
 	asset := string(content)
-	if !strings.Contains(asset, "command ash route --check -- \"$cmd\" \"$@\"") {
-		t.Error("bash asset must delegate routing to ash route --check")
+	if strings.Contains(asset, "command ash route --check") {
+		t.Error("bash asset must not launch a separate routing process")
 	}
+	if !strings.Contains(asset, "command ash --internal-route-prompt") {
+		t.Error("bash asset must combine routing and prompt execution")
+	}
+
 	for _, duplicated := range []string{"natural_wrapper=1", "has_path_like", "teatime"} {
 		if strings.Contains(asset, duplicated) {
 			t.Errorf("bash asset still contains duplicated heuristic marker %q", duplicated)
@@ -142,6 +149,77 @@ func TestBashAssetDelegatesRoutingPolicyToGo(t *testing.T) {
 	}
 }
 
+func TestBashRoutingUsesOneAshProcess(t *testing.T) {
+	bashPath, err := exec.LookPath("bash")
+	if err != nil {
+		t.Skipf("bash not available: %v", err)
+	}
+	content, err := readEmbeddedBootstrapAsset("ash_bootstrap/.ash_bashrc")
+	if err != nil {
+		t.Fatal(err)
+	}
+	asset := string(content)
+	start := strings.Index(asset, "# Question words that can open")
+	if start < 0 {
+		t.Fatal("missing routing functions")
+	}
+	for _, tc := range []struct {
+		name      string
+		command   string
+		ashExit   string
+		wantExit  int
+		wantCalls string
+	}{
+		{"prompt", "What is the time?", "0", 0, "ash --internal-route-prompt What is the time?\n"},
+		{"failed prompt", "What is the time?", "1", 1, "ash --internal-route-prompt What is the time?\n"},
+		{"native fallback", "What is the time?", "125", 0, "ash --internal-route-prompt What is the time?\nWhat is the time?\n"},
+		{"ordinary command", "which ls", "0", 0, "which ls\n"},
+		{"builtin prompt", "test is this a question?", "0", 0, "ash --internal-route-prompt test is this a question?\n"},
+		{"builtin fallback", "test is this a question?", "125", 2, "ash --internal-route-prompt test is this a question?\n"},
+		{"speech prompt", "say something witty", "0", 0, "ash --internal-route-prompt --say say something witty\n"},
+		{"speech fallback", "say something witty", "125", 0, "ash --internal-route-prompt --say say something witty\nsay something witty\n"},
+		{"unknown command", "Summarize my bio", "0", 0, "ash -- Summarize my bio\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			for _, name := range []string{"ash", "What", "which", "say"} {
+				script := "#!/bin/sh\nprintf '%s %s\\n' " + name + " \"$*\" >> \"$ASH_TEST_CALLS\"\n"
+				if name == "ash" {
+					script += "exit \"$ASH_TEST_EXIT\"\n"
+				}
+				if err := os.WriteFile(filepath.Join(dir, name), []byte(script), 0o700); err != nil {
+					t.Fatal(err)
+				}
+			}
+			hookStart := strings.Index(asset, "command_not_found_handle() {")
+			hookEnd := strings.Index(asset[hookStart:], "\nash() {")
+			script := asset[hookStart:hookStart+hookEnd] + "\n" + asset[start:] +
+				"\n_ash_prompt_processing_enabled() { return 0; }\n_ash_ensure_broker() { return 0; }\n" + tc.command + "\n"
+			callsPath := filepath.Join(dir, "calls")
+			cmd := exec.CommandContext(context.Background(), bashPath, "--noprofile", "--norc", "-ec", script)
+			cmd.Env = append(os.Environ(), "PATH="+dir+string(os.PathListSeparator)+os.Getenv("PATH"), "ASH_TEST_CALLS="+callsPath, "ASH_TEST_EXIT="+tc.ashExit)
+			output, runErr := cmd.CombinedOutput()
+			exitCode := 0
+			if runErr != nil {
+				var exitErr *exec.ExitError
+				if !errors.As(runErr, &exitErr) {
+					t.Fatal(runErr)
+				}
+				exitCode = exitErr.ExitCode()
+			}
+			if exitCode != tc.wantExit {
+				t.Fatalf("exit = %d, want %d; output=%q", exitCode, tc.wantExit, output)
+			}
+			calls, err := os.ReadFile(callsPath)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(calls) != tc.wantCalls {
+				t.Fatalf("calls = %q, want %q", calls, tc.wantCalls)
+			}
+		})
+	}
+}
 func TestBashCommandNotFoundDoesNotReenterWhenAshIsMissing(t *testing.T) {
 	bashPath, err := exec.LookPath("bash")
 	if err != nil {

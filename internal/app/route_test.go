@@ -4,6 +4,7 @@
 package app
 
 import (
+	"context"
 	"regexp"
 	"sort"
 	"strings"
@@ -63,11 +64,66 @@ func TestRunRouteExitCodes(t *testing.T) {
 	if code := runRoute([]string{"--check", "--", "what", "is", "the", "time?"}, &stdout, &stderr); code != 0 {
 		t.Fatalf("expected route exit 0 for a prompt, got %d", code)
 	}
+
 	if code := runRoute([]string{"--check", "--", "which", "ls"}, &stdout, &stderr); code != 1 {
 		t.Fatalf("expected route exit 1 for a real command, got %d", code)
 	}
 	if code := runRoute(nil, &stdout, &stderr); code != 2 {
 		t.Fatalf("expected route exit 2 for missing --check, got %d", code)
+	}
+}
+
+func TestRoutingInvocationsDoNotEmitSummary(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("ASH_VERBOSE", "1")
+	t.Setenv("ASH_AI_ENDPOINT", "")
+	t.Setenv("ASH_AI_MODEL", "")
+	for _, tc := range []struct {
+		args []string
+		want int
+	}{
+		{[]string{"route", "--check", "--", "What is the time?"}, 0},
+		{[]string{"route", "--check", "--", "which ls"}, 1},
+		{[]string{"--internal-route-prompt", "which", "ls"}, routePromptRejected},
+		{[]string{"--internal-route-prompt", "--say", "say", "-v", "Alex", "hello"}, routePromptRejected},
+	} {
+		var stdout, stderr strings.Builder
+		if code := run(tc.args, &stdout, &stderr); code != tc.want {
+			t.Fatalf("run(%q) = %d, want %d", tc.args, code, tc.want)
+		}
+		if stdout.Len() != 0 || stderr.Len() != 0 {
+			t.Fatalf("routing invocation %q emitted output: stdout=%q stderr=%q", tc.args, stdout.String(), stderr.String())
+		}
+	}
+}
+func TestRunRoutedPromptUsesNormalExecution(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("ASH_VERBOSE", "1")
+	t.Setenv("AI", "")
+	t.Setenv("ASH_AI_ENDPOINT", "http://127.0.0.1:1")
+	t.Setenv("ASH_AI_MODEL", "model")
+	t.Setenv("ASH_BROKER_SOCKET", "")
+	t.Setenv("ASH_STREAM", "0")
+	original := chatStreamExecutor
+	t.Cleanup(func() { chatStreamExecutor = original })
+	requests := 0
+	chatStreamExecutor = func(_ context.Context, _ aiConfig, messages []message, _ []toolDefinition, _ func(streamDelta)) (chatResponse, error) {
+		requests++
+		last, ok := lastUserMessageForTest(messages)
+		if !ok || last.Content != "What is the time?" {
+			t.Fatalf("unexpected user message: %#v", last)
+		}
+		return chatResponse{Message: message{Role: "assistant", Content: "answer"}}, nil
+	}
+	var stdout, stderr strings.Builder
+	if code := run([]string{"--internal-route-prompt", "What", "is", "the", "time?"}, &stdout, &stderr); code != 0 {
+		t.Fatalf("exit = %d; stderr=%q", code, stderr.String())
+	}
+	if requests != 1 || !strings.Contains(stdout.String(), "answer") {
+		t.Fatalf("requests=%d stdout=%q, want one AI request and its answer", requests, stdout.String())
+	}
+	if count := strings.Count(stderr.String(), "EXECUTION SUMMARY"); count != 1 {
+		t.Fatalf("dashboard count=%d, want 1; stderr=%q", count, stderr.String())
 	}
 }
 

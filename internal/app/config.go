@@ -941,16 +941,6 @@ func relevanceWindow() int {
 	return defaultRelevanceWin
 }
 
-// maxTaskStallRounds returns the configured number of stalled rounds before execution stops, or the default when unset or invalid.
-func maxTaskStallRounds() int {
-	if raw := strings.TrimSpace(os.Getenv("ASH_TASK_STALL_ROUNDS")); raw != "" {
-		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
-			return parsed
-		}
-	}
-	return defaultStallRounds
-}
-
 // toolRepeatLimit returns the configured number of consecutive identical tool calls allowed before the loop intervenes, or the default when unset or invalid.
 func toolRepeatLimit() int {
 	if raw := strings.TrimSpace(os.Getenv("ASH_TOOL_REPEAT_LIMIT")); raw != "" {

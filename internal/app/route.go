@@ -105,6 +105,9 @@ func normalizeQuestionToken(token string) string {
 	}
 }
 
+// Reserved for shell wrappers to distinguish native-command fallback from a failed prompt.
+const routePromptRejected = 125
+
 // runRoute answers whether a raw command line should be routed to ash as a prompt.
 // Exit code 0 means route, 1 means leave the line to the shell.
 func runRoute(args []string, stdout, stderr io.Writer) int {

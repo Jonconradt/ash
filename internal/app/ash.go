@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -39,7 +40,6 @@ const (
 	defaultMaxAgents                  = 6
 	defaultTaskMax                    = 6
 	defaultRelevanceWin               = 4
-	defaultStallRounds                = 2
 	defaultToolRepeatLimit            = 2
 	defaultLaunchdTimeout             = 15 * time.Second
 	defaultCronTimeout                = 15 * time.Second
@@ -90,15 +90,29 @@ func run(args []string, stdout, stderr io.Writer) int {
 		printUsage(stdout)
 		return 0
 	}
+	routedPrompt := len(args) > 0 && args[0] == "--internal-route-prompt"
+	if routedPrompt {
+		args = args[1:]
+		promptArgs := args
+		if len(promptArgs) > 0 && promptArgs[0] == "--say" {
+			promptArgs = promptArgs[1:]
+		}
+		if !shouldRoutePrompt(strings.Join(promptArgs, " ")) {
+			return routePromptRejected
+		}
+	}
 	if !initLanguage(stderr) {
 		return 1
+	}
+	if len(args) > 0 && args[0] == "route" && !routedPrompt {
+		return runRoute(args[1:], stdout, stderr)
 	}
 	if err := workspace.ValidateBaseDirs(); err != nil {
 		_, _ = fmt.Fprintln(stderr, err)
 		return 1
 	}
-	literalPrompt := len(args) > 0 && args[0] == "--"
-	if literalPrompt {
+	literalPrompt := routedPrompt || (len(args) > 0 && args[0] == "--")
+	if !routedPrompt && literalPrompt {
 		args = args[1:]
 	}
 	voiceMode := len(args) > 0 && args[0] == "--say" && !speechTextOutputEnabled()
@@ -147,9 +161,6 @@ func run(args []string, stdout, stderr io.Writer) int {
 	if !literalPrompt && args[0] == "broker" {
 		_, _ = fmt.Fprintln(stderr, localize.Text("ash.broker_moved"))
 		return 2
-	}
-	if !literalPrompt && args[0] == "route" {
-		return runRoute(args[1:], stdout, stderr)
 	}
 	if !literalPrompt && args[0] == "update" {
 		return runUpgrade(args[1:], stdout, stderr)
@@ -303,7 +314,11 @@ func run(args []string, stdout, stderr io.Writer) int {
 				return 1
 			}
 		}
-		slog.Error(localize.Format("log.ash.provider_request_failed", []any{aiCfg.Provider, err}), "EID", "XflUmD5L")
+		message := localize.Format("log.ash.provider_request_failed", []any{aiCfg.Provider, err})
+		if statusErr, ok := errors.AsType[chatStatusError](err); ok {
+			message = localize.Format("log.ash.endpoint_error", []any{strconv.Itoa(statusErr.StatusCode)})
+		}
+		slog.Error(message, "EID", "XflUmD5L")
 		return 1
 	}
 

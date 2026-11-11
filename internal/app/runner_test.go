@@ -17,6 +17,20 @@ import (
 	"time"
 )
 
+type fixedToolResultShim struct {
+	result string
+	calls  int
+}
+
+func (s *fixedToolResultShim) ListTools() []toolDefinition {
+	return []toolDefinition{{Type: "function", Function: toolFunctionDefinition{Name: "mcp_billing_charge"}}}
+}
+
+func (s *fixedToolResultShim) CallTool(context.Context, string, map[string]any) string {
+	s.calls++
+	return s.result
+}
+
 func TestToolLoopTaskProgression(t *testing.T) {
 	t.Run("task progression and stall handling", func(t *testing.T) {
 		tasks := []executionTask{{ID: 1, Goal: "one", Status: taskStatusPending}, {ID: 2, Goal: "two", Status: taskStatusPending}}
@@ -87,6 +101,55 @@ func TestRunToolLoopReasoningOnlyReply(t *testing.T) {
 	}
 	if calls != 2 {
 		t.Fatalf("expected 2 chat calls, got %d", calls)
+	}
+}
+
+func TestRunToolLoopDoesNotRetryFinalAnswerAfterTool(t *testing.T) {
+	for _, prompt := range []string{
+		"What is the unix command to sort the environment variables and display them in alphabetical order?",
+		"run command to sort the environment variables and display them",
+	} {
+		t.Run(prompt, func(t *testing.T) {
+			original := chatStreamExecutor
+			t.Cleanup(func() { chatStreamExecutor = original })
+			calls := 0
+			chatStreamExecutor = func(_ context.Context, _ aiConfig, _ []message, _ []toolDefinition, _ func(streamDelta)) (chatResponse, error) {
+				calls++
+				if calls == 1 {
+					return chatResponse{Message: message{Role: "assistant", ToolCalls: []toolCall{{
+						Function: toolFunctionCall{Name: "run_unix_pipeline", Arguments: map[string]any{"pipeline": "env | sort"}},
+					}}}}, nil
+				}
+				return chatResponse{Message: message{Role: "assistant", Content: "env | sort"}}, nil
+			}
+			shim := stubToolShim{tools: []toolDefinition{{Type: "function", Function: toolFunctionDefinition{Name: "run_unix_pipeline"}}}}
+			final, history, err := runToolLoop(context.Background(), testAIConfig("http://example.invalid", "model"), prompt, []message{{Role: "user", Content: prompt}}, shim)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if final != "env | sort" || calls != 2 || len(history) != 4 {
+				t.Fatalf("final=%q calls=%d history=%d, want final answer with exactly two AI calls", final, calls, len(history))
+			}
+		})
+	}
+}
+
+func TestRunToolLoopCommandExplanationNeedsOneRequest(t *testing.T) {
+	original := chatStreamExecutor
+	t.Cleanup(func() { chatStreamExecutor = original })
+	calls := 0
+	chatStreamExecutor = func(_ context.Context, _ aiConfig, _ []message, _ []toolDefinition, _ func(streamDelta)) (chatResponse, error) {
+		calls++
+		return chatResponse{Message: message{Role: "assistant", Content: "Run this: env | sort"}}, nil
+	}
+	prompt := "What is the unix command to sort environment variables and display them alphabetically?"
+	shim := stubToolShim{tools: []toolDefinition{{Type: "function", Function: toolFunctionDefinition{Name: "run_unix_pipeline"}}}}
+	final, _, err := runToolLoop(context.Background(), testAIConfig("http://example.invalid", "model"), prompt, []message{{Role: "user", Content: prompt}}, shim)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls != 1 || final != "Run this: env | sort" {
+		t.Fatalf("calls=%d final=%q, want one request and the command explanation", calls, final)
 	}
 }
 
@@ -516,6 +579,9 @@ func TestRunToolLoopInjectsExecutionStateMessage(t *testing.T) {
 	if !sawStateMessage {
 		t.Fatalf("expected execution state system message to be injected")
 	}
+	if requestCount != 2 {
+		t.Fatalf("expected exactly 2 AI requests despite pending heuristic tasks, got %d", requestCount)
+	}
 }
 
 func TestRunToolLoopInjectsPromptInjectionDefenseMessage(t *testing.T) {
@@ -811,5 +877,104 @@ func TestRunToolLoopStopsAfterRepeatedSameToolFailures(t *testing.T) {
 	}
 	if !sawStopNotice {
 		t.Fatalf("expected stop notice in messages, got %#v", updated)
+	}
+}
+
+func TestRunToolLoopStopsAfterRepeatedRemoteMCPFailures(t *testing.T) {
+	t.Setenv("ASH_PROMPT_TOOLS", "off")
+	raw := json.RawMessage(`{"isError":true,"code":503,"content":[{"type":"text","text":"service unavailable"}]}`)
+	shim := &fixedToolResultShim{
+		result: formatRemoteMCPFailure("mcp_billing_charge", formatRemoteMCPResult(raw), raw),
+	}
+
+	chatCalls := 0
+	originalExecutor := chatStreamExecutor
+	t.Cleanup(func() { chatStreamExecutor = originalExecutor })
+	chatStreamExecutor = func(_ context.Context, _ aiConfig, _ []message, _ []toolDefinition, _ func(streamDelta)) (chatResponse, error) {
+		chatCalls++
+		return chatResponse{Message: message{Role: "assistant", ToolCalls: []toolCall{{
+			Type: "function",
+			Function: toolFunctionCall{
+				Name:      "mcp_billing_charge",
+				Arguments: map[string]any{},
+			},
+		}}}}, nil
+	}
+
+	final, _, err := runToolLoop(context.Background(), testAIConfig("http://example.invalid", "model"), "charge", []message{{Role: "user", Content: "charge"}}, shim)
+	if err != nil {
+		t.Fatalf("runToolLoop returned error: %v", err)
+	}
+	if shim.calls != 2 || chatCalls != 2 {
+		t.Fatalf("MCP failure calls = tool %d, AI %d; want 2 each", shim.calls, chatCalls)
+	}
+	if !strings.Contains(final, "error=503") {
+		t.Fatalf("final response omitted the MCP error code: %q", final)
+	}
+}
+
+func TestRunToolLoopDoesNotRetryPermanentRemoteMCPFailure(t *testing.T) {
+	t.Setenv("ASH_PROMPT_TOOLS", "off")
+	raw := json.RawMessage(`{"isError":true,"code":402,"content":[{"type":"text","text":"payment required"}]}`)
+	shim := &fixedToolResultShim{
+		result: formatRemoteMCPFailure("mcp_billing_charge", formatRemoteMCPResult(raw), raw),
+	}
+
+	chatCalls := 0
+	originalExecutor := chatStreamExecutor
+	t.Cleanup(func() { chatStreamExecutor = originalExecutor })
+	chatStreamExecutor = func(_ context.Context, _ aiConfig, _ []message, _ []toolDefinition, _ func(streamDelta)) (chatResponse, error) {
+		chatCalls++
+		return chatResponse{Message: message{Role: "assistant", ToolCalls: []toolCall{{
+			Type: "function",
+			Function: toolFunctionCall{
+				Name:      "mcp_billing_charge",
+				Arguments: map[string]any{},
+			},
+		}}}}, nil
+	}
+
+	final, _, err := runToolLoop(context.Background(), testAIConfig("http://example.invalid", "model"), "charge", []message{{Role: "user", Content: "charge"}}, shim)
+	if err != nil {
+		t.Fatalf("runToolLoop returned error: %v", err)
+	}
+	if shim.calls != 1 || chatCalls != 1 {
+		t.Fatalf("permanent MCP failure calls = tool %d, AI %d; want 1 each", shim.calls, chatCalls)
+	}
+	if !strings.Contains(final, "permanent HTTP error 402") {
+		t.Fatalf("final response omitted permanent error code: %q", final)
+	}
+}
+
+func TestRemoteMCPRetryPolicy(t *testing.T) {
+	tests := []struct {
+		name          string
+		code          string
+		wantRetry     bool
+		wantPermanent bool
+	}{
+		{name: "payment required", code: "402", wantPermanent: true},
+		{name: "request timeout", code: "408", wantRetry: true},
+		{name: "too early", code: "425", wantRetry: true},
+		{name: "rate limited", code: "429", wantRetry: true},
+		{name: "server unavailable", code: "503", wantRetry: true},
+		{name: "non-http code", code: "-32000"},
+		{name: "redirect", code: "302"},
+		{name: "missing code", code: ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			encoded, err := json.Marshal(toolCommandResult{OK: false, ErrorCode: tt.code})
+			if err != nil {
+				t.Fatalf("marshal tool result: %v", err)
+			}
+			if got := shouldRetryRemoteMCPFailure("mcp_test_tool", string(encoded)); got != tt.wantRetry {
+				t.Fatalf("shouldRetryRemoteMCPFailure(code=%q) = %t, want %t", tt.code, got, tt.wantRetry)
+			}
+			gotPermanent := permanentRemoteMCPHTTPErrorCode("mcp_test_tool", string(encoded)) != ""
+			if gotPermanent != tt.wantPermanent {
+				t.Fatalf("permanentRemoteMCPHTTPErrorCode(code=%q) is permanent=%t, want %t", tt.code, gotPermanent, tt.wantPermanent)
+			}
+		})
 	}
 }
