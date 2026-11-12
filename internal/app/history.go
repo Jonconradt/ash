@@ -28,15 +28,42 @@ func sortedAllowlist(allowlist map[string]struct{}) []string {
 	return out
 }
 
-// stripSystemMessage removes the leading system message when present.
+// stripSystemMessage removes every system-role message before history is
+// persisted. Strict chat templates (for example, some Ollama / local models)
+// reject a system message after a non-system turn, so no system message may
+// survive in saved history: the leading system prompt is rebuilt from
+// configuration on the next turn, and mid-conversation injections are now
+// user-role messages.
 func stripSystemMessage(messages []message) []message {
 	if len(messages) == 0 {
 		return nil
 	}
-	if messages[0].Role == "system" {
-		return append([]message(nil), messages[1:]...)
+	kept := make([]message, 0, len(messages))
+	for _, msg := range messages {
+		if msg.Role == "system" {
+			continue
+		}
+		kept = append(kept, msg)
 	}
-	return append([]message(nil), messages...)
+	return kept
+}
+
+// dropNonLeadingSystemMessages keeps at most the leading system prompt and
+// removes any later system-role message. It guards the payload sent to the
+// model against history saved before mid-conversation injections became
+// user-role messages, which strict chat templates would reject.
+func dropNonLeadingSystemMessages(messages []message) []message {
+	if len(messages) == 0 {
+		return messages
+	}
+	kept := make([]message, 0, len(messages))
+	for i, msg := range messages {
+		if msg.Role == "system" && i != 0 {
+			continue
+		}
+		kept = append(kept, msg)
+	}
+	return kept
 }
 
 // recentConversationContext returns a bounded, quoted record of the immediately
