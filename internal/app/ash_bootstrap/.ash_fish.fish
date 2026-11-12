@@ -77,14 +77,17 @@ function _ash_ensure_broker
 	test -n "$token"; or return 1
 	set -l parent_pid $fish_pid
 
-	begin
-		set -lx ASH_BROKER_TOKEN "$token"
-		set -lx ASH_MCP_CREDENTIAL_KEY "$mcp_credential_key"
-		command ash-broker --socket "$socket_path" --session-id "$session_id" --parent-pid "$parent_pid" </dev/null >/dev/null 2>&1
-	end &
+	# This must stay a backgrounded simple command. Fish waits for a backgrounded
+	# compound block to finish before it continues, and the broker is a long-lived
+	# server, so launching it inside "begin ... end &" would hang every interactive
+	# fish shell at startup. env scopes the broker-only variables and execs in place,
+	# so $last_pid is the broker's own pid.
+	set -l broker_bin (command -v ash-broker)
+	test -n "$broker_bin"; or return 1
+	command env ASH_BROKER_TOKEN="$token" ASH_MCP_CREDENTIAL_KEY="$mcp_credential_key" "$broker_bin" --socket "$socket_path" --session-id "$session_id" --parent-pid "$parent_pid" </dev/null >/dev/null 2>&1 &
 	set -l broker_pid $last_pid
 	disown "$broker_pid" 2>/dev/null; or true
-	for attempt in (command seq 1 40)
+	for attempt in (command seq 1 200)
 		if test -S "$socket_path"
 			set -gx ASH_BROKER_SOCKET "$socket_path"
 			set -gx ASH_BROKER_TOKEN "$token"
@@ -94,6 +97,9 @@ function _ash_ensure_broker
 		command kill -0 "$broker_pid" 2>/dev/null; or return 1
 		command sleep 0.01
 	end
+	# The broker never came up; do not leave a process no shell owns.
+	command kill "$broker_pid" 2>/dev/null
+	command rm -f "$socket_path"
 	return 1
 end
 

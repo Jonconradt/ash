@@ -334,7 +334,7 @@ func TestShellWrappersScopeMCPCredentialKeyToBroker(t *testing.T) {
 	}{
 		{asset: "ash_bootstrap/.ash_bashrc", want: []string{"local mcp_credential_key=", "unset ASH_MCP_CREDENTIAL_KEY", `ASH_MCP_CREDENTIAL_KEY="$mcp_credential_key" command ash-broker`, "unset mcp_credential_key", `if [[ "${1:-}" == "mcp" && "${2:-}" == "add" ]]`, `command ash "$@"`}},
 		{asset: "ash_bootstrap/.ash_zshrc", want: []string{"local mcp_credential_key=", "unset ASH_MCP_CREDENTIAL_KEY", `ASH_MCP_CREDENTIAL_KEY="$mcp_credential_key" command ash-broker`, "unset mcp_credential_key", `if [[ "${1:-}" == "mcp" && "${2:-}" == "add" ]]`, `command ash "$@"`}},
-		{asset: "ash_bootstrap/.ash_fish.fish", want: []string{"set -l mcp_credential_key", "set -e ASH_MCP_CREDENTIAL_KEY", `set -lx ASH_MCP_CREDENTIAL_KEY "$mcp_credential_key"`, `if test (count $argv) -ge 2; and test "$argv[1]" = mcp; and test "$argv[2]" = add`, "command ash $argv"}},
+		{asset: "ash_bootstrap/.ash_fish.fish", want: []string{"set -l mcp_credential_key", "set -e ASH_MCP_CREDENTIAL_KEY", `ASH_MCP_CREDENTIAL_KEY="$mcp_credential_key"`, `if test (count $argv) -ge 2; and test "$argv[1]" = mcp; and test "$argv[2]" = add`, "command ash $argv"}},
 	}
 	for _, test := range tests {
 		content, err := readEmbeddedBootstrapAsset(test.asset)
