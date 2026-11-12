@@ -12,9 +12,10 @@ import (
 
 // Regression tests for Jonconradt/ash#22: strict chat templates (for
 // example, qwen3.8-flash-next behind an Ollama-compatible server) reject a
-// system message after a non-system turn with HTTP 400. Mid-conversation
-// injections must therefore never use the system role, and no system-role
-// message may persist in saved history.
+// system message after a non-system turn with HTTP 400. Policy and security
+// prompt text must therefore live in the leading system prompt, before all
+// user messages; mid-conversation injections carry dynamic state only, and
+// no system-role message may persist in saved history.
 
 // assertNoSystemAfterNonSystemTurn fails the test if any message with role
 // "system" appears after the first non-system message. A leading system
@@ -129,6 +130,17 @@ func TestRunToolLoopNoSystemAfterNonSystemTurn(t *testing.T) {
 		}
 		for _, payload := range payloads {
 			assertNoSystemAfterNonSystemTurn(t, label+" payload", payload)
+			// Policy and security text lives in the leading system prompt
+			// only: every payload must carry it there, and no user turn
+			// may contain it.
+			if len(payload) == 0 || payload[0].Role != "system" || !strings.Contains(payload[0].Content, toolLoopPolicyMarker) {
+				t.Fatalf("%s: leading system prompt is missing the tool-loop policy text: %#v", label, payload)
+			}
+			for _, msg := range payload[1:] {
+				if msg.Role == "user" && (strings.Contains(msg.Content, toolLoopPolicyMarker) || strings.Contains(msg.Content, "Use tools for operations the user requests")) {
+					t.Fatalf("%s: user turn carries policy text: %#v", label, payload)
+				}
+			}
 		}
 		assertNoSystemAfterNonSystemTurn(t, label+" returned history", returned)
 		assertNoSystemRole(t, label+" stripped history", stripSystemMessage(returned))
@@ -150,14 +162,56 @@ func TestRunToolLoopNoSystemAfterNonSystemTurn(t *testing.T) {
 		check(t, "prompt tools forced", payloads, returned)
 		sawCatalog := false
 		for _, payload := range payloads {
-			for _, msg := range payload {
-				if msg.Role == "user" && strings.Contains(msg.Content, promptToolCallFence) {
-					sawCatalog = true
-				}
+			if len(payload) > 0 && payload[0].Role == "system" && strings.Contains(payload[0].Content, promptToolCallFence) {
+				sawCatalog = true
 			}
 		}
 		if !sawCatalog {
-			t.Fatalf("expected the prompt tool catalog to be injected as a user-role message, got %#v", payloads)
+			t.Fatalf("expected the prompt tool catalog in the leading system prompt, got %#v", payloads)
+		}
+	})
+
+	t.Run("prompt tools fallback", func(t *testing.T) {
+		// The backend rejects native tools mid-conversation: the catalog
+		// must join the leading system prompt on the retry, never arrive
+		// as a system message after a user turn.
+		t.Setenv("ASH_PROMPT_TOOLS", "")
+		var captured [][]message
+		calls := 0
+		chatStreamExecutor = func(_ context.Context, _ aiConfig, msgs []message, tools []toolDefinition, _ func(streamDelta)) (chatResponse, error) {
+			captured = append(captured, append([]message(nil), msgs...))
+			calls++
+			if calls == 1 {
+				if len(tools) == 0 {
+					t.Fatalf("first attempt must send native tools")
+				}
+				return chatResponse{}, toolsUnsupportedStatusError()
+			}
+			if len(tools) != 0 {
+				t.Fatalf("fallback retry must not send native tools, got %d", len(tools))
+			}
+			return chatResponse{Message: message{Role: "assistant", Content: "done"}}, nil
+		}
+		shim := localToolShim{allowlist: map[string]struct{}{"ls": {}}}
+		final, _, err := runToolLoop(context.Background(), testAIConfig("http://example.invalid", "model"), "list files", []message{
+			{Role: "system", Content: "you are ash"},
+			{Role: "user", Content: "list files"},
+		}, shim)
+		if err != nil {
+			t.Fatalf("runToolLoop returned error: %v", err)
+		}
+		if final != "done" {
+			t.Fatalf("expected final answer %q, got %q", "done", final)
+		}
+		if calls != 2 {
+			t.Fatalf("expected 2 chat calls, got %d", calls)
+		}
+		if len(captured) != 2 {
+			t.Fatalf("expected 2 captured payloads, got %d", len(captured))
+		}
+		assertNoSystemAfterNonSystemTurn(t, "fallback payload", captured[1])
+		if len(captured[1]) == 0 || captured[1][0].Role != "system" || !strings.Contains(captured[1][0].Content, promptToolCallFence) {
+			t.Fatalf("fallback retry must carry the prompt tool catalog in the leading system prompt, got %#v", captured[1])
 		}
 	})
 

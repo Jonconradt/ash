@@ -73,7 +73,7 @@ type textError struct{ text string }
 
 func (e *textError) Error() string { return e.text }
 
-func TestBuildPromptToolCatalogMessage(t *testing.T) {
+func TestBuildPromptToolCatalogText(t *testing.T) {
 	tools := []toolDefinition{{
 		Type: "function",
 		Function: toolFunctionDefinition{
@@ -82,13 +82,10 @@ func TestBuildPromptToolCatalogMessage(t *testing.T) {
 			Parameters:  map[string]any{"type": "object", "required": []string{"command"}},
 		},
 	}}
-	msg := buildPromptToolCatalogMessage(tools)
-	if msg.Role != "user" {
-		t.Fatalf("expected user role, got %q", msg.Role)
-	}
+	text := buildPromptToolCatalogText(tools)
 	for _, want := range []string{"run_unix_command", "run an allowlisted executable", promptToolCallFence, `"required":["command"]`} {
-		if !strings.Contains(msg.Content, want) {
-			t.Fatalf("catalog message missing %q:\n%s", want, msg.Content)
+		if !strings.Contains(text, want) {
+			t.Fatalf("catalog text missing %q:\n%s", want, text)
 		}
 	}
 }
@@ -219,22 +216,17 @@ func TestRunToolLoopPromptToolsFallback(t *testing.T) {
 			if len(tools) != 0 {
 				t.Fatalf("fallback retry must not send native tools, got %#v", tools)
 			}
-			foundCatalog := false
-			for _, msg := range msgs {
-				if msg.Role == "user" && strings.Contains(msg.Content, promptToolCallFence) {
-					foundCatalog = true
-				}
-			}
-			if !foundCatalog {
-				t.Fatalf("fallback retry must carry the prompt tool catalog")
+			// The catalog joins the leading system prompt on the fallback
+			// retry, never as a message after a user turn.
+			if len(msgs) == 0 || msgs[0].Role != "system" || !strings.Contains(msgs[0].Content, promptToolCallFence) {
+				t.Fatalf("fallback retry must carry the prompt tool catalog in the leading system prompt, got %#v", msgs)
 			}
 			return chatResponse{Message: message{Role: "assistant", Content: `{"name": "what_time_is_it", "arguments": {}}`}}, nil
 		default:
 			// The tool result is a user-role message, but it is no longer
-			// necessarily the last user message: the per-round injections
-			// (execution state, injection defense, tool catalog) are now
-			// user-role messages too and are appended after it in the
-			// payload, so look for the tool result anywhere.
+			// necessarily the last user message: the per-round execution
+			// state message is appended after it in the payload, so look
+			// for the tool result anywhere.
 			sawToolResult := false
 			for _, msg := range msgs {
 				if msg.Role == "user" && strings.Contains(msg.Content, "Tool result for") && strings.Contains(msg.Content, "12:00") {
@@ -320,14 +312,10 @@ func TestRunToolLoopPromptToolsForcedPlainAnswer(t *testing.T) {
 		if len(tools) != 0 {
 			t.Fatalf("forced prompt mode must never send native tools, got %#v", tools)
 		}
-		foundCatalog := false
-		for _, msg := range msgs {
-			if msg.Role == "user" && strings.Contains(msg.Content, promptToolCallFence) {
-				foundCatalog = true
-			}
-		}
-		if !foundCatalog {
-			t.Fatalf("forced prompt mode must carry the prompt tool catalog")
+		// The catalog lives in the leading system prompt in forced prompt
+		// mode, never as a message after a user turn.
+		if len(msgs) == 0 || msgs[0].Role != "system" || !strings.Contains(msgs[0].Content, promptToolCallFence) {
+			t.Fatalf("forced prompt mode must carry the prompt tool catalog in the leading system prompt, got %#v", msgs)
 		}
 		return chatResponse{Message: message{Role: "assistant", Content: "No tool needed; hello!"}}, nil
 	}
@@ -357,8 +345,8 @@ func TestRunToolLoopNativeToolsUnchangedOnSuccess(t *testing.T) {
 			t.Fatalf("native tool calling must keep sending tools, got none on call %d", calls)
 		}
 		for _, msg := range msgs {
-			if msg.Role == "user" && strings.Contains(msg.Content, promptToolCallFence) {
-				t.Fatalf("native tool calling must not inject the prompt tool catalog")
+			if strings.Contains(msg.Content, promptToolCallFence) {
+				t.Fatalf("native tool calling must not inject the prompt tool catalog, got %#v", msg)
 			}
 		}
 		if calls == 1 {
@@ -465,15 +453,10 @@ func TestRunToolLoopCachesUnsupportedToolsWithBroker(t *testing.T) {
 			if len(tools) != 0 {
 				t.Fatalf("expected prompt-based request after cached rejection, got %d tools", len(tools))
 			}
-			foundCatalog := false
-			for _, msg := range msgs {
-				if msg.Role == "user" && strings.Contains(msg.Content, promptToolCallFence) {
-					foundCatalog = true
-					break
-				}
-			}
-			if !foundCatalog {
-				t.Fatal("prompt-based request is missing the tool catalog")
+			// The catalog joins the leading system prompt on the retry,
+			// never as a message after a user turn.
+			if len(msgs) == 0 || msgs[0].Role != "system" || !strings.Contains(msgs[0].Content, promptToolCallFence) {
+				t.Fatal("prompt-based request is missing the tool catalog from the leading system prompt")
 			}
 			return chatResponse{Message: message{Role: "assistant", Content: "done"}}, nil
 		default:
