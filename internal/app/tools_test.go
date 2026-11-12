@@ -289,9 +289,11 @@ func TestLoadAllowlistedCommands(t *testing.T) {
 func TestLocalToolShimRunUnixCommandPolicy(t *testing.T) {
 	originalRunner := toolCommandRunner
 	originalPipelineRunner := toolPipelineRunner
+	originalLookPath := execLookPath
 	t.Cleanup(func() {
 		toolCommandRunner = originalRunner
 		toolPipelineRunner = originalPipelineRunner
+		execLookPath = originalLookPath
 	})
 
 	shim := localToolShim{allowlist: map[string]struct{}{"ls": {}}}
@@ -365,6 +367,20 @@ func TestLocalToolShimRunUnixCommandPolicy(t *testing.T) {
 	})
 
 	t.Run("flattens one nested args array", func(t *testing.T) {
+		t.Setenv("ASH_PYTHON", "python3")
+		t.Setenv("ASH_STRICT", "")
+		t.Setenv("XDG_DATA_HOME", "")
+		home := t.TempDir()
+		t.Setenv("HOME", home)
+		scriptPath := filepath.Join(home, ".local", "share", "ash", "tools", "wikipedia.py")
+		if err := os.MkdirAll(filepath.Dir(scriptPath), 0o700); err != nil {
+			t.Fatalf("mkdir tools: %v", err)
+		}
+		if err := os.WriteFile(scriptPath, []byte("print('ok')\n"), 0o600); err != nil {
+			t.Fatalf("write Python tool: %v", err)
+		}
+		execLookPath = func(string) (string, error) { return "/usr/bin/python3", nil }
+
 		wikipediaShim := localToolShim{allowlist: map[string]struct{}{"wikipedia.py": {}}}
 		var gotArgs []string
 		toolCommandRunner = func(ctx context.Context, name string, args []string, timeout time.Duration, outputMax int) toolCommandResult {
