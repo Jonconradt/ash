@@ -220,6 +220,41 @@ func TestUnixShellBootstrapAssetsPassParentPID(t *testing.T) {
 	}
 }
 
+// Fish waits for a backgrounded compound block to finish before it continues, so
+// `begin ...; command ash-broker ...; end &` blocks every interactive shell forever:
+// the broker is a long-lived server and the block never returns. The broker must be
+// launched as a backgrounded simple command instead.
+func TestFishBootstrapAssetSpawnsBrokerAsBackgroundSimpleCommand(t *testing.T) {
+	content, err := readEmbeddedBootstrapAsset("ash_bootstrap/.ash_fish.fish")
+	if err != nil {
+		t.Fatalf("read embedded fish asset: %v", err)
+	}
+	asset := string(content)
+
+	for _, want := range []string{
+		`command env ASH_BROKER_TOKEN="$token" ASH_MCP_CREDENTIAL_KEY="$mcp_credential_key" "$broker_bin" --socket "$socket_path" --session-id "$session_id" --parent-pid "$parent_pid" </dev/null >/dev/null 2>&1 &`,
+		`set -l broker_pid $last_pid`,
+	} {
+		if !strings.Contains(asset, want) {
+			t.Errorf("fish asset does not launch the broker as a backgrounded simple command, missing %q", want)
+		}
+	}
+	for _, unwanted := range []string{"command ash-broker --socket"} {
+		if strings.Contains(asset, unwanted) {
+			t.Errorf("fish asset launches the broker with %q; it must be a backgrounded simple command", unwanted)
+		}
+	}
+	for _, line := range strings.Split(asset, "\n") {
+		if strings.TrimSpace(line) == "end &" {
+			t.Error("fish asset backgrounds a compound block; fish waits for it and hangs interactive shells")
+		}
+	}
+	// A broker that never opens its socket must not be left running unowned.
+	if !strings.Contains(asset, `command kill "$broker_pid"`) {
+		t.Error("fish asset does not reap a broker that failed to bind its socket")
+	}
+}
+
 var conservativeOperandPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
 
 func shouldRouteToAshConservative(command string, args []string) bool {
