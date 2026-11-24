@@ -3,6 +3,13 @@
 SHELL := /bin/bash
 SITE_LOCALES ?=
 UPDATE_DEPENDENCIES_ASSUME_YES ?= 0
+MAKE_JOBS ?= $(shell getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
+
+# Parallelize the lint/test dependency graph automatically. Preserve an explicit
+# -j value from the user or CI; otherwise use the host CPU count.
+ifeq ($(filter -j%,$(MAKEFLAGS)),)
+MAKEFLAGS += -j$(MAKE_JOBS)
+endif
 
 COVERAGE_MIN ?= 60
 FUZZ_TIME ?= 10s
@@ -162,7 +169,7 @@ sync-route-words:
 
 plugins-build:
 	@mkdir -p "$(PLUGINS_BIN_DIR)"
-	@set -eu; \
+	@set -eu; pids=(); status=0; \
 	target_goos="$(PLUGIN_TARGET_GOOS)"; \
 	if [[ -z "$$target_goos" ]]; then target_goos="$$(uname -s | tr '[:upper:]' '[:lower:]')"; fi; \
 	for dir in $(PLUGINS_SRC_DIR)/*; do \
@@ -172,25 +179,33 @@ plugins-build:
 				echo "skipping Rust plugin for macOS: $$(basename "$$dir")"; \
 				continue; \
 			fi; \
-			./scripts/dev/run-quiet.sh "plugin-build:$$(basename $$dir)" $(MAKE) -C "$$dir" build BUILD_DIR="$(abspath $(PLUGINS_BIN_DIR))" TARGET_GOOS="$(PLUGIN_TARGET_GOOS)" TARGET_GOARCH="$(PLUGIN_TARGET_GOARCH)" || exit 1; \
+			./scripts/dev/run-quiet.sh "plugin-build:$$(basename $$dir)" $(MAKE) -C "$$dir" build BUILD_DIR="$(abspath $(PLUGINS_BIN_DIR))" TARGET_GOOS="$(PLUGIN_TARGET_GOOS)" TARGET_GOARCH="$(PLUGIN_TARGET_GOARCH)" & pids+=($$!); \
 		fi; \
-	done
+	done; \
+	for pid in "$${pids[@]}"; do wait "$$pid" || status=1; done; \
+	[[ "$$status" -eq 0 ]]
 	@echo "plugins-build: ok"
 
 plugins-test: plugins-build
-	@for dir in $(PLUGINS_SRC_DIR)/*; do \
+	@set -eu; pids=(); status=0; \
+	for dir in $(PLUGINS_SRC_DIR)/*; do \
 		if [ -f "$$dir/Makefile" ]; then \
-			./scripts/dev/run-quiet.sh "plugin-test:$$(basename $$dir)" $(MAKE) -C "$$dir" test || exit 1; \
+			./scripts/dev/run-quiet.sh "plugin-test:$$(basename $$dir)" $(MAKE) -C "$$dir" test & pids+=($$!); \
 		fi; \
-	done
+	done; \
+	for pid in "$${pids[@]}"; do wait "$$pid" || status=1; done; \
+	[[ "$$status" -eq 0 ]]
 	@echo "plugins-test: ok"
 
 plugins-lint:
-	@for dir in $(PLUGINS_SRC_DIR)/*; do \
+	@set -eu; pids=(); status=0; \
+	for dir in $(PLUGINS_SRC_DIR)/*; do \
 		if [ -f "$$dir/Makefile" ]; then \
-			./scripts/dev/run-quiet.sh "plugin-lint:$$(basename $$dir)" $(MAKE) -C "$$dir" lint || exit 1; \
+			./scripts/dev/run-quiet.sh "plugin-lint:$$(basename $$dir)" $(MAKE) -C "$$dir" lint & pids+=($$!); \
 		fi; \
-	done
+	done; \
+	for pid in "$${pids[@]}"; do wait "$$pid" || status=1; done; \
+	[[ "$$status" -eq 0 ]]
 	@echo "plugins-lint: ok"
 
 plugins-clean:
