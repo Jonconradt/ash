@@ -10,6 +10,8 @@ GOLANGCI_LINT_VERSION ?= v2.15.0
 RUFF_VERSION ?= 0.17.6
 MARKDOWNLINT_CLI2_VERSION ?= 0.24.2
 HTML_VALIDATE_VERSION ?= 11.21.1
+NODE_VERSION ?= lts/*
+NVM_VERSION ?= v0.40.3
 GOSEC_VERSION ?= v2.30.0
 GOVULNCHECK_VERSION ?= v1.10.0
 STATICCHECK_VERSION ?= 2026.2.2
@@ -20,6 +22,16 @@ PIP_AUDIT_VERSION ?= 2.10.1
 CARGO_AUDIT_VERSION ?= 0.23.0
 APP_NAME ?= ash
 LOCAL_BIN_DIR ?= $(HOME)/.local/bin
+
+# Make recipes run in their own shell, so expose an installed NVM Node to every
+# Linux Make target (lint, test, release, and config itself) in the process PATH.
+ifeq ($(shell uname -s),Linux)
+NVM_NODE_DIR := $(shell bash -c 'export NVM_DIR="$${NVM_DIR:-$$HOME/.nvm}"; if [ -s "$$NVM_DIR/nvm.sh" ]; then source "$$NVM_DIR/nvm.sh" >/dev/null 2>&1; nvm use "$(NODE_VERSION)" >/dev/null 2>&1 || true; command -v node >/dev/null 2>&1 && dirname "$$(command -v node)"; fi')
+ifneq ($(strip $(NVM_NODE_DIR)),)
+export PATH := $(NVM_NODE_DIR):$(PATH)
+endif
+endif
+
 LOCAL_BINARY_PATH ?= $(LOCAL_BIN_DIR)/$(APP_NAME)
 BUILD_BIN_DIR ?= $(LOCAL_BIN_DIR)
 PLUGINS_SRC_DIR ?= internal/app/ash_bootstrap/plugins_src
@@ -95,6 +107,8 @@ config:
 	RUFF_VERSION=$(RUFF_VERSION) \
 	MARKDOWNLINT_CLI2_VERSION=$(MARKDOWNLINT_CLI2_VERSION) \
 	HTML_VALIDATE_VERSION=$(HTML_VALIDATE_VERSION) \
+	NODE_VERSION=$(NODE_VERSION) \
+	NVM_VERSION=$(NVM_VERSION) \
 	ACTIONLINT_VERSION=$(ACTIONLINT_VERSION) \
 	PIP_AUDIT_VERSION=$(PIP_AUDIT_VERSION) \
 	CARGO_AUDIT_VERSION=$(CARGO_AUDIT_VERSION) \

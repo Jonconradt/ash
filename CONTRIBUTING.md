@@ -6,6 +6,13 @@ First-time setup: install the required developer toolchain (Go, Node.js/npm,
 Python3, `uv`, Rust/`cargo`, and the Go lint/security tools) for macOS
 (Homebrew) or Debian/Ubuntu (apt):
 
+The pinned HTML validator requires Node.js 22.22 or later on the 22.x line, or
+24.8 or later. On Linux, `make config` installs the latest NVM LTS release
+when Node.js is missing or unsupported. It checks Node's published end-of-life
+date and upgrades an EOL LTS automatically. Distribution packages may remain
+older; NVM supplies the supported `node` and `npx` on `PATH` for setup.
+CI uses Node.js 24.
+
 ```bash
 make config
 ```

@@ -29,6 +29,112 @@ HTML_VALIDATE_VERSION="${HTML_VALIDATE_VERSION:-11.17.0}"
 ACTIONLINT_VERSION="${ACTIONLINT_VERSION:-v1.7.12}"
 PIP_AUDIT_VERSION="${PIP_AUDIT_VERSION:-2.10.1}"
 CARGO_AUDIT_VERSION="${CARGO_AUDIT_VERSION:-0.22.2}"
+NVM_VERSION="${NVM_VERSION:-v0.40.3}"
+NODE_VERSION="${NODE_VERSION:-lts/*}"
+
+node_supported() {
+	local version major minor
+	command -v node >/dev/null 2>&1 || return 1
+	version="$(node --version)" || return 1
+	if [[ ! "$version" =~ ^v([0-9]+)\.([0-9]+)\.[0-9]+$ ]]; then
+		return 1
+	fi
+	major=$((10#${BASH_REMATCH[1]}))
+	minor=$((10#${BASH_REMATCH[2]}))
+	if (( (major == 22 && minor >= 22) || (major == 24 && minor >= 8) || major > 24 )); then
+		return 0
+	fi
+	return 1
+}
+
+check_node_version() {
+	local version
+	if node_supported; then
+		if node_is_eol; then
+			version="$(node --version)"
+			fail "Node.js $version is end-of-life; run 'nvm install lts/* && nvm use lts/* && nvm alias default lts/* && make config'"
+		fi
+		return
+	fi
+	if command -v node >/dev/null 2>&1; then
+		version="$(node --version)"
+		fail "Node.js $version is unsupported; run 'nvm install lts/* && nvm use lts/* && nvm alias default lts/* && make config'"
+	fi
+	fail "Node.js is not on PATH; run 'nvm install lts/* && nvm use lts/* && nvm alias default lts/* && make config'"
+}
+
+node_is_eol() {
+	local version cycle eol_status
+	command -v curl >/dev/null 2>&1 || return 1
+	command -v python3 >/dev/null 2>&1 || return 1
+	command -v node >/dev/null 2>&1 || return 1
+	version="$(node --version)"
+	cycle="${version#v}"
+	cycle="${cycle%%.*}"
+	eol_status="$(
+		curl -fsSL --max-time 5 https://endoflife.date/api/nodejs.json 2>/dev/null |
+			python3 -c '
+import json, sys
+from datetime import date
+major = sys.argv[1]
+try:
+    rows = json.load(sys.stdin)
+except Exception:
+    raise SystemExit(2)
+for row in rows:
+    if str(row.get("cycle", "")).split(".")[0] == major:
+        value = row.get("eol")
+        if value is True:
+            print("eol")
+        elif isinstance(value, str):
+            try:
+                print("eol" if date.fromisoformat(value) <= date.today() else "supported")
+            except ValueError:
+                print("unknown")
+        else:
+            print("unknown")
+        break
+else:
+    print("unknown")
+' "$cycle"
+	)" || return 1
+	[[ "$eol_status" == "eol" ]]
+}
+
+install_linux_node() {
+	node_supported && ! node_is_eol && return
+
+	command -v curl >/dev/null 2>&1 || fail "curl is required to install Node.js ${NODE_VERSION}"
+	export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+	if [[ ! -s "$NVM_DIR/nvm.sh" ]]; then
+		log "node: installing NVM ${NVM_VERSION} for this user"
+		curl -fsSL "https://raw.githubusercontent.com/nvm-sh/nvm/${NVM_VERSION}/install.sh" | bash
+	fi
+	[[ -s "$NVM_DIR/nvm.sh" ]] || fail "NVM installation failed; install Node.js ${NODE_VERSION} manually"
+
+	# shellcheck disable=SC1091
+	source "$NVM_DIR/nvm.sh"
+	log "node: installing Node.js ${NODE_VERSION} via NVM"
+	nvm install "$NODE_VERSION"
+	nvm use "$NODE_VERSION" >/dev/null
+	nvm alias default "$NODE_VERSION" >/dev/null
+	node_supported || fail "Node.js ${NODE_VERSION} installation failed"
+	node_is_eol && fail "Node.js $(node --version) is still end-of-life; run 'nvm install lts/* && nvm use lts/* && nvm alias default lts/* && make config'"
+	log "node: active Node.js $(node --version)"
+}
+
+ensure_supported_node() {
+	if node_supported; then
+		if ! node_is_eol; then
+			return
+		fi
+		log "node: active Node.js $(node --version) is end-of-life"
+	fi
+	if [[ "$(uname -s)" == "Linux" ]]; then
+		install_linux_node
+	fi
+	check_node_version
+}
 
 install_macos_packages() {
 	command -v brew >/dev/null 2>&1 || fail "Homebrew is required on macOS; install it from https://brew.sh and re-run"
@@ -54,24 +160,32 @@ apt_install() {
 		log "apt: $pkg already installed"
 	else
 		log "apt: installing $pkg"
-		sudo apt-get install -y "$pkg"
+		sudo -A apt-get install -y "$pkg"
 	fi
 }
 
 install_linux_packages() {
 	command -v apt-get >/dev/null 2>&1 || fail "only Debian/Ubuntu (apt-get) based Linux is supported by this script"
 
-	log "apt: updating package index"
-	sudo apt-get update
-
 	local pkg
+	local missing=0
+	for pkg in golang-go nodejs npm python3 python3-pip git build-essential ruby ruby-dev rpm shellcheck; do
+		if ! dpkg -s "$pkg" >/dev/null 2>&1; then
+			missing=1
+		fi
+	done
+	if (( missing )); then
+		log "apt: updating package index"
+		sudo -A apt-get update
+	fi
+
 	for pkg in golang-go nodejs npm python3 python3-pip git build-essential ruby ruby-dev rpm shellcheck; do
 		apt_install "$pkg"
 	done
 
 	if command -v gem >/dev/null 2>&1 && ! gem list -i -v "$FPM_VERSION" fpm >/dev/null 2>&1; then
 		log "gem: installing fpm $FPM_VERSION (required for .deb/.rpm packaging in 'make release')"
-		sudo gem install --no-document --version "$FPM_VERSION" fpm
+		sudo -A gem install --no-document --version "$FPM_VERSION" fpm
 	fi
 
 	if command -v uv >/dev/null 2>&1; then
@@ -115,7 +229,9 @@ install_rust_toolchain() {
 
 	if command -v rustup >/dev/null 2>&1 && ! command -v cargo-clippy >/dev/null 2>&1; then
 		log "rust: adding clippy component"
-		rustup component add clippy
+		local active_toolchain
+		active_toolchain="$(rustup show active-toolchain | awk '{print $1}')"
+		rustup component add --toolchain "$active_toolchain" clippy
 	fi
 	if ! command -v cargo-audit >/dev/null 2>&1; then
 		log "rust: installing cargo-audit ${CARGO_AUDIT_VERSION}"
@@ -152,8 +268,10 @@ main() {
 	case "$(uname -s)" in
 	Darwin)
 		install_macos_packages
+		check_node_version
 		;;
 	Linux)
+		ensure_supported_node
 		install_linux_packages
 		;;
 	*)
@@ -161,6 +279,8 @@ main() {
 		;;
 	esac
 
+	command -v node >/dev/null 2>&1 || fail "Node.js is not on PATH after installation"
+	check_node_version
 	install_go_tools
 	install_rust_toolchain
 	warm_python_and_node_tools
@@ -168,4 +288,6 @@ main() {
 	log "done: Go, Node/npm, Python, git, uv, Rust/cargo, ShellCheck, Go static/security tools, actionlint, HTML/Markdown validators, and dependency auditors are ready"
 }
 
-main "$@"
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+	main "$@"
+fi

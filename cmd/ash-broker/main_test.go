@@ -209,6 +209,9 @@ func TestBrokerHotRestartExecsBuiltBinary(t *testing.T) {
 	if output, err := build.CombinedOutput(); err != nil {
 		t.Fatalf("build restart fixture: %v\n%s", err, output)
 	}
+	if err := os.Chmod(binary, 0o755); err != nil {
+		t.Fatal(err)
+	}
 	home := filepath.Join(tempDir, "home")
 	if err := os.MkdirAll(home, 0o700); err != nil {
 		t.Fatal(err)
