@@ -114,3 +114,54 @@ test("CLI removes recognized options and joins the remaining expression argument
     result: 12
   });
 });
+
+test("Provided simple, complex, and very complex examples produce correct answers", () => {
+  const examples = [
+    ["2 + 2 * 3", 8],
+    ["sqrt(3^2 + 4^2) + round(log10(1000) * 10)", 35],
+    ["round((sin(pi/6) + cos(pi/3) + ln(e)) * 100) + max(2^3, 3*3, sqrt(81))", 209]
+  ] as const;
+
+  for (const [expression, expected] of examples) {
+    const result = runCalculator("--expr", expression);
+    assert.equal(result.status, 0, result.stderr);
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.status, "success");
+    assert.equal(output.expression, expression);
+    assert.equal(output.result, expected);
+  }
+});
+
+test("AI documentation includes executable examples for every complexity level", () => {
+  const result = runCalculator("--ai-docs");
+  assert.equal(result.status, 0, result.stderr);
+  const docs = JSON.parse(result.stdout);
+  assert.equal(docs.Examples.simple.result, 8);
+  assert.equal(docs.Examples.complex.result, 35);
+  assert.equal(docs.Examples.very_complex.result, 209);
+  for (const example of Object.values(docs.Examples) as Array<{ cli: string }>) {
+    assert.match(example.cli, /^calculator --expr '/);
+  }
+});
+
+test("CLI errors explain the mistake and provide a valid retry format", () => {
+  for (const args of [
+    ["--expr"],
+    ["--expr", "--format", "json"],
+    ["--format"],
+    ["--format", "yaml"],
+    ["--unknown", "2"]
+  ]) {
+    const result = runCalculator(...args);
+    assert.notEqual(result.status, 0);
+    const output = JSON.parse(result.stdout);
+    assert.equal(output.status, "error");
+    assert.ok(output.error_message.length > 20);
+  }
+
+  const parseResult = runCalculator("--expr", "2 +");
+  assert.notEqual(parseResult.status, 0);
+  const parseOutput = JSON.parse(parseResult.stdout);
+  assert.match(parseOutput.error_message, /Retry with --expr/);
+  assert.match(parseOutput.error_message, /2 \+ 2 \* 3/);
+});

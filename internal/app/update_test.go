@@ -407,6 +407,9 @@ func TestInstallUpgradeArchiveInstallsAshAndBroker(t *testing.T) {
 	originalProvisionPythonEnv := provisionPythonEnv
 	provisionPythonEnv = func(io.Writer) {}
 	t.Cleanup(func() { provisionPythonEnv = originalProvisionPythonEnv })
+	originalProvisionNodeEnv := provisionNodeEnv
+	provisionNodeEnv = func(io.Writer) {}
+	t.Cleanup(func() { provisionNodeEnv = originalProvisionNodeEnv })
 
 	if err := installUpgradeArchive(archive.Bytes(), "v1.2.3", upgradeOptions{replace: true}, &bytes.Buffer{}); err != nil {
 		t.Fatalf("installUpgradeArchive() error = %v", err)

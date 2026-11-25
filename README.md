@@ -361,6 +361,13 @@ if Python, venv support, or network access is unavailable. Python is not a
 required dependency of the native packages; install Python 3 with venv support
 to use the bundled Python tools.
 
+The calculator plugin is a Node.js executable. `ash install` detects Node on
+`PATH`, an existing NVM installation, or `ASH_NODE`; if none is available, it
+attempts to provision the current Node.js LTS through NVM. The managed
+runtime is linked under `$XDG_DATA_HOME/ash/bin` (default
+`~/.local/share/ash/bin`). Basic Ash use remains valid without Node when the
+calculator plugin is not used.
+
 Linux `.deb` and `.rpm` packages and macOS `.tar.gz` archives remain available
 from the [latest GitHub release](https://github.com/Jonconradt/ash/releases/latest).
 Homebrew remains the preferred macOS install method. Each artifact contains `ash`, `ash-broker`, bundled native
@@ -611,6 +618,12 @@ https://mcpplaygroundonline.com/mcp-complex-server
 ```
 
 Alternatively, run `ash mcp add <url>` from an interactive Ash shell to connect and register a server. OAuth authorization opens in the desktop browser when a GUI is available; if the browser cannot be opened, Ash prints a copyable authorization URL and waits in the terminal. Use `ash mcp add <url> --no-browser` to always use the terminal flow. The server URL is added to the effective `.ash_allow` only after the connection succeeds.
+
+For example, add Parallel's internet search MCP server with:
+
+```bash
+ash mcp add https://mcp.parallel.ai/mcp
+```
 
 Ash derives each server's local name from the first 8 lowercase hexadecimal characters of SHA-256 over the exact URL text after trimming whitespace. The URL scheme is recognized case-insensitively; use the exact URL spelling consistently because it determines that name. Lines beginning with HTTP(S) register MCP servers and are ignored as shell-command allowlist entries. `ASH_STRICT=1` does not disable these explicitly registered servers. Old `mcp.json` files are not read; add trusted server URLs explicitly with `ash mcp add`.
 

@@ -181,13 +181,13 @@ func (s localToolShim) ListTools() []toolDefinition {
 			Type: "function",
 			Function: toolFunctionDefinition{
 				Name:        "ash_read_workspace_file",
-				Description: "Read a file inside ~/.ash workspace",
+				Description: "Read a file inside the Ash workspace at $XDG_CONFIG_HOME/ash",
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
 						"path": map[string]any{
 							"type":        "string",
-							"description": "Path relative to ~/.ash",
+							"description": "Path relative to $XDG_CONFIG_HOME/ash",
 						},
 					},
 					"required": []string{"path"},
@@ -198,13 +198,13 @@ func (s localToolShim) ListTools() []toolDefinition {
 			Type: "function",
 			Function: toolFunctionDefinition{
 				Name:        "ash_write_workspace_file",
-				Description: "Write a file inside ~/.ash workspace and update inventory.md",
+				Description: "Write a file inside the Ash workspace at $XDG_CONFIG_HOME/ash and update inventory.md",
 				Parameters: map[string]any{
 					"type": "object",
 					"properties": map[string]any{
 						"path": map[string]any{
 							"type":        "string",
-							"description": "Path relative to ~/.ash",
+							"description": "Path relative to $XDG_CONFIG_HOME/ash",
 						},
 						"content": map[string]any{
 							"type":        "string",
@@ -212,7 +212,7 @@ func (s localToolShim) ListTools() []toolDefinition {
 						},
 						"purpose": map[string]any{
 							"type":        "string",
-							"description": "Purpose text stored in ~/.ash/inventory.md",
+							"description": "Purpose text stored in $XDG_CONFIG_HOME/ash/inventory.md",
 						},
 					},
 					"required": []string{"path", "content", "purpose"},

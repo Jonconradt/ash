@@ -231,8 +231,10 @@ func runToolPipeline(ctx context.Context, commands [][]string, display string, t
 
 	processes := make([]*exec.Cmd, len(sanitized))
 	for i, command := range sanitized {
+		ensureManagedNodeForCalculator(command[0])
 		// #nosec G204 -- command has passed sanitizeCommandArgs and executes without a shell.
 		process := exec.CommandContext(commandCtx, command[0], command[1:]...)
+		process.Env = managedRuntimeEnvironment()
 		if i > 0 {
 			process.Stdin = pipes[i-1].reader
 		}
@@ -319,7 +321,9 @@ func runToolCommandWithInput(ctx context.Context, name string, args []string, st
 	commandCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	ensureManagedNodeForCalculator(name)
 	cmd := execCommandContext(commandCtx, name, args...)
+	cmd.Env = managedRuntimeEnvironment()
 	if stdin != "" {
 		cmd.Stdin = strings.NewReader(stdin)
 	}
@@ -361,7 +365,9 @@ func runToolCommand(ctx context.Context, name string, args []string, timeout tim
 	commandCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
+	ensureManagedNodeForCalculator(name)
 	cmd := execCommandContext(commandCtx, name, args...)
+	cmd.Env = managedRuntimeEnvironment()
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	cmd.Stdout = &stdout

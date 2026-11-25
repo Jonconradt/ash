@@ -43,6 +43,11 @@ if [[ "${_ASH_LOCAL_BIN_ON_PATH:-}" != 1 ]]; then
 	export PATH
 	_ASH_LOCAL_BIN_ON_PATH=1
 fi
+_ash_managed_bin="${XDG_DATA_HOME:-$HOME/.local/share}/ash/bin"
+if [[ -d "$_ash_managed_bin" && ":$PATH:" != *":$_ash_managed_bin:"* ]]; then
+	PATH="$_ash_managed_bin:$PATH"
+	export PATH
+fi
 _ash_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/ash"
 _ash_state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/ash"
 [[ -f "$_ash_config_dir/.ash_env" ]] && . "$_ash_config_dir/.ash_env"

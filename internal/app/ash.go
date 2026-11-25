@@ -172,7 +172,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return runSyncRouteWords(stdout, stderr)
 	}
 	if !literalPrompt && args[0] == "--internal-provision-python" {
-		provisionManagedPythonEnv(stdout)
+		provisionPythonEnv(stdout)
 		return 0
 	}
 

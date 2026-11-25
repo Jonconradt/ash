@@ -55,7 +55,12 @@ function getAiDocs(): string {
       result: "calculated numerical result as a float or integer",
       error_message: "description of syntax or evaluation error when status is error"
     },
-    "Usage guidance for the AI": "Use calculator for precise mathematical computations instead of performing mental math. A single call evaluates the expression. Directly parse and use the numerical result from the JSON response."
+    Examples: {
+      simple: { expression: "2 + 2 * 3", result: 8, cli: "calculator --expr '2 + 2 * 3'" },
+      complex: { expression: "sqrt(3^2 + 4^2) + round(log10(1000) * 10)", result: 35, cli: "calculator --expr 'sqrt(3^2 + 4^2) + round(log10(1000) * 10)'" },
+      very_complex: { expression: "round((sin(pi/6) + cos(pi/3) + ln(e)) * 100) + max(2^3, 3*3, sqrt(81))", result: 209, cli: "calculator --expr 'round((sin(pi/6) + cos(pi/3) + ln(e)) * 100) + max(2^3, 3*3, sqrt(81))'" }
+    },
+    "Usage guidance for the AI": "Use calculator for precise mathematical computations instead of performing mental math. Preserve parentheses, use * for multiplication, ^ for right-associative exponentiation, and use single-argument or comma-separated function syntax. Positional expressions are also accepted, but --expr '<expression>' is unambiguous. Avoid JavaScript syntax, variable assignment, implicit multiplication (for example '2pi'), brackets, or prose inside the expression."
   };
   return JSON.stringify(docs, null, 2);
 }
@@ -117,6 +122,9 @@ export class MathParser {
           num += str[i];
           i++;
         }
+        if ((num.match(/\./g) || []).length > 1) {
+          throw new Error(`Invalid number '${num}'. Use a single decimal point, for example '3.14', or omit the decimal point.`);
+        }
         tokens.push(num);
         continue;
       }
@@ -134,7 +142,7 @@ export class MathParser {
         i++;
         continue;
       }
-      throw new Error(`Unexpected character: '${ch}'`);
+      throw new Error(`Unexpected character '${ch}'. Allowed characters are digits, decimal points, letters for supported constants/functions, whitespace, parentheses, commas, and operators + - * / % ^.`);
     }
     return tokens;
   }
@@ -142,11 +150,11 @@ export class MathParser {
   public parse(): number {
     this.pos = 0;
     if (this.tokens.length === 0) {
-      throw new Error("Empty expression");
+      throw new Error("Empty expression. Use a simple expression such as '2 + 2', a complex expression such as 'sqrt(3^2 + 4^2)', or pass --expr '<expression>'.");
     }
     const res = this.parseExpression();
     if (this.pos < this.tokens.length) {
-      throw new Error(`Unexpected token '${this.tokens[this.pos]}' at position ${this.pos}`);
+      throw new Error(`Unexpected token '${this.tokens[this.pos]}' at token position ${this.pos}. Check operator placement and parentheses; for example use '2 + 2', 'sqrt(144)', or 'round((1 + 2) * 10)'.`);
     }
     return res;
   }
@@ -228,7 +236,7 @@ export class MathParser {
     if (/^[0-9.]+$/.test(token)) {
       this.pos++;
       const num = parseFloat(token);
-      if (isNaN(num)) throw new Error(`Invalid number '${token}'`);
+      if (isNaN(num) || !Number.isFinite(num)) throw new Error(`Invalid number '${token}'. Use a finite decimal such as '3.14', '0.25', or '10'.`);
       return num;
     }
     if (token === "pi") {
@@ -267,6 +275,13 @@ export class MathParser {
   }
 
   private evalFunction(name: string, args: number[]): number {
+    const singleArgumentFunctions = ["sin", "cos", "tan", "sqrt", "abs", "log", "ln", "log10", "exp", "floor", "ceil", "round"];
+    if (singleArgumentFunctions.includes(name) && args.length !== 1) {
+      throw new Error(`Function '${name}' expects exactly 1 argument, received ${args.length}. Use '${name}(value)' such as '${name}(1)' or '${name}(pi/2)' when applicable.`);
+    }
+    if ((name === "min" || name === "max") && args.length < 2) {
+      throw new Error(`Function '${name}' expects at least 2 arguments, received ${args.length}. Use '${name}(a, b, ...)' such as '${name}(10, 5, 20)'.`);
+    }
     switch (name) {
       case "sin": return Math.sin(args[0]);
       case "cos": return Math.cos(args[0]);
@@ -320,11 +335,34 @@ function main() {
   const expressionParts: string[] = [];
 
   for (let i = 0; i < rawArgs.length; i++) {
-    if (rawArgs[i] === "--expr" && i + 1 < rawArgs.length) {
+    if (rawArgs[i] === "--expr") {
+      if (i + 1 >= rawArgs.length || rawArgs[i + 1].startsWith("--")) {
+        const msg = "Missing expression after --expr. Use --expr '2 + 2', --expr 'sqrt(144)', or a positional expression.";
+        logEvent("ERROR", msg, { EID: "calc02b" });
+        console.log(JSON.stringify({ status: "error", error_message: msg }, null, 2));
+        process.exit(1);
+      }
       expr = rawArgs[++i];
       hasExplicitExpression = true;
-    } else if (rawArgs[i] === "--format" && i + 1 < rawArgs.length) {
+    } else if (rawArgs[i] === "--format") {
+      if (i + 1 >= rawArgs.length) {
+        const msg = "Missing format after --format. Use --format json or --format text.";
+        logEvent("ERROR", msg, { EID: "calc02b" });
+        console.log(JSON.stringify({ status: "error", error_message: msg }, null, 2));
+        process.exit(1);
+      }
       format = rawArgs[++i];
+      if (format !== "json" && format !== "text") {
+        const msg = `Unsupported --format '${format}'. Use --format json (default) or --format text.`;
+        logEvent("ERROR", msg, { EID: "calc02b" });
+        console.log(JSON.stringify({ status: "error", error_message: msg }, null, 2));
+        process.exit(1);
+      }
+    } else if (rawArgs[i].startsWith("--")) {
+      const msg = `Unknown option '${rawArgs[i]}'. Supported options are --expr, --format json|text, --ai-docs, --version, and --help.`;
+      logEvent("ERROR", msg, { EID: "calc02b" });
+      console.log(JSON.stringify({ status: "error", error_message: msg }, null, 2));
+      process.exit(1);
     } else {
       expressionParts.push(rawArgs[i]);
     }
@@ -364,15 +402,16 @@ function main() {
     process.exit(0);
   } catch (err: any) {
     const msg = err?.message || String(err);
-    logEvent("ERROR", `calculation failed: ${msg}`, { EID: "calc04d", expr });
+    const retryMessage = `${msg} Retry with --expr '<simple, complex, or nested expression>'; valid examples: '2 + 2 * 3', 'sqrt(3^2 + 4^2)', or 'round((sin(pi/6) + cos(pi/3) + ln(e)) * 100)'.`;
+    logEvent("ERROR", `calculation failed: ${retryMessage}`, { EID: "calc04d", expr });
     if (format === "json") {
       console.log(JSON.stringify({
         status: "error",
         expression: expr,
-        error_message: msg
+        error_message: retryMessage
       }, null, 2));
     } else {
-      console.error(`Error: ${msg}`);
+      console.error(`Error: ${retryMessage}`);
     }
     process.exit(1);
   }

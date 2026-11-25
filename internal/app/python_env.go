@@ -5,6 +5,7 @@ package app
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -20,6 +21,22 @@ const managedVenvDirName = "venv"
 // provisionPythonEnv is indirected so tests can skip real virtualenv creation.
 // Provisioning is synchronous so bundled tools are usable as soon as installation returns.
 var provisionPythonEnv = provisionManagedPythonEnv
+
+// managedBasePython finds a system Python interpreter without depending on an OS
+// package manager. Python 3 is commonly exposed as python3 or python.
+func managedBasePython() (string, error) {
+	if override := strings.TrimSpace(os.Getenv("ASH_PYTHON")); override != "" {
+		if _, err := execLookPath(override); err == nil {
+			return override, nil
+		}
+	}
+	for _, name := range []string{"python3", "python"} {
+		if path, err := execLookPath(name); err == nil {
+			return path, nil
+		}
+	}
+	return "", errors.New("python 3 interpreter not found")
+}
 
 // managedVenvPython returns the interpreter path inside the ash-managed virtualenv.
 func managedVenvPython() (string, error) {
@@ -87,6 +104,10 @@ func managedPythonInvocation(name string, args []string) ([]string, bool) {
 	if !ok {
 		return nil, false
 	}
+	venvPython, err := managedVenvPython()
+	if err == nil && !managedVenvReady(venvPython) {
+		provisionPythonEnv(io.Discard)
+	}
 	return append([]string{ashPythonInterpreter(), scriptPath}, args...), true
 }
 
@@ -96,6 +117,12 @@ func managedPythonInvocation(name string, args []string) ([]string, bool) {
 func provisionManagedPythonEnv(stdout io.Writer) {
 	requirements, err := readEmbeddedBootstrapAsset("ash_bootstrap/tools/requirements.txt")
 	if err != nil || strings.TrimSpace(string(requirements)) == "" {
+		return
+	}
+	basePython, err := managedBasePython()
+	if err != nil {
+		_, _ = fmt.Fprintln(stdout, localize.Format("install.python.setup_skipped", []any{err}))
+		_, _ = fmt.Fprintln(stdout, localize.Text("install.python.install_runtime"))
 		return
 	}
 
@@ -116,7 +143,7 @@ func provisionManagedPythonEnv(stdout io.Writer) {
 			_, _ = fmt.Fprintln(stdout, localize.Format("install.python.remove_incomplete", []any{removeErr}))
 			return
 		}
-		if runErr := runProvisionCommand(stdout, "python3", "-m", "venv", venvDir); runErr != nil {
+		if runErr := runProvisionCommand(stdout, basePython, "-m", "venv", venvDir); runErr != nil {
 			_, _ = fmt.Fprintln(stdout, localize.Format("install.python.setup_skipped", []any{runErr}))
 			_, _ = fmt.Fprintln(stdout, localize.Text("install.python.install_runtime"))
 			return

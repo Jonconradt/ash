@@ -7,6 +7,7 @@ import (
 	"bufio"
 	"bytes"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -229,6 +230,54 @@ func forceNonInteractiveInstallEnv(t *testing.T) {
 	original := shouldPromptInstallEnv
 	shouldPromptInstallEnv = func() bool { return false }
 	t.Cleanup(func() { shouldPromptInstallEnv = original })
+}
+
+func TestInstallProvisionsManagedPythonEnvironment(t *testing.T) {
+	forceNonInteractiveInstallEnv(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SHELL", "/bin/bash")
+
+	originalProvision := provisionPythonEnv
+	called := false
+	provisionPythonEnv = func(io.Writer) {
+		called = true
+	}
+	t.Cleanup(func() { provisionPythonEnv = originalProvision })
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"install", "--shell", "bash"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected install to succeed, got %d stderr=%q", code, stderr.String())
+	}
+	if !called {
+		t.Fatal("normal install did not provision the managed Python environment")
+	}
+}
+
+func TestInstallProvisionsManagedNodeEnvironment(t *testing.T) {
+	forceNonInteractiveInstallEnv(t)
+	home := t.TempDir()
+	t.Setenv("HOME", home)
+	t.Setenv("SHELL", "/bin/bash")
+
+	originalProvision := provisionNodeEnv
+	called := false
+	provisionNodeEnv = func(io.Writer) {
+		called = true
+	}
+	t.Cleanup(func() { provisionNodeEnv = originalProvision })
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run([]string{"install", "--shell", "bash"}, &stdout, &stderr)
+	if code != 0 {
+		t.Fatalf("expected install to succeed, got %d stderr=%q", code, stderr.String())
+	}
+	if !called {
+		t.Fatal("normal install did not provision the managed Node.js environment")
+	}
 }
 
 func TestInstallUsesEmbeddedBootstrapAssets(t *testing.T) {

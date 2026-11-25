@@ -117,6 +117,10 @@ func runInstall(args []string, stdout, stderr io.Writer) int {
 		slog.Error(localize.Format("log.install.error", []any{err}), "EID", "Hrs2Jw5A")
 		return 1
 	}
+	if !dryRun {
+		provisionPythonEnv(stdout)
+		provisionNodeEnv(stdout)
+	}
 	if err := maybeAdoptBundledAllowlistEntries(stdout, dryRun); err != nil {
 		slog.Error(localize.Format("log.install.error", []any{err}), "EID", "WnGm9KpQ")
 		return 1

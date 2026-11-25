@@ -27,6 +27,7 @@ func TestMain(m *testing.M) {
 		}
 	}
 	provisionPythonEnv = func(io.Writer) {}
+	provisionNodeEnv = func(io.Writer) {}
 	os.Exit(m.Run())
 }
 

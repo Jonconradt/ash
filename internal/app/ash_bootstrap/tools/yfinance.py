@@ -26,7 +26,7 @@ def load_yfinance_module():
                     "status": "error",
                     "message": (
                         "Missing required library 'yfinance'. Rerun 'ash install' to "
-                        "rebuild the managed environment at ~/.ash/venv. On "
+                        "rebuild the managed environment at ~/.local/share/ash/venv. On "
                         "Debian/Ubuntu, install python3-venv first, then rerun "
                         "'ash install'."
                     ),

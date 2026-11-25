@@ -591,6 +591,8 @@ func installUpgradeArchiveWithSignature(content []byte, version string, options 
 	if err := syncUpgradePlugins(filepath.Join(staging, "plugins"), stdout); err != nil {
 		return rollback(err)
 	}
+	provisionPythonEnv(stdout)
+	provisionNodeEnv(stdout)
 	// ashCommit belongs to the binary being replaced, so reporting it here would name the
 	// version just left behind; the installed build's commit shows up in ASH_VERBOSE output.
 	_, _ = fmt.Fprintf(stdout, "updated ash to %s at %s\n", version, destination)
@@ -717,7 +719,7 @@ func syncUpgradeAssets(candidateRoot string, options upgradeOptions, stdout io.W
 	for _, name := range assets {
 		target := filepath.Join(destinationRoot, name)
 		candidate := candidateFiles[name]
-		// #nosec G304 -- target is derived from the fixed ~/.ash asset names.
+		// #nosec G304 -- target is derived from fixed XDG Ash asset names.
 		current, readErr := os.ReadFile(target)
 		if errors.Is(readErr, os.ErrNotExist) {
 			changes = append(changes, upgradeAssetChange{target: target, content: candidate})
@@ -747,7 +749,7 @@ func syncUpgradeAssets(candidateRoot string, options upgradeOptions, stdout io.W
 		case 'r':
 			changes = append(changes, upgradeAssetChange{target: target, content: candidate, previous: current, hadPrevious: true})
 		case 'b':
-			// #nosec G304 -- target is derived from the fixed ~/.ash asset names.
+			// #nosec G304 -- target is derived from fixed XDG Ash asset names.
 			previousBackup, backupErr := os.ReadFile(target + ".bak")
 			if backupErr != nil && !errors.Is(backupErr, os.ErrNotExist) {
 				return backupErr
@@ -1124,6 +1126,7 @@ func extractUpgradeArchive(content []byte, destination string) ([]unsupportedUpg
 
 func findUpgradeBinary(root, expectedName string) (string, error) {
 	var matches []string
+	// #nosec G703 -- root is a private staging directory created for verified upgrade archives.
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -1146,6 +1149,7 @@ func findUpgradeBinary(root, expectedName string) (string, error) {
 // findUpgradeBrokerBinary locates the required ash-broker executable in an extracted archive.
 func findUpgradeBrokerBinary(root string) (string, error) {
 	var matches []string
+	// #nosec G703 -- root is a private staging directory created for verified upgrade archives.
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err

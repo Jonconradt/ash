@@ -94,6 +94,10 @@
             <h3>Optional: bundled Python tools</h3>
             <p>Basic ash use does not require Python. Bundled Python tools need Python 3 with <code>venv</code> and <code>ensurepip</code>, plus access to download their dependencies. On Debian/Ubuntu, install <code>python3</code> and <code>python3-venv</code>; Homebrew Python includes venv support. On FreeBSD, use the pip package matching your Python version. Then rerun <code>ash install</code>. Setup creates an isolated environment under <code>$XDG_DATA_HOME/ash/venv</code> (default <code>~/.local/share/ash/venv</code>); a failure disables those tools, not basic ash.</p>
           </div>
+          <div class="guide-note">
+            <h3>Optional: calculator plugin</h3>
+            <p>The calculator plugin requires Node.js. <code>ash install</code> detects Node on <code>PATH</code>, an existing NVM installation, or <code>ASH_NODE</code>, and attempts to provision Node.js LTS through NVM when it is missing. The managed runtime is linked under <code>$XDG_DATA_HOME/ash/bin</code> (default <code>~/.local/share/ash/bin</code>). A failure disables the calculator plugin, not basic ash.</p>
+          </div>
         </section>
         <section id="macos">
           <h2>macOS</h2>

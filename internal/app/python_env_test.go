@@ -11,6 +11,23 @@ import (
 	"testing"
 )
 
+func TestManagedBasePythonSupportsPython3AndPythonNames(t *testing.T) {
+	originalLookPath := execLookPath
+	t.Cleanup(func() { execLookPath = originalLookPath })
+	t.Setenv("ASH_PYTHON", "")
+
+	execLookPath = func(name string) (string, error) {
+		if name == "python3" {
+			return "/usr/bin/python3", nil
+		}
+		return "", os.ErrNotExist
+	}
+	got, err := managedBasePython()
+	if err != nil || got != "/usr/bin/python3" {
+		t.Fatalf("managedBasePython() = %q, %v; want /usr/bin/python3", got, err)
+	}
+}
+
 func TestAshPythonInterpreterPrefersOverrideThenVenv(t *testing.T) {
 	home := t.TempDir()
 	t.Setenv("HOME", home)

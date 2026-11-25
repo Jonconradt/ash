@@ -10,6 +10,15 @@ if not set -q __ash_local_bin_on_path
 	set -gx PATH "$HOME/.local/bin" $PATH
 	set -g __ash_local_bin_on_path 1
 end
+set -g __ash_managed_bin "$HOME/.local/share/ash/bin"
+if set -q XDG_DATA_HOME
+	set -g __ash_managed_bin "$XDG_DATA_HOME/ash/bin"
+end
+if test -d "$__ash_managed_bin"
+	if not contains "$__ash_managed_bin" $PATH
+		set -gx PATH "$__ash_managed_bin" $PATH
+	end
+end
 
 set -g __ash_config_base "$HOME/.config"
 set -g __ash_data_base "$HOME/.local/share"

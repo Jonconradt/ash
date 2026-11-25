@@ -514,6 +514,8 @@ remain active when ASH_STRICT=1. Existing ~/.ash/mcp.json files are not read.
 The
 .B ash mcp add
 command connects a server before registering its URL in the effective .ash_allow file.
+For example, internet search can be added with:
+.B ash mcp add https://mcp.parallel.ai/mcp
 For direct OAuth connections, discovery permits non-public IP addresses only for the exact
 registered MCP authority; other OAuth hosts remain subject to non-public-address blocking.
 When configured, an egress proxy is responsible for filtering destination addresses.
