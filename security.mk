@@ -35,7 +35,7 @@ npm-audit:
 	@./scripts/dev/run-quiet.sh "npm-audit" npm --prefix internal/app/ash_bootstrap/plugins_src/calculator audit --audit-level=high
 
 cargo-audit:
-	@./scripts/dev/run-quiet.sh "cargo-audit" bash -c 'cd internal/app/ash_bootstrap/plugins_src/flip_a_coin && cargo audit'
+	@./scripts/dev/run-quiet.sh "cargo-audit" env -u MAKEFLAGS -u MFLAGS bash -c 'cd internal/app/ash_bootstrap/plugins_src/flip_a_coin && cargo audit'
 
 pip-audit:
 	@./scripts/dev/run-quiet.sh "pip-audit" uvx --from pip-audit==$(PIP_AUDIT_VERSION) pip-audit -r internal/app/ash_bootstrap/tools/requirements.txt
