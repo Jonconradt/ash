@@ -26,7 +26,7 @@ require (
 
 require (
 	cloud.google.com/go v0.123.0 // indirect
-	cloud.google.com/go/auth v0.24.4 // indirect
+	cloud.google.com/go/auth v0.24.5 // indirect
 	cloud.google.com/go/compute/metadata v0.10.0 // indirect
 	filippo.io/edwards25519 v1.2.0 // indirect
 	github.com/alecthomas/chroma/v2 v2.27.0 // indirect
@@ -115,11 +115,11 @@ require (
 	github.com/segmentio/encoding v0.5.4 // indirect
 	github.com/shibumi/go-pathspec v1.3.0 // indirect
 	github.com/sigstore/rekor v1.6.5 // indirect
-	github.com/sigstore/rekor-tiles/v2 v2.4.6 // indirect
+	github.com/sigstore/rekor-tiles/v2 v2.4.7 // indirect
 	github.com/sigstore/timestamp-authority/v2 v2.2.2 // indirect
 	github.com/standard-webhooks/standard-webhooks/libraries v1.3.0 // indirect
-	github.com/theupdateframework/go-tuf/v2 v2.4.2 // indirect
-	github.com/tidwall/gjson v1.20.6 // indirect
+	github.com/theupdateframework/go-tuf/v2 v2.5.0 // indirect
+	github.com/tidwall/gjson v1.20.7 // indirect
 	github.com/tidwall/match v1.2.0 // indirect
 	github.com/tidwall/pretty v1.3.1 // indirect
 	github.com/tidwall/sjson v1.2.11 // indirect
@@ -143,7 +143,7 @@ require (
 	golang.org/x/sync v0.25.0 // indirect
 	golang.org/x/term v0.48.0 // indirect
 	golang.org/x/time v0.16.0 // indirect
-	google.golang.org/api v0.316.0 // indirect
+	google.golang.org/api v0.317.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20261123191846-1e707ab9fbc2 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20261123191846-1e707ab9fbc2 // indirect
 	google.golang.org/grpc v1.85.0 // indirect
