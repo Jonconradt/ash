@@ -188,6 +188,8 @@ make release CHANNEL=stable
 
 Contributor note: run `make pre-push` before submitting changes. `make config`
 installs the hook that runs this gate on the exact outgoing commits.
+The Makefile is split by domain (`config.mk`, `lint.mk`, `test.mk`,
+`security.mk`, `build.mk`, and `release.mk`) for maintainable target ownership.
 
 ## Install on Linux, macOS, or FreeBSD
 

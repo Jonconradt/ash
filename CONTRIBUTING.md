@@ -48,6 +48,12 @@ For the full local verification pass, run:
 make verify
 ```
 
+Makefile domains are split into `config.mk`, `lint.mk`, `test.mk`,
+`security.mk`, `build.mk`, and `release.mk`; the root `Makefile` is the
+entry point for high-level targets and shared orchestration. Add or change a
+target in the matching module, keep public target names stable, and update
+`Makefile` only for orchestration or shared entry-point targets.
+
 The lint/test/verify targets are quiet by default: steps run in parallel, and
 each step prints a single `ok` status line when it completes (so line order
 varies between runs); a failing step dumps its full captured output. To see the
