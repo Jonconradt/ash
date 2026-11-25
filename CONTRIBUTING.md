@@ -28,6 +28,10 @@ make test
 `make config` installs the repository-managed Git hooks. The pre-push hook
 validates each exact outgoing commit in a clean temporary worktree and blocks
 the push if static checks, security/dependency/secret scanning, or tests fail.
+The gate runs its phases in parallel across the available CPUs, and the
+network-backed dependency audits (`govulncheck` plus the npm, Cargo, and Python
+audits) run only when the outgoing commits change a dependency manifest;
+`make security` and `make verify` always run every audit.
 This is a local safeguard and can be bypassed with `git push --no-verify`; it is
 not a GitHub-enforced status check. Do not bypass it for release branches or
 tags.
@@ -44,8 +48,9 @@ For the full local verification pass, run:
 make verify
 ```
 
-The lint/test/verify targets are quiet by default: each step prints a single
-`ok` line on success and dumps its full output only when it fails. To see the
+The lint/test/verify targets are quiet by default: steps run in parallel, and
+each step prints a single `ok` status line when it completes (so line order
+varies between runs); a failing step dumps its full captured output. To see the
 full streaming output while debugging, prefix the target with `V=1`,
 `VERBOSE=1`, or `ASH_VERBOSE=1`:
 
@@ -125,9 +130,12 @@ configured AI endpoint, not every `.local` name.
 - Keep the working tree clean before publishing.
 - Ensure release artifacts are built and validated locally before tagging.
 - Run `make verify` locally before `make release`. The pre-push hook runs the
-  focused static, security, and test gates against outgoing commits. Tag-triggered
+  focused static, security, and test gates in parallel against outgoing
+  commits, skipping dependency audits unless the commits change a dependency
+  manifest. Tag-triggered
   packaging jobs retain artifact and platform validation but no longer repeat
-  source checks. Nightly automation runs the pre-push gate before creating tags.
+  source checks. Nightly automation runs the pre-push gate before creating tags
+  and always includes the dependency audits.
 - The external Go install check fetches the release tag directly from GitHub
   with `GONOPROXY` and `GONOSUMDB` scoped to `github.com/Jonconradt/ash`.
   This avoids proxy and checksum-database availability delays for newly pushed

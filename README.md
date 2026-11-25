@@ -142,9 +142,11 @@ make release CHANNEL=stable
   respective local quality gates; the latter also scans repository history and
   working-tree files for secrets
 - `make pre-push` runs static checks, security/dependency/secret scanning, and
-  tests against the exact commit being pushed. `make config` installs the
-  repository hooks. Hooks can be bypassed, so this is a local safeguard, not a
-  server-enforced GitHub status check.
+  tests against the exact commit being pushed; the phases run in parallel, and
+  the network-backed dependency audits run only when the pushed commits change
+  a dependency manifest (they always run in `make security` and `make verify`).
+  `make config` installs the repository hooks. Hooks can be bypassed, so this
+  is a local safeguard, not a server-enforced GitHub status check.
 - `make test` runs `go test ./...`
 - `make install` builds `ash`, `ash-broker`, and bundled plugins into user-local directories, then enables Bash shell integration.
 - `make verify` runs the complete quality gate, including race/coverage tests, vet,

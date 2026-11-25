@@ -2,11 +2,14 @@ PLUGIN_NAME := calculator
 BUILD_DIR ?= ../../../../../bin/plugins
 OUTPUT_PATH ?= $(BUILD_DIR)/$(PLUGIN_NAME)
 
-.PHONY: all build test lint security clean
+.PHONY: all build test lint security clean deps
 
 all: build
 
 RUN_QUIET := ../../../../../scripts/dev/run-quiet.sh
+
+deps:
+	@if [ ! -d node_modules ]; then $(RUN_QUIET) "npm-install" npm install; fi
 
 build:
 	@mkdir -p "$(BUILD_DIR)"

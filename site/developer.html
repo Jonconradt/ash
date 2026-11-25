@@ -74,7 +74,7 @@
 make check-security
 make test</code></pre>
           <p><code>make config</code> installs the repository-managed Git hooks. The local hook blocks pushes when checks fail, but can be bypassed with <code>git push --no-verify</code>; it is not a server-enforced status check.</p>
-          <p>Most Make targets use <code>scripts/dev/run-quiet.sh</code>: successful steps print one concise <code>ok</code> line, while failed steps print their captured output. Prefix a target with <code>V=1</code>, <code>VERBOSE=1</code>, or <code>ASH_VERBOSE=1</code> to stream its complete output as it runs:</p>
+          <p>Most Make targets use <code>scripts/dev/run-quiet.sh</code> and run their steps in parallel: each step prints one concise <code>ok</code> line when it completes, while failed steps print their captured output. Prefix a target with <code>V=1</code>, <code>VERBOSE=1</code>, or <code>ASH_VERBOSE=1</code> to stream its complete output as it runs:</p>
           <pre><code>make V=1 lint
 make V=1 test
 make V=1 verify</code></pre>
@@ -101,7 +101,7 @@ make V=1 verify</code></pre>
             <dt><code>make security</code></dt>
             <dd>Runs Go security and vulnerability analysis plus npm, Cargo, and Python dependency audits.</dd>
             <dt><code>make pre-push</code></dt>
-            <dd>Runs static checks, security and dependency scanning, secret scanning for outgoing commits, and tests. The Git pre-push hook runs this against each pushed commit.</dd>
+            <dd>Runs static checks, security scanning, secret scanning for outgoing commits, and tests, all in parallel. Network-backed dependency audits run only when the pushed commits change a dependency manifest; <code>make security</code> and <code>make verify</code> always run them. The Git pre-push hook runs this against each pushed commit.</dd>
             <dt><code>make build</code></dt>
             <dd>Runs lint and tests, builds and installs native plugins, and builds <code>ash</code> plus <code>ash-broker</code> under <code>~/.local/bin</code>.</dd>
             <dt><code>make install</code></dt>

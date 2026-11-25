@@ -279,7 +279,7 @@ func TestVerifyCIUsesPrePushGate(t *testing.T) {
 	if !strings.Contains(string(data), `"test-race"`) || !strings.Contains(string(data), `"benchmark"`) {
 		t.Fatal("full verify target lost its extended checks")
 	}
-	_, gate, found := strings.Cut(string(data), "pre-push:\n")
+	_, gate, found := strings.Cut(string(data), "\npre-push: ")
 	if !found {
 		t.Fatal("missing pre-push target")
 	}

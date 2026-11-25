@@ -1,4 +1,4 @@
-.PHONY: all verify verify-ci pre-push check-static check-security hooks-install build config lint language-lint site-lint yaml-lint python-lint markdown-lint static-config-lint shell-lint html-lint sync-route-words test go-test test-race test-cover test-fuzz vet staticcheck gosec govulncheck security install version release release-check release-clean release-build release-translate release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one release-checksums restart-broker plugins-build plugins-test plugins-lint plugins-clean plugins-install
+.PHONY: all verify verify-ci pre-push pre-push-security pre-push-audits pre-push-secrets check-static check-security hooks-install build config lint golangci-lint language-lint site-lint yaml-lint python-lint markdown-lint static-config-lint shell-lint html-lint sync-route-words test go-test site-tests site-generator-tests python-tool-tests test-race test-cover test-fuzz vet staticcheck gosec govulncheck npm-audit cargo-audit pip-audit security install version release release-check release-clean release-build release-translate release-pkg release-validate release-notes release-publish release-watch release-dashboard release-artifacts release-build-one release-pkg-one release-validate-one release-checksums restart-broker plugins-deps plugins-build plugins-test plugins-lint plugins-clean plugins-install
 
 SHELL := /bin/bash
 SITE_LOCALES ?=
@@ -6,9 +6,14 @@ UPDATE_DEPENDENCIES_ASSUME_YES ?= 0
 MAKE_JOBS ?= $(shell getconf _NPROCESSORS_ONLN 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 1)
 
 # Parallelize the lint/test dependency graph automatically. Preserve an explicit
-# -j value from the user or CI; otherwise use the host CPU count.
+# -j value from the user or CI. Sub-makes (MAKELEVEL > 0) inherit the parent's
+# jobserver instead of forcing a new -j, which would reset jobserver mode and
+# oversubscribe the CPU (GNU make exposes inherited jobserver flags in
+# MAKEFLAGS only after makefiles are parsed, so they cannot be filtered here).
+ifeq ($(MAKELEVEL),0)
 ifeq ($(filter -j%,$(MAKEFLAGS)),)
 MAKEFLAGS += -j$(MAKE_JOBS)
+endif
 endif
 
 COVERAGE_MIN ?= 60
@@ -142,19 +147,46 @@ verify:
 	@./scripts/dev/run-quiet.sh "benchmark"   go test -bench=. -benchmem ./...
 	@echo "verify: all checks passed"
 
-# Run the same fail-closed checks on the exact commit(s) being pushed.
-pre-push:
-	@$(MAKE) --no-print-directory lint
-	@$(MAKE) --no-print-directory security
-	@$(MAKE) --no-print-directory test
+# Run the same fail-closed checks on the exact commit(s) being pushed. The
+# phases are plain prerequisites so the automatic -j parallelism runs them
+# concurrently inside one make graph (shared prerequisites run exactly once).
+pre-push: lint pre-push-security test pre-push-secrets
+	@echo "pre-push: all checks passed"
+
+# Static security analysis always runs; the network-backed dependency audits
+# run only when the pushed commits change a dependency manifest. `make
+# security` (verify, install, CI) still runs every audit unconditionally.
+pre-push-security: gosec pre-push-audits
+
+# Dependency manifests whose changes trigger the vulnerability audits on push.
+DEP_MANIFEST_REGEX := (^|/)(go\.mod|go\.sum|package\.json|package-lock\.json|Cargo\.toml|Cargo\.lock|requirements[^/]*\.txt)$$
+
+pre-push-audits:
+	@set -euo pipefail; \
+	if [[ -n "$(PUSH_BASE)" ]]; then \
+		changed="$$(git diff --name-only "$(PUSH_BASE)"..HEAD)"; \
+	else \
+		changed="$$(git ls-files)"; \
+	fi; \
+	if grep -Eq '$(DEP_MANIFEST_REGEX)' <<<"$$changed"; then \
+		$(MAKE) --no-print-directory dependency-audits; \
+	else \
+		echo "pre-push-audits: skipped (no dependency manifest changes)"; \
+	fi
+
+# Aggregate of the network-backed dependency audits; prerequisites so they
+# parallelize under -j.
+.PHONY: dependency-audits
+dependency-audits: govulncheck npm-audit cargo-audit pip-audit
+
+pre-push-secrets:
 	@set -euo pipefail; \
 	if [[ -n "$(PUSH_BASE)" ]]; then \
 		log_opts="$(PUSH_BASE)..HEAD"; \
 	else \
 		log_opts="HEAD"; \
 	fi; \
-	go run github.com/zricethezav/gitleaks/v8@$(GITLEAKS_VERSION) git --platform github --redact --verbose --log-opts="$$log_opts" .
-	@echo "pre-push: all checks passed"
+	./scripts/dev/run-quiet.sh "secrets-range" go run github.com/zricethezav/gitleaks/v8@$(GITLEAKS_VERSION) git --platform github --redact --verbose --log-opts="$$log_opts" .
 
 check-security: security
 	@./scripts/dev/run-quiet.sh "secrets-history" go run github.com/zricethezav/gitleaks/v8@$(GITLEAKS_VERSION) git --platform github --redact --verbose --log-opts=--all .
@@ -167,7 +199,20 @@ verify-ci:
 sync-route-words:
 	@cd internal/app && go run ../../cmd/ash --internal-sync-route-words
 
-plugins-build:
+# Install per-plugin dependencies exactly once per make graph so plugins-lint
+# and plugins-build can run concurrently without racing on npm install. The
+# deps target is optional in plugin Makefiles.
+plugins-deps:
+	@set -eu; pids=(); status=0; \
+	for dir in $(PLUGINS_SRC_DIR)/*; do \
+		if [ -f "$$dir/Makefile" ] && grep -qE '^deps:' "$$dir/Makefile"; then \
+			./scripts/dev/run-quiet.sh "plugin-deps:$$(basename $$dir)" $(MAKE) -C "$$dir" deps & pids+=($$!); \
+		fi; \
+	done; \
+	for pid in "$${pids[@]}"; do wait "$$pid" || status=1; done; \
+	[[ "$$status" -eq 0 ]]
+
+plugins-build: plugins-deps
 	@mkdir -p "$(PLUGINS_BIN_DIR)"
 	@set -eu; pids=(); status=0; \
 	target_goos="$(PLUGIN_TARGET_GOOS)"; \
@@ -197,7 +242,7 @@ plugins-test: plugins-build
 	[[ "$$status" -eq 0 ]]
 	@echo "plugins-test: ok"
 
-plugins-lint:
+plugins-lint: plugins-deps
 	@set -eu; pids=(); status=0; \
 	for dir in $(PLUGINS_SRC_DIR)/*; do \
 		if [ -f "$$dir/Makefile" ]; then \
@@ -239,9 +284,11 @@ restart-broker:
 		echo "restart-broker: no broker is attached to this shell; new shells will start the built binary when BUILD_BIN_DIR is on PATH"; \
 	fi
 
-lint: language-lint site-lint yaml-lint python-lint markdown-lint plugins-lint static-config-lint
-	@./scripts/dev/run-quiet.sh "golangci-lint" go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run --allow-serial-runners ./...
+lint: language-lint site-lint yaml-lint python-lint markdown-lint plugins-lint static-config-lint golangci-lint
 	@echo "lint: ok"
+
+golangci-lint:
+	@./scripts/dev/run-quiet.sh "golangci-lint" go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION) run --allow-serial-runners ./...
 
 language-lint:
 	@./scripts/dev/run-quiet.sh "language-catalogs" go run ./cmd/langcheck
@@ -274,11 +321,17 @@ python-lint:
 markdown-lint:
 	@./scripts/dev/run-quiet.sh "markdown-lint" npx --yes markdownlint-cli2@$(MARKDOWNLINT_CLI2_VERSION) "**/*.md" "!dist/**" "!.venv/**" "!node_modules/**" "!**/node_modules/**" "!**/target/**"
 
-security: gosec govulncheck
-	@./scripts/dev/run-quiet.sh "npm-audit" npm --prefix internal/app/ash_bootstrap/plugins_src/calculator audit --audit-level=high
-	@./scripts/dev/run-quiet.sh "cargo-audit" bash -c 'cd internal/app/ash_bootstrap/plugins_src/flip_a_coin && cargo audit'
-	@./scripts/dev/run-quiet.sh "pip-audit" uvx --from pip-audit==$(PIP_AUDIT_VERSION) pip-audit -r internal/app/ash_bootstrap/tools/requirements.txt
+security: gosec govulncheck npm-audit cargo-audit pip-audit
 	@echo "security: ok"
+
+npm-audit:
+	@./scripts/dev/run-quiet.sh "npm-audit" npm --prefix internal/app/ash_bootstrap/plugins_src/calculator audit --audit-level=high
+
+cargo-audit:
+	@./scripts/dev/run-quiet.sh "cargo-audit" bash -c 'cd internal/app/ash_bootstrap/plugins_src/flip_a_coin && cargo audit'
+
+pip-audit:
+	@./scripts/dev/run-quiet.sh "pip-audit" uvx --from pip-audit==$(PIP_AUDIT_VERSION) pip-audit -r internal/app/ash_bootstrap/tools/requirements.txt
 
 gosec:
 	@./scripts/dev/run-quiet.sh "gosec" go run github.com/securego/gosec/v2/cmd/gosec@$(GOSEC_VERSION) -quiet ./...
@@ -286,12 +339,17 @@ gosec:
 govulncheck:
 	@./scripts/dev/run-quiet.sh "govulncheck" go run golang.org/x/vuln/cmd/govulncheck@$(GOVULNCHECK_VERSION) ./...
 
-test: plugins-test
-	@./scripts/dev/run-quiet.sh "site-tests" node --test site/site.test.cjs
-	@./scripts/dev/run-quiet.sh "site-generator-tests" python3 -B -m unittest discover -s site -p 'test_*.py'
-	@./scripts/dev/run-quiet.sh "python-tool-tests" python3 -B -m unittest discover -s internal/app/ash_bootstrap/tools -p 'test_*.py'
-	@$(MAKE) --no-print-directory go-test
+test: plugins-test site-tests site-generator-tests python-tool-tests go-test
 	@echo "test: ok"
+
+site-tests:
+	@./scripts/dev/run-quiet.sh "site-tests" node --test site/site.test.cjs
+
+site-generator-tests:
+	@./scripts/dev/run-quiet.sh "site-generator-tests" python3 -B -m unittest discover -s site -p 'test_*.py'
+
+python-tool-tests:
+	@./scripts/dev/run-quiet.sh "python-tool-tests" python3 -B -m unittest discover -s internal/app/ash_bootstrap/tools -p 'test_*.py'
 
 go-test:
 	@./scripts/dev/run-quiet.sh "go-test" go test ./...

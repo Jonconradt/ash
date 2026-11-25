@@ -32,7 +32,10 @@ For a public Ollama or OpenAI-compatible endpoint, configure all three AI
 secrets, including `ASH_AI_AUTH_TOKEN`.
 
 Source and dependency checks run locally through the installed pre-push hook;
-the tag-triggered release workflow focuses on building and validating artifacts.
+to keep pushes fast, the network-backed dependency audits run there only when
+the outgoing commits change a dependency manifest. `make security`, the nightly
+gate, and `make verify` always run every audit. The tag-triggered release
+workflow focuses on building and validating artifacts.
 The scheduled nightly workflow runs the local-equivalent gate on Ubuntu before
 creating a tag. Local hooks are bypassable and are not a server-side status
 check.
