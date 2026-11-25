@@ -36,8 +36,10 @@ config:
 hooks-install:
 	@./scripts/dev/install_hooks.sh
 
-# verify runs the full quality gate quietly. Each phase is a prerequisite,
-# allowing GNU make to run independent checks in parallel under -j.
+# verify runs the full quality gate quietly. Each correctness phase is a
+# prerequisite that can run in parallel under -j. benchmark is deliberately
+# last: it depends on every other phase, and runs only after they finish, so
+# benchmark timing is not distorted by concurrent test, lint, or security work.
 verify: verify-lint verify-test verify-race verify-cover verify-vet verify-staticcheck verify-security verify-fuzz verify-benchmark
 	@echo "verify: all checks passed"
 
@@ -65,7 +67,7 @@ verify-security:
 verify-fuzz:
 	@./scripts/dev/run-quiet.sh "test-fuzz" $(MAKE) --no-print-directory test-fuzz
 
-verify-benchmark:
+verify-benchmark: verify-lint verify-test verify-race verify-cover verify-vet verify-staticcheck verify-security verify-fuzz
 	@./scripts/dev/run-quiet.sh "benchmark" $(MAKE) --no-print-directory benchmark
 
 # Used by scheduled release automation before it creates a tag.

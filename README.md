@@ -137,7 +137,9 @@ make release CHANNEL=stable
 - `make lint` checks Go, shell scripts, HTML, JSON, GitHub Actions workflows,
   YAML formatting, localization, Python, Markdown, and plugin sources
 - `make security` runs Go security/vulnerability analysis plus npm, Cargo, and
-  Python dependency audits
+  Python dependency audits. The Cargo advisory Git repository is synced at most
+  once every 24 hours; normal `cargo audit` runs use `--no-fetch` and the local
+  cache.
 - `make check-static` and `make check-security` are named aliases for those
   respective local quality gates; the latter also scans repository history and
   working-tree files for secrets

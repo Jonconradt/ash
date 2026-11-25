@@ -34,8 +34,11 @@ test-cover:
 test-fuzz:
 	@./scripts/dev/run-quiet.sh "go-test-fuzz" go test -fuzz=Fuzz -fuzztime=$(FUZZ_TIME) ./internal/app
 
+# Benchmarks deliberately use one package and one CPU setting. This is the
+# isolated timing mode used by make verify; do not add -p or -cpu parallelism
+# here, and keep benchmark as verify's last prerequisite in the Makefile.
 benchmark:
-	@./scripts/dev/run-quiet.sh "benchmark" go test -bench=. -benchmem ./...
+	@./scripts/dev/run-quiet.sh "benchmark" go test -p=1 -cpu=1 -bench=. -benchmem ./...
 
 vet:
 	@go vet ./...

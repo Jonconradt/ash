@@ -135,7 +135,7 @@ func runSubAgentCommand(ctx context.Context, prompt, childID string) toolCommand
 	}
 	commandCtx, cancel := context.WithTimeout(ctx, aiTimeout())
 	defer cancel()
-	cmd := execCommandContext(commandCtx, ashPath, prompt)
+	cmd := execCommandContext(context.WithoutCancel(commandCtx), ashPath, prompt)
 	configureProcessGroup(cmd)
 	cmd.Env = withEnvironmentValues(map[string]string{
 		sessionIDEnvName:  childID,
@@ -159,7 +159,7 @@ func runSubAgentCommand(ctx context.Context, prompt, childID string) toolCommand
 	err = cmd.Wait()
 	close(processDone)
 	if commandCtx.Err() != nil {
-		// CommandContext may kill the leader before the watcher kills its process group.
+		// The process may finish as the context expires; ensure the whole group is stopped.
 		terminateProcessTree(cmd)
 	}
 	result := toolCommandResult{

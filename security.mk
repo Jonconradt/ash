@@ -1,6 +1,6 @@
 # Security, secret, and pre-push quality targets.
 
-.PHONY: pre-push pre-push-security pre-push-audits pre-push-secrets check-security security npm-audit cargo-audit pip-audit gosec govulncheck
+.PHONY: pre-push pre-push-security pre-push-audits pre-push-secrets check-security security npm-audit cargo-audit-sync cargo-audit pip-audit gosec govulncheck
 
 # Run the same fail-closed checks on the exact commit(s) being pushed. The
 # phases are plain prerequisites so the automatic -j parallelism runs them
@@ -34,8 +34,11 @@ security: gosec govulncheck npm-audit cargo-audit pip-audit
 npm-audit:
 	@./scripts/dev/run-quiet.sh "npm-audit" npm --prefix internal/app/ash_bootstrap/plugins_src/calculator audit --audit-level=high
 
-cargo-audit:
-	@./scripts/dev/run-quiet.sh "cargo-audit" env -u MAKEFLAGS -u MFLAGS bash -c 'cd internal/app/ash_bootstrap/plugins_src/flip_a_coin && cargo audit'
+cargo-audit: cargo-audit-sync
+	@./scripts/dev/run-quiet.sh "cargo-audit" env -u MAKEFLAGS -u MFLAGS bash -c 'cd internal/app/ash_bootstrap/plugins_src/flip_a_coin && cargo audit --no-fetch'
+
+cargo-audit-sync:
+	@./scripts/dev/run-quiet.sh "cargo-audit-sync" ./scripts/dev/cargo-audit-sync.sh
 
 pip-audit:
 	@./scripts/dev/run-quiet.sh "pip-audit" uvx --from pip-audit==$(PIP_AUDIT_VERSION) pip-audit -r internal/app/ash_bootstrap/tools/requirements.txt
