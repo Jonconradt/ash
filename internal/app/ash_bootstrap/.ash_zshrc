@@ -30,6 +30,21 @@ _ash_ensure_broker() {
 	# would forward the broker's own command line to the AI as a prompt.
 	command -v ash-broker >/dev/null 2>&1 || return 1
 	if [[ -n "${ASH_BROKER_SOCKET:-}" && -n "${ASH_BROKER_TOKEN:-}" && -S "$ASH_BROKER_SOCKET" && -n "${ASH_BROKER_PID:-}" ]] && kill -0 "$ASH_BROKER_PID" 2>/dev/null; then
+		local broker_candidate broker_candidate_version running_broker_version
+		broker_candidate="$(whence -p ash-broker 2>/dev/null)"
+		broker_candidate_version="$(command "$broker_candidate" --version 2>/dev/null)" || broker_candidate_version=""
+		if [[ -n "$broker_candidate" && -n "$broker_candidate_version" && "${ASH_BROKER_CHECKED_VERSION:-}" != "$broker_candidate_version" ]]; then
+			running_broker_version="$(command "$broker_candidate" --status 2>/dev/null)" || running_broker_version=""
+			if [[ -n "$running_broker_version" ]]; then
+				if [[ "$running_broker_version" == "$broker_candidate_version" ]]; then
+					export ASH_BROKER_CHECKED_VERSION="$broker_candidate_version"
+				else
+					if command "$broker_candidate" --restart "$broker_candidate" >/dev/null 2>&1; then
+						export ASH_BROKER_CHECKED_VERSION="$broker_candidate_version"
+					fi
+				fi
+			fi
+		fi
 		return 0
 	fi
 	local runtime_dir="$_ash_runtime_dir"

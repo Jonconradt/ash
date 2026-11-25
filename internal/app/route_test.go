@@ -220,6 +220,37 @@ func TestUnixShellBootstrapAssetsPassParentPID(t *testing.T) {
 	}
 }
 
+func TestUnixShellBootstrapAssetsSupportBrokerVersionRefresh(t *testing.T) {
+	cases := []struct {
+		path string
+		want []string
+	}{
+		{
+			path: "ash_bootstrap/.ash_bashrc",
+			want: []string{"--status", "--restart", "ASH_BROKER_CHECKED_VERSION", "running_broker_version"},
+		},
+		{
+			path: "ash_bootstrap/.ash_zshrc",
+			want: []string{"--status", "--restart", "ASH_BROKER_CHECKED_VERSION", "running_broker_version"},
+		},
+		{
+			path: "ash_bootstrap/.ash_fish.fish",
+			want: []string{"--status", "--restart", "ASH_BROKER_CHECKED_VERSION", "running_broker_version"},
+		},
+	}
+	for _, tc := range cases {
+		content, err := readEmbeddedBootstrapAsset(tc.path)
+		if err != nil {
+			t.Fatalf("read embedded asset %q: %v", tc.path, err)
+		}
+		for _, want := range tc.want {
+			if !strings.Contains(string(content), want) {
+				t.Errorf("bootstrap asset %q missing %q", tc.path, want)
+			}
+		}
+	}
+}
+
 var conservativeOperandPattern = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
 
 func shouldRouteToAshConservative(command string, args []string) bool {

@@ -292,6 +292,51 @@ func TestBrokerHTTPClientRetainsBoundedIdleConnections(t *testing.T) {
 }
 
 // dialBroker sends one brokerproto.Request to the listener and returns the decoded response.
+func TestRequestBrokerStatus(t *testing.T) {
+	socket := "/tmp/ash-broker-test-" + strconv.Itoa(os.Getpid()) + "-status.sock"
+	listener, err := (&net.ListenConfig{}).Listen(context.Background(), "unix", socket)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() {
+		_ = listener.Close()
+		_ = os.Remove(socket)
+	}()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		conn, acceptErr := listener.Accept()
+		if acceptErr != nil {
+			return
+		}
+		defer func() { _ = conn.Close() }()
+		payload, readErr := brokerproto.ReadFrame(conn)
+		if readErr != nil {
+			return
+		}
+		var request brokerproto.Request
+		if json.Unmarshal(payload, &request) != nil || request.BrokerAction != "status" {
+			return
+		}
+		response, marshalErr := json.Marshal(brokerproto.Response{Version: brokerproto.Version, BrokerVersion: "test-status-version", BrokerInstance: "test-instance"})
+		if marshalErr == nil {
+			_ = brokerproto.WriteFrame(conn, response)
+		}
+	}()
+
+	t.Setenv("ASH_BROKER_SOCKET", socket)
+	t.Setenv("ASH_BROKER_TOKEN", "test-status-token")
+	var stdout strings.Builder
+	if err := requestBrokerStatus(&stdout); err != nil {
+		t.Fatalf("requestBrokerStatus: %v", err)
+	}
+	if strings.TrimSpace(stdout.String()) != "test-status-version" {
+		t.Fatalf("status output = %q, want test-status-version", stdout.String())
+	}
+	<-done
+}
+
 func dialBroker(t *testing.T, socket string, req brokerproto.Request) brokerproto.Response {
 	t.Helper()
 	conn, err := (&net.Dialer{}).DialContext(context.Background(), "unix", socket)

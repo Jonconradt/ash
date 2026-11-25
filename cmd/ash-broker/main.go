@@ -118,6 +118,13 @@ type brokerRestart struct {
 }
 
 func runBrokerServer(ctx context.Context, args []string, stdout, stderr io.Writer, restarts chan<- brokerRestart) int {
+	if len(args) == 1 && args[0] == "--status" {
+		if err := requestBrokerStatus(stdout); err != nil {
+			_, _ = fmt.Fprintln(stderr, err)
+			return 1
+		}
+		return 0
+	}
 	if len(args) == 2 && args[0] == "--restart" {
 		if err := requestBrokerRestart(args[1]); err != nil {
 			return 1
@@ -645,6 +652,26 @@ func handleBrokerConnWithRestart(ctx context.Context, conn net.Conn, token strin
 	if err != nil {
 		_ = brokerproto.WriteFrame(conn, mustBrokerJSON(brokerproto.Response{Version: brokerproto.Version, Error: err.Error()}))
 	}
+}
+
+func requestBrokerStatus(stdout io.Writer) error {
+	socket := strings.TrimSpace(os.Getenv("ASH_BROKER_SOCKET"))
+	token := strings.TrimSpace(os.Getenv("ASH_BROKER_TOKEN"))
+	if socket == "" || token == "" {
+		return errors.New("this shell has no active broker to inspect")
+	}
+	response, err := brokerControlRequest(socket, token, brokerproto.Request{BrokerAction: "status"})
+	if err != nil {
+		return fmt.Errorf("querying broker status: %w", err)
+	}
+	if response.Error != "" {
+		return fmt.Errorf("broker status rejected: %s", response.Error)
+	}
+	if strings.TrimSpace(response.BrokerVersion) == "" {
+		return errors.New("the running broker did not report a version")
+	}
+	_, err = fmt.Fprintln(stdout, response.BrokerVersion)
+	return err
 }
 
 func requestBrokerRestart(binary string) error {

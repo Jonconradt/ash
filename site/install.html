@@ -270,6 +270,7 @@ rm ./ash-install.sh</code></pre>
             <li><strong>Nightly:</strong> recent default-branch changes, tagged <code>vX.Y.Z-nightly.YYYYMMDD.N</code>; the highest regression risk. Builds are scheduled but may be skipped when nothing changes or publishing fails.</li>
           </ul>
           <p>A published release updates the corresponding Homebrew formula or signed Linux repository. You receive it when you run the owning manager's upgrade command (or your own OS update policy does). Publication, repository updates, and website deployment can lag one another; check availability before changing channels. ash does not silently install background binary updates.</p>
+          <p>Interactive Bash, zsh, and Fish integrations check whether their running broker matches the installed <code>ash-broker</code> binary. When they differ, the next broker check hot-restarts that shell's broker from the updated executable. The check is quiet and fail-open; if a broker cannot be restarted, Ash continues using the existing broker until it is restarted normally or the shell is reopened.</p>
           <div class="table-scroll" role="region" aria-label="Update channel subscriptions" tabindex="0">
             <table>
               <caption>Subscribe using the installation method you own</caption>

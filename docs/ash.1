@@ -455,6 +455,14 @@ failure falls back to direct HTTPS. Broker credentials are ephemeral and are not
 written to scheduler configuration; a non-secret lease expires after shell
 activity stops. Scheduled jobs use direct HTTPS by default.
 .PP
+The installed Bash, zsh, and Fish wrappers compare the candidate
+.B ash-broker
+binary version with the running broker while preserving an active broker. If
+they differ, the wrapper requests a quiet hot restart from the newly installed
+executable. Failed or unsupported restarts leave the existing broker running.
+Package upgrades replace the binary automatically; active broker replacement
+happens on the next wrapper broker check.
+.PP
 The broker warms registered MCP server sessions and complete tool catalogs in
 the background after binding its socket. This does not delay shell startup and
 does not open a browser for OAuth; pending authorization is handled by an

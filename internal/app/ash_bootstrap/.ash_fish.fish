@@ -58,6 +58,23 @@ function _ash_ensure_broker
 	end
 	if set -q ASH_BROKER_SOCKET ASH_BROKER_TOKEN ASH_BROKER_PID
 		if test -S "$ASH_BROKER_SOCKET"; and command kill -0 "$ASH_BROKER_PID" 2>/dev/null
+			set -l broker_candidate (command -s ash-broker)
+			set -l broker_candidate_version ""
+			if test -n "$broker_candidate"
+				set broker_candidate_version (command "$broker_candidate" --version 2>/dev/null)
+			end
+			if test -n "$broker_candidate"; and test -n "$broker_candidate_version"; and test "$ASH_BROKER_CHECKED_VERSION" != "$broker_candidate_version"
+				set -l running_broker_version (command "$broker_candidate" --status 2>/dev/null)
+				if test -n "$running_broker_version"
+					if test "$running_broker_version" = "$broker_candidate_version"
+						set -gx ASH_BROKER_CHECKED_VERSION "$broker_candidate_version"
+					else
+						if command "$broker_candidate" --restart "$broker_candidate" >/dev/null 2>&1
+							set -gx ASH_BROKER_CHECKED_VERSION "$broker_candidate_version"
+						end
+					end
+				end
+			end
 			return 0
 		end
 	end
