@@ -301,6 +301,7 @@ func (p *gitPlugin) Run(ctx context.Context, args []string, stdout, stderr io.Wr
 
 	runCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
+	// #nosec G204 -- gitPath comes from LookPath; spec.Name and every runArg are allowlist-validated above.
 	cmd := exec.CommandContext(runCtx, gitPath, append([]string{spec.Name}, runArgs...)...)
 	cmd.Dir = cwd
 	cmd.Stdin = strings.NewReader("")
