@@ -187,15 +187,29 @@ func pinFiles() ([]string, error) {
 	return paths, nil
 }
 
+func readFileWithinRoot(root *os.Root, path string) ([]byte, error) {
+	file, err := root.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = file.Close() }()
+	return io.ReadAll(file)
+}
+
 func (u *updater) updatePins(ctx context.Context) error {
 	paths, err := pinFiles()
 	if err != nil {
 		return err
 	}
+	root, err := os.OpenRoot(".")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = root.Close() }()
 	original := make(map[string][]byte, len(paths))
 	updated := make(map[string]string, len(paths))
 	for _, path := range paths {
-		data, readErr := os.ReadFile(path)
+		data, readErr := readFileWithinRoot(root, path)
 		if readErr != nil {
 			if os.IsNotExist(readErr) {
 				continue
@@ -272,8 +286,13 @@ func replaceFile(original, updated []byte) error {
 }
 
 func replaceFiles(original, updated map[string][]byte) (err error) {
+	root, rootErr := os.OpenRoot(".")
+	if rootErr != nil {
+		return rootErr
+	}
+	defer func() { _ = root.Close() }()
 	for path, originalData := range original {
-		current, readErr := os.ReadFile(path)
+		current, readErr := readFileWithinRoot(root, path)
 		if readErr != nil {
 			return readErr
 		}

@@ -20,14 +20,14 @@ label="$1"
 shift
 
 if [[ "${V:-0}" == "1" || "${VERBOSE:-0}" == "1" || "${ASH_VERBOSE:-0}" == "1" ]]; then
-	"$@"
+	"$@" </dev/null
 	exit $?
 fi
 
 log="$(mktemp "${TMPDIR:-/tmp}/ash-verify-${label//[^A-Za-z0-9_.-]/_}.XXXXXX")"
 trap 'rm -f "$log"' EXIT
 
-"$@" >"$log" 2>&1
+"$@" </dev/null >"$log" 2>&1
 status=$?
 if [[ "$status" -eq 0 ]]; then
 	printf '==> %s ... ok\n' "$label"
