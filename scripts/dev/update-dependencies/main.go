@@ -288,9 +288,14 @@ func replaceFile(original, updated []byte) error {
 }
 
 func snapshotFiles(paths ...string) (map[string][]byte, error) {
+	root, err := os.OpenRoot(".")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = root.Close() }()
 	snapshot := make(map[string][]byte, len(paths))
 	for _, path := range paths {
-		data, err := os.ReadFile(path)
+		data, err := readFileWithinRoot(root, path)
 		if errors.Is(err, os.ErrNotExist) {
 			continue
 		}

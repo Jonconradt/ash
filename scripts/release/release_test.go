@@ -343,8 +343,10 @@ func TestPrePushFailureBlocksAndSkipsSecretScan(t *testing.T) {
 	cmd.Env = append(os.Environ(), "PATH="+path+":"+os.Getenv("PATH"), "PRE_PUSH_LOG="+logPath)
 	cmd.Stdin = strings.NewReader(input)
 	output, err := cmd.CombinedOutput()
-	if err == nil || !strings.Contains(string(output), "pre-push validation failed") {
-		t.Fatalf("failed validation did not block push: err=%v output=%s", err, output)
+	if err == nil ||
+		!strings.Contains(string(output), "fixture validation failure: gosec") ||
+		!strings.Contains(string(output), "pre-push validation failed") {
+		t.Fatalf("failed validation did not include make output or block push: err=%v output=%s", err, output)
 	}
 	log, readErr := os.ReadFile(logPath)
 	if readErr != nil || strings.Contains(string(log), "gitleaks") {
@@ -414,8 +416,11 @@ func installFakeMake(t *testing.T, logPath string, status int) string {
 	dir := t.TempDir()
 	makeScript := fmt.Sprintf(`#!/bin/sh
 printf '%%s\n' "$PWD" "$@" "$(git rev-parse HEAD)" "$(cat README.md)" > "$PRE_PUSH_LOG"
+if [ %d -ne 0 ]; then
+	echo "fixture validation failure: gosec" >&2
+fi
 exit %d
-`, status)
+`, status, status)
 	writeFixture(t, filepath.Join(dir, "make"), makeScript, 0o755)
 	if runtime.GOOS == "windows" {
 		t.Skip("pre-push hook tests require a POSIX shell")

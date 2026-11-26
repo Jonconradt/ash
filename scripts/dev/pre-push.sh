@@ -7,9 +7,13 @@ set -Eeuo pipefail
 repo_root="$(git rev-parse --show-toplevel)"
 tmp_root="$(mktemp -d "${TMPDIR:-/tmp}/ash-pre-push.XXXXXX")"
 worktree=""
+validation_log=""
 cleanup() {
 	if [[ -n "$worktree" && -d "$worktree" ]]; then
 		git -C "$repo_root" worktree remove --force "$worktree"
+	fi
+	if [[ -n "$validation_log" && -f "$validation_log" ]]; then
+		rm -f "$validation_log"
 	fi
 	rmdir "$tmp_root"
 }
@@ -40,7 +44,10 @@ while read -r local_ref local_oid remote_ref remote_oid; do
 	worktree="$tmp_root/revision"
 	git -C "$repo_root" worktree add --quiet --detach "$worktree" "$local_oid"
 	echo "Validating pushed commit $local_oid ($local_ref)"
-	if ! (cd "$worktree" && make pre-push PUSH_BASE="$push_base"); then
+	validation_log="$tmp_root/pre-push.log"
+	if ! (cd "$worktree" && make pre-push PUSH_BASE="$push_base") >"$validation_log" 2>&1; then
+		echo "pre-push validation output:" >&2
+		cat "$validation_log" >&2
 		echo "pre-push validation failed for $local_ref ($local_oid); push aborted" >&2
 		exit 1
 	fi
