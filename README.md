@@ -79,7 +79,7 @@ Is this thing secure and safe? It really depends on how bold you are. It runs as
 
 ## Build
 
-Requires Go 1.27.2 or newer. To install the two Go commands from the canonical
+Requires Go 1.27.4 or newer. To install the two Go commands from the canonical
 module:
 
 ```bash

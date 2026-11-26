@@ -5,6 +5,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -346,6 +347,8 @@ func TestGoDirectiveBehindOrAhead(t *testing.T) {
 		t.Run(tt.required+"/"+tt.input, func(t *testing.T) {
 			u := fixtureUpdater(t, tt.input)
 			writeFile(t, "go.mod", "module example.com/test\n\ngo "+tt.required+"\n")
+			var output bytes.Buffer
+			u.output = &output
 			edit := false
 			baseRun := u.run
 			u.run = func(ctx context.Context, name string, args ...string) (string, error) {
@@ -358,6 +361,10 @@ func TestGoDirectiveBehindOrAhead(t *testing.T) {
 			err := u.updateGo(context.Background())
 			if (err != nil) != tt.wantError || edit != tt.wantEdit {
 				t.Fatalf("error=%v edit=%v; want error=%v edit=%v", err, edit, tt.wantError, tt.wantEdit)
+			}
+			wantStatus := "Go: go.mod " + tt.required + ";"
+			if !strings.Contains(output.String(), wantStatus) {
+				t.Fatalf("status output %q does not contain %q", output.String(), wantStatus)
 			}
 		})
 	}

@@ -462,6 +462,15 @@ func (u *updater) updateGo(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	data, err := os.ReadFile("go.mod")
+	if err != nil {
+		return err
+	}
+	match := regexp.MustCompile(`(?m)^go ([^ \r\n]+)\s*$`).FindSubmatch(data)
+	if match == nil {
+		return errors.New("go.mod has no Go directive")
+	}
+	required := string(match[1])
 	var releases []struct {
 		Version string `json:"version"`
 		Stable  bool   `json:"stable"`
@@ -477,7 +486,7 @@ func (u *updater) updateGo(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(u.output, "Go: installed %s; package candidate %s; latest upstream stable %s\n", installed, available, latest); err != nil {
+	if _, err := fmt.Fprintf(u.output, "Go: go.mod %s; installed %s; package candidate %s; latest upstream stable %s\n", required, installed, available, latest); err != nil {
 		return err
 	}
 	target := latest
@@ -539,15 +548,6 @@ func (u *updater) updateGo(ctx context.Context) error {
 			}
 		}
 	}
-	data, err := os.ReadFile("go.mod")
-	if err != nil {
-		return err
-	}
-	match := regexp.MustCompile(`(?m)^go ([^ \r\n]+)\s*$`).FindSubmatch(data)
-	if match == nil {
-		return errors.New("go.mod has no Go directive")
-	}
-	required := string(match[1])
 	behind, err := newerStable(required, installed)
 	if err != nil {
 		return err
