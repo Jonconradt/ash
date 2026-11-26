@@ -66,7 +66,12 @@ func releaseFixture(t *testing.T) (string, string) {
 		t.Fatal(err)
 	}
 	dir := t.TempDir()
-	for _, name := range []string{"Makefile", "scripts/release/next_version.sh", "scripts/release/push_with_retry.sh"} {
+	for _, name := range []string{
+		"Makefile", "config.mk", "lint.mk", "test.mk", "security.mk", "build.mk", "release.mk",
+		"scripts/release/next_version.sh", "scripts/release/push_with_retry.sh",
+		"scripts/dev/nvm-node-dir.sh", "scripts/dev/pre-push-audits.sh", "scripts/dev/pre-push-secrets.sh",
+		"scripts/dev/run-quiet.sh",
+	} {
 		copyFixture(t, root, dir, name)
 	}
 	writeFixture(t, filepath.Join(dir, ".gitignore"), "/dist/\n/.cache/\n", 0o644)
@@ -159,7 +164,7 @@ func TestReleaseVersionRemainsFrozenAfterTagging(t *testing.T) {
 	for _, channel := range []string{"beta", "stable", "nightly"} {
 		t.Run(channel, func(t *testing.T) {
 			_, dir := releaseFixture(t)
-			makefile := filepath.Join(dir, "Makefile")
+			makefile := filepath.Join(dir, "release.mk")
 			data, err := os.ReadFile(makefile)
 			if err != nil {
 				t.Fatal(err)
@@ -248,13 +253,16 @@ func TestReleaseVerificationDefaultsToFullSuite(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	data, err := os.ReadFile(filepath.Join(root, "Makefile"))
+	config, err := os.ReadFile(filepath.Join(root, "config.mk"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	makefile := string(data)
-	if !strings.Contains(makefile, "RELEASE_VERIFY_TARGET ?= verify\n") ||
-		!strings.Contains(makefile, "release-check: $(RELEASE_VERIFY_TARGET)") {
+	releaseMake, err := os.ReadFile(filepath.Join(root, "release.mk"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(config), "RELEASE_VERIFY_TARGET ?= verify\n") ||
+		!strings.Contains(string(releaseMake), "release-check: $(RELEASE_VERIFY_TARGET)") {
 		t.Fatal("release target does not default to full verification")
 	}
 }
@@ -265,6 +273,10 @@ func TestVerifyCIUsesPrePushGate(t *testing.T) {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(filepath.Join(root, "Makefile"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	securityData, err := os.ReadFile(filepath.Join(root, "security.mk"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -279,7 +291,7 @@ func TestVerifyCIUsesPrePushGate(t *testing.T) {
 	if !strings.Contains(string(data), `"test-race"`) || !strings.Contains(string(data), `"benchmark"`) {
 		t.Fatal("full verify target lost its extended checks")
 	}
-	_, gate, found := strings.Cut(string(data), "\npre-push: ")
+	_, gate, found := strings.Cut(string(securityData), "\npre-push: ")
 	if !found {
 		t.Fatal("missing pre-push target")
 	}

@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"runtime"
 	"strconv"
@@ -176,24 +177,69 @@ func pinPattern(key string) *regexp.Regexp {
 	return regexp.MustCompile(`(?m)^(` + regexp.QuoteMeta(key) + `[ \t]+\?=[ \t]+)([^ \t\r\n]+)([^\r\n]*)$`)
 }
 
+func pinFiles() ([]string, error) {
+	paths := []string{"Makefile"}
+	matches, err := filepath.Glob("*.mk")
+	if err != nil {
+		return nil, err
+	}
+	paths = append(paths, matches...)
+	return paths, nil
+}
+
+func readFileWithinRoot(root *os.Root, path string) ([]byte, error) {
+	file, err := root.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = file.Close() }()
+	return io.ReadAll(file)
+}
+
 func (u *updater) updatePins(ctx context.Context) error {
-	original, err := os.ReadFile("Makefile")
+	paths, err := pinFiles()
 	if err != nil {
 		return err
 	}
-	updated := string(original)
+	root, err := os.OpenRoot(".")
+	if err != nil {
+		return err
+	}
+	defer func() { _ = root.Close() }()
+	original := make(map[string][]byte, len(paths))
+	updated := make(map[string]string, len(paths))
+	for _, path := range paths {
+		data, readErr := readFileWithinRoot(root, path)
+		if readErr != nil {
+			if os.IsNotExist(readErr) {
+				continue
+			}
+			return readErr
+		}
+		original[path] = data
+		updated[path] = string(data)
+	}
 	type update struct {
-		item    tool
-		current string
-		latest  string
+		item     tool
+		current  string
+		latest   string
+		location string
 	}
 	var changes []update
 	// Discover every version before prompting or writing, so a failed lookup
 	// cannot leave a partially updated set of pins.
 	for _, item := range tools {
-		matches := pinPattern(item.key).FindAllStringSubmatch(updated, -1)
+		var matches [][]string
+		location := ""
+		for _, path := range paths {
+			found := pinPattern(item.key).FindAllStringSubmatch(updated[path], -1)
+			if len(found) > 0 {
+				location = path
+				matches = append(matches, found...)
+			}
+		}
 		if len(matches) != 1 {
-			return fmt.Errorf("expected exactly one %s assignment in Makefile", item.key)
+			return fmt.Errorf("expected exactly one %s assignment across Makefiles; found %d", item.key, len(matches))
 		}
 		current := matches[0][2]
 		latest, err := u.latest(ctx, item)
@@ -208,7 +254,7 @@ func (u *updater) updatePins(ctx context.Context) error {
 			if _, err := fmt.Fprintf(u.output, "%s: pinned %s; latest stable %s\n", item.key, current, latest); err != nil {
 				return err
 			}
-			changes = append(changes, update{item, current, latest})
+			changes = append(changes, update{item, current, latest, location})
 		}
 	}
 	for _, change := range changes {
@@ -217,52 +263,84 @@ func (u *updater) updatePins(ctx context.Context) error {
 			return err
 		}
 		if yes {
-			updated = pinPattern(change.item.key).ReplaceAllStringFunc(updated, func(line string) string {
+			updated[change.location] = pinPattern(change.item.key).ReplaceAllStringFunc(updated[change.location], func(line string) string {
 				match := pinPattern(change.item.key).FindStringSubmatch(line)
 				return match[1] + change.latest + match[3]
 			})
 		}
 	}
-	if updated == string(original) {
+	changed := make(map[string][]byte)
+	for path, data := range original {
+		if updated[path] != string(data) {
+			changed[path] = []byte(updated[path])
+		}
+	}
+	if len(changed) == 0 {
 		return nil
 	}
-	return replaceFile(original, []byte(updated))
+	return replaceFiles(original, changed)
 }
 
-func replaceFile(original, updated []byte) (err error) {
-	const path = "Makefile"
-	current, err := os.ReadFile(path)
-	if err != nil {
-		return err
+func replaceFile(original, updated []byte) error {
+	return replaceFiles(map[string][]byte{"Makefile": original}, map[string][]byte{"Makefile": updated})
+}
+
+func replaceFiles(original, updated map[string][]byte) (err error) {
+	root, rootErr := os.OpenRoot(".")
+	if rootErr != nil {
+		return rootErr
 	}
-	if !bytes.Equal(current, original) {
-		return fmt.Errorf("%s changed during approval; refusing to overwrite it", path)
+	defer func() { _ = root.Close() }()
+	for path, originalData := range original {
+		current, readErr := readFileWithinRoot(root, path)
+		if readErr != nil {
+			return readErr
+		}
+		if !bytes.Equal(current, originalData) {
+			return fmt.Errorf("%s changed during approval; refusing to overwrite it", path)
+		}
 	}
-	info, err := os.Stat(path)
-	if err != nil {
-		return err
-	}
-	tmp, err := os.CreateTemp(".", ".dependency-update-*")
-	if err != nil {
-		return err
-	}
+
+	tempPaths := make(map[string]string, len(updated))
 	defer func() {
-		if cleanupErr := os.Remove(tmp.Name()); cleanupErr != nil && !errors.Is(cleanupErr, os.ErrNotExist) {
-			err = errors.Join(err, cleanupErr)
+		for _, tempPath := range tempPaths {
+			if cleanupErr := os.Remove(tempPath); cleanupErr != nil && !errors.Is(cleanupErr, os.ErrNotExist) {
+				err = errors.Join(err, cleanupErr)
+			}
 		}
 	}()
-	if _, err := tmp.Write(updated); err != nil {
-		_ = tmp.Close()
-		return err
+	for path, data := range updated {
+		info, statErr := os.Stat(path)
+		if statErr != nil {
+			return statErr
+		}
+		tmp, createErr := os.CreateTemp(filepath.Dir(path), ".dependency-update-*")
+		if createErr != nil {
+			return createErr
+		}
+		if _, writeErr := tmp.Write(data); writeErr != nil {
+			_ = tmp.Close()
+			_ = os.Remove(tmp.Name())
+			return writeErr
+		}
+		if chmodErr := tmp.Chmod(info.Mode().Perm()); chmodErr != nil {
+			_ = tmp.Close()
+			_ = os.Remove(tmp.Name())
+			return chmodErr
+		}
+		if closeErr := tmp.Close(); closeErr != nil {
+			_ = os.Remove(tmp.Name())
+			return closeErr
+		}
+		tempPaths[path] = tmp.Name()
 	}
-	if err := tmp.Chmod(info.Mode().Perm()); err != nil {
-		_ = tmp.Close()
-		return err
+	for path, tempPath := range tempPaths {
+		if renameErr := os.Rename(tempPath, path); renameErr != nil {
+			return renameErr
+		}
+		delete(tempPaths, path)
 	}
-	if err := tmp.Close(); err != nil {
-		return err
-	}
-	return os.Rename(tmp.Name(), path)
+	return nil
 }
 
 func (u *updater) installedGo(ctx context.Context) (string, error) {

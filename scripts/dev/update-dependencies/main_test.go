@@ -173,6 +173,37 @@ func TestUpdatePinsOmitsUnchangedVersions(t *testing.T) {
 	}
 }
 
+func TestUpdatePinsInIncludedMakefile(t *testing.T) {
+	u := fixtureUpdater(t, strings.Repeat("yes\n", len(tools)))
+	var config strings.Builder
+	for _, item := range tools {
+		fmt.Fprintf(&config, "%s ?= %s1.2.3\n", item.key, item.prefix)
+	}
+	writeFile(t, "Makefile", "# preserve root Makefile\n")
+	writeFile(t, "config.mk", config.String())
+
+	if err := u.updatePins(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	root, err := os.ReadFile("Makefile")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(root) != "# preserve root Makefile\n" {
+		t.Fatalf("root Makefile changed unexpectedly: %q", string(root))
+	}
+	updated, err := os.ReadFile("config.mk")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, item := range tools {
+		want := fmt.Sprintf("%s ?= %s99.2.3", item.key, item.prefix)
+		if !strings.Contains(string(updated), want) {
+			t.Errorf("config.mk missing updated pin %q", want)
+		}
+	}
+}
+
 func TestPinLookupFailureDoesNotWrite(t *testing.T) {
 	u := fixtureUpdater(t, "yes\n")
 	original := tools[0].key + " ?= v1.0.0\n"
@@ -420,6 +451,28 @@ func TestReplaceFileRejectsConcurrentChanges(t *testing.T) {
 	writeFile(t, "Makefile", "concurrent edit")
 	if err := replaceFile([]byte("original"), []byte("update")); err == nil {
 		t.Fatal("concurrent change overwritten")
+	}
+}
+
+func TestReplaceFilesRejectsConcurrentIncludedMakefileChanges(t *testing.T) {
+	t.Chdir(t.TempDir())
+	writeFile(t, "Makefile", "root original")
+	writeFile(t, "config.mk", "config changed")
+	err := replaceFiles(
+		map[string][]byte{
+			"Makefile":  []byte("root original"),
+			"config.mk": []byte("config original"),
+		},
+		map[string][]byte{
+			"Makefile":  []byte("root update"),
+			"config.mk": []byte("config update"),
+		},
+	)
+	if err == nil {
+		t.Fatal("concurrent included Makefile change overwritten")
+	}
+	if got, readErr := os.ReadFile("Makefile"); readErr != nil || string(got) != "root original" {
+		t.Fatalf("Makefile changed before concurrent check: %q, %v", got, readErr)
 	}
 }
 

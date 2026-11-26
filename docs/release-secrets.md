@@ -36,6 +36,8 @@ to keep pushes fast, the network-backed dependency audits run there only when
 the outgoing commits change a dependency manifest. `make security`, the nightly
 gate, and `make verify` always run every audit. The tag-triggered release
 workflow focuses on building and validating artifacts.
+Cargo audits use the cached RustSec advisory repository with `--no-fetch`;
+the advisory repository is refreshed at most once every 24 hours.
 The scheduled nightly workflow runs the local-equivalent gate on Ubuntu before
 creating a tag. Local hooks are bypassable and are not a server-side status
 check.

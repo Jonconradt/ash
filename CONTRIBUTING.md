@@ -32,6 +32,8 @@ The gate runs its phases in parallel across the available CPUs, and the
 network-backed dependency audits (`govulncheck` plus the npm, Cargo, and Python
 audits) run only when the outgoing commits change a dependency manifest;
 `make security` and `make verify` always run every audit.
+Cargo audits use the cached RustSec advisory repository with `--no-fetch`;
+`cargo-audit-sync` refreshes that repository at most once every 24 hours.
 This is a local safeguard and can be bypassed with `git push --no-verify`; it is
 not a GitHub-enforced status check. Do not bypass it for release branches or
 tags.
@@ -47,6 +49,12 @@ For the full local verification pass, run:
 ```bash
 make verify
 ```
+
+Makefile domains are split into `config.mk`, `lint.mk`, `test.mk`,
+`security.mk`, `build.mk`, and `release.mk`; the root `Makefile` is the
+entry point for high-level targets and shared orchestration. Add or change a
+target in the matching module, keep public target names stable, and update
+`Makefile` only for orchestration or shared entry-point targets.
 
 The lint/test/verify targets are quiet by default: steps run in parallel, and
 each step prints a single `ok` status line when it completes (so line order
