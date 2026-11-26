@@ -19,15 +19,23 @@ set -u
 label="$1"
 shift
 
+run_command() {
+	if command -v setsid >/dev/null 2>&1; then
+		setsid --wait -- "$@" </dev/null
+	else
+		"$@" </dev/null
+	fi
+}
+
 if [[ "${V:-0}" == "1" || "${VERBOSE:-0}" == "1" || "${ASH_VERBOSE:-0}" == "1" ]]; then
-	setsid --wait -- "$@" </dev/null
+	run_command "$@"
 	exit $?
 fi
 
 log="$(mktemp "${TMPDIR:-/tmp}/ash-verify-${label//[^A-Za-z0-9_.-]/_}.XXXXXX")"
 trap 'rm -f "$log"' EXIT
 
-setsid --wait -- "$@" </dev/null >"$log" 2>&1
+run_command "$@" >"$log" 2>&1
 status=$?
 if [[ "$status" -eq 0 ]]; then
 	printf '==> %s ... ok\n' "$label"

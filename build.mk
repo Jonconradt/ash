@@ -6,18 +6,18 @@
 # and plugins-build can run concurrently without racing on npm install. The
 # deps target is optional in plugin Makefiles.
 plugins-deps:
-	@set -eu; pids=(); status=0; \
+	@set -eu; pids=""; status=0; \
 	for dir in $(PLUGINS_SRC_DIR)/*; do \
 		if [ -f "$$dir/Makefile" ] && grep -qE '^deps:' "$$dir/Makefile"; then \
-			./scripts/dev/run-quiet.sh "plugin-deps:$$(basename $$dir)" $(MAKE) -C "$$dir" deps & pids+=($$!); \
+			./scripts/dev/run-quiet.sh "plugin-deps:$$(basename $$dir)" $(MAKE) -C "$$dir" deps & pids="$$pids $$!"; \
 		fi; \
 	done; \
-	for pid in "$${pids[@]}"; do wait "$$pid" || status=1; done; \
+	for pid in $$pids; do wait "$$pid" || status=1; done; \
 	[[ "$$status" -eq 0 ]]
 
 plugins-build: plugins-deps
 	@mkdir -p "$(PLUGINS_BIN_DIR)"
-	@set -eu; pids=(); status=0; \
+	@set -eu; pids=""; status=0; \
 	target_goos="$(PLUGIN_TARGET_GOOS)"; \
 	if [[ -z "$$target_goos" ]]; then target_goos="$$(uname -s | tr '[:upper:]' '[:lower:]')"; fi; \
 	for dir in $(PLUGINS_SRC_DIR)/*; do \
@@ -27,32 +27,32 @@ plugins-build: plugins-deps
 				echo "skipping Rust plugin for macOS: $$(basename "$$dir")"; \
 				continue; \
 			fi; \
-			./scripts/dev/run-quiet.sh "plugin-build:$$(basename $$dir)" $(MAKE) -C "$$dir" build BUILD_DIR="$(abspath $(PLUGINS_BIN_DIR))" TARGET_GOOS="$(PLUGIN_TARGET_GOOS)" TARGET_GOARCH="$(PLUGIN_TARGET_GOARCH)" & pids+=($$!); \
+			./scripts/dev/run-quiet.sh "plugin-build:$$(basename $$dir)" $(MAKE) -C "$$dir" build BUILD_DIR="$(abspath $(PLUGINS_BIN_DIR))" TARGET_GOOS="$(PLUGIN_TARGET_GOOS)" TARGET_GOARCH="$(PLUGIN_TARGET_GOARCH)" & pids="$$pids $$!"; \
 		fi; \
 	done; \
-	for pid in "$${pids[@]}"; do wait "$$pid" || status=1; done; \
+	for pid in $$pids; do wait "$$pid" || status=1; done; \
 	[[ "$$status" -eq 0 ]]
 	@echo "plugins-build: ok"
 
 plugins-test: plugins-build
-	@set -eu; pids=(); status=0; \
+	@set -eu; pids=""; status=0; \
 	for dir in $(PLUGINS_SRC_DIR)/*; do \
 		if [ -f "$$dir/Makefile" ]; then \
-			./scripts/dev/run-quiet.sh "plugin-test:$$(basename $$dir)" $(MAKE) -C "$$dir" test & pids+=($$!); \
+			./scripts/dev/run-quiet.sh "plugin-test:$$(basename $$dir)" $(MAKE) -C "$$dir" test & pids="$$pids $$!"; \
 		fi; \
 	done; \
-	for pid in "$${pids[@]}"; do wait "$$pid" || status=1; done; \
+	for pid in $$pids; do wait "$$pid" || status=1; done; \
 	[[ "$$status" -eq 0 ]]
 	@echo "plugins-test: ok"
 
 plugins-lint: plugins-deps
-	@set -eu; pids=(); status=0; \
+	@set -eu; pids=""; status=0; \
 	for dir in $(PLUGINS_SRC_DIR)/*; do \
 		if [ -f "$$dir/Makefile" ]; then \
-			./scripts/dev/run-quiet.sh "plugin-lint:$$(basename $$dir)" $(MAKE) -C "$$dir" lint & pids+=($$!); \
+			./scripts/dev/run-quiet.sh "plugin-lint:$$(basename $$dir)" $(MAKE) -C "$$dir" lint & pids="$$pids $$!"; \
 		fi; \
 	done; \
-	for pid in "$${pids[@]}"; do wait "$$pid" || status=1; done; \
+	for pid in $$pids; do wait "$$pid" || status=1; done; \
 	[[ "$$status" -eq 0 ]]
 	@echo "plugins-lint: ok"
 
