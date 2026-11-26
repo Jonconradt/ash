@@ -5,7 +5,6 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -347,8 +346,6 @@ func TestGoDirectiveBehindOrAhead(t *testing.T) {
 		t.Run(tt.required+"/"+tt.input, func(t *testing.T) {
 			u := fixtureUpdater(t, tt.input)
 			writeFile(t, "go.mod", "module example.com/test\n\ngo "+tt.required+"\n")
-			var output bytes.Buffer
-			u.output = &output
 			edit := false
 			baseRun := u.run
 			u.run = func(ctx context.Context, name string, args ...string) (string, error) {
@@ -361,10 +358,6 @@ func TestGoDirectiveBehindOrAhead(t *testing.T) {
 			err := u.updateGo(context.Background())
 			if (err != nil) != tt.wantError || edit != tt.wantEdit {
 				t.Fatalf("error=%v edit=%v; want error=%v edit=%v", err, edit, tt.wantError, tt.wantEdit)
-			}
-			wantStatus := "Go: go.mod " + tt.required + ";"
-			if !strings.Contains(output.String(), wantStatus) {
-				t.Fatalf("status output %q does not contain %q", output.String(), wantStatus)
 			}
 		})
 	}
@@ -450,6 +443,78 @@ func TestUpdateModuleCommands(t *testing.T) {
 				t.Fatalf("commands=%v error=%v; want commands=%v", commands, err, want)
 			}
 		})
+	}
+}
+
+func TestUpdateStopsAfterModuleChanges(t *testing.T) {
+	u := fixtureUpdater(t, "yes\n")
+	writeFile(t, "go.mod", "module example.com/test\n\ngo 1.27.4\n")
+	writeFile(t, "go.sum", "old checksum\n")
+	var makefile strings.Builder
+	for _, item := range tools {
+		fmt.Fprintf(&makefile, "%s ?= %s99.2.3\n", item.key, item.prefix)
+	}
+	writeFile(t, "Makefile", makefile.String())
+
+	baseRun := u.run
+	u.run = func(ctx context.Context, name string, args ...string) (string, error) {
+		command := name + " " + strings.Join(args, " ")
+		if command == "go get -u ./..." {
+			writeFile(t, "go.mod", "module example.com/test\n\ngo 1.27.4\nrequire example.com/dependency v1.0.0\n")
+			writeFile(t, "go.sum", "new checksum\n")
+			return "", nil
+		}
+		if command == "go mod tidy" {
+			return "", nil
+		}
+		return baseRun(ctx, name, args...)
+	}
+
+	err := u.update(context.Background())
+	if err == nil || !errors.Is(err, errModuleFilesChanged) {
+		t.Fatalf("update error = %v; want module-change stop", err)
+	}
+	for _, command := range []string{
+		"git add go.mod go.sum",
+		"git diff --cached -- go.mod go.sum",
+		`git commit -m "chore: update Go modules"`,
+		"git push",
+	} {
+		if !strings.Contains(err.Error(), command) {
+			t.Fatalf("module-change error %q missing command %q", err, command)
+		}
+	}
+	if got, readErr := os.ReadFile("go.sum"); readErr != nil || string(got) != "new checksum\n" {
+		t.Fatalf("go.sum = %q, %v; want retained module changes", got, readErr)
+	}
+}
+
+func TestUpdateIsQuietWhenModuleFilesUnchanged(t *testing.T) {
+	u := fixtureUpdater(t, "no\n")
+	u.assumeYes = true
+	writeFile(t, "go.mod", "module example.com/test\n\ngo 1.27.4\n")
+	writeFile(t, "go.sum", "unchanged checksum\n")
+	var makefile strings.Builder
+	for _, item := range tools {
+		fmt.Fprintf(&makefile, "%s ?= %s99.2.3\n", item.key, item.prefix)
+	}
+	writeFile(t, "Makefile", makefile.String())
+	var output strings.Builder
+	u.output = &output
+	baseRun := u.run
+	u.run = func(ctx context.Context, name string, args ...string) (string, error) {
+		command := name + " " + strings.Join(args, " ")
+		if command == "go get -u ./..." || command == "go mod tidy" {
+			return "", nil
+		}
+		return baseRun(ctx, name, args...)
+	}
+
+	if err := u.update(context.Background()); err != nil {
+		t.Fatalf("update error = %v", err)
+	}
+	if got := output.String(); got != "" {
+		t.Fatalf("unchanged update output = %q; want no message", got)
 	}
 }
 

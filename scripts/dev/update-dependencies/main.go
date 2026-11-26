@@ -52,6 +52,8 @@ var tools = []tool{
 
 var versionPattern = regexp.MustCompile(`^v?([0-9]+)\.([0-9]+)(?:\.([0-9]+))?(-[0-9A-Za-z.-]+)?$`)
 
+var errModuleFilesChanged = errors.New("go.mod or go.sum changed")
+
 type releaseVersion struct {
 	parts      [3]int
 	prerelease bool
@@ -285,6 +287,37 @@ func replaceFile(original, updated []byte) error {
 	return replaceFiles(map[string][]byte{"Makefile": original}, map[string][]byte{"Makefile": updated})
 }
 
+func snapshotFiles(paths ...string) (map[string][]byte, error) {
+	snapshot := make(map[string][]byte, len(paths))
+	for _, path := range paths {
+		data, err := os.ReadFile(path)
+		if errors.Is(err, os.ErrNotExist) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		snapshot[path] = data
+	}
+	return snapshot, nil
+}
+
+func filesChanged(before map[string][]byte, paths ...string) (bool, error) {
+	current, err := snapshotFiles(paths...)
+	if err != nil {
+		return false, err
+	}
+	if len(before) != len(current) {
+		return true, nil
+	}
+	for path, data := range before {
+		if !bytes.Equal(data, current[path]) {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 func replaceFiles(original, updated map[string][]byte) (err error) {
 	root, rootErr := os.OpenRoot(".")
 	if rootErr != nil {
@@ -486,9 +519,6 @@ func (u *updater) updateGo(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(u.output, "Go: go.mod %s; installed %s; package candidate %s; latest upstream stable %s\n", required, installed, available, latest); err != nil {
-		return err
-	}
 	target := latest
 	newer, err := newerStable(available, target)
 	if err != nil {
@@ -568,6 +598,10 @@ func (u *updater) updateGo(ctx context.Context) error {
 }
 
 func (u *updater) update(ctx context.Context) error {
+	moduleFilesBefore, err := snapshotFiles("go.mod", "go.sum")
+	if err != nil {
+		return err
+	}
 	if err := u.updateGo(ctx); err != nil {
 		return err
 	}
@@ -585,8 +619,14 @@ func (u *updater) update(ctx context.Context) error {
 			}
 		}
 	}
-	_, err = fmt.Fprintln(u.output, "Dependency checks complete. Review and commit any changes before releasing; run make config to refresh installed development tools.")
-	return err
+	moduleFilesChanged, err := filesChanged(moduleFilesBefore, "go.mod", "go.sum")
+	if err != nil {
+		return err
+	}
+	if moduleFilesChanged {
+		return fmt.Errorf("%w; commit and push the changes before retrying:\n  git add go.mod go.sum\n  git diff --cached -- go.mod go.sum\n  git commit -m \"chore: update Go modules\"\n  git push", errModuleFilesChanged)
+	}
+	return nil
 }
 
 func runCommand(ctx context.Context, name string, args ...string) (string, error) {
@@ -660,7 +700,11 @@ func main() {
 		assumeYes: os.Getenv("UPDATE_DEPENDENCIES_ASSUME_YES") == "1",
 	}
 	if err := u.update(context.Background()); err != nil {
-		fmt.Fprintf(os.Stderr, "update-dependencies: %v\nChanges already applied are retained; review git diff before retrying.\n", err)
+		if errors.Is(err, errModuleFilesChanged) {
+			fmt.Fprintf(os.Stderr, "update-dependencies: %v\n", err)
+		} else {
+			fmt.Fprintf(os.Stderr, "update-dependencies: %v\nChanges already applied are retained; review git diff before retrying.\n", err)
+		}
 		os.Exit(1)
 	}
 }
